@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#252b29">
+  <title>Player Terminal | Fieldbook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b23;
+      --lcd: #c7d0b4;
+      --lcd-bright: #d7dfc7;
+      --line: #7d8973;
+      --muted: #596851;
+      --dark: #252b29;
+      --case: #39423d;
+      --case-edge: #69716b;
+      --amber: #d6a64a;
+      --red: #a94135;
+      --green: #526946;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --sans: "Bahnschrift", "Arial Narrow", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--dark);
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 1000px; min-height: 100vh; margin: 0; padding: 28px 30px 34px; background: radial-gradient(ellipse at 50% 0%, #46504a, #252b29 70%); }
+    button { font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 3px solid #d5b86b; outline-offset: 3px; }
+    .masthead { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto 14px; color: #e2e8de; }
+    .masthead strong { display: block; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; }
+    .masthead small { display: block; margin-top: 4px; color: #aeb8ac; font: 9px var(--mono); text-transform: uppercase; }
+    .preview-link { color: #c9d4c2; font: 9px var(--mono); text-transform: uppercase; }
+    .device { position: relative; max-width: 1120px; min-height: 720px; margin: 0 auto; padding: 20px; border: 2px solid var(--case-edge); border-radius: 8px; background: linear-gradient(145deg, #56615b, #333b37 20%, #414b45 80%, #29312d); box-shadow: inset 0 1px #ffffff45, inset 0 -4px #151b18, 0 12px 30px #11171480; }
+    .screw { position: absolute; top: 10px; width: 9px; height: 9px; border: 1px solid #202723; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #c1c7bd, #657067 65%, #303934 66%); }
+    .screw.left { left: 10px; }.screw.right { right: 10px; }
+    .device-top { display: flex; align-items: center; justify-content: space-between; min-height: 30px; padding: 0 7px 12px; color: #e3e7dd; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .link-state { display: inline-flex; align-items: center; gap: 8px; color: #d6be82; }
+    .link-dot { width: 7px; height: 7px; border-radius: 50%; background: #8faa7e; box-shadow: 0 0 0 3px #8faa7e24; }
+    .lcd { min-height: 545px; padding: 20px 24px; border: 3px solid #171d19; color: var(--ink); background: var(--lcd); box-shadow: inset 0 0 24px #35452c33; }
+    .lcd-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 15px; border-bottom: 2px solid #586650; }
+    .lcd-header h1 { margin: 5px 0 0; font: 700 24px/1.05 var(--mono); letter-spacing: .02em; text-transform: uppercase; }
+    .eyebrow { color: var(--muted); font: 9px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+    .header-meta { display: flex; align-items: center; gap: 20px; text-align: right; }
+    .header-meta strong { display: block; margin-top: 4px; font: 11px var(--mono); }
+    .signal-bars { display: flex; align-items: end; gap: 3px; height: 25px; padding-left: 12px; border-left: 1px solid #89957f; }
+    .signal-bars i { width: 5px; border: 1px solid #485b43; background: #526946; }
+    .signal-bars i:nth-child(1) { height: 7px; }.signal-bars i:nth-child(2) { height: 12px; }.signal-bars i:nth-child(3) { height: 18px; }.signal-bars i:nth-child(4) { height: 24px; }
+    .player-panel { display: none; min-height: 445px; padding-top: 18px; }
+    .player-panel.active { display: block; }
+    .sitrep-grid { display: grid; grid-template-columns: minmax(0, 1fr) 205px; gap: 20px; }
+    .dispatch { min-height: 166px; padding: 16px 18px; border-left: 4px solid #75866a; background: var(--lcd-bright); }
+    .dispatch-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .dispatch-title strong { font: 10px var(--mono); text-transform: uppercase; }
+    .dispatch-stamp { padding: 4px 7px; border: 1px solid #62765c; color: #42583e; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch p { max-width: 680px; margin: 15px 0 0; font: 19px/1.45 var(--sans); }
+    .status-stack { display: grid; gap: 9px; }
+    .status-readout { padding: 12px 13px; border: 1px solid #89957f; background: #cdd6bd; }
+    .status-readout strong { display: block; margin-top: 6px; font: 13px var(--mono); text-transform: uppercase; }
+    .status-readout.alert { border-color: #aa6857; background: #e5d7c6; }
+    .status-readout.alert strong { color: #923d31; }
+    .route-heading { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0 8px; }
+    .route-strip { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; align-items: center; padding: 13px 15px; border: 1px solid #89957f; background: #d0d8c3; }
+    .route-point strong { display: block; font: 11px var(--mono); text-transform: uppercase; }
+    .route-point small { display: block; margin-top: 4px; color: #58664f; font: 8px var(--mono); text-transform: uppercase; }
+    .route-point.current strong { color: var(--red); }
+    .route-track { border-top: 2px dashed #7c896d; }
+    .info-ribbon { display: flex; justify-content: space-between; gap: 18px; margin-top: 15px; padding-top: 10px; border-top: 1px solid #929c87; color: #4c5c4d; font: 9px var(--mono); text-transform: uppercase; }
+    .inventory-layout { display: grid; grid-template-columns: minmax(0, 1fr) 225px; gap: 20px; }
+    .list-heading { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 8px; }
+    .list-heading h2 { margin: 4px 0 0; font: 700 16px var(--mono); text-transform: uppercase; }
+    .item-table { border-top: 2px solid #596650; }
+    .item-row { display: grid; grid-template-columns: minmax(0,1fr) 100px 105px 105px; align-items: center; gap: 8px; min-height: 56px; padding: 0 8px; border-bottom: 1px solid #9aa38f; }
+    .item-row.selected { background: #dce4d0; }
+    .item-select { display: block; width: 100%; min-width: 0; padding: 0 0 0 7px; border: 0; border-left: 2px solid transparent; color: inherit; background: transparent; text-align: left; }
+    .item-select[aria-pressed="true"] { border-left-color: #526946; }
+    .item-select:focus-visible { outline-offset: 1px; }
+    .item-name { font-size: 12px; font-weight: 700; }
+    .item-name small { display: block; margin-top: 4px; color: #5e6a56; font: 8px var(--mono); text-transform: uppercase; }
+    .quantity-control { display: grid; grid-template-columns: 25px minmax(22px,1fr) 25px; align-items: center; gap: 3px; }
+    .quantity-control button { width: 25px; height: 27px; padding: 0; border: 1px solid #89947f; border-radius: 2px; color: #2b382d; background: #dce3d0; font: 14px var(--mono); }
+    .quantity-control button:disabled { cursor: not-allowed; opacity: .48; }
+    .item-qty { display: block; min-width: 22px; text-align: center; font: 12px var(--mono); }
+    .item-button { min-height: 29px; padding: 0 9px; border: 1px solid #738069; border-radius: 2px; color: #26342a; background: linear-gradient(#dce3d0, #bdc9ad); font: 9px var(--mono); text-transform: uppercase; box-shadow: inset 0 1px #ffffff98; }
+    .item-button:hover { background: #e4e9db; }
+    .ledger-note { min-height: 100%; padding: 14px; border: 1px solid #87937c; background: #d2dac5; }
+    .ledger-note strong { display: block; margin: 8px 0; font: 11px var(--mono); text-transform: uppercase; }
+    .ledger-note p { margin: 0; color: #4e5e4d; font-size: 11px; line-height: 1.5; }
+    .item-record { display: grid; gap: 0; margin: 11px 0; border-top: 1px solid #aeb8a5; }
+    .item-record div { padding: 8px 0; border-bottom: 1px solid #aeb8a5; }
+    .item-record strong { margin: 4px 0 0; font: 9px/1.4 var(--mono); }
+    .record-note { margin-top: 10px !important; }
+    .inventory-source-note { display: flex; align-items: start; gap: 9px; margin: 0 0 11px; padding: 9px 11px; border: 1px solid #a68a50; color: #524a34; background: #e5dfc7; font-size: 10px; line-height: 1.4; }
+    .inventory-source-note strong { flex: 0 0 auto; font: 9px var(--mono); text-transform: uppercase; }
+    .proposal-list { display: grid; gap: 7px; margin-top: 12px; }
+    .proposal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 14px; padding: 10px; border: 1px dashed #98794a; background: #e8e0ca; }
+    .proposal-card strong { display: block; font-size: 11px; }
+    .proposal-card p { margin: 4px 0 0; color: #58614e; font-size: 10px; line-height: 1.4; }
+    .proposal-card small { color: #66583b; font: 8px var(--mono); text-transform: uppercase; }
+    .proposal-status { grid-column: 1 / -1; color: #8d5c22; font: 8px var(--mono); text-transform: uppercase; }
+    dialog { width: min(580px, calc(100vw - 36px)); padding: 0; border: 2px solid #48564b; border-radius: 4px; color: var(--ink); background: var(--lcd); box-shadow: 0 18px 55px #111714a8; }
+    dialog::backdrop { background: #111714c7; }
+    .dialog-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; padding: 17px 19px; border-bottom: 1px solid var(--line); background: #d7dfc7; }
+    .dialog-head h2 { margin: 5px 0 0; font: 700 17px var(--mono); text-transform: uppercase; }
+    .dialog-form { display: grid; gap: 12px; padding: 17px 19px 19px; }
+    .dialog-notice { margin: 0; color: #5a5b45; font-size: 10px; line-height: 1.45; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: #52604d; font: 9px var(--mono); text-transform: uppercase; }
+    .field input, .field textarea, .field select { width: 100%; min-height: 36px; padding: 8px 9px; border: 1px solid #929c87; border-radius: 2px; color: #202b23; background: #edf0e7; font: 11px var(--sans); }
+    .field textarea { min-height: 75px; resize: vertical; line-height: 1.4; }
+    .dialog-actions { display: flex; justify-content: end; gap: 8px; padding-top: 3px; }
+    .dialog-button { min-height: 34px; padding: 0 12px; border: 1px solid #6f7b69; border-radius: 2px; color: #27342a; background: #d8dfce; font: 9px var(--mono); text-transform: uppercase; }
+    .dialog-button.primary { border-color: #394b3b; color: #f0f3e8; background: #405642; }
+    .dialog-feedback { min-height: 15px; margin: 8px 0 0; color: #73531f; font: 9px var(--mono); }
+    .character-record { display: grid; gap: 12px; }
+    .character-identity { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 20px; padding: 14px 16px; border: 1px solid #89957f; background: #d1d9c4; }
+    .character-identity h2 { margin: 4px 0 3px; font: 700 22px var(--mono); text-transform: uppercase; }
+    .character-role { color: #53614c; font: 9px var(--mono); text-transform: uppercase; }
+    .character-facts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 13px; }
+    .character-fact { padding: 8px 10px; border-top: 2px solid #69765f; background: #dfe5d4; }
+    .character-fact strong { display: block; margin-top: 4px; font: 10px var(--mono); text-transform: uppercase; }
+    .character-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 12px; }
+    .character-block { min-width: 0; padding: 12px 14px; border: 1px solid #89957f; background: #d7dfca; }
+    .character-block.skills { grid-column: 1 / -1; }
+    .character-block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid #aeb8a5; }
+    .character-block-head strong { font: 10px var(--mono); text-transform: uppercase; }
+    .character-attributes { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; padding-top: 9px; }
+    .character-attribute { padding: 8px; border: 1px solid #b2bbaa; background: #e3e8da; }
+    .character-attribute b { display: block; margin-top: 7px; color: #626f5e; font: 14px var(--mono); }
+    .capacity-list { display: grid; gap: 0; }
+    .capacity-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 39px; border-bottom: 1px solid #aeb8a5; }
+    .capacity-row:last-child { border-bottom: 0; }
+    .capacity-row span { font-size: 10px; }
+    .capacity-row strong { color: #596850; font: 9px var(--mono); text-align: right; text-transform: uppercase; }
+    .character-placeholder { margin: 10px 0 0; color: #5b6855; font: 9px/1.45 var(--mono); }
+    .skills-placeholder { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 10px; color: #54614e; font-size: 10px; }
+    .character-actions { display: flex; align-items: center; justify-content: end; gap: 7px; }
+    .character-actions .item-button { min-width: 103px; }
+    .character-value { display: block; width: 100%; min-height: 28px; margin-top: 5px; padding: 4px 5px; border: 1px solid transparent; color: #626f5e; background: transparent; font: 13px var(--mono); }
+    .character-value:not(:disabled) { border-color: #839077; color: #26342a; background: #f0f2e9; }
+    .character-value:disabled { opacity: 1; }
+    .character-skills-input { width: 100%; min-height: 54px; margin-top: 9px; padding: 8px; border: 1px solid transparent; color: #445344; background: transparent; font: 10px/1.4 var(--sans); resize: vertical; }
+    .character-skills-input:not(:disabled) { border-color: #839077; background: #f0f2e9; }
+    .character-proposal-list { display: grid; gap: 7px; }
+    .character-proposal-list:empty { display: none; }
+    .character-review-status { margin: 0; color: #745a27; font: 9px/1.45 var(--mono); }
+    .read-only-stamp { padding: 6px 8px; border: 1px solid #69775f; color: #475841; font: 8px var(--mono); text-align: center; text-transform: uppercase; }
+    .dispatch-console { display: grid; grid-template-columns: 255px minmax(0,1fr); gap: 12px; min-height: 390px; }
+    .dispatch-index { border: 1px solid #89957f; background: #d7dfca; }
+    .dispatch-index-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 12px; border-bottom: 1px solid #aeb8a5; }
+    .dispatch-index-head strong { display: block; margin-top: 4px; font: 10px var(--mono); text-transform: uppercase; }
+    .dispatch-select { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; width: 100%; gap: 8px; padding: 12px; border: 0; border-bottom: 1px solid #aeb8a5; color: var(--ink); background: transparent; text-align: left; }
+    .dispatch-select:hover { background: #e4e9dc; }
+    .dispatch-select[aria-current="true"] { box-shadow: inset 3px 0 #53694c; background: #e1e7d8; }
+    .dispatch-select strong { display: block; font: 700 10px/1.35 var(--mono); text-transform: uppercase; }
+    .dispatch-select small { display: block; margin-top: 6px; color: #5d6955; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-select .dispatch-stamp { white-space: nowrap; }
+    .message-state { align-self: start; padding: 4px 6px; border: 1px solid #78846e; color: #53614c; background: #e4e9dc; font: 8px var(--mono); white-space: nowrap; text-transform: uppercase; }
+    .message-state.new { border-color: #a47737; color: #775425; background: #eee3c9; }
+    .dispatch-detail { display: flex; flex-direction: column; min-width: 0; padding: 15px 17px; border: 1px solid #89957f; background: #d2dac5; }
+    .dispatch-detail-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding-bottom: 11px; border-bottom: 1px solid #aab49f; }
+    .dispatch-detail-actions { display: flex; align-items: center; gap: 8px; }
+    .dispatch-delete { min-height: 28px; padding: 0 8px; border: 1px solid #a0776a; border-radius: 2px; color: #8d4035; background: #e5d7c6; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-delete:hover { background: #f0dfd0; }
+    .dispatch-detail h2 { margin: 4px 0 0; font: 700 16px var(--mono); text-transform: uppercase; }
+    .dispatch-meta { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 11px 0; border-bottom: 1px solid #aab49f; }
+    .dispatch-meta strong { display: block; margin-top: 4px; font: 9px var(--mono); text-transform: uppercase; }
+    .dispatch-message { max-width: 670px; margin: 19px 0; font: 18px/1.55 var(--sans); }
+    .dispatch-detail-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 10px; border-top: 1px solid #aab49f; color: #566450; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-feedback { min-height: 14px; margin: 8px 0 0; color: #73531f; font: 8px var(--mono); }
+    .device-controls { margin-top: 14px; padding: 0 1px; color: #dbe1d8; }
+    .control-label { display: flex; align-items: center; justify-content: space-between; margin: 0 3px 7px; font: 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .action-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 118px; gap: 8px; }
+    .action-button { display: flex; align-items: center; justify-content: center; min-height: 53px; gap: 9px; border: 1px solid #171e1a; border-radius: 3px; color: #e8eee6; background: linear-gradient(180deg, #505b54, #303a34); font: 10px var(--mono); text-transform: uppercase; box-shadow: inset 0 1px #ffffff35, 0 2px 0 #161c18; }
+    .action-button:hover:not(:disabled) { background: linear-gradient(180deg, #647066, #3c493f); }
+    .action-button[aria-current="page"] { border-color: #c8d39e; color: #fff; background: linear-gradient(180deg, #586c54, #344a39); box-shadow: inset 0 0 0 1px #d0dba254, 0 2px 0 #161c18; }
+    .action-number { color: #c7d3b6; font-size: 9px; }
+    .action-button.menu { color: #adb6ac; border-style: dashed; background: #303733; box-shadow: inset 0 1px #ffffff12; }
+    .action-button:disabled { cursor: not-allowed; opacity: .78; }
+    .hardware-foot { display: flex; justify-content: space-between; gap: 14px; margin-top: 11px; color: #abb5aa; font: 8px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+    .disclaimer { max-width: 1120px; margin: 15px auto 0; color: #bac3b8; font: 10px/1.5 var(--mono); }
+    .disclaimer a { color: #d4dfca; }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div><strong>Fieldbook / Player terminal</strong><small>Selected direction / radio handset</small></div>
+    <a class="preview-link" href="/player-interface-concepts.html">Open four-concept comparison</a>
+  </header>
+  <main class="device">
+    <span class="screw left" aria-hidden="true"></span><span class="screw right" aria-hidden="true"></span>
+    <div class="device-top"><span>Portable field terminal / operator Lena Fors / seat 02</span><span class="link-state"><i class="link-dot"></i>Local preview / link stable</span></div>
+    <section class="lcd" aria-live="polite">
+      <header class="lcd-header">
+        <div><span class="eyebrow">The Long Road / campaign copy 02</span><h1 id="screen-title">Situation report</h1></div>
+        <div class="header-meta"><div><span class="eyebrow">Campaign date</span><strong>11 MAY 2000 / DAY 14</strong></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
+      </header>
+      <section class="player-panel active" data-panel="situation" aria-label="Situation report">
+        <div class="sitrep-grid">
+          <article class="dispatch"><div class="dispatch-title"><strong>GM-published dispatch / Dalarna sector</strong><span class="dispatch-stamp">Current</span></div><p>North bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.</p></article>
+          <div class="status-stack"><div class="status-readout"><span class="eyebrow">Column position</span><strong>Vansbro / Route 26</strong></div><div class="status-readout"><span class="eyebrow">Weather</span><strong>Cold rain</strong></div><div class="status-readout alert"><span class="eyebrow">Road notice</span><strong>Bridge unknown</strong></div></div>
+        </div>
+        <div class="route-heading"><span class="eyebrow">Northbound route / published</span><span class="eyebrow">86 km logged</span></div>
+        <div class="route-strip"><div class="route-point"><strong>Sälen</strong><small>Departure</small></div><i class="route-track"></i><div class="route-point current"><strong>Vansbro</strong><small>Current position</small></div><i class="route-track"></i><div class="route-point"><strong>Mora</strong><small>Next waypoint</small></div></div>
+        <div class="info-ribbon"><span>Published by campaign control / 07:55</span><span>Player view / GM-selected information</span></div>
+      </section>
+      <section class="player-panel" data-panel="inventory" aria-label="Personal inventory" hidden>
+        <div class="inventory-layout">
+          <div>
+            <div class="list-heading">
+              <div><span class="eyebrow">Assigned inventory / Lena Fors</span><h2>Personal inventory</h2><span class="eyebrow">Select an item to inspect its record</span></div>
+              <button class="item-button" type="button" data-open-proposal>Propose item or data</button>
+            </div>
+            <div class="inventory-source-note"><strong>Source categories</strong><span>RB / rule book &nbsp; GM / GM-defined &nbsp; UF / unverified. Player-selected categories are claims only; the GM must verify them. Sample entries below are UF. Carrying effects are not calculated without verified item weights and capacity rules.</span></div>
+            <div class="item-table" aria-label="Illustrative personal inventory">
+              <div class="item-row selected" data-item-id="ration"><button class="item-select" type="button" data-item-select="ration" aria-pressed="true"><span class="item-name">Field ration<small>UF / Unverified</small></span></button><div class="quantity-control" role="group" aria-label="Field ration quantity"><button type="button" data-quantity-step="-1" aria-label="Remove one field ration" disabled>−</button><output class="item-qty" aria-label="Field ration quantity">02</output><button type="button" data-quantity-step="1" aria-label="Add one field ration">+</button></div><button class="item-button" type="button">Use item</button><button class="item-button" type="button">Transfer</button></div>
+              <div class="item-row" data-item-id="bandage"><button class="item-select" type="button" data-item-select="bandage" aria-pressed="false"><span class="item-name">Bandage pack<small>UF / Unverified</small></span></button><div class="quantity-control" role="group" aria-label="Bandage pack quantity"><button type="button" data-quantity-step="-1" aria-label="Remove one bandage pack">−</button><output class="item-qty" aria-label="Bandage pack quantity">01</output><button type="button" data-quantity-step="1" aria-label="Add one bandage pack">+</button></div><button class="item-button" type="button">Use item</button><button class="item-button" type="button">Transfer</button></div>
+              <div class="item-row" data-item-id="flashlight"><button class="item-select" type="button" data-item-select="flashlight" aria-pressed="false"><span class="item-name">Flashlight<small>UF / Unverified</small></span></button><div class="quantity-control" role="group" aria-label="Flashlight quantity"><button type="button" data-quantity-step="-1" aria-label="Remove one flashlight">−</button><output class="item-qty" aria-label="Flashlight quantity">01</output><button type="button" data-quantity-step="1" aria-label="Add one flashlight">+</button></div><button class="item-button" type="button" data-inspect-item="flashlight">Inspect</button><button class="item-button" type="button">Transfer</button></div>
+            </div>
+            <div class="proposal-list" id="proposal-list" aria-live="polite"></div>
+            <p class="dialog-feedback" id="proposal-feedback" role="status">Player-submitted items and data stay pending until GM verification and acceptance.</p>
+          </div>
+          <aside class="ledger-note" aria-live="polite"><span class="eyebrow">Personal record / selected item</span><strong id="record-item-name">Field ration</strong><div class="item-record"><div><span class="eyebrow">Item class</span><strong id="record-item-class">Consumable / sample record</strong></div><div><span class="eyebrow">Quantity</span><strong id="record-item-quantity">02</strong></div><div><span class="eyebrow">Source category</span><strong id="record-item-category">UF / Unverified</strong></div><div><span class="eyebrow">Fourth Edition source</span><strong id="record-item-source">No verified citation</strong></div><div><span class="eyebrow">Carrying effects</span><strong id="record-carry-status">Not calculated / rule data missing</strong></div></div><p class="record-note" id="record-item-note">No Fourth Edition mechanics or verified weight are recorded for this illustrative entry.</p></aside>
+        </div>
+      </section>
+      <section class="player-panel" data-panel="character" aria-label="Character record" hidden>
+        <div class="character-record">
+          <section class="character-identity"><div><span class="eyebrow">Assigned character / player seat 02</span><h2>Lena Fors</h2><span class="character-role">Scout / The Long Road</span><div class="character-facts"><div class="character-fact"><span class="eyebrow">Campaign</span><strong>Dalarna</strong></div><div class="character-fact"><span class="eyebrow">Current location</span><strong>Vansbro</strong></div><div class="character-fact"><span class="eyebrow">Travel day</span><strong>14</strong></div></div></div><div class="character-actions"><button class="item-button" type="button" data-edit-character>Edit values</button><button class="item-button" type="button" data-send-character disabled>Send to GM</button></div></section>
+          <div class="character-grid">
+            <section class="character-block"><div class="character-block-head"><strong>Attributes</strong><span class="eyebrow">GM record / not linked</span></div><div class="character-attributes"><label class="character-attribute"><span class="eyebrow">Strength</span><input class="character-value" type="text" name="Strength" data-character-input placeholder="Not set" disabled></label><label class="character-attribute"><span class="eyebrow">Agility</span><input class="character-value" type="text" name="Agility" data-character-input placeholder="Not set" disabled></label><label class="character-attribute"><span class="eyebrow">Intelligence</span><input class="character-value" type="text" name="Intelligence" data-character-input placeholder="Not set" disabled></label><label class="character-attribute"><span class="eyebrow">Empathy</span><input class="character-value" type="text" name="Empathy" data-character-input placeholder="Not set" disabled></label></div><p class="character-placeholder">Enter proposed values for GM review. The accepted character record is not changed here.</p></section>
+            <section class="character-block"><div class="character-block-head"><strong>Derived capacities</strong><span class="eyebrow">Rules calculation</span></div><div class="capacity-list"><div class="capacity-row"><span>Hit capacity</span><strong>Not calculated</strong></div><div class="capacity-row"><span>Stress capacity</span><strong>Not calculated</strong></div></div><p class="character-placeholder">Requires verified Fourth Edition attributes and calculation procedures.</p></section>
+            <section class="character-block skills"><div class="character-block-head"><strong>Skills and specialties</strong><span class="eyebrow">Player-editable / GM approval required</span></div><textarea class="character-skills-input" name="Skills and specialties" data-character-input placeholder="No assigned values / enter a proposed change" disabled></textarea></section>
+          </div>
+          <div class="character-proposal-list" id="character-proposal-list" aria-live="polite"></div>
+          <p class="character-review-status" id="character-review-status" role="status">Changes require GM approval. Sending a request does not update the accepted character record.</p>
+        </div>
+      </section>
+      <section class="player-panel" data-panel="dispatches" aria-label="Published dispatches" hidden>
+        <div class="dispatch-console">
+          <aside class="dispatch-index" aria-label="Published dispatch list">
+            <div class="dispatch-index-head"><div><span class="eyebrow">Player mailbox / seat 02</span><strong>Dispatch archive</strong></div><span class="dispatch-stamp" id="dispatch-count">02</span></div>
+            <button class="dispatch-select" type="button" data-dispatch-id="bridge" aria-current="true"><span><strong>North bridge / Vansbro</strong><small>11 May 2000 / 07:55</small></span><span class="message-state new" data-message-state>NEW / UNREAD</span></button>
+            <button class="dispatch-select" type="button" data-dispatch-id="movement" aria-current="false"><span><strong>Column movement</strong><small>10 May 2000 / 18:20</small></span><span class="message-state" data-message-state>READ</span></button>
+          </aside>
+          <article class="dispatch-detail" aria-live="polite">
+            <header class="dispatch-detail-head"><div><span class="eyebrow" id="dispatch-sector">GM-published / Dalarna sector</span><h2 id="dispatch-title">North bridge / Vansbro</h2></div><div class="dispatch-detail-actions"><span class="message-state new" id="dispatch-status">NEW / UNREAD</span><button class="dispatch-delete" type="button" data-delete-dispatch>Delete</button></div></header>
+            <div class="dispatch-meta"><div><span class="eyebrow">Date</span><strong id="dispatch-date">11 May 2000</strong></div><div><span class="eyebrow">Time sent</span><strong id="dispatch-time">07:55</strong></div><div><span class="eyebrow">Recipient</span><strong>Player seat 02</strong></div></div>
+            <p class="dispatch-message" id="dispatch-message">Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.</p>
+            <footer class="dispatch-detail-foot"><span>Published by campaign control</span><span>Player copy / read only</span></footer>
+            <p class="dispatch-feedback" id="dispatch-feedback" role="status">Delete removes this copy from your inbox only; the GM archive is unchanged.</p>
+          </article>
+        </div>
+      </section>
+    </section>
+    <nav class="device-controls" aria-label="Player quick access">
+      <div class="control-label"><span>Direct access / player controls</span><span>MENU / reserved</span></div>
+      <div class="action-bar">
+        <button class="action-button" type="button" data-target="situation" data-title="Situation report" aria-current="page"><span class="action-number">01</span>Sitrep</button>
+        <button class="action-button" type="button" data-target="inventory" data-title="Personal inventory"><span class="action-number">02</span>Inventory</button>
+        <button class="action-button" type="button" data-target="character" data-title="Character record"><span class="action-number">03</span>Character</button>
+        <button class="action-button" type="button" data-target="dispatches" data-title="COMMS"><span class="action-number">04</span>COMMS</button>
+        <button class="action-button menu" type="button" disabled title="Reserved for future features"><span>MENU</span></button>
+      </div>
+    </nav>
+    <div class="hardware-foot"><span>Player terminal / campaign information controlled by GM</span><span>Fourth Edition rules actions require source verification</span></div>
+  </main>
+  <dialog id="item-proposal-dialog" aria-labelledby="proposal-title">
+    <div class="dialog-head"><div><span class="eyebrow">Player inventory / pending review</span><h2 id="proposal-title">Propose item or item data</h2></div><button class="dialog-button" type="button" data-close-proposal>Close</button></div>
+    <form class="dialog-form" id="item-proposal-form">
+      <p class="dialog-notice">This submits a proposal only. The item will not enter your inventory until the GM verifies the data and accepts it.</p>
+      <div class="form-grid">
+        <div class="field"><label for="proposal-kind">Proposal type</label><select id="proposal-kind" name="kind"><option>New item</option><option>Update item data</option></select></div>
+        <div class="field"><label for="proposal-name">Item name</label><input id="proposal-name" name="name" maxlength="70" required></div>
+        <div class="field full"><label for="proposal-data">Proposed item data</label><textarea id="proposal-data" name="data" maxlength="800" required placeholder="Describe the item or the data change you are suggesting."></textarea></div>
+        <div class="field"><label for="proposal-source-category">Source category</label><select id="proposal-source-category" name="sourceCategory"><option value="UF">UF / Unverified</option><option value="RB">RB / Rule book</option><option value="GM">GM / GM-defined</option></select></div>
+        <div class="field"><label for="proposal-source">Source reference, if known</label><input id="proposal-source" name="source" maxlength="120" placeholder="Book and page or GM note"></div>
+      </div>
+      <div class="dialog-actions"><button class="dialog-button" type="button" data-close-proposal>Cancel</button><button class="dialog-button primary" type="submit">Submit for GM review</button></div>
+    </form>
+  </dialog>
+  <p class="disclaimer">Visual prototype only: quantity controls and character change requests stay in this preview; player authentication, GM delivery, campaign persistence, encumbrance penalties, and dice resolution are not connected. <a href="https://www.bing.com/images/search?q=military+communications+equipment+field+radio+handset+display" target="_blank" rel="noreferrer">Visual reference: field handsets and radio displays</a></p>
+  <script>
+    const buttons = [...document.querySelectorAll(".action-button[data-target]")];
+    const panels = [...document.querySelectorAll(".player-panel")];
+    const title = document.querySelector("#screen-title");
+    const proposalDialog = document.querySelector("#item-proposal-dialog");
+    const proposalForm = document.querySelector("#item-proposal-form");
+    const proposalList = document.querySelector("#proposal-list");
+    const proposalFeedback = document.querySelector("#proposal-feedback");
+    const itemSelectButtons = [...document.querySelectorAll("[data-item-select]")];
+    const quantityButtons = [...document.querySelectorAll("[data-quantity-step]")];
+    const characterInputs = [...document.querySelectorAll("[data-character-input]")];
+    const editCharacterButton = document.querySelector("[data-edit-character]");
+    const sendCharacterButton = document.querySelector("[data-send-character]");
+    const characterProposalList = document.querySelector("#character-proposal-list");
+    const characterReviewStatus = document.querySelector("#character-review-status");
+    const dispatchButtons = [...document.querySelectorAll("[data-dispatch-id]")];
+    const deleteDispatchButton = document.querySelector("[data-delete-dispatch]");
+    const dispatchFeedback = document.querySelector("#dispatch-feedback");
+    const dispatchRecords = {
+      bridge: { sector: "GM-published / Dalarna sector", title: "North bridge / Vansbro", date: "11 May 2000", time: "07:55", message: "Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.", isNew: true, isRead: false },
+      movement: { sector: "GM-published / Dalarna sector", title: "Column movement", date: "10 May 2000", time: "18:20", message: "Vehicles reached the southern approach before nightfall. Road remains passable through the next waypoint.", isNew: false, isRead: true }
+    };
+    let selectedDispatchId = "bridge";
+    const itemRecords = {
+      ration: { name: "Field ration", itemClass: "Consumable / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." },
+      bandage: { name: "Bandage pack", itemClass: "Medical supply / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." },
+      flashlight: { name: "Flashlight", itemClass: "Equipment / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." }
+    };
+    let proposalNumber = 0;
+    let characterProposalNumber = 0;
+    let characterEditBaseline = new Map();
+
+    function updateCharacterSendState() {
+      const hasChanges = characterInputs.some((input) => input.value.trim() !== characterEditBaseline.get(input.name));
+      sendCharacterButton.disabled = !hasChanges;
+    }
+
+    function setCharacterEditing(editing) {
+      if (editing) {
+        characterEditBaseline = new Map(characterInputs.map((input) => [input.name, input.value.trim()]));
+        characterInputs.forEach((input) => { input.disabled = false; });
+        editCharacterButton.textContent = "Cancel edit";
+        sendCharacterButton.disabled = true;
+        characterReviewStatus.textContent = "Draft only. The accepted character record remains unchanged.";
+        characterInputs[0].focus();
+        return;
+      }
+
+      characterInputs.forEach((input) => {
+        input.value = characterEditBaseline.get(input.name) || "";
+        input.disabled = true;
+      });
+      editCharacterButton.textContent = "Edit values";
+      sendCharacterButton.disabled = true;
+      characterReviewStatus.textContent = "Changes require GM approval. Sending a request does not update the accepted character record.";
+    }
+
+    editCharacterButton.addEventListener("click", () => {
+      setCharacterEditing(characterInputs.some((input) => !input.disabled) ? false : true);
+    });
+    characterInputs.forEach((input) => input.addEventListener("input", updateCharacterSendState));
+    sendCharacterButton.addEventListener("click", () => {
+      const changes = characterInputs
+        .filter((input) => input.value.trim() !== characterEditBaseline.get(input.name))
+        .map((input) => ({ field: input.name, value: input.value.trim() }));
+      if (!changes.length) return;
+
+      characterProposalNumber += 1;
+      const card = document.createElement("article");
+      card.className = "proposal-card";
+      const summary = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = `Character update request ${String(characterProposalNumber).padStart(2, "0")}`;
+      summary.append(title);
+      changes.forEach((change) => {
+        const detail = document.createElement("p");
+        detail.textContent = `${change.field}: ${change.value}`;
+        summary.append(detail);
+      });
+      const status = document.createElement("span");
+      status.className = "dispatch-stamp";
+      status.textContent = "Pending GM";
+      const review = document.createElement("div");
+      review.className = "proposal-status";
+      review.textContent = "Pending GM review / accepted character data unchanged";
+      card.append(summary, status, review);
+      characterProposalList.prepend(card);
+      setCharacterEditing(false);
+      characterReviewStatus.textContent = "Saved in this preview only; not delivered to a GM service.";
+    });
+
+    function renderDispatchStatus(button, record) {
+      const state = button.querySelector("[data-message-state]");
+      const label = record.isNew ? "NEW / UNREAD" : record.isRead ? "READ" : "UNREAD";
+      state.textContent = label;
+      state.classList.toggle("new", record.isNew);
+    }
+
+    function selectDispatch(messageId, markRead = true) {
+      const record = dispatchRecords[messageId];
+      const button = dispatchButtons.find((item) => item.dataset.dispatchId === messageId && item.isConnected);
+      if (!record || !button) return;
+      selectedDispatchId = messageId;
+      if (markRead) {
+        record.isRead = true;
+        record.isNew = false;
+      }
+      dispatchButtons.forEach((item) => {
+        if (!item.isConnected) return;
+        item.setAttribute("aria-current", String(item === button));
+        renderDispatchStatus(item, dispatchRecords[item.dataset.dispatchId]);
+      });
+      document.querySelector("#dispatch-sector").textContent = record.sector;
+      document.querySelector("#dispatch-title").textContent = record.title;
+      const detailStatus = document.querySelector("#dispatch-status");
+      detailStatus.textContent = record.isNew ? "NEW / UNREAD" : record.isRead ? "READ" : "UNREAD";
+      detailStatus.classList.toggle("new", record.isNew);
+      document.querySelector("#dispatch-date").textContent = record.date;
+      document.querySelector("#dispatch-time").textContent = record.time;
+      document.querySelector("#dispatch-message").textContent = record.message;
+      deleteDispatchButton.disabled = false;
+    }
+
+    dispatchButtons.forEach((button) => {
+      renderDispatchStatus(button, dispatchRecords[button.dataset.dispatchId]);
+      button.addEventListener("click", () => selectDispatch(button.dataset.dispatchId));
+    });
+    deleteDispatchButton.addEventListener("click", () => {
+      if (!selectedDispatchId || !dispatchRecords[selectedDispatchId]) return;
+      const selectedButton = dispatchButtons.find((item) => item.dataset.dispatchId === selectedDispatchId && item.isConnected);
+      delete dispatchRecords[selectedDispatchId];
+      selectedButton?.remove();
+      const remainingButton = dispatchButtons.find((item) => item.isConnected);
+      const remainingCount = document.querySelectorAll(".dispatch-select").length;
+      document.querySelector("#dispatch-count").textContent = String(remainingCount).padStart(2, "0");
+      dispatchFeedback.textContent = "Message deleted from this player's preview inbox; GM publication is unchanged.";
+      if (remainingButton) {
+        selectDispatch(remainingButton.dataset.dispatchId, false);
+      } else {
+        selectedDispatchId = null;
+        document.querySelector("#dispatch-sector").textContent = "Player mailbox / seat 02";
+        document.querySelector("#dispatch-title").textContent = "No messages";
+        const detailStatus = document.querySelector("#dispatch-status");
+        detailStatus.textContent = "EMPTY";
+        detailStatus.classList.remove("new");
+        document.querySelector("#dispatch-date").textContent = "—";
+        document.querySelector("#dispatch-time").textContent = "—";
+        document.querySelector("#dispatch-message").textContent = "No messages remain in this preview inbox. The GM archive is unchanged.";
+        deleteDispatchButton.disabled = true;
+      }
+    });
+
+    function selectItem(itemId) {
+      const item = itemRecords[itemId];
+      const row = document.querySelector(`[data-item-id="${itemId}"]`);
+      if (!item || !row) return;
+      itemSelectButtons.forEach((button) => {
+        const selected = button.dataset.itemSelect === itemId;
+        button.setAttribute("aria-pressed", String(selected));
+        button.closest(".item-row").classList.toggle("selected", selected);
+      });
+      document.querySelector("#record-item-name").textContent = item.name;
+      document.querySelector("#record-item-class").textContent = item.itemClass;
+      document.querySelector("#record-item-quantity").textContent = row.querySelector(".item-qty").textContent.trim();
+      document.querySelector("#record-item-category").textContent = item.sourceCategory;
+      document.querySelector("#record-item-source").textContent = item.source;
+      document.querySelector("#record-item-note").textContent = item.note;
+    }
+
+    itemSelectButtons.forEach((button) => button.addEventListener("click", () => selectItem(button.dataset.itemSelect)));
+    document.querySelector("[data-inspect-item]").addEventListener("click", (event) => selectItem(event.currentTarget.dataset.inspectItem));
+    quantityButtons.forEach((button) => button.addEventListener("click", () => {
+      const row = button.closest(".item-row");
+      const quantity = row.querySelector(".item-qty");
+      const nextQuantity = Math.max(0, Number(quantity.textContent) + Number(button.dataset.quantityStep));
+      quantity.textContent = String(nextQuantity).padStart(2, "0");
+      row.querySelector('[data-quantity-step="-1"]').disabled = nextQuantity === 0;
+      if (row.querySelector("[aria-pressed='true']")) {
+        document.querySelector("#record-item-quantity").textContent = quantity.textContent;
+      }
+    }));
+
+    document.querySelector("[data-open-proposal]").addEventListener("click", () => proposalDialog.showModal());
+    document.querySelectorAll("[data-close-proposal]").forEach((button) => button.addEventListener("click", () => proposalDialog.close()));
+    proposalDialog.addEventListener("click", (event) => {
+      if (event.target === proposalDialog) proposalDialog.close();
+    });
+    proposalForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(proposalForm);
+      proposalNumber += 1;
+
+      const card = document.createElement("article");
+      card.className = "proposal-card";
+      const description = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = `${data.get("kind")}: ${data.get("name").trim()}`;
+      const details = document.createElement("p");
+      details.textContent = data.get("data").trim();
+      const source = document.createElement("small");
+      const sourceLabels = { RB: "Rule book", GM: "GM-defined", UF: "Unverified" };
+      source.textContent = `${data.get("sourceCategory")} / ${sourceLabels[data.get("sourceCategory")]} / ${data.get("source").trim() || "No reference supplied"}`;
+      const status = document.createElement("span");
+      status.className = "dispatch-stamp";
+      status.textContent = `Proposal ${String(proposalNumber).padStart(2, "0")}`;
+      const review = document.createElement("div");
+      review.className = "proposal-status";
+      review.textContent = "Pending GM verification and acceptance / inventory unchanged";
+      description.append(name, details, source);
+      card.append(description, status, review);
+      proposalList.prepend(card);
+      proposalFeedback.textContent = "Saved in this preview only; not sent to a GM or campaign data store.";
+      proposalForm.reset();
+      proposalDialog.close();
+    });
+
+    buttons.forEach((button) => button.addEventListener("click", () => {
+      const target = button.dataset.target;
+      panels.forEach((panel) => {
+        const active = panel.dataset.panel === target;
+        panel.classList.toggle("active", active);
+        panel.hidden = !active;
+      });
+      buttons.forEach((item) => {
+        if (item === button) item.setAttribute("aria-current", "page");
+        else item.removeAttribute("aria-current");
+      });
+      title.textContent = button.dataset.title;
+    }));
+  </script>
+</body>
+</html>

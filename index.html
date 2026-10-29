@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Fieldbook | Twilight: 2000 GM Desk</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --fern: #687e68;
+      --signal: #b74435;
+      --signal-pale: #efdfd8;
+      --sky: #487c87;
+      --sky-pale: #dae7e7;
+      --gold: #a97832;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--paper); }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 3px solid #82a9ad;
+      outline-offset: 2px;
+    }
+    .app-shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+    .rail {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 25px 16px 18px;
+      color: #e8eee7;
+      background: var(--forest-deep);
+      border-right: 1px solid #526158;
+      box-shadow: inset -4px 0 #111b17;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 9px 28px; }
+    .brand-mark {
+      display: grid;
+      width: 35px;
+      height: 35px;
+      place-items: center;
+      border: 1px solid #839783;
+      border-radius: 3px;
+      color: #d4dfcb;
+      font: 700 11px var(--mono);
+      letter-spacing: 0;
+      background: linear-gradient(145deg, #293d33, #1d2b24);
+      box-shadow: inset 0 1px #ffffff18, 0 2px 0 #0e1713;
+    }
+    .brand-copy { display: grid; gap: 2px; }
+    .brand-copy strong { font: 700 15px var(--serif); letter-spacing: 0; }
+    .brand-copy span { color: #a7b5a8; font: 9px var(--mono); letter-spacing: 0; text-transform: uppercase; }
+    .campaign-chip { margin: 0 8px 26px; padding: 13px 12px; border: 1px solid #43594c; border-left: 3px solid #9aaf82; border-radius: 2px; background: linear-gradient(135deg, #24372d, #1d2d25); box-shadow: inset 0 1px #ffffff0b; }
+    .eyebrow { color: var(--muted); font: 10px var(--mono); letter-spacing: 0; text-transform: uppercase; }
+    .campaign-chip .eyebrow { color: #a6b69f; }
+    .campaign-chip strong { display: block; margin-top: 7px; color: #f0f3ec; font: 17px var(--serif); }
+    .campaign-chip small { display: block; margin-top: 5px; color: #aab8a9; font: 10px var(--mono); }
+    .nav-label { padding: 0 11px 9px; color: #899a8d; font: 9px var(--mono); letter-spacing: 0; text-transform: uppercase; }
+    .nav-list { display: grid; gap: 4px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 11px;
+      padding: 11px 12px;
+      border: 0;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      color: #c5d0c4;
+      background: transparent;
+      text-align: left;
+      font-size: 13px;
+    }
+    .nav-item:hover { color: white; background: #263b30; }
+    .nav-item[aria-current="page"] { border-color: #506354; color: #fff; background: linear-gradient(90deg, #344b3d, #293d32); box-shadow: inset 3px 0 #c2cc91, inset 0 1px #ffffff12; }
+    .nav-icon { display: inline-grid; width: 18px; place-items: center; color: #a7b99f; font: 12px var(--mono); }
+    .rail-bottom { margin-top: auto; padding: 18px 9px 2px; }
+    .signal-line { display: flex; align-items: center; gap: 8px; color: #aab8a9; font: 9px var(--mono); text-transform: uppercase; }
+    .signal-dot { width: 7px; height: 7px; border-radius: 50%; background: #88a67c; box-shadow: 0 0 0 3px #304436; }
+    .rail-bottom p { margin: 10px 0 0; color: #758779; font: 10px/1.5 var(--mono); }
+
+    main { min-width: 0; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 68px;
+      gap: 16px;
+      padding: 0 34px;
+      border-bottom: 1px solid var(--line);
+      background: #e2e7df;
+      box-shadow: 0 2px 0 #aeb8ac;
+    }
+    .crumb { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 10px var(--mono); text-transform: uppercase; }
+    .crumb b { color: #a5aea3; font-weight: 400; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .date-stamp { padding-right: 14px; border-right: 1px solid var(--line); text-align: right; }
+    .date-stamp span { display: block; color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .date-stamp strong { display: block; margin-top: 4px; font: 12px var(--mono); }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      gap: 8px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f0f2ec, #dfe5dc);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px #ffffffb8, 0 1px 0 #aab4aa;
+    }
+    .button:hover { border-color: #758579; background: linear-gradient(180deg, #f8f9f4, #e5eae2); }
+    .button:active { transform: translateY(1px); box-shadow: inset 0 1px 2px #17231f28; }
+    .button-primary { border-color: #263a30; color: white; background: linear-gradient(180deg, #40594b, #2d4338); box-shadow: inset 0 1px #ffffff24, 0 1px 0 #7a8a7b; }
+    .button-primary:hover { border-color: #24382e; background: linear-gradient(180deg, #4a6654, #344c3e); }
+    .button-danger { color: var(--signal); }
+    .button-quiet { border-color: transparent; background: transparent; }
+    .button-icon { min-width: 34px; padding: 0 8px; font: 15px var(--mono); }
+    .content { width: min(1420px, 100%); margin: 0 auto; padding: 31px 34px 52px; background-image: linear-gradient(90deg, #344a4008 1px, transparent 1px), linear-gradient(#344a4008 1px, transparent 1px); background-size: 24px 24px; }
+    .view { display: none; animation: appear .24s ease-out; }
+    .view.active { display: block; }
+    @keyframes appear { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+    .page-heading h1 { margin: 6px 0 0; font: 700 34px/1.05 var(--serif); letter-spacing: 0; text-transform: uppercase; }
+    .page-heading p { max-width: 480px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .heading-tag { color: var(--signal); font: 10px var(--mono); text-transform: uppercase; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 20px; border: 1px solid #8d9b8e; background: #aab5aa; box-shadow: inset 0 1px #ffffffa8, 0 2px 0 #a3ada3; }
+    .stat { min-height: 89px; padding: 15px 19px; border-right: 1px solid var(--line); background: linear-gradient(180deg, #edf0e9, #e0e6dd); }
+    .stat:last-child { border-right: 0; }
+    .stat-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .stat-value { display: flex; align-items: baseline; gap: 7px; margin-top: 10px; font: 700 25px/1 var(--serif); }
+    .stat-value small { color: var(--muted); font: 10px var(--mono); }
+    .stat-alert .stat-value { color: var(--signal); }
+    .panel { min-width: 0; border: 1px solid #a3aea3; border-radius: 2px; background: var(--surface); box-shadow: inset 0 1px #ffffffb8, 0 2px 0 #b5beb4; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #eff1eb, #e1e7df); }
+    .panel-head h2 { margin: 0; font: 700 17px var(--serif); }
+    .panel-head .eyebrow { margin-bottom: 4px; }
+    .panel-body { padding: 16px; }
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(290px, .85fr); gap: 18px; }
+    .map-wrap { position: relative; overflow: hidden; background: #dce5d2; }
+    #field-map { display: block; width: 100%; height: 335px; }
+    .map-key { display: flex; flex-wrap: wrap; gap: 15px; padding: 11px 15px; border-top: 1px solid var(--line); color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .key-item { display: inline-flex; align-items: center; gap: 6px; }
+    .key-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); }
+    .key-mark.route { width: 14px; height: 2px; border-radius: 0; background: var(--gold); }
+    .key-mark.river { width: 14px; height: 2px; border-radius: 0; background: var(--sky); }
+    .map-caption { position: absolute; top: 12px; left: 13px; padding: 6px 8px; color: #344239; background: rgba(247, 249, 242, .84); font: 9px var(--mono); text-transform: uppercase; }
+    .side-stack { display: grid; align-content: start; gap: 18px; }
+    .alert-block { display: flex; gap: 12px; padding: 15px 16px; background: var(--signal-pale); }
+    .alert-mark { display: grid; flex: 0 0 25px; width: 25px; height: 25px; place-items: center; border: 1px solid #d59a8f; border-radius: 50%; color: var(--signal); font: 13px var(--mono); }
+    .alert-block strong { display: block; font-size: 12px; }
+    .alert-block p { margin: 5px 0 0; color: #78514b; font-size: 11px; line-height: 1.5; }
+    .route-list { display: grid; gap: 0; }
+    .route-stop { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; border-bottom: 1px solid #e8ece5; }
+    .route-stop:last-child { border-bottom: 0; }
+    .route-node { width: 9px; height: 9px; margin-left: 3px; border: 1.5px solid var(--fern); border-radius: 50%; background: var(--surface); }
+    .route-stop.current .route-node { border-color: var(--signal); background: var(--signal); box-shadow: 0 0 0 3px var(--signal-pale); }
+    .route-stop strong { font-size: 11px; font-weight: 700; }
+    .route-stop small { display: block; color: var(--muted); font: 9px var(--mono); }
+    .route-stop .distance { color: var(--muted); font: 9px var(--mono); }
+    .lower-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 18px; margin-top: 18px; }
+    .roster-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .person-row { display: flex; align-items: center; min-width: 0; gap: 10px; padding: 10px; border: 1px solid #e5e9e1; }
+    .avatar { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; color: #344b3b; background: #e3eadc; font: 11px var(--mono); }
+    .person-copy { min-width: 0; }
+    .person-copy strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .person-copy small { display: block; margin-top: 3px; color: var(--muted); font: 9px var(--mono); }
+    .status { margin-left: auto; color: #60795e; font: 9px var(--mono); text-transform: uppercase; }
+    .status.watch { color: var(--signal); }
+    .log-list { display: grid; }
+    .log-entry { display: grid; grid-template-columns: 57px minmax(0, 1fr); gap: 10px; padding: 11px 0; border-bottom: 1px solid #e8ece5; }
+    .log-entry:last-child { border-bottom: 0; }
+    .log-time { padding-top: 2px; color: var(--muted); font: 9px var(--mono); }
+    .log-entry strong { display: block; font-size: 11px; }
+    .log-entry p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .roster-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .person-card { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 15px; border: 1px solid var(--line); background: var(--surface); }
+    .person-card .avatar { width: 42px; height: 42px; font-size: 13px; }
+    .person-card h3 { margin: 1px 0 4px; font: 18px var(--serif); }
+    .person-card .role { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .person-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .person-meta span { padding: 5px 7px; border: 1px solid var(--line); color: #56635a; font: 9px var(--mono); text-transform: uppercase; }
+    .person-actions { display: flex; gap: 3px; }
+    .icon-button { display: inline-grid; width: 29px; height: 29px; place-items: center; border: 1px solid transparent; border-radius: 2px; color: var(--muted); background: transparent; font: 14px var(--mono); }
+    .icon-button:hover { border-color: var(--line); color: var(--signal); background: #fff; }
+    .section-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 28px 0 12px; }
+    .section-bar h2 { margin: 0; font: 19px var(--serif); }
+    .section-bar p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .movement-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(275px, .75fr); gap: 18px; }
+    .travel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    .travel-controls strong { font: 15px var(--serif); }
+    .stepper { display: flex; align-items: center; gap: 6px; }
+    .stepper output { min-width: 80px; text-align: center; font: 11px var(--mono); }
+    .supply-line { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid #e8ece5; }
+    .supply-line:last-child { border-bottom: 0; }
+    .supply-line strong { display: block; font-size: 11px; }
+    .supply-line small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .supply-control { display: flex; align-items: center; gap: 8px; }
+    .supply-control output { min-width: 26px; text-align: center; font: 13px var(--mono); }
+    .prompt-panel { padding: 17px; background: #e9eee4; }
+    .prompt-panel p { margin: 9px 0 14px; font: 17px/1.4 var(--serif); }
+    .note-card { padding: 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+    .note-card:last-child { border-bottom: 0; }
+    .note-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .note-top span { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .note-card h3 { margin: 9px 0 6px; font: 18px var(--serif); }
+    .note-card p { margin: 0; color: #536057; font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
+    .empty-state { padding: 38px 20px; color: var(--muted); text-align: center; font: 12px var(--mono); }
+    .inline-hint { color: var(--muted); font: 9px var(--mono); }
+    dialog { width: min(480px, calc(100vw - 28px)); padding: 0; border: 1px solid #cbd4c8; border-radius: 4px; color: var(--ink); background: var(--surface); box-shadow: 0 18px 60px #10201844; }
+    dialog::backdrop { background: #15231bb8; }
+    .dialog-head { display: flex; align-items: start; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin: 4px 0 0; font: 22px var(--serif); }
+    .dialog-form { display: grid; gap: 13px; padding: 18px 20px 20px; }
+    .field { display: grid; gap: 6px; }
+    .field label { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .field input, .field textarea, .field select { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: #fff; font-size: 12px; }
+    .field textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+    .dialog-actions { display: flex; justify-content: end; gap: 8px; padding-top: 4px; }
+    .toast { position: fixed; right: 20px; bottom: 20px; z-index: 3; max-width: calc(100vw - 40px); padding: 12px 15px; border: 1px solid #718c73; color: #f4f6ef; background: var(--forest); font: 11px var(--mono); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 13px; border-top: 1px solid var(--line); color: #879188; font: 9px var(--mono); text-transform: uppercase; }
+
+    @media (max-width: 1050px) {
+      .app-shell { grid-template-columns: 194px minmax(0, 1fr); }
+      .topbar { padding: 0 23px; }
+      .content { padding: 25px 23px 42px; }
+      .dashboard-grid, .lower-grid, .movement-grid { grid-template-columns: minmax(0, 1fr); }
+      .side-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 700px) {
+      .app-shell { display: block; }
+      .rail { min-height: auto; padding: 13px 14px 9px; }
+      .brand { padding: 0 2px 12px; }
+      .campaign-chip, .nav-label, .rail-bottom { display: none; }
+      .nav-list { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 1px; }
+      .nav-item { width: auto; flex: 0 0 auto; padding: 9px 10px; font-size: 11px; }
+      .nav-icon { width: 14px; }
+      .topbar { min-height: 56px; padding: 0 15px; }
+      .crumb { font-size: 8px; }
+      .date-stamp { padding-right: 9px; }
+      .date-stamp span { display: none; }
+      .date-stamp strong { font-size: 10px; }
+      .top-actions { gap: 7px; }
+      .button { min-height: 33px; padding: 0 9px; font-size: 10px; }
+      .content { padding: 22px 14px 35px; }
+      .page-heading { align-items: start; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+      .page-heading h1 { font-size: 29px; }
+      .page-heading p { font-size: 11px; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stat { min-height: 76px; padding: 12px; border-bottom: 1px solid var(--line); }
+      .stat:nth-child(2) { border-right: 0; }
+      .stat:nth-child(3), .stat:nth-child(4) { border-bottom: 0; }
+      .stat-value { font-size: 22px; }
+      .side-stack { grid-template-columns: minmax(0, 1fr); }
+      #field-map { height: 275px; }
+      .roster-preview, .roster-grid { grid-template-columns: minmax(0, 1fr); }
+      .panel-head { padding: 12px; }
+      .panel-body { padding: 12px; }
+      .person-card { padding: 12px; }
+      .section-bar { align-items: start; }
+      footer { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Campaign navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">T2K</div>
+        <div class="brand-copy"><strong>Fieldbook</strong><span>Game master desk</span></div>
+      </div>
+      <div class="campaign-chip">
+        <span class="eyebrow">Active campaign</span>
+        <strong>The Long Road</strong>
+        <small>Dalarna, Sweden / 2000</small>
+      </div>
+      <div class="nav-label">Campaign desk</div>
+      <nav class="nav-list" aria-label="Views">
+        <button class="nav-item" data-view="situation" aria-current="page"><span class="nav-icon" aria-hidden="true">01</span>Situation</button>
+        <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
+        <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
+        <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
+      </nav>
+      <div class="rail-bottom">
+        <div class="signal-line"><span class="signal-dot"></span>Local record active</div>
+        <p>CAMPAIGN FILE<br>FIELDBOOK / 04</p>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="crumb"><span>The Long Road</span><b>/</b><span id="crumb-view">Situation</span></div>
+        <div class="top-actions">
+          <div class="date-stamp"><span>Campaign date</span><strong id="top-date"></strong></div>
+          <button class="button button-icon" data-action="export-record" aria-label="Export campaign record" title="Export campaign record">↓</button>
+          <button class="button button-primary" data-action="open-note"><span aria-hidden="true">+</span> Log entry</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="view active" id="view-situation" aria-labelledby="situation-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">Campaign / Field report 014</div><h1 id="situation-title">Situation report</h1></div>
+            <p id="situation-summary">The column is moving north through Dalarna. The road is passable, but the weather is turning.</p>
+          </div>
+          <div class="stats" aria-label="Campaign status">
+            <div class="stat"><div class="stat-label">Days in field <span>01</span></div><div class="stat-value"><output id="stat-day">14</output><small>days</small></div></div>
+            <div class="stat"><div class="stat-label">Route logged <span>02</span></div><div class="stat-value"><output id="stat-distance">86</output><small>km</small></div></div>
+            <div class="stat stat-alert"><div class="stat-label">Rations <span>03</span></div><div class="stat-value"><output id="stat-rations">6</output><small>days</small></div></div>
+            <div class="stat"><div class="stat-label">Weather <span>04</span></div><div class="stat-value"><output id="stat-weather">Cold rain</output></div></div>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel" aria-labelledby="map-title">
+              <div class="panel-head"><div><div class="eyebrow">Theater / Dalarna County</div><h2 id="map-title">Route sketch</h2></div><span class="inline-hint">FIELD SKETCH / NOT TO SCALE</span></div>
+              <div class="map-wrap"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated field map showing the route north from Vansbro toward Mora"></canvas></div>
+              <div class="map-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
+            </section>
+            <div class="side-stack">
+              <section class="panel" aria-labelledby="situation-title-card">
+                <div class="panel-head"><div><div class="eyebrow">Command notes</div><h2 id="situation-title-card">Immediate concern</h2></div><span class="heading-tag">Priority 02</span></div>
+                <div class="alert-block"><div class="alert-mark" aria-hidden="true">!</div><div><strong>Bridge status unknown</strong><p>Locals reported damage on the north road. Confirm before committing the vehicles.</p></div></div>
+                <div class="panel-body"><button class="button" data-action="open-note">Add a note <span aria-hidden="true">+</span></button></div>
+              </section>
+              <section class="panel" aria-labelledby="route-title">
+                <div class="panel-head"><div><div class="eyebrow">Northbound / Route 26</div><h2 id="route-title">Route checkpoints</h2></div><button class="button button-icon" data-action="advance-day" aria-label="Advance campaign one day" title="Advance campaign one day">+1</button></div>
+                <div class="panel-body"><div class="route-list" id="route-list"></div></div>
+              </section>
+            </div>
+          </div>
+          <div class="lower-grid">
+            <section class="panel" aria-labelledby="roster-preview-title">
+              <div class="panel-head"><div><div class="eyebrow">Column strength</div><h2 id="roster-preview-title">Personnel</h2></div><button class="button" data-view="roster">View roster <span aria-hidden="true">→</span></button></div>
+              <div class="panel-body"><div class="roster-preview" id="roster-preview"></div></div>
+            </section>
+            <section class="panel" aria-labelledby="recent-log-title">
+              <div class="panel-head"><div><div class="eyebrow">Latest dispatches</div><h2 id="recent-log-title">Field journal</h2></div><button class="button" data-view="journal">All entries <span aria-hidden="true">→</span></button></div>
+              <div class="panel-body"><div class="log-list" id="recent-log"></div></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-roster" aria-labelledby="roster-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">Column / personnel record</div><h1 id="roster-title">Personnel</h1></div>
+            <button class="button button-primary" data-action="open-person"><span aria-hidden="true">+</span> Add person</button>
+          </div>
+          <div class="section-bar"><div><h2>Attached personnel</h2><p id="roster-count"></p></div><span class="inline-hint">LOCAL CAMPAIGN RECORD</span></div>
+          <div class="roster-grid" id="roster-grid"></div>
+        </section>
+
+        <section class="view" id="view-movement" aria-labelledby="movement-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">Route / supply ledger</div><h1 id="movement-title">Movement</h1></div>
+            <p>Track the column's travel day, distance, and remaining provisions.</p>
+          </div>
+          <div class="movement-grid">
+            <section class="panel" aria-labelledby="travel-day-title">
+              <div class="travel-controls"><div><div class="eyebrow">Current travel day</div><strong id="travel-date"></strong></div><div class="stepper"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of rations" title="Use one day of rations">−</button><output id="travel-day-count"></output><button class="button button-icon" data-action="advance-day" aria-label="Advance campaign one day" title="Advance campaign one day">+</button></div></div>
+              <div class="panel-body"><div class="section-bar" style="margin:0 0 12px"><div><h2>Planned route</h2></div><div class="supply-control"><span class="inline-hint" id="movement-distance"></span><button class="button" data-action="next-stop">Mark next waypoint</button></div></div><div class="route-list" id="movement-route"></div></div>
+            </section>
+            <div class="side-stack">
+              <section class="panel" aria-labelledby="supply-title"><div class="panel-head"><div><div class="eyebrow">Column inventory</div><h2 id="supply-title">Provisions</h2></div><span class="heading-tag">Days remaining</span></div><div class="panel-body"><div class="supply-line"><div><strong>Food</strong><small>Shared ration reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of food" title="Use one day of food">−</button><output id="food-count"></output><button class="button button-icon" data-action="add-rations" aria-label="Add one day of food" title="Add one day of food">+</button></div></div><div class="supply-line"><div><strong>Fuel</strong><small>Estimated vehicle reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="fuel-down" aria-label="Reduce fuel reserve" title="Reduce fuel reserve">−</button><output id="fuel-count"></output><button class="button button-icon" data-action="fuel-up" aria-label="Increase fuel reserve" title="Increase fuel reserve">+</button></div></div><div class="supply-line"><div><strong>Distance</strong><small>Logged since leaving the coast</small></div><div class="supply-control"><button class="button button-icon" data-action="distance-down" aria-label="Reduce logged distance" title="Reduce logged distance">−</button><output id="distance-count"></output><button class="button button-icon" data-action="distance-up" aria-label="Add ten kilometers" title="Add ten kilometers">+</button></div></div></div></section>
+              <section class="panel" aria-labelledby="weather-title"><div class="panel-head"><div><div class="eyebrow">Conditions</div><h2 id="weather-title">Weather log</h2></div><button class="button" data-action="cycle-weather">Change</button></div><div class="panel-body"><div class="prompt-panel"><span class="eyebrow">Current conditions</span><p id="weather-copy"></p><span class="inline-hint">WEATHER IS A CAMPAIGN NOTE</span></div></div></section>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-journal" aria-labelledby="journal-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">Campaign / dispatch archive</div><h1 id="journal-title">Field journal</h1></div>
+            <button class="button button-primary" data-action="open-note"><span aria-hidden="true">+</span> New entry</button>
+          </div>
+          <section class="panel" aria-label="Campaign journal entries"><div id="journal-list"></div></section>
+        </section>
+
+        <footer><span>Fieldbook / The Long Road</span><span>Record stored in this browser</span></footer>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="note-dialog" aria-labelledby="note-dialog-title">
+    <div class="dialog-head"><div><div class="eyebrow">Campaign dispatch</div><h2 id="note-dialog-title">New journal entry</h2></div><button class="icon-button" data-action="close-note" aria-label="Close dialog">×</button></div>
+    <form class="dialog-form" id="note-form">
+      <div class="field"><label for="note-title">Subject</label><input id="note-title" name="title" maxlength="70" required placeholder="Bridge at the north road"></div>
+      <div class="field"><label for="note-body">Entry</label><textarea id="note-body" name="body" maxlength="1200" required placeholder="Record what the column learned..."></textarea></div>
+      <div class="dialog-actions"><button class="button" type="button" data-action="close-note">Cancel</button><button class="button button-primary" type="submit">Save entry</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="person-dialog" aria-labelledby="person-dialog-title">
+    <div class="dialog-head"><div><div class="eyebrow">Column / personnel</div><h2 id="person-dialog-title">Add person</h2></div><button class="icon-button" data-action="close-person" aria-label="Close dialog">×</button></div>
+    <form class="dialog-form" id="person-form">
+      <div class="field"><label for="person-name">Name</label><input id="person-name" name="name" maxlength="50" required placeholder="Name"></div>
+      <div class="field"><label for="person-role">Role</label><input id="person-role" name="role" maxlength="40" required placeholder="Medic, driver, scout..."></div>
+      <div class="field"><label for="person-condition">Condition</label><select id="person-condition" name="condition"><option>Stable</option><option>Bruised</option><option>Wounded</option><option>Exhausted</option><option>Recovering</option></select></div>
+      <div class="dialog-actions"><button class="button" type="button" data-action="close-person">Cancel</button><button class="button button-primary" type="submit">Add to roster</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = "fieldbook-twilight-2000-v1";
+      const defaults = {
+        date: "2000-05-11",
+        day: 14,
+        distance: 86,
+        rations: 6,
+        fuel: 3,
+        weather: "Cold rain",
+        weatherNote: "Low cloud and steady rain. The gravel roads are softening; visibility is short in the tree line.",
+        activeStop: 1,
+        currentPrompt: "",
+        people: [
+          { id: 1, name: "Anja Lind", role: "Medic", condition: "Stable", status: "Ready" },
+          { id: 2, name: "Erik Dahl", role: "Driver", condition: "Bruised", status: "Worn" },
+          { id: 3, name: "Lena Fors", role: "Scout", condition: "Stable", status: "Ready" },
+          { id: 4, name: "Tomas Varga", role: "Mechanic", condition: "Exhausted", status: "Watch" }
+        ],
+        notes: [
+          { id: 3, title: "A light on the ridge", body: "A single light moved above the treeline after dusk. No sound carried down to the road. Keep the column off the skyline tomorrow.", date: "2000-05-11", kind: "Observation" },
+          { id: 2, title: "Fuel tally", body: "The truck is running rough. Tomas wants to check the filter before the next long stretch.", date: "2000-05-10", kind: "Logistics" },
+          { id: 1, title: "Vansbro crossing", body: "The southern bridge held under the truck. The north approach is still unconfirmed.", date: "2000-05-09", kind: "Route" }
+        ]
+      };
+      const route = [
+        { name: "Sälen coast road", detail: "Departure point", distance: "0 km", kmFromPrevious: 0 },
+        { name: "Vansbro", detail: "Current position", distance: "86 km", kmFromPrevious: 86 },
+        { name: "Mora", detail: "Next waypoint", distance: "+48 km", kmFromPrevious: 48 },
+        { name: "Orsa", detail: "Northbound", distance: "+28 km", kmFromPrevious: 28 }
+      ];
+      const prompts = [
+        "A farmhouse chimney has smoke, but no tracks lead to the door.",
+        "A road sign has been turned to point into the forest.",
+        "Someone has left a bicycle across the bridge approach.",
+        "The radio catches a weather report from a station that should be silent.",
+        "A fresh tire track leaves the road and returns a kilometer later."
+      ];
+      let state = loadState();
+      let toastTimer;
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          if (saved && typeof saved === "object") return { ...structuredClone(defaults), ...saved };
+        } catch (error) {
+          console.warn("Could not load the local campaign record.", error);
+        }
+        return structuredClone(defaults);
+      }
+      function persist() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          return true;
+        } catch (error) {
+          showToast("Browser storage is unavailable; changes may not persist.");
+          return false;
+        }
+      }
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+      }
+      function dateLabel(date, options = { day: "numeric", month: "short", year: "numeric" }) {
+        return new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+      }
+      function initials(name) {
+        return name.split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase();
+      }
+      function showToast(message) {
+        const toast = document.querySelector("#toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
+      }
+      function addDays(amount) {
+        const date = new Date(`${state.date}T12:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + amount);
+        state.date = date.toISOString().slice(0, 10);
+      }
+      function noteMarkup(note) {
+        return `<article class="note-card"><div class="note-top"><span>${escapeHtml(note.kind)} / ${escapeHtml(dateLabel(note.date))}</span><button class="icon-button" data-action="delete-note" data-id="${note.id}" aria-label="Delete ${escapeHtml(note.title)}" title="Delete entry">×</button></div><h3>${escapeHtml(note.title)}</h3><p>${escapeHtml(note.body)}</p></article>`;
+      }
+      function renderRoute(targetId) {
+        document.getElementById(targetId).innerHTML = route.map((stop, index) => `<div class="route-stop ${index === state.activeStop ? "current" : ""}"><span class="route-node" aria-hidden="true"></span><div><strong>${escapeHtml(stop.name)}</strong><small>${escapeHtml(index === state.activeStop ? "Current position" : stop.detail)}</small></div><span class="distance">${escapeHtml(index < state.activeStop ? stop.distance : index === state.activeStop ? "HERE" : stop.distance)}</span></div>`).join("");
+      }
+      function personPreview(person) {
+        return `<div class="person-row"><span class="avatar" aria-hidden="true">${escapeHtml(initials(person.name))}</span><div class="person-copy"><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.role)}</small></div><span class="status ${person.status === "Watch" ? "watch" : ""}">${escapeHtml(person.status)}</span></div>`;
+      }
+      function renderPeople() {
+        const html = state.people.map((person) => `<article class="person-card"><span class="avatar" aria-hidden="true">${escapeHtml(initials(person.name))}</span><div><h3>${escapeHtml(person.name)}</h3><div class="role">${escapeHtml(person.role)}</div><div class="person-meta"><span>${escapeHtml(person.condition)}</span><span>${escapeHtml(person.status)}</span></div></div><div class="person-actions"><button class="icon-button" data-action="delete-person" data-id="${person.id}" aria-label="Remove ${escapeHtml(person.name)}" title="Remove from roster">×</button></div></article>`).join("");
+        document.getElementById("roster-grid").innerHTML = html || `<div class="panel empty-state">No personnel recorded.</div>`;
+        document.getElementById("roster-preview").innerHTML = state.people.slice(0, 4).map(personPreview).join("") || `<div class="empty-state">No personnel recorded.</div>`;
+        document.getElementById("roster-count").textContent = `${state.people.length} ${state.people.length === 1 ? "person" : "people"} attached to the column`;
+      }
+      function renderNotes() {
+        document.getElementById("journal-list").innerHTML = state.notes.length ? state.notes.map(noteMarkup).join("") : `<div class="empty-state">No entries recorded.</div>`;
+        document.getElementById("recent-log").innerHTML = state.notes.slice(0, 3).map((note) => `<article class="log-entry"><time class="log-time">${escapeHtml(dateLabel(note.date, { day: "2-digit", month: "short" }))}</time><div><strong>${escapeHtml(note.title)}</strong><p>${escapeHtml(note.body)}</p></div></article>`).join("") || `<div class="empty-state">No recent dispatches.</div>`;
+      }
+      function render() {
+        const formattedDate = dateLabel(state.date);
+        document.getElementById("top-date").textContent = formattedDate;
+        document.getElementById("stat-day").textContent = state.day;
+        document.getElementById("stat-distance").textContent = state.distance;
+        document.getElementById("stat-rations").textContent = state.rations;
+        document.getElementById("stat-weather").textContent = state.weather;
+        document.getElementById("travel-date").textContent = formattedDate;
+        document.getElementById("travel-day-count").textContent = `DAY ${state.day}`;
+        document.getElementById("food-count").textContent = state.rations;
+        document.getElementById("fuel-count").textContent = state.fuel;
+        document.getElementById("distance-count").textContent = `${state.distance} km`;
+        document.getElementById("movement-distance").textContent = `${state.distance} KM LOGGED`;
+        document.getElementById("weather-copy").textContent = state.weatherNote;
+        document.getElementById("situation-summary").textContent = `The column is moving north through Dalarna. ${state.weather} conditions continue; the next waypoint is ${route[Math.min(state.activeStop + 1, route.length - 1)].name}.`;
+        document.getElementById("weather-title").setAttribute("data-weather", state.weather);
+        renderRoute("route-list");
+        renderRoute("movement-route");
+        renderPeople();
+        renderNotes();
+        drawMap();
+      }
+      function setView(view) {
+        document.querySelectorAll(".view").forEach((section) => section.classList.toggle("active", section.id === `view-${view}`));
+        document.querySelectorAll(".nav-item").forEach((button) => {
+          if (button.dataset.view === view) button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        });
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal" })[view] || "Situation";
+        document.getElementById("crumb-view").textContent = name;
+        if (view === "situation") requestAnimationFrame(drawMap);
+      }
+      function drawMap() {
+        const canvas = document.getElementById("field-map");
+        if (!canvas || !canvas.clientWidth) return;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const scale = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale);
+        ctx.fillStyle = "#dce5d2";
+        ctx.fillRect(0, 0, width, height);
+        let seed = 41;
+        const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+        for (let i = 0; i < 16; i++) {
+          const x = random() * width;
+          const y = random() * height;
+          const rx = 22 + random() * 65;
+          const ry = 13 + random() * 43;
+          ctx.beginPath();
+          ctx.ellipse(x, y, rx, ry, random() * Math.PI, 0, Math.PI * 2);
+          ctx.fillStyle = i % 3 === 0 ? "rgba(91, 126, 87, .12)" : "rgba(159, 174, 131, .17)";
+          ctx.fill();
+        }
+        for (let ring = 0; ring < 10; ring++) {
+          const cx = width * (.16 + ring * .072);
+          const cy = height * (.26 + Math.sin(ring * .77) * .1);
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 44 + (ring % 3) * 13, 23 + (ring % 4) * 7, -.16, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(87, 118, 79, .28)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.moveTo(width * .86, -10);
+        ctx.bezierCurveTo(width * .76, height * .21, width * .92, height * .36, width * .72, height * .52);
+        ctx.bezierCurveTo(width * .59, height * .65, width * .71, height * .81, width * .51, height + 12);
+        ctx.strokeStyle = "rgba(74, 129, 144, .72)";
+        ctx.lineWidth = 8;
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(226, 238, 230, .7)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(width * .12, height * .83);
+        ctx.bezierCurveTo(width * .31, height * .75, width * .27, height * .54, width * .47, height * .57);
+        ctx.bezierCurveTo(width * .68, height * .6, width * .65, height * .33, width * .9, height * .2);
+        ctx.strokeStyle = "#8e795b";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const stops = [
+          { x: .12, y: .83, name: "SÄLEN" },
+          { x: .47, y: .57, name: "VANSBRO" },
+          { x: .68, y: .43, name: "MORA" },
+          { x: .9, y: .2, name: "ORSA" }
+        ];
+        ctx.beginPath();
+        stops.slice(0, state.activeStop + 1).forEach((stop, index) => {
+          const x = width * stop.x, y = height * stop.y;
+          if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = "#bd5143";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        stops.forEach((stop, index) => {
+          const x = width * stop.x, y = height * stop.y;
+          ctx.beginPath();
+          ctx.arc(x, y, index === state.activeStop ? 6 : 4, 0, Math.PI * 2);
+          ctx.fillStyle = index === state.activeStop ? "#c04c3e" : "#f7f8f2";
+          ctx.fill();
+          ctx.strokeStyle = index === state.activeStop ? "#fff" : "#6e8068";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.font = "10px Cascadia Mono, Courier New, monospace";
+          ctx.fillStyle = "#344239";
+          ctx.fillText(stop.name, x + 9, y - 9);
+        });
+        ctx.fillStyle = "rgba(48, 65, 53, .68)";
+        ctx.font = "9px Cascadia Mono, Courier New, monospace";
+        ctx.fillText("N", width - 23, 25);
+        ctx.beginPath();
+        ctx.moveTo(width - 20, 32); ctx.lineTo(width - 20, 48);
+        ctx.strokeStyle = "#425346"; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(width - 20, 30); ctx.lineTo(width - 24, 37); ctx.lineTo(width - 16, 37); ctx.closePath();
+        ctx.fillStyle = "#425346"; ctx.fill();
+      }
+      function nextId(items) { return items.reduce((largest, item) => Math.max(largest, Number(item.id) || 0), 0) + 1; }
+
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        if (button.dataset.view) { setView(button.dataset.view); return; }
+        const action = button.dataset.action;
+        if (!action) return;
+        if (action === "open-note") document.getElementById("note-dialog").showModal();
+        if (action === "close-note") document.getElementById("note-dialog").close();
+        if (action === "open-person") document.getElementById("person-dialog").showModal();
+        if (action === "close-person") document.getElementById("person-dialog").close();
+        if (action === "export-record") {
+          const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), campaign: state }, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `fieldbook-${state.date}.json`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          showToast("Campaign record exported.");
+        }
+        if (action === "next-stop") {
+          const nextStop = Math.min(route.length - 1, state.activeStop + 1);
+          if (nextStop === state.activeStop) { showToast("No further waypoint is listed."); return; }
+          state.activeStop = nextStop;
+          state.distance += route[nextStop].kmFromPrevious;
+          state.notes.unshift({ id: nextId(state.notes), title: `Reached ${route[nextStop].name}`, body: "The column reached the next planned waypoint. Record the situation and decide the next leg.", date: state.date, kind: "Movement" });
+          persist(); render(); showToast(`Waypoint reached: ${route[nextStop].name}.`);
+        }
+        if (action === "advance-day") {
+          addDays(1); state.day += 1; state.rations = Math.max(0, state.rations - 1);
+          state.notes.unshift({ id: nextId(state.notes), title: `Travel day ${state.day}`, body: "The column continued north. Update the journal with what happened on the road.", date: state.date, kind: "Movement" });
+          persist(); render(); showToast("Campaign advanced one day; one ration day used.");
+        }
+        if (action === "use-rations") { state.rations = Math.max(0, state.rations - 1); persist(); render(); showToast("Ration reserve updated."); }
+        if (action === "add-rations") { state.rations += 1; persist(); render(); showToast("Ration reserve updated."); }
+        if (action === "fuel-down") { state.fuel = Math.max(0, state.fuel - 1); persist(); render(); }
+        if (action === "fuel-up") { state.fuel += 1; persist(); render(); }
+        if (action === "distance-down") { state.distance = Math.max(0, state.distance - 10); persist(); render(); }
+        if (action === "distance-up") { state.distance += 10; persist(); render(); }
+        if (action === "cycle-weather") {
+          const conditions = [
+            ["Clear", "Clear skies and a cool wind. Distant movement is easier to spot across the open ground."],
+            ["Overcast", "A low grey ceiling hangs over the forest. The air is still and damp."],
+            ["Cold rain", "Low cloud and steady rain. The gravel roads are softening; visibility is short in the tree line."],
+            ["Fog", "A cold fog has settled into the low ground. Sound carries, but the road disappears ahead."]
+          ];
+          const next = (conditions.findIndex((entry) => entry[0] === state.weather) + 1) % conditions.length;
+          [state.weather, state.weatherNote] = conditions[next]; persist(); render(); showToast(`Conditions updated: ${state.weather}.`);
+        }
+        if (action === "delete-person") {
+          state.people = state.people.filter((person) => String(person.id) !== button.dataset.id);
+          persist(); render(); showToast("Person removed from the roster.");
+        }
+        if (action === "delete-note") {
+          state.notes = state.notes.filter((note) => String(note.id) !== button.dataset.id);
+          persist(); render(); showToast("Journal entry removed.");
+        }
+      });
+      document.getElementById("note-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        state.notes.unshift({ id: nextId(state.notes), title: data.get("title").trim(), body: data.get("body").trim(), date: state.date, kind: "Dispatch" });
+        persist(); render(); event.currentTarget.reset(); document.getElementById("note-dialog").close(); showToast("Journal entry saved.");
+      });
+      document.getElementById("person-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        state.people.push({ id: nextId(state.people), name: data.get("name").trim(), role: data.get("role").trim(), condition: data.get("condition"), status: "Ready" });
+        persist(); render(); event.currentTarget.reset(); document.getElementById("person-dialog").close(); showToast("Person added to the roster.");
+      });
+      document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      }));
+      window.addEventListener("resize", () => requestAnimationFrame(drawMap));
+      render();
+    })();
+  </script>
+</body>
+</html>
