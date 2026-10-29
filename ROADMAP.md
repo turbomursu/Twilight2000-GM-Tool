@@ -6,15 +6,15 @@ This roadmap sequences the scope in [FEATURES.md](FEATURES.md) into deliverable 
 
 The product has three connected surfaces over a shared, versioned campaign model:
 
-- **Campaign Setup Tool:** GM-only authoring. Creates a campaign and exports a portable setup package.
-- **GM Tool:** Runtime control surface. Imports a setup package, runs the live campaign, and controls what information is published to players.
+- **Campaign Setup Tool:** GM-only authoring. Creates a campaign and its map, then exports a portable setup package.
+- **GM Tool:** Runtime control surface. Imports a setup package, runs the live campaign, controls what information is published to players, and manages map markings, route, and player position.
 - **Player Interface:** A browser-based surface for 1-4 separately identified players. Each player sees the GM-published situation report and their assigned character and personal inventory. The GM adds, removes, edits, previews, publishes, or withdraws report information through the GM Tool.
 
 Keep a setup package distinct from a running campaign save, and keep GM-only notes, unrevealed state, and other players' private data outside each player's view. Enforce identity, character ownership, and permissions at the authoritative data boundary. Decide before implementation whether browser sessions connect over the GM's local network or a remote host; both options require an authenticated shared data service, while remote hosting adds deployment and operational requirements.
 
 ## Current Baseline
 
-The GM Tool is a single-file browser prototype with sample campaign data. It has a situation dashboard, fixed route sketch and waypoint tracking, basic personnel and food/fuel counters, a field journal, browser-local autosave, and JSON export. A standalone radio-handset Player Interface visual prototype provides Situation, Inventory, Character, and Dispatches quick access; its inventory view locally selects sample items and displays their record, but is not connected to campaign data. Explicit campaign creation, load/import, authenticated player seats, shared inventory, rules-backed actions, and the larger simulation systems are not implemented.
+The GM Tool is a single-file browser prototype with sample campaign data. It has a situation dashboard, fixed route sketch and waypoint tracking, basic personnel and food/fuel counters, a field journal, browser-local autosave, and JSON export. A standalone radio-handset Player Interface visual prototype provides Situation, Inventory, Character, COMMS, and Map quick access; its inventory and messaging work locally, while the map is a GM-published schematic. These views are not connected to campaign data. Explicit campaign creation, load/import, authenticated player seats, shared inventory, rules-backed actions, and the larger simulation systems are not implemented.
 
 ## Delivery Principles
 
@@ -33,7 +33,7 @@ The GM Tool is a single-file browser prototype with sample campaign data. It has
 
 - Choose a modular browser-client and authoritative shared-data architecture; the static-file prototype cannot safely support separate GM and player sessions or enforce ownership. Decide local-network versus remote hosting before selecting deployment details.
 - Split the current single HTML file into maintainable presentation, interaction, and domain modules as part of the selected approach.
-- Define versioned campaign setup and runtime-save schemas with stable IDs for characters, NPCs, locations, settlements, factions, routes, resources, missions, events, and journal entries.
+- Define versioned campaign setup and runtime-save schemas with stable IDs for characters, NPCs, locations, settlements, factions, routes, resources, missions, events, messages, and journal entries.
 - Define a player-facing projection and explicit visibility/publication state, separate from GM-only campaign fields.
 - Define GM and player roles, 1-4 player seats, character ownership, per-player inventory permissions, and server-side authorization rules.
 - Define an auditable action record for dice-governed inventory changes, without encoding unverified game procedures.
@@ -74,6 +74,8 @@ The GM Tool is a single-file browser prototype with sample campaign data. It has
 - Turn the existing dashboard, clock, journal, roster, route, and resource counters into views over imported campaign state rather than separate sample state.
 - Complete runtime save/load, autosave, backup, and recovery workflows for the running campaign.
 - Add a Player Interface situation report backed only by a deliberately constructed player-visible projection.
+- Let the GM publish the Setup Tool map with GM-managed markings, route, and player position. Give players scroll access and zoom up to 200%, with map open/reset centered on their position, without allowing them to change campaign map state.
+- Allow players to send a single-line COMMS message to the GM and all player seats; record player identity, campaign game time, and message content.
 - Support 1-4 authenticated player seats, each assigned one character and an independent browser session.
 - Show each player only their own character and inventory, alongside GM-published situation information.
 - From the GM Tool, let the GM add, remove, edit, preview, publish, and withdraw report information; show whether changes are drafts or published.
@@ -82,7 +84,7 @@ The GM Tool is a single-file browser prototype with sample campaign data. It has
 - Record publication revisions so the GM can tell what players have been shown.
 - Add missions and a campaign event ledger as GM-managed runtime records.
 
-**Exit checks:** Verify one-player and four-player campaigns, independent browser sessions, and blocked cross-player/GM-only access. Character and inventory requests never change accepted state before GM approval. GM changes appear in the player report only after publishing; withdrawn information disappears. Runtime recovery does not unexpectedly alter published content or player ownership.
+**Exit checks:** Verify one-player and four-player campaigns, independent browser sessions, and blocked cross-player/GM-only access. Players can scroll/zoom the full published map but cannot modify map, markings, route, or position state. Character and inventory requests never change accepted state before GM approval. COMMS messages preserve sender and game time and reach the GM and all player seats. GM changes appear in the player report only after publishing; withdrawn information disappears. Runtime recovery does not unexpectedly alter published content or player ownership.
 
 ## Phase 4: Environment, Routes, and Logistics
 

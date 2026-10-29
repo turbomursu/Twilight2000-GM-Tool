@@ -15,9 +15,11 @@ The website's required functionality includes:
 - A Game Master-operated Campaign Setup Tool that creates a campaign package which can be imported into the GM Tool to run the campaign.
 - A GM runtime tool that imports campaign packages and manages the live campaign state.
 - A Player Interface with a situation report whose displayed information the GM can add, remove, edit, and publish from the GM Tool.
+- The Campaign Setup Tool creates campaign maps. The GM controls map markings, published route, and player position from the GM Tool; players can browse the full published map with scroll and zoom up to 200%, reset centered on their GM-set position, but cannot change campaign map state.
 - A browser-accessible Player Interface for 1-4 players, with a separate assigned character and inventory for each player.
 - Players can manage their own character's inventory and items; dice-governed actions must follow verified Fourth Edition procedures wherever applicable.
 - In the Player Interface handset layout, use labeled lower-bar shortcuts for common views and actions; omit Select and reserve Menu for future features.
+- In COMMS, allow a player to send a single-line message to the GM and all other players; include the sender and campaign game time.
 - A clear, simple interface inspired by rugged military communications devices, with readable hierarchy, labeled controls, restrained status colors, and no decorative clutter.
 - Do not create mobile-specific layouts or mobile versions unless the user explicitly asks for them.
 - Minimize unnecessary scrolling where practical, keeping frequently used campaign information and controls easy to reach without sacrificing readability or accessibility.

@@ -149,6 +149,42 @@
     .character-proposal-list:empty { display: none; }
     .character-review-status { margin: 0; color: #745a27; font: 9px/1.45 var(--mono); }
     .read-only-stamp { padding: 6px 8px; border: 1px solid #69775f; color: #475841; font: 8px var(--mono); text-align: center; text-transform: uppercase; }
+    .map-record { display: grid; gap: 10px; }
+    .map-record-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .map-record-head h2 { margin: 4px 0 0; font: 700 16px var(--mono); text-transform: uppercase; }
+    .map-legend { display: flex; align-items: center; gap: 15px; color: #4e5e4d; font: 8px var(--mono); text-transform: uppercase; }
+    .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .map-key-dot { width: 8px; height: 8px; border: 1px solid #66765e; border-radius: 50%; background: #d7dfca; }
+    .map-key-dot.current { border-color: #a94135; background: #b84939; }
+    .map-key-line { width: 18px; border-top: 2px dashed #9a753d; }
+    .map-controls { display: flex; align-items: center; gap: 6px; }
+    .map-controls button { min-width: 32px; min-height: 30px; border: 1px solid #78846e; border-radius: 2px; color: #304033; background: #dce3d0; font: 12px var(--mono); }
+    .map-controls button:hover { background: #edf0e7; }
+    .map-controls button:disabled { cursor: not-allowed; opacity: .48; }
+    .map-zoom-level { min-width: 43px; color: #52604d; font: 8px var(--mono); text-align: center; }
+    .map-browse-hint { margin-left: 7px; color: #5b6855; font: 8px var(--mono); text-transform: uppercase; }
+    .map-viewport { height: 410px; overflow: auto; overscroll-behavior: contain; border: 1px solid #89957f; background: #cbd6c3; scrollbar-color: #72816d #dce3d5; }
+    .map-surface { position: relative; width: 1350px; height: 825px; }
+    .map-art { position: absolute; top: 0; left: 0; width: 1800px; height: 1100px; overflow: hidden; transform: scale(.75); transform-origin: top left; background-color: #d8e1d0; background-image: linear-gradient(#87977e31 1px, transparent 1px), linear-gradient(90deg, #87977e31 1px, transparent 1px), radial-gradient(ellipse at 38% 42%, #9eae8d 0 2%, transparent 36%), radial-gradient(ellipse at 79% 76%, #a9b48f 0 2%, transparent 34%); background-size: 30px 30px, 30px 30px, 100% 100%, 100% 100%; }
+    .map-art::before, .map-art::after { position: absolute; width: 420px; height: 250px; border: 1px solid #74886f55; border-radius: 50%; content: ""; transform: rotate(-18deg); }
+    .map-art::before { left: 23%; top: 17%; }
+    .map-art::after { right: 7%; bottom: 8%; width: 500px; height: 330px; }
+    .map-water { position: absolute; top: -25%; right: 17%; width: 18%; height: 145%; border-left: 12px solid #6b9b9d88; border-radius: 50%; transform: rotate(20deg); }
+    .map-route-segment { position: absolute; height: 0; border-top: 3px dashed #9a753d; transform-origin: left center; }
+    .map-route-segment.first { left: 16%; top: 64%; width: 35%; transform: rotate(-15deg); }
+    .map-route-segment.second { left: 50%; top: 59%; width: 28%; transform: rotate(-28deg); }
+    .map-marker { position: absolute; z-index: 1; display: grid; grid-template-columns: 12px auto; align-items: start; gap: 6px; color: #27382d; }
+    .map-marker i { width: 10px; height: 10px; margin-top: 2px; border: 1.5px solid #687c64; border-radius: 50%; background: #edf0e7; }
+    .map-marker.current i { border: 2px solid #f3eadc; outline: 2px solid #a94135; background: #b84939; }
+    .map-marker strong { display: block; padding: 3px 5px; border: 1px solid #9aa692; background: #e6ebdfed; font: 9px var(--mono); text-transform: uppercase; }
+    .map-marker small { display: block; margin-top: 4px; padding-left: 5px; color: #596851; font: 7px var(--mono); text-transform: uppercase; }
+    .map-marker.salen { left: 12%; top: 62%; }
+    .map-marker.vansbro { left: 47%; top: 57%; }
+    .map-marker.mora { right: 14%; top: 31%; }
+    .map-north { position: absolute; top: 14px; right: 18px; color: #405344; font: 9px var(--mono); text-align: center; }
+    .map-north strong { display: block; font-size: 18px; }
+    .map-grid-label { position: absolute; left: 12px; top: 12px; padding: 5px 7px; border: 1px solid #a3ad9c; color: #4e5b4f; background: #edf0e5df; font: 8px var(--mono); text-transform: uppercase; }
+    .map-record-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid #aab49f; color: #596851; font: 8px var(--mono); text-transform: uppercase; }
     .dispatch-console { display: grid; grid-template-columns: 255px minmax(0,1fr); gap: 12px; min-height: 390px; }
     .dispatch-index { border: 1px solid #89957f; background: #d7dfca; }
     .dispatch-index-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 12px; border-bottom: 1px solid #aeb8a5; }
@@ -172,13 +208,18 @@
     .dispatch-message { max-width: 670px; margin: 19px 0; font: 18px/1.55 var(--sans); }
     .dispatch-detail-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 10px; border-top: 1px solid #aab49f; color: #566450; font: 8px var(--mono); text-transform: uppercase; }
     .dispatch-feedback { min-height: 14px; margin: 8px 0 0; color: #73531f; font: 8px var(--mono); }
+    .dispatch-compose { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 9px; margin-top: 11px; padding: 10px 12px; border: 1px solid #89957f; background: #d7dfca; }
+    .dispatch-compose label { display: grid; gap: 5px; }
+    .dispatch-compose input { width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid #929c87; border-radius: 2px; color: #202b23; background: #edf0e7; font: 11px var(--sans); }
+    .dispatch-send { display: inline-flex; align-items: center; justify-content: center; min-width: 90px; min-height: 36px; gap: 7px; padding: 0 11px; border: 1px solid #394b3b; border-radius: 2px; color: #f0f3e8; background: #405642; font: 9px var(--mono); text-transform: uppercase; }
+    .dispatch-send:hover { background: #4c674e; }
+    .dispatch-send-feedback { margin: 5px 2px 0; color: #65715e; font: 8px var(--mono); }
     .device-controls { margin-top: 14px; padding: 0 1px; color: #dbe1d8; }
     .control-label { display: flex; align-items: center; justify-content: space-between; margin: 0 3px 7px; font: 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
-    .action-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 118px; gap: 8px; }
-    .action-button { display: flex; align-items: center; justify-content: center; min-height: 53px; gap: 9px; border: 1px solid #171e1a; border-radius: 3px; color: #e8eee6; background: linear-gradient(180deg, #505b54, #303a34); font: 10px var(--mono); text-transform: uppercase; box-shadow: inset 0 1px #ffffff35, 0 2px 0 #161c18; }
+    .action-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .action-button { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 53px; padding: 0 8px; border: 1px solid #171e1a; border-radius: 3px; color: #e8eee6; background: linear-gradient(180deg, #505b54, #303a34); font: 700 14px var(--mono); letter-spacing: .06em; text-transform: uppercase; box-shadow: inset 0 1px #ffffff35, 0 2px 0 #161c18; }
     .action-button:hover:not(:disabled) { background: linear-gradient(180deg, #647066, #3c493f); }
     .action-button[aria-current="page"] { border-color: #c8d39e; color: #fff; background: linear-gradient(180deg, #586c54, #344a39); box-shadow: inset 0 0 0 1px #d0dba254, 0 2px 0 #161c18; }
-    .action-number { color: #c7d3b6; font-size: 9px; }
     .action-button.menu { color: #adb6ac; border-style: dashed; background: #303733; box-shadow: inset 0 1px #ffffff12; }
     .action-button:disabled { cursor: not-allowed; opacity: .78; }
     .hardware-foot { display: flex; justify-content: space-between; gap: 14px; margin-top: 11px; color: #abb5aa; font: 8px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
@@ -197,7 +238,7 @@
     <section class="lcd" aria-live="polite">
       <header class="lcd-header">
         <div><span class="eyebrow">The Long Road / campaign copy 02</span><h1 id="screen-title">Situation report</h1></div>
-        <div class="header-meta"><div><span class="eyebrow">Campaign date</span><strong>11 MAY 2000 / DAY 14</strong></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
+        <div class="header-meta"><div><span class="eyebrow">Campaign date / game time</span><strong id="campaign-game-clock">11 MAY 2000 / DAY 14 / 08:40</strong></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
       </header>
       <section class="player-panel active" data-panel="situation" aria-label="Situation report">
         <div class="sitrep-grid">
@@ -207,6 +248,22 @@
         <div class="route-heading"><span class="eyebrow">Northbound route / published</span><span class="eyebrow">86 km logged</span></div>
         <div class="route-strip"><div class="route-point"><strong>Sälen</strong><small>Departure</small></div><i class="route-track"></i><div class="route-point current"><strong>Vansbro</strong><small>Current position</small></div><i class="route-track"></i><div class="route-point"><strong>Mora</strong><small>Next waypoint</small></div></div>
         <div class="info-ribbon"><span>Published by campaign control / 07:55</span><span>Player view / GM-selected information</span></div>
+      </section>
+      <section class="player-panel" data-panel="map" aria-label="Published campaign map" hidden>
+        <div class="map-record">
+          <div class="map-record-head"><div><span class="eyebrow">GM-controlled map / Dalarna sector</span><h2>Player map</h2></div><div class="map-legend"><span><i class="map-key-dot current"></i>Current position</span><span><i class="map-key-line"></i>Published route</span></div></div>
+          <div class="map-controls" aria-label="Map zoom controls"><button type="button" data-map-zoom="-0.25" aria-label="Zoom out" title="Zoom out">−</button><output class="map-zoom-level" id="map-zoom-level">75%</output><button type="button" data-map-zoom="0.25" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-map-reset title="Reset map view">Reset view</button><span class="map-browse-hint">Scroll to browse / GM markings are read-only</span></div>
+          <div class="map-viewport" id="map-viewport" role="region" tabindex="0" aria-label="Scrollable GM-published campaign map">
+            <div class="map-surface" id="map-surface"><div class="map-art" id="map-art" role="img" aria-label="Schematic route from Sälen through the current position at Vansbro toward Mora">
+              <span class="map-grid-label">Dalarna / route 26 / schematic</span><div class="map-water" aria-hidden="true"></div><div class="map-route-segment first" aria-hidden="true"></div><div class="map-route-segment second" aria-hidden="true"></div>
+              <div class="map-marker salen"><i></i><div><strong>Sälen</strong><small>Departure</small></div></div>
+              <div class="map-marker vansbro current"><i></i><div><strong>Vansbro</strong><small>Current position</small></div></div>
+              <div class="map-marker mora"><i></i><div><strong>Mora</strong><small>Next waypoint</small></div></div>
+              <div class="map-north"><strong>↑</strong>N</div>
+            </div></div>
+          </div>
+          <div class="map-record-foot"><span>Player position set by GM / Vansbro</span><span>Map created in setup / markings published by GM</span></div>
+        </div>
       </section>
       <section class="player-panel" data-panel="inventory" aria-label="Personal inventory" hidden>
         <div class="inventory-layout">
@@ -243,27 +300,32 @@
         <div class="dispatch-console">
           <aside class="dispatch-index" aria-label="Published dispatch list">
             <div class="dispatch-index-head"><div><span class="eyebrow">Player mailbox / seat 02</span><strong>Dispatch archive</strong></div><span class="dispatch-stamp" id="dispatch-count">02</span></div>
-            <button class="dispatch-select" type="button" data-dispatch-id="bridge" aria-current="true"><span><strong>North bridge / Vansbro</strong><small>11 May 2000 / 07:55</small></span><span class="message-state new" data-message-state>NEW / UNREAD</span></button>
+            <button class="dispatch-select" type="button" data-dispatch-id="bridge" aria-current="true"><span><strong>North bridge / Vansbro</strong><small>11 May 2000 / 07:55</small></span><span class="message-state new" data-message-state>NEW</span></button>
             <button class="dispatch-select" type="button" data-dispatch-id="movement" aria-current="false"><span><strong>Column movement</strong><small>10 May 2000 / 18:20</small></span><span class="message-state" data-message-state>READ</span></button>
           </aside>
           <article class="dispatch-detail" aria-live="polite">
-            <header class="dispatch-detail-head"><div><span class="eyebrow" id="dispatch-sector">GM-published / Dalarna sector</span><h2 id="dispatch-title">North bridge / Vansbro</h2></div><div class="dispatch-detail-actions"><span class="message-state new" id="dispatch-status">NEW / UNREAD</span><button class="dispatch-delete" type="button" data-delete-dispatch>Delete</button></div></header>
-            <div class="dispatch-meta"><div><span class="eyebrow">Date</span><strong id="dispatch-date">11 May 2000</strong></div><div><span class="eyebrow">Time sent</span><strong id="dispatch-time">07:55</strong></div><div><span class="eyebrow">Recipient</span><strong>Player seat 02</strong></div></div>
+            <header class="dispatch-detail-head"><div><span class="eyebrow" id="dispatch-sector">GM-published / Dalarna sector</span><h2 id="dispatch-title">North bridge / Vansbro</h2></div><div class="dispatch-detail-actions"><button class="dispatch-delete" type="button" data-delete-dispatch>Delete</button></div></header>
+            <div class="dispatch-meta"><div><span class="eyebrow">Date</span><strong id="dispatch-date">11 May 2000</strong></div><div><span class="eyebrow">Game time sent</span><strong id="dispatch-time">07:55</strong></div><div><span class="eyebrow">From</span><strong id="dispatch-sender">Campaign control</strong></div><div><span class="eyebrow">To</span><strong id="dispatch-recipient">Player seat 02</strong></div></div>
             <p class="dispatch-message" id="dispatch-message">Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.</p>
-            <footer class="dispatch-detail-foot"><span>Published by campaign control</span><span>Player copy / read only</span></footer>
+            <footer class="dispatch-detail-foot"><span id="dispatch-origin">Published by campaign control</span><span id="dispatch-visibility">Player copy / read only</span></footer>
             <p class="dispatch-feedback" id="dispatch-feedback" role="status">Delete removes this copy from your inbox only; the GM archive is unchanged.</p>
           </article>
         </div>
+        <form class="dispatch-compose" id="dispatch-compose-form">
+          <label for="dispatch-compose-input"><span class="eyebrow">Broadcast / GM + all players / Lena Fors</span><input id="dispatch-compose-input" name="message" type="text" maxlength="240" required placeholder="Type a message for the group"></label>
+          <button class="dispatch-send" type="submit"><span aria-hidden="true">↗</span>Send</button>
+        </form>
+        <p class="dispatch-send-feedback" id="dispatch-send-feedback" role="status">Uses campaign game time / delivery is local preview only.</p>
       </section>
     </section>
     <nav class="device-controls" aria-label="Player quick access">
-      <div class="control-label"><span>Direct access / player controls</span><span>MENU / reserved</span></div>
+      <div class="control-label"><span>Direct access / player views</span><span>COMMS / connected</span></div>
       <div class="action-bar">
-        <button class="action-button" type="button" data-target="situation" data-title="Situation report" aria-current="page"><span class="action-number">01</span>Sitrep</button>
-        <button class="action-button" type="button" data-target="inventory" data-title="Personal inventory"><span class="action-number">02</span>Inventory</button>
-        <button class="action-button" type="button" data-target="character" data-title="Character record"><span class="action-number">03</span>Character</button>
-        <button class="action-button" type="button" data-target="dispatches" data-title="COMMS"><span class="action-number">04</span>COMMS</button>
-        <button class="action-button menu" type="button" disabled title="Reserved for future features"><span>MENU</span></button>
+        <button class="action-button" type="button" data-target="situation" data-title="Situation report" aria-current="page">Sitrep</button>
+        <button class="action-button" type="button" data-target="inventory" data-title="Personal inventory">Inventory</button>
+        <button class="action-button" type="button" data-target="character" data-title="Character record">Character</button>
+        <button class="action-button" type="button" data-target="dispatches" data-title="COMMS">COMMS</button>
+        <button class="action-button" type="button" data-target="map" data-title="Map">Map</button>
       </div>
     </nav>
     <div class="hardware-foot"><span>Player terminal / campaign information controlled by GM</span><span>Fourth Edition rules actions require source verification</span></div>
@@ -301,11 +363,29 @@
     const dispatchButtons = [...document.querySelectorAll("[data-dispatch-id]")];
     const deleteDispatchButton = document.querySelector("[data-delete-dispatch]");
     const dispatchFeedback = document.querySelector("#dispatch-feedback");
+    const dispatchComposeForm = document.querySelector("#dispatch-compose-form");
+    const dispatchMessageInput = document.querySelector("#dispatch-compose-input");
+    const dispatchSendFeedback = document.querySelector("#dispatch-send-feedback");
+    const mapViewport = document.querySelector("#map-viewport");
+    const mapSurface = document.querySelector("#map-surface");
+    const mapArt = document.querySelector("#map-art");
+    const mapZoomLevel = document.querySelector("#map-zoom-level");
+    const mapZoomButtons = [...document.querySelectorAll("[data-map-zoom]")];
+    const mapResetButton = document.querySelector("[data-map-reset]");
+    const mapWidth = 1800;
+    const mapHeight = 1100;
+    const minMapZoom = 0.5;
+    const maxMapZoom = 2;
+    let mapZoom = 0.75;
+    const playerName = "Lena Fors";
+    const playerSeat = "Player seat 02";
+    const gameClock = { date: "11 May 2000", time: "08:40", day: 14 };
     const dispatchRecords = {
-      bridge: { sector: "GM-published / Dalarna sector", title: "North bridge / Vansbro", date: "11 May 2000", time: "07:55", message: "Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.", isNew: true, isRead: false },
-      movement: { sector: "GM-published / Dalarna sector", title: "Column movement", date: "10 May 2000", time: "18:20", message: "Vehicles reached the southern approach before nightfall. Road remains passable through the next waypoint.", isNew: false, isRead: true }
+      bridge: { sector: "GM-published / Dalarna sector", title: "North bridge / Vansbro", date: "11 May 2000", time: "07:55", sender: "Campaign control", recipient: playerSeat, origin: "Published by campaign control", visibility: "Player copy / read only", message: "Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.", isNew: true, isRead: false, receivedOrder: 1 },
+      movement: { sector: "GM-published / Dalarna sector", title: "Column movement", date: "10 May 2000", time: "18:20", sender: "Campaign control", recipient: playerSeat, origin: "Published by campaign control", visibility: "Player copy / read only", message: "Vehicles reached the southern approach before nightfall. Road remains passable through the next waypoint.", isNew: false, isRead: false }
     };
     let selectedDispatchId = "bridge";
+    let outgoingMessageNumber = 0;
     const itemRecords = {
       ration: { name: "Field ration", itemClass: "Consumable / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." },
       bandage: { name: "Bandage pack", itemClass: "Medical supply / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." },
@@ -314,6 +394,43 @@
     let proposalNumber = 0;
     let characterProposalNumber = 0;
     let characterEditBaseline = new Map();
+
+    function setMapZoom(nextZoom, preserveCenter = true) {
+      const previousZoom = mapZoom;
+      const centerX = (mapViewport.scrollLeft + mapViewport.clientWidth / 2) / previousZoom;
+      const centerY = (mapViewport.scrollTop + mapViewport.clientHeight / 2) / previousZoom;
+      mapZoom = Math.min(maxMapZoom, Math.max(minMapZoom, Math.round(nextZoom * 100) / 100));
+      mapArt.style.transform = `scale(${mapZoom})`;
+      mapSurface.style.width = `${Math.round(mapWidth * mapZoom)}px`;
+      mapSurface.style.height = `${Math.round(mapHeight * mapZoom)}px`;
+      mapZoomLevel.textContent = `${Math.round(mapZoom * 100)}%`;
+      mapZoomButtons.forEach((button) => {
+        const proposedZoom = mapZoom + Number(button.dataset.mapZoom);
+        button.disabled = proposedZoom < minMapZoom || proposedZoom > maxMapZoom;
+      });
+      if (preserveCenter && mapViewport.clientWidth) {
+        mapViewport.scrollLeft = centerX * mapZoom - mapViewport.clientWidth / 2;
+        mapViewport.scrollTop = centerY * mapZoom - mapViewport.clientHeight / 2;
+      }
+    }
+
+    function centerMapOnPlayer() {
+      const marker = mapArt.querySelector(".map-marker.current");
+      if (!marker || !mapViewport.clientWidth) return;
+      const markerX = (mapArt.offsetLeft + marker.offsetLeft + marker.offsetWidth / 2) * mapZoom;
+      const markerY = (mapArt.offsetTop + marker.offsetTop + marker.offsetHeight / 2) * mapZoom;
+      mapViewport.scrollLeft = markerX - mapViewport.clientWidth / 2;
+      mapViewport.scrollTop = markerY - mapViewport.clientHeight / 2;
+    }
+
+    mapZoomButtons.forEach((button) => button.addEventListener("click", () => {
+      setMapZoom(mapZoom + Number(button.dataset.mapZoom));
+    }));
+    mapResetButton.addEventListener("click", () => {
+      setMapZoom(0.75, false);
+      centerMapOnPlayer();
+    });
+    setMapZoom(mapZoom, false);
 
     function updateCharacterSendState() {
       const hasChanges = characterInputs.some((input) => input.value.trim() !== characterEditBaseline.get(input.name));
@@ -376,9 +493,14 @@
 
     function renderDispatchStatus(button, record) {
       const state = button.querySelector("[data-message-state]");
-      const label = record.isNew ? "NEW / UNREAD" : record.isRead ? "READ" : "UNREAD";
+      const recentNewIds = Object.entries(dispatchRecords)
+        .filter(([, message]) => message.isNew && !message.isRead)
+        .sort((left, right) => right[1].receivedOrder - left[1].receivedOrder)
+        .slice(0, 3)
+        .map(([id]) => id);
+      const label = record.isRead ? "READ" : recentNewIds.includes(button.dataset.dispatchId) ? "NEW" : "UNREAD";
       state.textContent = label;
-      state.classList.toggle("new", record.isNew);
+      state.classList.toggle("new", label === "NEW");
     }
 
     function selectDispatch(messageId, markRead = true) {
@@ -397,11 +519,12 @@
       });
       document.querySelector("#dispatch-sector").textContent = record.sector;
       document.querySelector("#dispatch-title").textContent = record.title;
-      const detailStatus = document.querySelector("#dispatch-status");
-      detailStatus.textContent = record.isNew ? "NEW / UNREAD" : record.isRead ? "READ" : "UNREAD";
-      detailStatus.classList.toggle("new", record.isNew);
       document.querySelector("#dispatch-date").textContent = record.date;
       document.querySelector("#dispatch-time").textContent = record.time;
+      document.querySelector("#dispatch-sender").textContent = record.sender;
+      document.querySelector("#dispatch-recipient").textContent = record.recipient;
+      document.querySelector("#dispatch-origin").textContent = record.origin;
+      document.querySelector("#dispatch-visibility").textContent = record.visibility;
       document.querySelector("#dispatch-message").textContent = record.message;
       deleteDispatchButton.disabled = false;
     }
@@ -409,6 +532,54 @@
     dispatchButtons.forEach((button) => {
       renderDispatchStatus(button, dispatchRecords[button.dataset.dispatchId]);
       button.addEventListener("click", () => selectDispatch(button.dataset.dispatchId));
+    });
+    dispatchComposeForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const message = dispatchMessageInput.value.trim();
+      if (!message) return;
+
+      outgoingMessageNumber += 1;
+      const messageId = `player-${outgoingMessageNumber}`;
+      const record = {
+        sector: "Player sent / outbound",
+        title: `Message from ${playerName}`,
+        date: gameClock.date,
+        time: gameClock.time,
+        sender: playerName,
+        recipient: "GM + all players",
+        origin: `Sent by ${playerName} / game time`,
+        visibility: "GM + all players / preview only",
+        message,
+        isNew: false,
+        isRead: true,
+        receivedOrder: Object.values(dispatchRecords).reduce((latest, item) => Math.max(latest, item.receivedOrder || 0), 0) + 1
+      };
+      dispatchRecords[messageId] = record;
+
+      const listButton = document.createElement("button");
+      listButton.className = "dispatch-select";
+      listButton.type = "button";
+      listButton.dataset.dispatchId = messageId;
+      listButton.setAttribute("aria-current", "false");
+      const summary = document.createElement("span");
+      const messageTitle = document.createElement("strong");
+      messageTitle.textContent = record.title;
+      const messageTime = document.createElement("small");
+      messageTime.textContent = `${record.date} / ${record.time}`;
+      summary.append(messageTitle, messageTime);
+      const state = document.createElement("span");
+      state.className = "message-state";
+      state.dataset.messageState = "";
+      listButton.append(summary, state);
+      renderDispatchStatus(listButton, record);
+      listButton.addEventListener("click", () => selectDispatch(messageId));
+      dispatchButtons.push(listButton);
+      document.querySelector(".dispatch-index-head").after(listButton);
+      document.querySelector("#dispatch-count").textContent = String(dispatchButtons.filter((button) => button.isConnected).length).padStart(2, "0");
+      selectDispatch(messageId, false);
+
+      dispatchMessageInput.value = "";
+      dispatchSendFeedback.textContent = `Added to this preview at ${gameClock.time}; other browsers will not receive it until messaging is connected.`;
     });
     deleteDispatchButton.addEventListener("click", () => {
       if (!selectedDispatchId || !dispatchRecords[selectedDispatchId]) return;
@@ -425,11 +596,12 @@
         selectedDispatchId = null;
         document.querySelector("#dispatch-sector").textContent = "Player mailbox / seat 02";
         document.querySelector("#dispatch-title").textContent = "No messages";
-        const detailStatus = document.querySelector("#dispatch-status");
-        detailStatus.textContent = "EMPTY";
-        detailStatus.classList.remove("new");
         document.querySelector("#dispatch-date").textContent = "—";
         document.querySelector("#dispatch-time").textContent = "—";
+        document.querySelector("#dispatch-sender").textContent = "—";
+        document.querySelector("#dispatch-recipient").textContent = "—";
+        document.querySelector("#dispatch-origin").textContent = "No player inbox message selected";
+        document.querySelector("#dispatch-visibility").textContent = "Preview only";
         document.querySelector("#dispatch-message").textContent = "No messages remain in this preview inbox. The GM archive is unchanged.";
         deleteDispatchButton.disabled = true;
       }
@@ -511,6 +683,7 @@
         else item.removeAttribute("aria-current");
       });
       title.textContent = button.dataset.title;
+      if (target === "map") requestAnimationFrame(centerMapOnPlayer);
     }));
   </script>
 </body>
