@@ -13,7 +13,7 @@ Open `index.html` in a current desktop or mobile browser. No package install, bu
 - Travel day, waypoint, distance, food, fuel, and weather tracking
 - Field journal entries
 - Browser-local autosave and JSON campaign export
-- Standalone [radio-handset Player Interface prototype](player-interface.html), not connected to campaign data
+- Standalone [radio-handset Player Interface prototype](player-interface.html) with a separate browser-local preview store, not connected to campaign data
 
 ## Ruleset Fidelity
 
