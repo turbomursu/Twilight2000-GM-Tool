@@ -6,11 +6,11 @@ This roadmap sequences the scope in [FEATURES.md](FEATURES.md) into deliverable 
 
 The product has three connected surfaces over a shared, versioned campaign model:
 
-- **Campaign Setup Tool:** GM-only authoring. Creates a campaign and its map, then exports a portable setup package.
-- **GM Tool:** Runtime control surface. Imports a setup package, runs the live campaign, controls what information is published to players, and manages map markings, route, and player position.
+- **Campaign Setup Tool:** GM-only authoring of initial campaign identity, premise, map, locations, factions, settlements, and scenario notes. Exports a portable, versioned setup package; it does not own evolving campaign state or publish player data.
+- **GM Tool:** Authoritative runtime control surface. Imports a setup package to create the initial campaign state, owns all subsequent campaign changes, controls player publication, and manages live map markings, route, and player position.
 - **Player Interface:** A browser-based surface for 1-4 separately identified players. Each player sees the GM-published situation report and their assigned character and personal inventory. The GM adds, removes, edits, previews, publishes, or withdraws report information through the GM Tool.
 
-Keep a setup package distinct from a running campaign save, and keep GM-only notes, unrevealed state, and other players' private data outside each player's view. Enforce identity, character ownership, and permissions at the authoritative data boundary. Decide before implementation whether browser sessions connect over the GM's local network or a remote host; both options require an authenticated shared data service, while remote hosting adds deployment and operational requirements.
+Keep a setup package distinct from a running campaign save. Importing setup data creates a new initial runtime state; later changes belong to the GM runtime and do not rewrite the setup package. Setup notes and other GM-only content are never published automatically. Keep GM-only notes, unrevealed state, and other players' private data outside each player's view. Enforce identity, character ownership, and permissions at the authoritative data boundary. Decide before implementation whether browser sessions connect over the GM's local network or a remote host; both options require an authenticated shared data service, while remote hosting adds deployment and operational requirements.
 
 ## Current Baseline
 
@@ -47,13 +47,15 @@ The GM Tool is a single-file browser prototype with sample campaign data. It has
 **Goal:** Let a GM create a campaign in the setup tool and transfer it safely into the GM runtime.
 
 - Build the Campaign Setup Tool's manual path for campaign identity, premise, initial locations, factions, settlements, and scenario notes.
+- Create the initial campaign map in Setup; keep live markings, published route, and player position under GM runtime control.
 - Export a versioned, portable setup package; validate and preview a package before importing it into the GM Tool.
 - Keep setup-package export/import separate from runtime campaign save/load and backup.
+- Treat imported setup content as initial state only; do not auto-publish setup notes or other content to players.
 - Establish campaign selection and create the initial GM runtime state from an imported package.
 - Define explicit error handling for malformed, unsupported, or duplicate package data.
 - Make unsaved or failed persistence states visible.
 
-**Exit checks:** A GM can author a setup package, inspect it, import it into a clean GM runtime, and confirm the expected initial campaign state. Invalid packages fail without partially changing or destroying existing campaign data.
+**Exit checks:** A GM can author a setup package, inspect it, import it into a clean GM runtime, and confirm the expected initial campaign state. Runtime changes do not rewrite the source package, and no content becomes player-visible until the GM explicitly publishes it. Invalid packages fail without partially changing or destroying existing campaign data.
 
 ## Phase 2: Characters and AI-Assisted Campaign Setup
 

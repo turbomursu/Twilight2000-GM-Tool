@@ -355,11 +355,11 @@
         <div class="character-record">
           <header class="character-identity"><div><span class="eyebrow">Assigned character / player seat 02</span><h2>Lena Fors</h2><span class="character-role">Scout / The Long Road</span></div><div class="character-actions"><button class="item-button" type="button" data-edit-character>Edit values</button><button class="item-button" type="button" data-send-character disabled>Send to GM</button></div></header>
           <nav class="character-tabs" role="tablist" aria-label="Character record sections">
-            <button class="character-tab" type="button" role="tab" id="character-tab-record" aria-controls="character-pane-record" aria-selected="true" data-character-tab="record">Record</button>
+            <button class="character-tab" type="button" role="tab" id="character-tab-condition" aria-controls="character-pane-condition" aria-selected="true" data-character-tab="condition">Condition</button>
             <button class="character-tab" type="button" role="tab" id="character-tab-skills" aria-controls="character-pane-skills" aria-selected="false" data-character-tab="skills">Skills</button>
-            <button class="character-tab" type="button" role="tab" id="character-tab-condition" aria-controls="character-pane-condition" aria-selected="false" data-character-tab="condition">Condition</button>
+            <button class="character-tab" type="button" role="tab" id="character-tab-record" aria-controls="character-pane-record" aria-selected="false" data-character-tab="record">Record</button>
           </nav>
-          <section class="character-pane active" id="character-pane-record" role="tabpanel" aria-labelledby="character-tab-record" data-character-pane="record" tabindex="0">
+          <section class="character-pane" id="character-pane-record" role="tabpanel" aria-labelledby="character-tab-record" data-character-pane="record" tabindex="0" hidden>
             <div class="character-overview-grid">
               <div class="character-column">
                 <section class="character-block"><div class="character-block-head"><strong>Identity and service</strong><span class="eyebrow">Assigned record</span></div><div class="character-form-grid">
@@ -381,7 +381,7 @@
                   <label class="character-attribute"><span>Intelligence</span><select name="Intelligence" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output class="character-die" data-die-for="Intelligence">Not set</output></label>
                   <label class="character-attribute"><span>Empathy</span><select name="Empathy" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output class="character-die" data-die-for="Empathy">Not set</output></label>
                 </div><div class="character-summary-footer"><p class="character-placeholder">Players' Manual / pp. 15-16 / draft changes remain unapproved.</p><button class="character-link-button" type="button" data-open-inventory>Open inventory</button></div></section>
-                <section class="character-block"><div class="character-block-head"><strong>Group status</strong><span class="eyebrow">Shared campaign value</span></div><div class="character-group-status"><strong>Unit morale</strong><output>Not assigned</output></div><p class="character-placeholder">One shared rating for the group, not a personal character stat.</p></section>
+                <section class="character-block"><div class="character-block-head"><strong>Group status</strong><span class="eyebrow">Shared campaign value</span></div><div class="character-group-status"><strong>Unit morale</strong><output id="condition-unit-morale">Not linked</output></div><p class="character-placeholder">One shared rating for the group, supplied by the GM.</p></section>
               </div>
             </div>
           </section>
@@ -413,19 +413,19 @@
               <section class="character-block"><div class="character-block-head"><strong>Experience</strong><span class="eyebrow">Current / total</span></div><div class="character-experience"><span class="eyebrow">Recorded experience</span><label class="character-field"><span>Current</span><input class="character-field-input" type="number" min="0" step="1" name="Current experience" placeholder="Not set" data-character-input disabled></label><label class="character-field"><span>Total</span><input class="character-field-input" type="number" min="0" step="1" name="Total experience" placeholder="Not set" data-character-input disabled></label></div></section>
             </div>
           </section>
-          <section class="character-pane" id="character-pane-condition" role="tabpanel" aria-labelledby="character-tab-condition" data-character-pane="condition" tabindex="0" hidden>
+          <section class="character-pane active" id="character-pane-condition" role="tabpanel" aria-labelledby="character-tab-condition" data-character-pane="condition" tabindex="0">
             <div class="condition-grid">
               <div class="character-column">
-                <section class="character-block"><div class="character-block-head"><strong>Damage and stress</strong><span class="eyebrow">Personal tracks</span></div><div class="track-grid">
-                  <div class="track-panel"><div class="track-head"><strong>Damage</strong><output>Not linked</output></div><div class="track-boxes" role="group" aria-label="Damage track"><input type="checkbox" disabled aria-label="Damage mark 1"><input type="checkbox" disabled aria-label="Damage mark 2"><input type="checkbox" disabled aria-label="Damage mark 3"><input type="checkbox" disabled aria-label="Damage mark 4"><input type="checkbox" disabled aria-label="Damage mark 5"><input type="checkbox" disabled aria-label="Damage mark 6"></div></div>
-                  <div class="track-panel"><div class="track-head"><strong>Stress</strong><output>Not linked</output></div><div class="track-boxes" role="group" aria-label="Stress track"><input type="checkbox" disabled aria-label="Stress mark 1"><input type="checkbox" disabled aria-label="Stress mark 2"><input type="checkbox" disabled aria-label="Stress mark 3"><input type="checkbox" disabled aria-label="Stress mark 4"><input type="checkbox" disabled aria-label="Stress mark 5"><input type="checkbox" disabled aria-label="Stress mark 6"></div></div>
-                </div><div class="capacity-list"><div class="capacity-row"><span>Hit capacity</span><output id="hit-capacity">Not set</output></div><div class="capacity-row"><span>Stress capacity</span><output id="stress-capacity">Not set</output></div><div class="capacity-row"><span>Coolness under fire</span><select class="skill-rating" name="Coolness under fire" data-character-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div></div><p class="character-placeholder">Players' Manual / p. 16 / capacities preview from draft attribute ratings. Damage and stress tracks are not connected.</p></section>
-                <section class="character-block"><div class="character-block-head"><strong>Armor</strong><span class="eyebrow">GM record / not linked</span></div><div class="armor-list"><div class="armor-row"><span>Head</span><output>Not assigned</output></div><div class="armor-row"><span>Arms</span><output>Not assigned</output></div><div class="armor-row"><span>Torso</span><output>Not assigned</output></div><div class="armor-row"><span>Legs</span><output>Not assigned</output></div></div></section>
+                <section class="character-block"><div class="character-block-head"><strong>Damage and stress</strong><span class="eyebrow" id="condition-sync-state">Awaiting GM push</span></div><div class="track-grid">
+                  <div class="track-panel"><div class="track-head"><strong>Damage</strong><output id="condition-damage-count">Not linked</output></div><div class="track-boxes" role="group" aria-label="Damage track"><input type="checkbox" data-condition-track="damage" data-track-mark="1" disabled aria-label="Damage mark 1"><input type="checkbox" data-condition-track="damage" data-track-mark="2" disabled aria-label="Damage mark 2"><input type="checkbox" data-condition-track="damage" data-track-mark="3" disabled aria-label="Damage mark 3"><input type="checkbox" data-condition-track="damage" data-track-mark="4" disabled aria-label="Damage mark 4"><input type="checkbox" data-condition-track="damage" data-track-mark="5" disabled aria-label="Damage mark 5"><input type="checkbox" data-condition-track="damage" data-track-mark="6" disabled aria-label="Damage mark 6"></div></div>
+                  <div class="track-panel"><div class="track-head"><strong>Stress</strong><output id="condition-stress-count">Not linked</output></div><div class="track-boxes" role="group" aria-label="Stress track"><input type="checkbox" data-condition-track="stress" data-track-mark="1" disabled aria-label="Stress mark 1"><input type="checkbox" data-condition-track="stress" data-track-mark="2" disabled aria-label="Stress mark 2"><input type="checkbox" data-condition-track="stress" data-track-mark="3" disabled aria-label="Stress mark 3"><input type="checkbox" data-condition-track="stress" data-track-mark="4" disabled aria-label="Stress mark 4"><input type="checkbox" data-condition-track="stress" data-track-mark="5" disabled aria-label="Stress mark 5"><input type="checkbox" data-condition-track="stress" data-track-mark="6" disabled aria-label="Stress mark 6"></div></div>
+                </div><div class="capacity-list"><div class="capacity-row"><span>Hit capacity</span><output id="hit-capacity">Not set</output></div><div class="capacity-row"><span>Stress capacity</span><output id="stress-capacity">Not set</output></div><div class="capacity-row"><span>Coolness under fire</span><output id="condition-cuf">Not linked</output></div></div><p class="character-placeholder">Players' Manual / p. 16 / capacities preview from character attributes. Damage, stress, and CUF show the latest GM condition push.</p></section>
+                <section class="character-block"><div class="character-block-head"><strong>Armor</strong><span class="eyebrow">Latest GM record</span></div><div class="armor-list"><div class="armor-row"><span>Head</span><output data-armor-slot="head">Not linked</output></div><div class="armor-row"><span>Arms</span><output data-armor-slot="arms">Not linked</output></div><div class="armor-row"><span>Torso</span><output data-armor-slot="torso">Not linked</output></div><div class="armor-row"><span>Legs</span><output data-armor-slot="legs">Not linked</output></div></div></section>
               </div>
               <div class="character-column">
-                <section class="character-block"><div class="character-block-head"><strong>Conditions</strong><span class="eyebrow">GM record / not linked</span></div><div class="condition-list"><label class="condition-row"><span>Starving</span><input type="checkbox" disabled aria-label="Starving condition"></label><label class="condition-row"><span>Dehydrated</span><input type="checkbox" disabled aria-label="Dehydrated condition"></label><label class="condition-row"><span>Sleep deprived</span><input type="checkbox" disabled aria-label="Sleep deprived condition"></label><label class="condition-row"><span>Hypothermic</span><input type="checkbox" disabled aria-label="Hypothermic condition"></label></div></section>
-                <section class="character-block"><div class="character-block-head"><strong>Critical injuries and diseases</strong><span class="eyebrow">GM record / not linked</span></div><div class="capacity-list"><div class="capacity-row"><span>Critical injuries</span><strong>Not linked</strong></div><div class="capacity-row"><span>Diseases</span><strong>Not linked</strong></div></div></section>
-                <section class="character-block"><div class="character-block-head"><strong>Radiation</strong><span class="eyebrow">Recorded state</span></div><div class="radiation-grid"><div class="radiation-readout"><span>Temporary</span><strong>Not recorded</strong></div><div class="radiation-readout"><span>Permanent</span><strong>Not recorded</strong></div></div><p class="character-placeholder">No radiation values are connected in this preview.</p></section>
+                <section class="character-block"><div class="character-block-head"><strong>Conditions</strong><span class="eyebrow">Latest GM record</span></div><div class="condition-list"><label class="condition-row"><span>Starving</span><input type="checkbox" data-condition-flag="starving" disabled aria-label="Starving condition"></label><label class="condition-row"><span>Dehydrated</span><input type="checkbox" data-condition-flag="dehydrated" disabled aria-label="Dehydrated condition"></label><label class="condition-row"><span>Sleep deprived</span><input type="checkbox" data-condition-flag="sleepDeprived" disabled aria-label="Sleep deprived condition"></label><label class="condition-row"><span>Hypothermic</span><input type="checkbox" data-condition-flag="hypothermic" disabled aria-label="Hypothermic condition"></label></div></section>
+                <section class="character-block"><div class="character-block-head"><strong>Critical injuries and diseases</strong><span class="eyebrow">Latest GM record</span></div><div class="capacity-list"><div class="capacity-row"><span>Critical injuries</span><strong id="condition-critical-injuries">Not linked</strong></div><div class="capacity-row"><span>Diseases</span><strong id="condition-diseases">Not linked</strong></div></div></section>
+                <section class="character-block"><div class="character-block-head"><strong>Radiation</strong><span class="eyebrow">Latest GM record</span></div><div class="radiation-grid"><div class="radiation-readout"><span>Temporary</span><strong id="condition-radiation-temporary">Not linked</strong></div><div class="radiation-readout"><span>Permanent</span><strong id="condition-radiation-permanent">Not linked</strong></div></div></section>
               </div>
             </div>
           </section>
@@ -481,7 +481,7 @@
       <div class="dialog-actions"><button class="dialog-button" type="button" data-close-proposal>Cancel</button><button class="dialog-button primary" type="submit">Submit for GM review</button></div>
     </form>
   </dialog>
-  <p class="disclaimer">Visual prototype: character values, inventory quantities, and pending proposals autosave to this browser only. They are not GM-approved or shared; authentication, campaign sync, rule-based encumbrance, and dice resolution are not connected. <a href="https://www.bing.com/images/search?q=military+communications+equipment+field+radio+handset+display" target="_blank" rel="noreferrer">Visual reference: field handsets and radio displays</a></p>
+  <p class="disclaimer">Character values, inventory quantities, and proposals autosave locally. GM-pushed condition snapshots are read-only and cached until the next push. Authenticated GM publishing, cross-device delivery, rule-based encumbrance, and dice resolution are not connected. <a href="https://www.bing.com/images/search?q=military+communications+equipment+field+radio+handset+display" target="_blank" rel="noreferrer">Visual reference: field handsets and radio displays</a></p>
   <script>
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];
     const panels = [...document.querySelectorAll(".player-panel")];
@@ -533,6 +533,9 @@
       flashlight: { name: "Flashlight", itemClass: "Equipment / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." }
     };
     const PLAYER_STORAGE_KEY = "fieldbook-player-terminal-v1";
+    const GM_CONDITION_PUSH_KEY = "fieldbook-gm-condition-push-v1";
+    const GM_CONDITION_CHANNEL = "fieldbook-gm-condition-push-v1";
+    const PLAYER_SEAT_ID = "seat-02";
     const PLAYER_DATA_VERSION = 1;
     const PLAYER_RULES_REFERENCE = Object.freeze({
       source: "Twilight: 2000 Players' Manual / Fourth Edition",
@@ -578,10 +581,65 @@
       return value !== null && typeof value === "object" && !Array.isArray(value);
     }
 
+    function normalizeConditionSnapshot(snapshot) {
+      if (!isRecord(snapshot)) return null;
+      const readCount = (value, maximum = Number.MAX_SAFE_INTEGER) => Number.isSafeInteger(value) && value >= 0 && value <= maximum ? value : null;
+      const readText = (value) => {
+        if (typeof value === "string") return value.trim() ? value.trim().slice(0, 160) : null;
+        return typeof value === "number" && Number.isFinite(value) ? String(value) : null;
+      };
+      const requiredKeys = ["damage", "stress", "coolnessUnderFire", "unitMorale", "armor", "conditions", "criticalInjuries", "diseases", "radiation"];
+      if (!requiredKeys.every((key) => Object.prototype.hasOwnProperty.call(snapshot, key))
+        || !isRecord(snapshot.armor)
+        || !isRecord(snapshot.conditions)
+        || !isRecord(snapshot.radiation)
+        || !["head", "arms", "torso", "legs"].every((key) => Object.prototype.hasOwnProperty.call(snapshot.armor, key))
+        || !["starving", "dehydrated", "sleepDeprived", "hypothermic"].every((key) => typeof snapshot.conditions[key] === "boolean")
+        || !["temporary", "permanent"].every((key) => Number.isSafeInteger(snapshot.radiation[key]) && snapshot.radiation[key] >= 0)
+        || !Array.isArray(snapshot.criticalInjuries)
+        || !snapshot.criticalInjuries.every((item) => typeof item === "string")
+        || !Array.isArray(snapshot.diseases)
+        || !snapshot.diseases.every((item) => typeof item === "string")) return null;
+
+      const damage = readCount(snapshot.damage, 6);
+      const stress = readCount(snapshot.stress, 6);
+      const validCuf = snapshot.coolnessUnderFire === null || ["A", "B", "C", "D"].includes(snapshot.coolnessUnderFire);
+      const validMorale = snapshot.unitMorale === null || ["A", "B", "C", "D", "E", "F"].includes(snapshot.unitMorale);
+      if (damage === null || stress === null || !validCuf || !validMorale) return null;
+
+      return {
+        damage,
+        stress,
+        coolnessUnderFire: snapshot.coolnessUnderFire,
+        unitMorale: snapshot.unitMorale,
+        armor: {
+          head: readText(snapshot.armor.head),
+          arms: readText(snapshot.armor.arms),
+          torso: readText(snapshot.armor.torso),
+          legs: readText(snapshot.armor.legs)
+        },
+        conditions: {
+          starving: snapshot.conditions.starving,
+          dehydrated: snapshot.conditions.dehydrated,
+          sleepDeprived: snapshot.conditions.sleepDeprived,
+          hypothermic: snapshot.conditions.hypothermic
+        },
+        criticalInjuries: snapshot.criticalInjuries.slice(0, 20).map((item) => item.trim().slice(0, 160)).filter(Boolean),
+        diseases: snapshot.diseases.slice(0, 20).map((item) => item.trim().slice(0, 160)).filter(Boolean),
+        radiation: {
+          temporary: snapshot.radiation.temporary,
+          permanent: snapshot.radiation.permanent
+        }
+      };
+    }
+
     function createDefaultPlayerData() {
       return {
         schemaVersion: PLAYER_DATA_VERSION,
         rulesReference: PLAYER_RULES_REFERENCE,
+        conditionSnapshot: null,
+        conditionSequence: 0,
+        conditionPushedAt: null,
         character: {
           record: Object.fromEntries(characterInputs.map((input) => [input.name, input.value])),
           changeRequests: []
@@ -610,6 +668,10 @@
         const savedRecord = isRecord(savedCharacter.record) ? savedCharacter.record : {};
         const savedInventory = isRecord(saved.inventory) ? saved.inventory : {};
         const savedQuantities = isRecord(savedInventory.quantities) ? savedInventory.quantities : {};
+        const conditionSnapshot = normalizeConditionSnapshot(saved.conditionSnapshot);
+        const conditionSequence = conditionSnapshot && Number.isSafeInteger(saved.conditionSequence) && saved.conditionSequence >= 0
+          ? saved.conditionSequence
+          : 0;
         const record = Object.fromEntries(characterInputs.map((input) => [
           input.name,
           typeof savedRecord[input.name] === "string" ? savedRecord[input.name] : defaults.character.record[input.name]
@@ -622,6 +684,9 @@
         return {
           schemaVersion: PLAYER_DATA_VERSION,
           rulesReference: PLAYER_RULES_REFERENCE,
+          conditionSnapshot,
+          conditionSequence,
+          conditionPushedAt: conditionSnapshot && typeof saved.conditionPushedAt === "string" ? saved.conditionPushedAt : null,
           character: {
             record,
             changeRequests: Array.isArray(savedCharacter.changeRequests) ? savedCharacter.changeRequests.filter(isRecord) : []
@@ -724,6 +789,91 @@
       document.querySelector("#stress-capacity").textContent = calculateCapacity(PLAYER_RULES_REFERENCE.tables.capacities.stress);
     }
 
+    function renderConditionSnapshot() {
+      const snapshot = playerData.conditionSnapshot;
+      ["damage", "stress"].forEach((track) => {
+        const value = snapshot?.[track];
+        document.querySelectorAll(`[data-condition-track="${track}"]`).forEach((box) => {
+          box.checked = value !== null && value !== undefined && Number(box.dataset.trackMark) <= value;
+        });
+        document.querySelector(`#condition-${track}-count`).textContent = value === null || value === undefined
+          ? "Not linked"
+          : `${value} / 6`;
+      });
+
+      document.querySelector("#condition-cuf").textContent = snapshot?.coolnessUnderFire || "Not linked";
+      document.querySelector("#condition-unit-morale").textContent = snapshot?.unitMorale || "Not linked";
+      document.querySelectorAll("[data-armor-slot]").forEach((output) => {
+        const value = snapshot?.armor?.[output.dataset.armorSlot];
+        output.textContent = snapshot ? value || "Not recorded" : "Not linked";
+      });
+      document.querySelectorAll("[data-condition-flag]").forEach((input) => {
+        input.checked = snapshot?.conditions?.[input.dataset.conditionFlag] === true;
+      });
+      document.querySelector("#condition-critical-injuries").textContent = snapshot
+        ? snapshot.criticalInjuries.join("; ") || "None reported"
+        : "Not linked";
+      document.querySelector("#condition-diseases").textContent = snapshot
+        ? snapshot.diseases.join("; ") || "None reported"
+        : "Not linked";
+      document.querySelector("#condition-radiation-temporary").textContent = snapshot?.radiation?.temporary ?? "Not linked";
+      document.querySelector("#condition-radiation-permanent").textContent = snapshot?.radiation?.permanent ?? "Not linked";
+      document.querySelector("#condition-sync-state").textContent = snapshot
+        ? `GM update ${playerData.conditionSequence} / ${playerData.conditionPushedAt || "time not supplied"}`
+        : "Awaiting GM push";
+    }
+
+    function applyGmConditionPush(input) {
+      let envelope = input;
+      if (typeof input === "string") {
+        try {
+          envelope = JSON.parse(input);
+        } catch {
+          return false;
+        }
+      }
+      if (!isRecord(envelope)
+        || envelope.schemaVersion !== 1
+        || envelope.seatId !== PLAYER_SEAT_ID
+        || !Number.isSafeInteger(envelope.sequence)
+        || envelope.sequence < 1
+        || envelope.sequence <= playerData.conditionSequence) return false;
+
+      const snapshot = normalizeConditionSnapshot(envelope.condition);
+      if (!snapshot) return false;
+      playerData.conditionSnapshot = snapshot;
+      playerData.conditionSequence = envelope.sequence;
+      playerData.conditionPushedAt = typeof envelope.pushedAt === "string" && envelope.pushedAt.trim()
+        ? envelope.pushedAt.trim().slice(0, 40)
+        : new Date().toISOString();
+      renderConditionSnapshot();
+      persistPlayerData();
+      return true;
+    }
+
+    function receiveStoredConditionPush(value) {
+      if (value) applyGmConditionPush(value);
+    }
+
+    renderConditionSnapshot();
+    window.addEventListener("storage", (event) => {
+      if (event.key === GM_CONDITION_PUSH_KEY) receiveStoredConditionPush(event.newValue);
+    });
+    window.addEventListener("fieldbook:gm-condition-push", (event) => applyGmConditionPush(event.detail));
+    if ("BroadcastChannel" in window) {
+      try {
+        const gmConditionChannel = new BroadcastChannel(GM_CONDITION_CHANNEL);
+        gmConditionChannel.addEventListener("message", (event) => applyGmConditionPush(event.data));
+      } catch (error) {
+        console.warn("Could not listen for GM condition updates.", error);
+      }
+    }
+    try {
+      receiveStoredConditionPush(localStorage.getItem(GM_CONDITION_PUSH_KEY));
+    } catch (error) {
+      console.warn("Could not read the latest GM condition update.", error);
+    }
+
     function selectCharacterTab(target, moveFocus = false) {
       characterTabButtons.forEach((button) => {
         const selected = button.dataset.characterTab === target;
@@ -782,7 +932,7 @@
     openInventoryButton.addEventListener("click", () => {
       buttons.find((button) => button.dataset.target === "inventory")?.click();
     });
-    selectCharacterTab("record");
+    selectCharacterTab("condition");
     updateCharacterDerivedValues();
 
     function renderCharacterProposal(request) {
