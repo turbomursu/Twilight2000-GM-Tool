@@ -13,6 +13,7 @@ Open `index.html` in a current desktop or mobile browser. No package install, bu
 - Travel day, waypoint, distance, food, fuel, and weather tracking
 - Field journal entries
 - Browser-local autosave and JSON campaign export
+- Standalone [Campaign Setup Tool prototype](campaign-setup.html) with import-first Field Papers atlas GeoJSON and campaign-local map edits; offline vector basemap packaging and GM runtime import are not connected
 - Standalone [radio-handset Player Interface prototype](player-interface.html) with a separate browser-local store and a read-only GM condition-snapshot receiver; authenticated GM publishing and cross-device delivery are not connected
 
 ## Ruleset Fidelity

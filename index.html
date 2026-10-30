@@ -90,6 +90,8 @@
     }
     .nav-item:hover { color: white; background: #263b30; }
     .nav-item[aria-current="page"] { border-color: #506354; color: #fff; background: linear-gradient(90deg, #344b3d, #293d32); box-shadow: inset 3px 0 #c2cc91, inset 0 1px #ffffff12; }
+    .nav-link { display: flex; align-items: center; width: 100%; gap: 11px; padding: 11px 12px; border: 1px solid transparent; border-radius: 2px; color: #c5d0c4; font-size: 13px; text-decoration: none; }
+    .nav-link:hover { border-color: #506354; color: #fff; background: linear-gradient(90deg, #344b3d, #293d32); }
     .nav-icon { display: inline-grid; width: 18px; place-items: center; color: #a7b99f; font: 12px var(--mono); }
     .rail-bottom { margin-top: auto; padding: 18px 9px 2px; }
     .signal-line { display: flex; align-items: center; gap: 8px; color: #aab8a9; font: 9px var(--mono); text-transform: uppercase; }
@@ -307,6 +309,8 @@
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
       </nav>
+      <div class="nav-label" style="margin-top: 20px;">Authoring</div>
+      <a class="nav-link" href="campaign-setup.html"><span class="nav-icon" aria-hidden="true">05</span>Campaign setup</a>
       <div class="rail-bottom">
         <div class="signal-line"><span class="signal-dot"></span>Local record active</div>
         <p>CAMPAIGN FILE<br>FIELDBOOK / 04</p>

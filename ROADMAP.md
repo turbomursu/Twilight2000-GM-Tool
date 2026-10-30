@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-The GM Tool is a single-file browser prototype with sample campaign data. It has a situation dashboard, fixed route sketch and waypoint tracking, basic personnel and food/fuel counters, a field journal, browser-local autosave, and JSON export. A standalone radio-handset Player Interface visual prototype provides Situation, Inventory, Character, COMMS, and Map quick access; its inventory and messaging work locally, while the map is a GM-published schematic. These views are not connected to campaign data. Explicit campaign creation, load/import, authenticated player seats, shared inventory, rules-backed actions, and the larger simulation systems are not implemented.
+The GM Tool is a single-file browser prototype with sample campaign data. It has a situation dashboard, fixed route sketch and waypoint tracking, basic personnel and food/fuel counters, a field journal, browser-local autosave, and JSON export. The standalone Campaign Setup Tool is an authoring/export prototype; setup-package import into the GM runtime is not implemented. A standalone radio-handset Player Interface visual prototype provides Situation, Inventory, Character, COMMS, and Map quick access; its inventory and messaging work locally, while the map is a GM-published schematic. These views are not connected to campaign data. Authenticated player seats, shared inventory, rules-backed actions, and the larger simulation systems are not implemented.
 
 ## Delivery Principles
 
@@ -47,7 +47,7 @@ The GM Tool is a single-file browser prototype with sample campaign data. It has
 **Goal:** Let a GM create a campaign in the setup tool and transfer it safely into the GM runtime.
 
 - Build the Campaign Setup Tool's manual path for campaign identity, premise, initial locations, factions, settlements, and scenario notes.
-- Create the initial campaign map in Setup; keep live markings, published route, and player position under GM runtime control.
+- Make Field Papers atlas GeoJSON the first map input. Restore its area/page extents, then use a dedicated Terrain Grid step before initial location entry. Store GM terrain labels in 10 km axial Q/R travel hexes anchored to the imported atlas northwest corner, using the T2K Referee Aid / Strategic Play terrain reference; display the values without applying modifiers. Use the same map in the read-only Locations view, where locations receive Q/R references and retain latitude/longitude for rendering. Treat Field Papers as import-only; keep map edits in campaign data and never post them back. Keep the current online OSM layer as a reference view with attribution. Add offline interactive basemaps as a separate, licensed or self-hosted PMTiles vector asset plus its style and attribution; package/recover that asset without conflating it with editable GeoJSON. Do not bulk-download public OSM tiles. Keep live markings, published route, and player position under GM runtime control.
 - Export a versioned, portable setup package; validate and preview a package before importing it into the GM Tool.
 - Keep setup-package export/import separate from runtime campaign save/load and backup.
 - Treat imported setup content as initial state only; do not auto-publish setup notes or other content to players.
