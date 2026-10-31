@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#18251e">
   <title>Fieldbook | Twilight: 2000 GM Desk</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     :root {
       color-scheme: light;
@@ -211,6 +212,18 @@
     .section-bar h2 { margin: 0; font: 19px var(--serif); }
     .section-bar p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
     .movement-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(275px, .75fr); gap: 18px; }
+    .influence-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(290px, .6fr); gap: 18px; align-items: start; }
+    .influence-map-frame { min-height: 470px; border: 1px solid #7d8b7b; background: #dce5d2; }
+    #live-influence-map { width: 100%; height: min(68vh, 680px); min-height: 470px; background: #dce5d2; }
+    .influence-map-status { min-height: 18px; margin: 0; padding: 9px 12px; border-top: 1px solid var(--line); color: var(--muted); font: 9px/1.45 var(--mono); }
+    .influence-map-status.error { color: #9b4136; }
+    .influence-tools { display: grid; gap: 12px; }
+    .influence-list { display: grid; border-top: 1px solid #d5ddd3; }
+    .influence-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 35px; border-bottom: 1px solid #d5ddd3; font: 9px var(--mono); }
+    .influence-swatch { width: 10px; height: 10px; border: 2px solid currentColor; background: transparent; }
+    .influence-row small { color: var(--muted); font: 8px var(--mono); }
+    #setup-import-summary { max-height: 190px; overflow: auto; margin: 10px 0; padding: 11px; border: 1px solid var(--line); background: #f4f6ef; font: 10px/1.5 var(--mono); white-space: pre-wrap; }
+    #setup-import-summary[hidden] { display: none; }
     .travel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
     .travel-controls strong { font: 15px var(--serif); }
     .stepper { display: flex; align-items: center; gap: 6px; }
@@ -308,9 +321,10 @@
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
+        <button class="nav-item" data-view="influence"><span class="nav-icon" aria-hidden="true">05</span>Faction influence</button>
       </nav>
       <div class="nav-label" style="margin-top: 20px;">Authoring</div>
-      <a class="nav-link" href="campaign-setup.html"><span class="nav-icon" aria-hidden="true">05</span>Campaign setup</a>
+      <a class="nav-link" href="campaign-setup.html"><span class="nav-icon" aria-hidden="true">06</span>Campaign setup</a>
       <div class="rail-bottom">
         <div class="signal-line"><span class="signal-dot"></span>Local record active</div>
         <p>CAMPAIGN FILE<br>FIELDBOOK / 04</p>
@@ -322,6 +336,8 @@
         <div class="crumb"><span>The Long Road</span><b>/</b><span id="crumb-view">Situation</span></div>
         <div class="top-actions">
           <div class="date-stamp"><span>Campaign date</span><strong id="top-date"></strong></div>
+          <button class="button" data-action="open-setup-import">Import setup</button>
+          <input id="setup-package-file" type="file" accept=".json,application/json" hidden>
           <button class="button button-icon" data-action="export-record" aria-label="Export campaign record" title="Export campaign record">↓</button>
           <button class="button button-primary" data-action="open-note"><span aria-hidden="true">+</span> Log entry</button>
         </div>
@@ -403,6 +419,32 @@
           <section class="panel" aria-label="Campaign journal entries"><div id="journal-list"></div></section>
         </section>
 
+        <section class="view" id="view-influence" aria-labelledby="influence-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">GM-only / campaign map layer</div><h1 id="influence-title">Faction influence</h1></div>
+            <p>Manage overlapping faction influence on the imported 10 km campaign grid. Influence is campaign data only; it does not apply rules or publish to players.</p>
+          </div>
+          <div class="influence-layout">
+            <section class="panel" aria-labelledby="influence-map-title">
+              <div class="panel-head"><div><div class="eyebrow" id="influence-campaign-label">No setup map loaded</div><h2 id="influence-map-title">Campaign influence map</h2></div><span class="inline-hint">OSM REFERENCE / GM ONLY</span></div>
+              <div class="influence-map-frame"><div id="live-influence-map" aria-label="Editable GM faction influence map"></div></div>
+              <div class="panel-body"><div class="influence-list" id="live-influence-legend"></div></div>
+              <p class="influence-map-status" id="influence-map-status" role="status">Import a setup package to load its campaign map and factions.</p>
+            </section>
+            <aside class="side-stack">
+              <section class="panel">
+                <div class="panel-head"><div><div class="eyebrow">Live GM record</div><h2>Edit influence</h2></div></div>
+                <div class="panel-body influence-tools">
+                  <label class="field"><span class="eyebrow">Faction layer</span><select id="live-influence-faction" disabled><option value="">Import a setup package</option></select></label>
+                  <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button></div>
+                  <p class="feedback" id="live-influence-feedback" role="status">The setup package remains unchanged; live edits are saved in this GM browser.</p>
+                  <div class="influence-list" id="live-influence-factions"><div class="empty-state">No influence layers loaded.</div></div>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </section>
+
         <footer><span>Fieldbook / The Long Road</span><span>Record stored in this browser</span></footer>
       </div>
     </main>
@@ -426,8 +468,13 @@
       <div class="dialog-actions"><button class="button" type="button" data-action="close-person">Cancel</button><button class="button button-primary" type="submit">Add to roster</button></div>
     </form>
   </dialog>
+  <dialog id="setup-import-dialog" aria-labelledby="setup-import-title">
+    <div class="dialog-head"><div><div class="eyebrow">GM-only setup handoff</div><h2 id="setup-import-title">Load map and factions</h2></div><button class="icon-button" id="close-setup-import" aria-label="Close setup import">×</button></div>
+    <div class="dialog-form"><p id="setup-import-status" class="feedback" role="status">Choose an exported schema-v2 setup package.</p><pre id="setup-import-summary" hidden></pre><p class="row-description">This loads the map and faction layers into a separate GM influence workspace. It does not overwrite the running dashboard record or publish player data.</p><div class="dialog-actions"><button class="button" id="cancel-setup-import" type="button">Cancel</button><button class="button button-primary" id="apply-setup-import" type="button" disabled>Load influence map</button></div></div>
+  </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -441,6 +488,8 @@
         weatherNote: "Low cloud and steady rain. The gravel roads are softening; visibility is short in the tree line.",
         activeStop: 1,
         currentPrompt: "",
+        setupPackage: null,
+        liveInfluence: {},
         people: [
           { id: 1, name: "Anja Lind", role: "Medic", condition: "Stable", status: "Ready" },
           { id: 2, name: "Erik Dahl", role: "Driver", condition: "Bruised", status: "Worn" },
@@ -466,8 +515,19 @@
         "The radio catches a weather report from a station that should be silent.",
         "A fresh tire track leaves the road and returns a kilometer later."
       ];
+      const liveInfluenceColors = ["#b74435", "#487c87", "#a97832", "#687e68", "#6d7196", "#955d78"];
+      const setupPackageFile = document.getElementById("setup-package-file");
+      const setupImportDialog = document.getElementById("setup-import-dialog");
+      const setupImportStatus = document.getElementById("setup-import-status");
+      const setupImportSummary = document.getElementById("setup-import-summary");
+      const applySetupImportButton = document.getElementById("apply-setup-import");
       let state = loadState();
       let toastTimer;
+      let pendingSetupPackage = null;
+      let influenceMap = null;
+      let influenceHexLayer = null;
+      let stagedInfluenceCells = new Set();
+      let liveInfluenceEditing = false;
 
       function loadState() {
         try {
@@ -555,9 +615,15 @@
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
+        if (view === "influence") requestAnimationFrame(() => {
+          renderLiveInfluenceControls();
+          initializeInfluenceMap();
+          influenceMap?.invalidateSize({ pan: false });
+          renderLiveInfluenceGrid();
+        });
       }
       function drawMap() {
         const canvas = document.getElementById("field-map");
@@ -648,6 +714,317 @@
         ctx.moveTo(width - 20, 30); ctx.lineTo(width - 24, 37); ctx.lineTo(width - 16, 37); ctx.closePath();
         ctx.fillStyle = "#425346"; ctx.fill();
       }
+
+      function isRecord(value) {
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+      }
+
+      function normalizeInfluenceCellIds(cells) {
+        if (!Array.isArray(cells)) return [];
+        return [...new Set(cells.filter((key) => {
+          if (typeof key !== "string" || !/^-?\d+,-?\d+$/.test(key)) return false;
+          return key.split(",").every((value) => Number.isSafeInteger(Number(value)) && Math.abs(Number(value)) <= 10000);
+        }))];
+      }
+
+      function normalizeSetupPackageForInfluence(input) {
+        if (!isRecord(input) || input.packageType !== "fieldbook.campaign-setup" || input.schemaVersion !== 2) {
+          throw new Error("Choose a Fieldbook setup package using schema version 2.");
+        }
+        if (!isRecord(input.campaign) || !isRecord(input.map) || !isRecord(input.map.grid)) {
+          throw new Error("The setup package is missing campaign or map data.");
+        }
+        const requireText = (value, label, maxLength) => {
+          if (typeof value !== "string" || !value.trim() || value.length > maxLength) throw new Error(`${label} is missing or too long.`);
+          return value.trim();
+        };
+        const campaign = {
+          id: requireText(input.campaign.id, "Campaign ID", 120),
+          name: requireText(input.campaign.name, "Campaign name", 80),
+          setting: requireText(input.campaign.setting, "Campaign setting", 100),
+          era: typeof input.campaign.era === "string" ? input.campaign.era.slice(0, 60) : ""
+        };
+        const rawBounds = input.map.bounds;
+        if (!isRecord(rawBounds) || ![rawBounds.south, rawBounds.west, rawBounds.north, rawBounds.east].every(Number.isFinite)
+          || rawBounds.south < -90 || rawBounds.north > 90 || rawBounds.west < -180 || rawBounds.east > 180
+          || rawBounds.south >= rawBounds.north || rawBounds.west >= rawBounds.east) {
+          throw new Error("The setup package needs valid campaign-area bounds.");
+        }
+        const bounds = { south: rawBounds.south, west: rawBounds.west, north: rawBounds.north, east: rawBounds.east };
+        if (input.map.grid.coordinateSystem !== "axial-q-r" || input.map.grid.cellKm !== 10
+          || !Array.isArray(input.map.grid.terrainCells) || input.map.grid.terrainCells.length > 10000) {
+          throw new Error("The setup package contains an unsupported travel grid.");
+        }
+        const terrainCells = {};
+        input.map.grid.terrainCells.forEach((cell) => {
+          if (!isRecord(cell) || !Number.isSafeInteger(cell.q) || !Number.isSafeInteger(cell.r)
+            || Math.abs(cell.q) > 10000 || Math.abs(cell.r) > 10000 || typeof cell.terrainType !== "string") {
+            throw new Error("The setup package contains an invalid terrain cell.");
+          }
+          const key = `${cell.q},${cell.r}`;
+          if (Object.prototype.hasOwnProperty.call(terrainCells, key)) throw new Error("The setup package contains a duplicate terrain cell.");
+          terrainCells[key] = cell.terrainType;
+        });
+        const origin = input.map.grid.origin === null
+          ? { lat: bounds.north, lng: bounds.west }
+          : isRecord(input.map.grid.origin) && Number.isFinite(input.map.grid.origin.lat) && Number.isFinite(input.map.grid.origin.lng)
+            && input.map.grid.origin.lat >= -90 && input.map.grid.origin.lat <= 90 && input.map.grid.origin.lng >= -180 && input.map.grid.origin.lng <= 180
+          ? { lat: input.map.grid.origin.lat, lng: input.map.grid.origin.lng }
+          : null;
+        if (!origin) throw new Error("The setup package has an invalid grid origin.");
+        if (!Array.isArray(input.factions) || input.factions.length > 200) throw new Error("The setup package faction list is invalid or too large.");
+        const factionIds = new Set();
+        const factions = input.factions.map((faction) => {
+          if (!isRecord(faction)) throw new Error("The setup package contains an invalid faction.");
+          const id = requireText(faction.id, "Faction ID", 120);
+          const name = requireText(faction.name, "Faction name", 160);
+          if (factionIds.has(id)) throw new Error(`The setup package has a duplicate faction ID: ${id}.`);
+          factionIds.add(id);
+          const rawInfluenceCells = faction.influenceCells ?? [];
+          if (!Array.isArray(rawInfluenceCells) || rawInfluenceCells.length > 10000) throw new Error(`The influence layer for ${name} is invalid or too large.`);
+          const influenceCells = normalizeInfluenceCellIds(rawInfluenceCells);
+          if (influenceCells.length !== rawInfluenceCells.length) throw new Error(`The influence layer for ${name} contains an invalid or duplicate hex.`);
+          return { id, name, influenceCells };
+        });
+        const center = isRecord(input.map.center) && Number.isFinite(input.map.center.lat) && Number.isFinite(input.map.center.lng)
+          ? { lat: input.map.center.lat, lng: input.map.center.lng }
+          : { lat: (bounds.south + bounds.north) / 2, lng: (bounds.west + bounds.east) / 2 };
+        const zoom = Number.isFinite(input.map.zoom) ? Math.min(18, Math.max(2, input.map.zoom)) : 10;
+        const locations = Array.isArray(input.map.locations) ? input.map.locations.slice(0, 500).flatMap((location) => {
+          if (!isRecord(location) || !isRecord(location.mapPosition)) return [];
+          const { lat, lng } = location.mapPosition;
+          if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) return [];
+          return [{ name: typeof location.name === "string" ? location.name.slice(0, 160) : "Location", position: { lat, lng } }];
+        }) : [];
+        return {
+          packageType: "fieldbook.campaign-setup",
+          schemaVersion: 2,
+          campaign,
+          map: { name: requireText(input.map.name || input.campaign.mapName, "Map name", 80), bounds, center, zoom, grid: { cellKm: 10, coordinateSystem: "axial-q-r", origin, terrainCells }, locations },
+          factions
+        };
+      }
+
+      function liveInfluenceForCampaign() {
+        return state.liveInfluence?.[state.setupPackage?.campaign.id] || {};
+      }
+
+      function liveAxialForPosition(position, origin) {
+        const metersPerLat = 111132;
+        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+        const radius = 10000 / Math.sqrt(3);
+        const eastMeters = (position.lng - origin.lng) * metersPerLng;
+        const northMeters = (position.lat - origin.lat) * metersPerLat;
+        const q = (Math.sqrt(3) / 3 * eastMeters - northMeters / 3) / radius;
+        const r = (2 / 3 * northMeters) / radius;
+        const x = q, z = r, y = -x - z;
+        let roundedX = Math.round(x), roundedY = Math.round(y), roundedZ = Math.round(z);
+        const xDiff = Math.abs(roundedX - x), yDiff = Math.abs(roundedY - y), zDiff = Math.abs(roundedZ - z);
+        if (xDiff > yDiff && xDiff > zDiff) roundedX = -roundedY - roundedZ;
+        else if (yDiff > zDiff) roundedY = -roundedX - roundedZ;
+        else roundedZ = -roundedX - roundedY;
+        return { q: roundedX, r: roundedZ };
+      }
+
+      function livePositionForMeters(x, y, origin) {
+        const metersPerLat = 111132;
+        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+        return { lat: origin.lat + y / metersPerLat, lng: origin.lng + x / metersPerLng };
+      }
+
+      function initializeInfluenceMap() {
+        if (influenceMap || !state.setupPackage || !window.L) {
+          if (state.setupPackage && !window.L) document.getElementById("influence-map-status").textContent = "Map library unavailable. Check network access and reload.";
+          return;
+        }
+        const mapData = state.setupPackage.map;
+        influenceMap = L.map("live-influence-map", { minZoom: 2, maxZoom: 18 }).setView([mapData.center.lat, mapData.center.lng], mapData.zoom);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+        }).addTo(influenceMap);
+        influenceHexLayer = L.layerGroup().addTo(influenceMap);
+        influenceMap.on("click", handleLiveInfluenceMapClick);
+        influenceMap.on("moveend zoomend", renderLiveInfluenceGrid);
+        influenceMap.fitBounds([[mapData.bounds.south, mapData.bounds.west], [mapData.bounds.north, mapData.bounds.east]], { padding: [28, 28] });
+      }
+
+      function renderLiveInfluenceGrid() {
+        const setup = state.setupPackage;
+        if (!influenceMap || !influenceHexLayer || !setup) return;
+        influenceHexLayer.clearLayers();
+        const { bounds, grid, locations } = setup.map;
+        const origin = grid.origin;
+        const metersPerLat = 111132;
+        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+        const radius = 10000 / Math.sqrt(3);
+        const view = influenceMap.getBounds();
+        const corners = [view.getSouthWest(), view.getNorthWest(), view.getNorthEast(), view.getSouthEast()];
+        const axialCorners = corners.map((corner) => {
+          const x = (corner.lng - origin.lng) * metersPerLng;
+          const y = (corner.lat - origin.lat) * metersPerLat;
+          return { q: (Math.sqrt(3) / 3 * x - y / 3) / radius, r: (2 / 3 * y) / radius };
+        });
+        const qMin = Math.floor(Math.min(...axialCorners.map((point) => point.q))) - 2;
+        const qMax = Math.ceil(Math.max(...axialCorners.map((point) => point.q))) + 2;
+        const rMin = Math.floor(Math.min(...axialCorners.map((point) => point.r))) - 2;
+        const rMax = Math.ceil(Math.max(...axialCorners.map((point) => point.r))) + 2;
+        if ((qMax - qMin + 1) * (rMax - rMin + 1) > 900) {
+          document.getElementById("influence-map-status").textContent = "Zoom in to view the 10 km influence grid.";
+          return;
+        }
+        const liveLayers = liveInfluenceForCampaign();
+        const cellOwners = new Map();
+        setup.factions.forEach((faction, factionIndex) => {
+          (liveLayers[faction.id] || faction.influenceCells).forEach((key) => {
+            if (!cellOwners.has(key)) cellOwners.set(key, []);
+            cellOwners.get(key).push({ factionId: faction.id, color: liveInfluenceColors[factionIndex % liveInfluenceColors.length] });
+          });
+        });
+        for (let q = qMin; q <= qMax; q += 1) {
+          for (let r = rMin; r <= rMax; r += 1) {
+            const x = radius * Math.sqrt(3) * (q + r / 2);
+            const y = radius * 1.5 * r;
+            const center = livePositionForMeters(x, y, origin);
+            if (center.lat < bounds.south || center.lat > bounds.north || center.lng < bounds.west || center.lng > bounds.east || !view.contains([center.lat, center.lng])) continue;
+            const vertices = Array.from({ length: 6 }, (_, index) => {
+              const angle = (30 + index * 60) * Math.PI / 180;
+              const point = livePositionForMeters(x + radius * Math.cos(angle), y + radius * Math.sin(angle), origin);
+              return [point.lat, point.lng];
+            });
+            const key = `${q},${r}`;
+            L.polygon(vertices, {
+              color: "#344a40",
+              weight: stagedInfluenceCells.has(key) ? 3 : 1,
+              opacity: .48,
+              fill: true,
+              fillColor: "#e8ece5",
+              fillOpacity: .05,
+              interactive: liveInfluenceEditing,
+              className: liveInfluenceEditing ? "live-influence-hex" : ""
+            }).addTo(influenceHexLayer);
+            const owners = cellOwners.get(key) || [];
+            owners.forEach((owner) => {
+              L.polygon(vertices, {
+                color: owner.color,
+                weight: stagedInfluenceCells.has(key) ? 4 : 2,
+                opacity: .95,
+                fill: true,
+                fillColor: owner.color,
+                fillOpacity: owners.length > 1 ? .1 : .2,
+                interactive: false,
+                className: "live-faction-influence-cell"
+              }).addTo(influenceHexLayer);
+            });
+            if (stagedInfluenceCells.has(key) && !owners.length) {
+              const factionIndex = Math.max(0, setup.factions.findIndex((faction) => faction.id === document.getElementById("live-influence-faction").value));
+              L.polygon(vertices, { color: liveInfluenceColors[factionIndex % liveInfluenceColors.length], weight: 4, fill: true, fillColor: liveInfluenceColors[factionIndex % liveInfluenceColors.length], fillOpacity: .18, interactive: false }).addTo(influenceHexLayer);
+            }
+            if (influenceMap.getZoom() >= 9) {
+              L.marker([center.lat, center.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: "leaflet-hex-label", html: `Q${q >= 0 ? "+" : ""}${q} R${r >= 0 ? "+" : ""}${r}`, iconSize: [60, 12], iconAnchor: [30, 6] }) }).addTo(influenceHexLayer);
+            }
+          }
+        }
+        locations.forEach((location) => {
+          L.circleMarker([location.position.lat, location.position.lng], { radius: 5, color: "#fff", weight: 2, fillColor: "#b74435", fillOpacity: 1, interactive: false }).addTo(influenceHexLayer)
+            .bindTooltip(location.name, { direction: "top", offset: [0, -5] });
+        });
+        document.getElementById("influence-map-status").textContent = liveInfluenceEditing
+          ? "Selection mode active. Click hexes to stage or unstage this faction's influence."
+          : `${setup.campaign.name} / influence is GM-managed campaign data only.`;
+      }
+
+      function handleLiveInfluenceMapClick(event) {
+        if (!liveInfluenceEditing || !state.setupPackage || !event.originalEvent.target.closest?.(".live-influence-hex")) return;
+        const factionId = document.getElementById("live-influence-faction").value;
+        if (!factionId) return;
+        const { q, r } = liveAxialForPosition(event.latlng, state.setupPackage.map.grid.origin);
+        const key = `${q},${r}`;
+        if (stagedInfluenceCells.has(key)) stagedInfluenceCells.delete(key);
+        else stagedInfluenceCells.add(key);
+        renderLiveInfluenceControls();
+        renderLiveInfluenceGrid();
+      }
+
+      function renderLiveInfluenceRows(target, setup, layers) {
+        target.replaceChildren();
+        setup.factions.forEach((faction, index) => {
+          const row = document.createElement("div");
+          row.className = "influence-row";
+          const swatch = document.createElement("i");
+          swatch.className = "influence-swatch";
+          swatch.style.color = liveInfluenceColors[index % liveInfluenceColors.length];
+          const name = document.createElement("span");
+          name.textContent = faction.name;
+          const count = document.createElement("small");
+          count.textContent = `${(layers[faction.id] || faction.influenceCells).length} hex(es)`;
+          row.append(swatch, name, count);
+          target.append(row);
+        });
+        if (!setup.factions.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No factions in this setup package.";
+          target.append(empty);
+        }
+      }
+
+      function renderLiveInfluenceControls() {
+        const factionSelect = document.getElementById("live-influence-faction");
+        const previousFactionId = factionSelect.value;
+        const editButton = document.getElementById("live-influence-edit");
+        const saveButton = document.getElementById("live-influence-save");
+        const clearButton = document.getElementById("live-influence-clear");
+        const feedback = document.getElementById("live-influence-feedback");
+        const setup = state.setupPackage;
+        factionSelect.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = setup?.factions.length ? "Choose a faction" : setup ? "No factions in package" : "Import a setup package";
+        factionSelect.append(placeholder);
+        if (!setup) {
+          document.getElementById("influence-campaign-label").textContent = "No setup map loaded";
+          document.getElementById("live-influence-legend").replaceChildren();
+          document.getElementById("live-influence-factions").replaceChildren();
+          document.getElementById("influence-map-status").textContent = "Import a schema-v2 setup package to load a GM influence map.";
+          factionSelect.disabled = true;
+          editButton.disabled = true;
+          saveButton.disabled = true;
+          clearButton.disabled = true;
+          feedback.textContent = "The live influence workspace is separate from the sample campaign dashboard.";
+          return;
+        }
+        setup.factions.forEach((faction) => {
+          const option = document.createElement("option");
+          option.value = faction.id;
+          option.textContent = faction.name;
+          factionSelect.append(option);
+        });
+        const selectedId = setup.factions.some((faction) => faction.id === previousFactionId) ? previousFactionId : "";
+        if (selectedId) factionSelect.value = selectedId;
+        else if (setup.factions.length) factionSelect.value = setup.factions[0].id;
+        factionSelect.disabled = !setup.factions.length;
+        document.getElementById("influence-campaign-label").textContent = `${setup.campaign.name} / ${setup.campaign.setting}`;
+        const layers = liveInfluenceForCampaign();
+        renderLiveInfluenceRows(document.getElementById("live-influence-legend"), setup, layers);
+        renderLiveInfluenceRows(document.getElementById("live-influence-factions"), setup, layers);
+        const faction = setup.factions.find((item) => item.id === factionSelect.value);
+        editButton.disabled = !faction;
+        editButton.textContent = liveInfluenceEditing ? "Finish selection" : "Select hexes";
+        editButton.setAttribute("aria-pressed", String(liveInfluenceEditing));
+        editButton.classList.toggle("button-primary", liveInfluenceEditing);
+        const selected = [...stagedInfluenceCells];
+        const currentCells = faction ? (layers[faction.id] || faction.influenceCells) : [];
+        saveButton.disabled = !faction || !selected.length;
+        clearButton.disabled = !faction || !selected.some((key) => currentCells.includes(key));
+        feedback.textContent = !faction
+          ? "Choose a faction to inspect or edit its layer."
+          : selected.length
+            ? `${selected.length} hex(es) staged for ${faction.name}. Save to commit these live edits.`
+            : `${faction.name}: ${currentCells.length} live influence hex(es).`;
+        if (influenceMap) influenceMap.invalidateSize({ pan: false });
+      }
+
       function nextId(items) { return items.reduce((largest, item) => Math.max(largest, Number(item.id) || 0), 0) + 1; }
 
       document.addEventListener("click", (event) => {
@@ -656,6 +1033,10 @@
         if (button.dataset.view) { setView(button.dataset.view); return; }
         const action = button.dataset.action;
         if (!action) return;
+        if (action === "open-setup-import") {
+          setupPackageFile.value = "";
+          setupPackageFile.click();
+        }
         if (action === "open-note") document.getElementById("note-dialog").showModal();
         if (action === "close-note") document.getElementById("note-dialog").close();
         if (action === "open-person") document.getElementById("person-dialog").showModal();
@@ -709,6 +1090,120 @@
           state.notes = state.notes.filter((note) => String(note.id) !== button.dataset.id);
           persist(); render(); showToast("Journal entry removed.");
         }
+      });
+      setupPackageFile.addEventListener("change", async () => {
+        const file = setupPackageFile.files?.[0];
+        if (!file) return;
+        pendingSetupPackage = null;
+        applySetupImportButton.disabled = true;
+        setupImportSummary.hidden = true;
+        setupImportStatus.className = "feedback";
+        setupImportStatus.textContent = "Checking setup package…";
+        setupImportDialog.showModal();
+        try {
+          if (file.size > 25 * 1024 * 1024) throw new Error("Setup packages must be smaller than 25 MB.");
+          pendingSetupPackage = normalizeSetupPackageForInfluence(JSON.parse(await file.text()));
+          const setup = pendingSetupPackage;
+          setupImportSummary.textContent = [
+            `Campaign: ${setup.campaign.name}`,
+            `Setting: ${setup.campaign.setting}`,
+            `Map: ${setup.map.name}`,
+            `Factions: ${setup.factions.length}`,
+            `Terrain cells: ${Object.keys(setup.map.grid.terrainCells).length}`,
+            `Initial influence layers: ${setup.factions.filter((faction) => faction.influenceCells.length).length}`
+          ].join("\n");
+          setupImportSummary.hidden = false;
+          setupImportStatus.className = "feedback success";
+          setupImportStatus.textContent = `Validated ${file.name}. Load this map into the GM-only influence workspace.`;
+          applySetupImportButton.disabled = false;
+        } catch (error) {
+          setupImportStatus.className = "feedback error";
+          setupImportStatus.textContent = error instanceof Error ? error.message : "Could not read this setup package.";
+        }
+      });
+      const closeSetupImportDialog = () => {
+        pendingSetupPackage = null;
+        setupImportDialog.close();
+      };
+      document.getElementById("close-setup-import").addEventListener("click", closeSetupImportDialog);
+      document.getElementById("cancel-setup-import").addEventListener("click", closeSetupImportDialog);
+      applySetupImportButton.addEventListener("click", () => {
+        if (!pendingSetupPackage) return;
+        const setupPackage = pendingSetupPackage;
+        const previousState = state;
+        const liveInfluence = isRecord(state.liveInfluence) ? { ...state.liveInfluence } : {};
+        if (!Object.prototype.hasOwnProperty.call(liveInfluence, setupPackage.campaign.id)) {
+          liveInfluence[setupPackage.campaign.id] = Object.fromEntries(setupPackage.factions.map((faction) => [faction.id, [...faction.influenceCells]]));
+        }
+        state = { ...state, setupPackage, liveInfluence };
+        if (!persist()) {
+          state = previousState;
+          return;
+        }
+        pendingSetupPackage = null;
+        stagedInfluenceCells.clear();
+        liveInfluenceEditing = false;
+        setupImportDialog.close();
+        if (influenceMap) influenceMap.fitBounds([[setupPackage.map.bounds.south, setupPackage.map.bounds.west], [setupPackage.map.bounds.north, setupPackage.map.bounds.east]], { padding: [28, 28] });
+        setView("influence");
+        showToast("Setup map loaded into the GM-only influence workspace.");
+      });
+      document.getElementById("live-influence-faction").addEventListener("change", () => {
+        stagedInfluenceCells.clear();
+        renderLiveInfluenceControls();
+        renderLiveInfluenceGrid();
+      });
+      document.getElementById("live-influence-edit").addEventListener("click", (event) => {
+        liveInfluenceEditing = !liveInfluenceEditing;
+        if (liveInfluenceEditing) stagedInfluenceCells.clear();
+        renderLiveInfluenceControls();
+        renderLiveInfluenceGrid();
+        document.getElementById("influence-map-status").textContent = liveInfluenceEditing
+          ? "Selection mode active. Click hexes to stage or unstage this faction's influence."
+          : "Selection mode ended. Save or clear the staged hexes.";
+        event.currentTarget.setAttribute("aria-pressed", String(liveInfluenceEditing));
+      });
+      document.getElementById("live-influence-save").addEventListener("click", () => {
+        const setup = state.setupPackage;
+        const factionId = document.getElementById("live-influence-faction").value;
+        if (!setup || !factionId || !stagedInfluenceCells.size) return;
+        const campaignId = setup.campaign.id;
+        const currentCampaignLayers = liveInfluenceForCampaign();
+        const currentCells = currentCampaignLayers[factionId] || setup.factions.find((faction) => faction.id === factionId)?.influenceCells || [];
+        const nextState = {
+          ...state,
+          liveInfluence: {
+            ...(isRecord(state.liveInfluence) ? state.liveInfluence : {}),
+            [campaignId]: { ...currentCampaignLayers, [factionId]: [...new Set([...currentCells, ...stagedInfluenceCells])].sort() }
+          }
+        };
+        const previousState = state;
+        state = nextState;
+        if (!persist()) { state = previousState; return; }
+        stagedInfluenceCells.clear();
+        renderLiveInfluenceControls();
+        renderLiveInfluenceGrid();
+      });
+      document.getElementById("live-influence-clear").addEventListener("click", () => {
+        const setup = state.setupPackage;
+        const factionId = document.getElementById("live-influence-faction").value;
+        if (!setup || !factionId || !stagedInfluenceCells.size) return;
+        const campaignId = setup.campaign.id;
+        const currentCampaignLayers = liveInfluenceForCampaign();
+        const currentCells = currentCampaignLayers[factionId] || setup.factions.find((faction) => faction.id === factionId)?.influenceCells || [];
+        const staged = new Set(stagedInfluenceCells);
+        const previousState = state;
+        state = {
+          ...state,
+          liveInfluence: {
+            ...(isRecord(state.liveInfluence) ? state.liveInfluence : {}),
+            [campaignId]: { ...currentCampaignLayers, [factionId]: currentCells.filter((key) => !staged.has(key)) }
+          }
+        };
+        if (!persist()) { state = previousState; return; }
+        stagedInfluenceCells.clear();
+        renderLiveInfluenceControls();
+        renderLiveInfluenceGrid();
       });
       document.getElementById("note-form").addEventListener("submit", (event) => {
         event.preventDefault();

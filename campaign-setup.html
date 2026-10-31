@@ -318,10 +318,16 @@
                 <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Selected travel hex</span><h2>Terrain assignment</h2></div></div><div class="panel-body">
                   <div class="terrain-selected-cell"><span id="terrain-selected-coordinate">Select a hex</span><strong id="terrain-selected-status">No selection</strong></div>
                   <label class="field"><span class="field-label">Strategic terrain type</span><select id="terrain-type-select"><option value="">Unassigned</option><option value="road">Road</option><option value="open">Open</option><option value="woods">Woods</option><option value="hills">Hills</option><option value="mountains">Mountains</option><option value="lake-river">Lake / river</option><option value="swamp">Swamp</option><option value="ruins">Ruins</option></select></label>
-                  <div class="button-group"><button class="button button-primary" type="button" id="save-terrain-type" disabled>Save terrain</button><button class="button" type="button" id="remove-terrain-type" disabled>Clear hex</button></div>
+                  <div class="button-group"><button class="button" type="button" id="terrain-batch-mode" aria-pressed="false">Select multiple</button><button class="button button-primary" type="button" id="save-terrain-type" disabled>Save terrain</button><button class="button" type="button" id="remove-terrain-type" disabled>Clear selected</button></div>
                   <p class="feedback">Source: T2K Referee Aid / Strategic Play / Terrain Types. These entries do not apply tactical combat rules.</p>
                 </div></section>
                 <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Saved terrain</span><h2>Campaign hexes</h2></div><span class="eyebrow" id="terrain-assignment-count">0</span></div><div class="terrain-assignments" id="terrain-assignments"><div class="empty-state">No terrain labels assigned.</div></div></section>
+                <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Faction map layer</span><h2>Influence areas</h2></div></div><div class="panel-body">
+                  <label class="field"><span class="field-label">Faction layer</span><select id="influence-faction-select"><option value="">Add a faction first</option></select></label>
+                  <div class="button-group"><button class="button" type="button" id="influence-batch-mode" aria-pressed="false" disabled>Select influence hexes</button><button class="button button-primary" type="button" id="save-influence-cells" disabled>Save layer</button><button class="button" type="button" id="clear-influence-cells" disabled>Clear selected</button></div>
+                  <p class="feedback" id="influence-feedback" role="status">Influence is a GM-managed map layer; it does not apply game effects.</p>
+                  <div class="terrain-assignments" id="faction-influence-list"><div class="empty-state">No faction influence assigned.</div></div>
+                </div></section>
               </aside>
             </div>
             <section class="panel terrain-reference" aria-labelledby="terrain-reference-title"><div class="panel-heading"><div><span class="eyebrow">Rules reference</span><h2 id="terrain-reference-title">Strategic Play terrain</h2></div><span class="eyebrow">T2K Referee Aid / Terrain Types</span></div><div class="panel-body"><div class="terrain-data-table" id="terrain-data-table"></div></div></section>
@@ -433,6 +439,12 @@
       const saveTerrainButton = document.querySelector("#save-terrain-type");
       const removeTerrainButton = document.querySelector("#remove-terrain-type");
       const terrainAssignmentsList = document.querySelector("#terrain-assignments");
+      const influenceFactionSelect = document.querySelector("#influence-faction-select");
+      const influenceBatchModeButton = document.querySelector("#influence-batch-mode");
+      const saveInfluenceButton = document.querySelector("#save-influence-cells");
+      const clearInfluenceButton = document.querySelector("#clear-influence-cells");
+      const influenceFeedback = document.querySelector("#influence-feedback");
+      const factionInfluenceList = document.querySelector("#faction-influence-list");
       const exportButton = document.querySelector("#export-package");
       const previewDialog = document.querySelector("#preview-dialog");
       const packageFileInput = document.querySelector("#package-file");
@@ -440,6 +452,7 @@
       const importPackageStatus = document.querySelector("#import-package-status");
       const importPackageSummaryElement = document.querySelector("#import-package-summary");
       const applyImportedPackageButton = document.querySelector("#apply-import-package");
+      const factionInfluenceColors = ["#b74435", "#487c87", "#a97832", "#687e68", "#6d7196", "#955d78"];
       let leafletMap = null;
       let locationMarkerLayer = null;
       let hexGridLayer = null;
@@ -449,6 +462,9 @@
       let areaHandles = [];
       let drawingArea = false;
       let selectedTerrainCell = null;
+      const selectedTerrainCells = new Map();
+      let terrainBatchMode = false;
+      let influenceBatchMode = false;
       let placementMode = false;
       let pendingPosition = null;
       let editingLocationId = null;
@@ -498,6 +514,14 @@
       function normalizeTerrainCells(cells) {
         if (!isRecord(cells)) return {};
         return Object.fromEntries(Object.entries(cells).filter(([key, terrain]) => /^-?\d+,-?\d+$/.test(key) && Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrain)));
+      }
+
+      function normalizeInfluenceCells(cells) {
+        if (!Array.isArray(cells)) return [];
+        return [...new Set(cells.filter((key) => {
+          if (typeof key !== "string" || !/^-?\d+,-?\d+$/.test(key)) return false;
+          return key.split(",").every((value) => Number.isSafeInteger(Number(value)) && Math.abs(Number(value)) <= 10000);
+        }))];
       }
 
       function ensureGridOrigin(bounds = state.map.bounds) {
@@ -718,7 +742,7 @@
                 ...(legacySchematic && isRecord(location.position) ? { legacySchematicPosition: { ...location.position } } : {})
               };
             }) : [],
-            factions: Array.isArray(parsed.factions) ? parsed.factions.filter(isRecord) : [],
+            factions: Array.isArray(parsed.factions) ? parsed.factions.filter(isRecord).map((faction) => ({ ...faction, influenceCells: normalizeInfluenceCells(faction.influenceCells) })) : [],
             settlements: Array.isArray(parsed.settlements) ? parsed.settlements.filter(isRecord) : [],
             scenarioNotes: Array.isArray(parsed.scenarioNotes) ? parsed.scenarioNotes.filter(isRecord) : []
           };
@@ -893,6 +917,13 @@
         if (!leafletMap || !hexGridLayer) return;
         const terrainEditing = !document.querySelector('[data-panel="terrain"]').hidden;
         hexGridLayer.clearLayers();
+        const influenceByCell = new Map();
+        state.factions.forEach((faction, factionIndex) => {
+          (faction.influenceCells || []).forEach((key) => {
+            if (!influenceByCell.has(key)) influenceByCell.set(key, []);
+            influenceByCell.get(key).push(factionInfluenceColors[factionIndex % factionInfluenceColors.length]);
+          });
+        });
         const area = normalizeAreaBounds(state.map.bounds);
         if (!area) return;
         ensureGridOrigin(area);
@@ -933,7 +964,7 @@
             const terrain = TERRAIN_TYPES[terrainType];
             const polygon = L.polygon(vertices, {
               color: terrain ? terrain.color : "#344a40",
-              weight: terrainEditing && selectedTerrainCell?.key === key ? 3 : 1,
+              weight: terrainEditing && selectedTerrainCells.has(key) ? 3 : 1,
               opacity: terrain ? .75 : .3,
               fill: terrainEditing || Boolean(terrain),
               fillColor: terrain?.color || "#344a40",
@@ -941,9 +972,18 @@
               interactive: terrainEditing,
               className: terrainEditing ? "terrain-grid-polygon" : ""
             }).addTo(hexGridLayer);
-            if (terrainEditing) polygon.on("click", (event) => {
-              if (document.querySelector('[data-panel="terrain"]').hidden) return;
-              selectTerrainCell(q, r);
+            const influenceColors = influenceByCell.get(key) || [];
+            influenceColors.forEach((color, index) => {
+              L.polygon(vertices, {
+                color,
+                weight: terrainEditing && selectedTerrainCells.has(key) ? 4 : 2,
+                opacity: .95,
+                fill: true,
+                fillColor: color,
+                fillOpacity: influenceColors.length > 1 ? .1 : .2,
+                interactive: false,
+                className: `faction-influence-cell faction-influence-${index}`
+              }).addTo(hexGridLayer);
             });
             if (leafletMap.getZoom() >= 9) {
               const ref = formatAxialCoordinate(q, r);
@@ -962,13 +1002,18 @@
 
       function selectTerrainCell(q, r, centerMap = false) {
         const key = `${q},${r}`;
-        selectedTerrainCell = { q, r, key, ref: formatAxialCoordinate(q, r) };
-        const terrainType = state.map.grid.terrainCells[key] || "";
-        document.querySelector("#terrain-selected-coordinate").textContent = selectedTerrainCell.ref;
-        document.querySelector("#terrain-selected-status").textContent = terrainType ? TERRAIN_TYPES[terrainType].label : "Unassigned";
-        terrainTypeSelect.value = terrainType;
-        saveTerrainButton.disabled = false;
-        removeTerrainButton.disabled = !terrainType;
+        const cell = { q, r, key, ref: formatAxialCoordinate(q, r) };
+        if (terrainBatchMode) {
+          if (selectedTerrainCells.has(key)) selectedTerrainCells.delete(key);
+          else selectedTerrainCells.set(key, cell);
+          selectedTerrainCell = cell;
+        } else {
+          selectedTerrainCells.clear();
+          selectedTerrainCells.set(key, cell);
+          selectedTerrainCell = cell;
+          terrainTypeSelect.value = state.map.grid.terrainCells[key] || "";
+        }
+        renderTerrainSelection();
         if (centerMap && leafletMap) {
           const radius = TRAVEL_HEX_KM * 1000 / Math.sqrt(3);
           const x = radius * Math.sqrt(3) * (q + r / 2);
@@ -976,6 +1021,93 @@
           const position = localMetersToPosition(x, y);
           if (position) leafletMap.panTo([position.lat, position.lng]);
         }
+        renderHexGrid();
+      }
+
+      function renderTerrainSelection() {
+        const selected = [...selectedTerrainCells.values()];
+        const coordinate = document.querySelector("#terrain-selected-coordinate");
+        const status = document.querySelector("#terrain-selected-status");
+        if (!selected.length) {
+          coordinate.textContent = "Select a hex";
+          status.textContent = "No selection";
+        } else if (selected.length === 1) {
+          const cell = selected[0];
+          const terrainType = state.map.grid.terrainCells[cell.key] || "";
+          coordinate.textContent = cell.ref;
+          status.textContent = terrainType ? TERRAIN_TYPES[terrainType].label : "Unassigned";
+        } else {
+          coordinate.textContent = `${selected.length} hexes selected`;
+          status.textContent = terrainBatchMode ? "Multi-select" : "Selected";
+        }
+        saveTerrainButton.disabled = influenceBatchMode || !selected.length || !Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrainTypeSelect.value);
+        removeTerrainButton.disabled = influenceBatchMode || !selected.some((cell) => state.map.grid.terrainCells[cell.key]);
+      }
+
+      function renderInfluenceControls() {
+        const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
+        const selectedCount = selectedTerrainCells.size;
+        influenceBatchModeButton.disabled = !faction;
+        influenceBatchModeButton.setAttribute("aria-pressed", String(influenceBatchMode));
+        influenceBatchModeButton.classList.toggle("button-primary", influenceBatchMode);
+        influenceBatchModeButton.textContent = influenceBatchMode ? "Finish influence selection" : "Select influence hexes";
+        saveInfluenceButton.disabled = !faction || !selectedCount;
+        clearInfluenceButton.disabled = !faction || !selectedCount || ![...selectedTerrainCells.keys()].some((key) => faction.influenceCells?.includes(key));
+        if (!faction) influenceFeedback.textContent = "Add a faction first in Factions & settlements.";
+        else if (selectedCount) influenceFeedback.textContent = `${selectedCount} hex(es) selected for ${faction.name}. Save the layer to keep these edits.`;
+        else influenceFeedback.textContent = influenceBatchMode ? `Select hexes for ${faction.name}; saved cells stay visible on the map.` : `${faction.name}: ${(faction.influenceCells || []).length} influence hex(es).`;
+      }
+
+      function renderInfluenceList() {
+        factionInfluenceList.replaceChildren();
+        if (!state.factions.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No factions added.";
+          factionInfluenceList.append(empty);
+          return;
+        }
+        state.factions.forEach((faction, index) => {
+          const row = document.createElement("div");
+          row.className = "terrain-row";
+          const name = document.createElement("span");
+          const swatch = document.createElement("i");
+          swatch.className = "terrain-swatch";
+          swatch.style.backgroundColor = factionInfluenceColors[index % factionInfluenceColors.length];
+          name.append(swatch, document.createTextNode(faction.name));
+          const count = document.createElement("span");
+          count.textContent = `${(faction.influenceCells || []).length} hex(es)`;
+          row.append(name, count);
+          factionInfluenceList.append(row);
+        });
+      }
+
+      function renderInfluenceFactionOptions() {
+        const currentId = influenceFactionSelect.value;
+        influenceFactionSelect.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = state.factions.length ? "Choose a faction" : "Add a faction first";
+        influenceFactionSelect.append(placeholder);
+        state.factions.forEach((faction) => {
+          const option = document.createElement("option");
+          option.value = faction.id;
+          option.textContent = faction.name;
+          influenceFactionSelect.append(option);
+        });
+        if (state.factions.some((faction) => faction.id === currentId)) influenceFactionSelect.value = currentId;
+        else if (state.factions.length === 1) influenceFactionSelect.value = state.factions[0].id;
+        if (!influenceFactionSelect.value) influenceBatchMode = false;
+        renderInfluenceList();
+        renderInfluenceControls();
+      }
+
+      function selectInfluenceCell(q, r) {
+        const key = `${q},${r}`;
+        if (selectedTerrainCells.has(key)) selectedTerrainCells.delete(key);
+        else selectedTerrainCells.set(key, { q, r, key, ref: formatAxialCoordinate(q, r) });
+        renderTerrainSelection();
+        renderInfluenceControls();
         renderHexGrid();
       }
 
@@ -1119,7 +1251,10 @@
       function handleMapClick(event) {
         if (!document.querySelector('[data-panel="terrain"]').hidden && event.originalEvent.target.closest?.(".terrain-grid-polygon")) {
           const cell = gridCoordinatesForPosition(event.latlng);
-          if (cell) selectTerrainCell(cell.q, cell.r);
+          if (cell) {
+            if (influenceBatchMode) selectInfluenceCell(cell.q, cell.r);
+            else selectTerrainCell(cell.q, cell.r);
+          }
           return;
         }
         if (placementMode) {
@@ -1325,6 +1460,7 @@
           list.append(row);
         });
         document.querySelector(isFaction ? "#faction-count" : "#settlement-count").textContent = String(records.length);
+        if (isFaction) renderInfluenceFactionOptions();
       }
 
       function renderNotes() {
@@ -1508,7 +1644,13 @@
             };
           });
         };
-        const factions = normalizeRecords(input.factions, "Faction");
+        const factions = normalizeRecords(input.factions, "Faction").map((faction, index) => {
+          const influenceCells = input.factions[index].influenceCells ?? [];
+          if (!Array.isArray(influenceCells) || influenceCells.length > 10000) throw new Error("A faction influence layer is invalid or too large.");
+          const normalizedCells = normalizeInfluenceCells(influenceCells);
+          if (normalizedCells.length !== influenceCells.length) throw new Error(`The influence layer for ${faction.name} contains an invalid or duplicate hex.`);
+          return { ...faction, influenceCells: normalizedCells };
+        });
         const settlements = normalizeRecords(input.settlements, "Settlement");
         if (!Array.isArray(input.scenarioNotes) || input.scenarioNotes.length > 500) throw new Error("The scenario-note list is invalid or too large.");
         const scenarioNotes = input.scenarioNotes.map((note) => {
@@ -1696,7 +1838,12 @@
         const nameInput = form.querySelector("input");
         const descriptionInput = form.querySelector("textarea");
         const records = type === "faction" ? state.factions : state.settlements;
-        records.push({ id: makeId(type), name: nameInput.value.trim(), description: descriptionInput.value.trim() });
+        records.push({
+          id: makeId(type),
+          name: nameInput.value.trim(),
+          description: descriptionInput.value.trim(),
+          ...(type === "faction" ? { influenceCells: [] } : {})
+        });
         form.reset();
         renderEntities(type);
         saveDraft();
@@ -1816,26 +1963,93 @@
 
       chooseFieldPapersFileButton.addEventListener("click", () => fieldPapersFileInput.click());
       applyFieldPapersImportButton.addEventListener("click", applyFieldPapersFeatures);
-      saveTerrainButton.addEventListener("click", () => {
-        if (!selectedTerrainCell) return;
-        const terrainType = terrainTypeSelect.value;
-        if (terrainType && Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrainType)) {
-          state.map.grid.terrainCells[selectedTerrainCell.key] = terrainType;
-        } else {
-          delete state.map.grid.terrainCells[selectedTerrainCell.key];
+      document.querySelector("#terrain-batch-mode").addEventListener("click", (event) => {
+        terrainBatchMode = !terrainBatchMode;
+        if (terrainBatchMode) {
+          influenceBatchMode = false;
+          selectedTerrainCells.clear();
         }
-        const { q, r } = selectedTerrainCell;
+        event.currentTarget.setAttribute("aria-pressed", String(terrainBatchMode));
+        event.currentTarget.classList.toggle("button-primary", terrainBatchMode);
+        event.currentTarget.textContent = terrainBatchMode ? "Exit multi-select" : "Select multiple";
+        renderTerrainSelection();
+        renderInfluenceControls();
+        setMapStatus(terrainBatchMode ? "Multi-select active. Click hexes to add or remove them from the selection." : "Multi-select ended. Save or clear the selected hexes.");
+      });
+      influenceBatchModeButton.addEventListener("click", () => {
+        influenceBatchMode = !influenceBatchMode;
+        if (influenceBatchMode) {
+          terrainBatchMode = false;
+          selectedTerrainCells.clear();
+        }
+        const terrainModeButton = document.querySelector("#terrain-batch-mode");
+        terrainModeButton.setAttribute("aria-pressed", String(terrainBatchMode));
+        terrainModeButton.classList.toggle("button-primary", terrainBatchMode);
+        terrainModeButton.textContent = terrainBatchMode ? "Exit multi-select" : "Select multiple";
+        renderTerrainSelection();
+        renderInfluenceControls();
+        renderHexGrid();
+        setMapStatus(influenceBatchMode ? "Influence selection active. Click hexes to add or remove them from this faction's staged layer." : "Influence selection ended.");
+      });
+      influenceFactionSelect.addEventListener("change", () => {
+        selectedTerrainCells.clear();
+        renderTerrainSelection();
+        renderInfluenceControls();
+        renderHexGrid();
+      });
+      saveInfluenceButton.addEventListener("click", () => {
+        const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
+        if (!faction || !selectedTerrainCells.size) return;
+        const savedCount = selectedTerrainCells.size;
+        faction.influenceCells = [...new Set([...(faction.influenceCells || []), ...selectedTerrainCells.keys()])].sort();
+        selectedTerrainCells.clear();
+        saveDraft();
+        renderInfluenceList();
+        renderInfluenceControls();
+        renderTerrainSelection();
+        renderHexGrid();
+        influenceFeedback.textContent = `Saved ${savedCount} influence hex(es) for ${faction.name}.`;
+      });
+      clearInfluenceButton.addEventListener("click", () => {
+        const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
+        if (!faction || !selectedTerrainCells.size) return;
+        const selected = new Set(selectedTerrainCells.keys());
+        const removedCount = (faction.influenceCells || []).filter((key) => selected.has(key)).length;
+        faction.influenceCells = (faction.influenceCells || []).filter((key) => !selected.has(key));
+        selectedTerrainCells.clear();
+        saveDraft();
+        renderInfluenceList();
+        renderInfluenceControls();
+        renderTerrainSelection();
+        renderHexGrid();
+        influenceFeedback.textContent = `Cleared ${removedCount} influence hex(es) from ${faction.name}.`;
+      });
+      terrainTypeSelect.addEventListener("change", renderTerrainSelection);
+      saveTerrainButton.addEventListener("click", () => {
+        if (!selectedTerrainCells.size) return;
+        const terrainType = terrainTypeSelect.value;
+        if (!Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrainType)) return;
+        const savedCount = selectedTerrainCells.size;
+        selectedTerrainCells.forEach((cell, key) => { state.map.grid.terrainCells[key] = terrainType; });
+        selectedTerrainCells.clear();
+        selectedTerrainCell = null;
         saveDraft();
         renderTerrainAssignments();
-        selectTerrainCell(q, r);
+        renderTerrainSelection();
+        renderHexGrid();
+        setMapStatus(`Saved ${TERRAIN_TYPES[terrainType].label} to ${savedCount} hex(es). Select another terrain type to continue.`, "success");
       });
       removeTerrainButton.addEventListener("click", () => {
-        if (!selectedTerrainCell) return;
-        delete state.map.grid.terrainCells[selectedTerrainCell.key];
-        const { q, r } = selectedTerrainCell;
+        if (!selectedTerrainCells.size) return;
+        const clearedCount = selectedTerrainCells.size;
+        selectedTerrainCells.forEach((cell, key) => { delete state.map.grid.terrainCells[key]; });
+        selectedTerrainCells.clear();
+        selectedTerrainCell = null;
         saveDraft();
         renderTerrainAssignments();
-        selectTerrainCell(q, r);
+        renderTerrainSelection();
+        renderHexGrid();
+        setMapStatus(`Cleared terrain from ${clearedCount} selected hex(es).`, "success");
       });
       fieldPapersFileInput.addEventListener("change", async () => {
         const file = fieldPapersFileInput.files?.[0];
