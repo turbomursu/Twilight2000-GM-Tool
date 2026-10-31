@@ -189,9 +189,17 @@
     .icon-button { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid #aab5aa; border-radius: 2px; color: #445247; background: #f4f6ef; font: 12px var(--mono); }
     .icon-button:hover { border-color: #758579; background: #fff; }
     .start-badge { padding: 3px 5px; border: 1px solid #738875; color: #34503e; font: 7px var(--mono); text-transform: uppercase; }
+    .visibility-badge { padding: 3px 5px; border: 1px solid #9aab9b; color: #405248; font: 7px var(--mono); text-transform: uppercase; }
+    .visibility-badge.players { border-color: #487c87; color: #315d67; background: #e2eeee; }
     .entity-layout { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 15px; align-items: start; }
     .entity-form { display: grid; gap: 10px; padding: 13px; border-bottom: 1px solid #c5cec4; }
     .entity-form .field textarea { min-height: 65px; }
+    .faction-settlement-choices { display: grid; max-height: 190px; overflow: auto; border-top: 1px solid #c5cec4; }
+    .faction-settlement-choice { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: center; gap: 8px; min-height: 36px; border-bottom: 1px solid #d5ddd3; color: var(--ink); font-size: 10px; }
+    .faction-settlement-choice small { color: var(--muted); font: 8px var(--mono); }
+    .settlement-prominence-list { display: grid; gap: 3px; margin-top: 7px; }
+    .settlement-prominence-row { display: grid; grid-template-columns: 26px minmax(0,1fr) auto; align-items: center; gap: 5px; font: 8px var(--mono); }
+    .settlement-prominence-row .icon-button { width: 23px; height: 23px; }
     .note-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 15px; align-items: start; }
     .private-stamp { display: inline-flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid #b88648; color: #755526; background: #f1e7d4; font: 8px var(--mono); text-transform: uppercase; }
     .note-form { display: grid; gap: 10px; }
@@ -239,9 +247,10 @@
         <button class="step-button" type="button" data-step="map"><span class="step-number">02</span><span>Import atlas</span><span class="step-state" data-step-state="map">Required</span></button>
         <button class="step-button" type="button" data-step="terrain"><span class="step-number">03</span><span>Terrain grid</span><span class="step-state" data-step-state="terrain">0</span></button>
         <button class="step-button" type="button" data-step="locations"><span class="step-number">04</span><span>Locations</span><span class="step-state" data-step-state="locations">0</span></button>
-        <button class="step-button" type="button" data-step="groups"><span class="step-number">05</span><span>Factions & settlements</span><span class="step-state" data-step-state="groups">0 / 0</span></button>
-        <button class="step-button" type="button" data-step="notes"><span class="step-number">06</span><span>Scenario notes</span><span class="step-state" data-step-state="notes">0</span></button>
-        <button class="step-button" type="button" data-step="package"><span class="step-number">07</span><span>Package review</span><span class="step-state" data-step-state="package">Check</span></button>
+        <button class="step-button" type="button" data-step="settlements"><span class="step-number">05</span><span>Settlements</span><span class="step-state" data-step-state="settlements">0</span></button>
+        <button class="step-button" type="button" data-step="factions"><span class="step-number">06</span><span>Factions</span><span class="step-state" data-step-state="factions">0</span></button>
+        <button class="step-button" type="button" data-step="notes"><span class="step-number">07</span><span>Scenario notes</span><span class="step-state" data-step-state="notes">0</span></button>
+        <button class="step-button" type="button" data-step="package"><span class="step-number">08</span><span>Package review</span><span class="step-state" data-step-state="package">Check</span></button>
       </nav>
       <div class="rail-card"><span class="eyebrow">Setup package</span><strong id="rail-campaign-name">Untitled campaign</strong><small>Initial state only / version 1</small></div>
       <div class="rail-bottom">
@@ -298,12 +307,12 @@
               <section class="panel" aria-label="Location placement map"><div id="location-map-host"></div><div class="map-legend"><span class="legend-item"><i class="legend-dot start"></i>Starting location</span><span class="legend-item"><i class="legend-dot"></i>Initial location</span><span>Labels use Q/R travel-hex coordinates</span></div></section>
               <aside class="location-side">
                 <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Add to initial campaign data</span><h2>New location</h2></div></div>
-                  <form class="location-form" id="location-form"><div class="field"><label for="location-name">Name</label><input id="location-name" maxlength="70" required placeholder="Bridge, village, rally point"></div><div class="field"><label for="location-kind">Location type</label><select id="location-kind"><option value="Location">Location</option><option value="Settlement">Settlement</option><option value="Landmark">Landmark</option><option value="Crossing">Crossing</option><option value="Site">Site</option></select></div><div class="field"><label for="location-description">Description</label><textarea id="location-description" maxlength="500" placeholder="Starting campaign detail"></textarea></div><p class="location-coordinate" id="location-coordinate">No grid reference selected</p><p class="feedback" id="location-feedback" role="status">Place a location on the map, or edit an existing entry.</p><div class="button-group"><button class="button" type="button" id="place-location">Place on map</button><button class="button button-primary" type="button" id="add-location" disabled>Add to package</button><button class="button" type="button" id="cancel-location-edit" hidden>Cancel edit</button></div></form>
+                  <form class="location-form" id="location-form"><div class="field"><label for="location-name">Name</label><input id="location-name" maxlength="70" required placeholder="Bridge, village, rally point"></div><div class="field"><label for="location-kind">Location type</label><select id="location-kind"><option value="Location">Location</option><option value="Settlement">Settlement</option><option value="Landmark">Landmark</option><option value="Crossing">Crossing</option><option value="Site">Site</option></select></div><div class="field"><label for="location-visibility">Player visibility / GM-managed</label><select id="location-visibility"><option value="gm-only">GM-only</option><option value="players">Player-visible / eligible for explicit publication</option></select><p class="feedback">This flag does not publish information. The GM controls publication separately.</p></div><div class="field"><label for="location-description">Description</label><textarea id="location-description" maxlength="500" placeholder="Starting campaign detail"></textarea></div><p class="location-coordinate" id="location-coordinate">No grid reference selected</p><p class="feedback" id="location-feedback" role="status">Place a location on the map, or edit an existing entry.</p><div class="button-group"><button class="button" type="button" id="place-location">Place on map</button><button class="button button-primary" type="button" id="add-location" disabled>Add to package</button><button class="button" type="button" id="cancel-location-edit" hidden>Cancel edit</button></div></form>
                 </section>
                 <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Initial map entries</span><h2>Locations</h2></div></div><div class="location-list" id="location-list"><div class="empty-state">No initial locations yet.</div></div></section>
               </aside>
             </div>
-            <div class="step-footer"><p class="feedback" id="locations-feedback">Location identity is stored as a Q/R travel-hex reference; map position is retained separately.</p><div class="button-group"><button class="button" type="button" data-go-step="terrain">← Terrain</button><button class="button button-primary" type="button" data-go-step="groups">Factions & settlements →</button></div></div>
+            <div class="step-footer"><p class="feedback" id="locations-feedback">Location identity is stored as a Q/R travel-hex reference; map position is retained separately.</p><div class="button-group"><button class="button" type="button" data-go-step="terrain">← Terrain</button><button class="button button-primary" type="button" data-go-step="settlements">Settlements →</button></div></div>
           </div>
         </section>
 
@@ -325,7 +334,9 @@
                 <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Faction map layer</span><h2>Influence areas</h2></div></div><div class="panel-body">
                   <label class="field"><span class="field-label">Faction layer</span><select id="influence-faction-select"><option value="">Add a faction first</option></select></label>
                   <div class="button-group"><button class="button" type="button" id="influence-batch-mode" aria-pressed="false" disabled>Select influence hexes</button><button class="button button-primary" type="button" id="save-influence-cells" disabled>Save layer</button><button class="button" type="button" id="clear-influence-cells" disabled>Clear selected</button></div>
+                  <button class="button" type="button" id="finish-faction-influence" hidden>Done editing faction</button>
                   <p class="feedback" id="influence-feedback" role="status">Influence is a GM-managed map layer; it does not apply game effects.</p>
+                  <p class="feedback">Free = no faction influence assigned to this hex.</p>
                   <div class="terrain-assignments" id="faction-influence-list"><div class="empty-state">No faction influence assigned.</div></div>
                 </div></section>
               </aside>
@@ -335,27 +346,49 @@
           </div>
         </section>
 
-        <section class="setup-panel" data-panel="groups" aria-labelledby="groups-title" hidden>
-          <div class="panel-heading"><div><span class="eyebrow">05 / Initial campaign actors</span><h2 id="groups-title">Factions & settlements</h2></div><span class="eyebrow">Starting descriptions only / no simulation</span></div>
+        <section class="setup-panel" data-panel="settlements" aria-labelledby="settlements-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">05 / Initial settlements</span><h2 id="settlements-title">Settlement creator</h2></div><span class="eyebrow" id="settlement-count">0</span></div>
           <div class="panel-body">
-            <div class="entity-layout">
-              <section class="panel">
-                <div class="panel-heading"><div><span class="eyebrow">Campaign setup data</span><h2>Factions</h2></div><span class="eyebrow" id="faction-count">0</span></div>
-                <form class="entity-form" id="faction-form"><div class="field"><label for="faction-name">Faction name</label><input id="faction-name" maxlength="70" required placeholder="Name"></div><div class="field"><label for="faction-description">Starting description</label><textarea id="faction-description" maxlength="500" placeholder="Known presence or identity at campaign start"></textarea></div><button class="button button-primary" type="submit">Add faction</button></form>
-                <div class="location-list" id="faction-list"><div class="empty-state">No factions added.</div></div>
-              </section>
-              <section class="panel">
-                <div class="panel-heading"><div><span class="eyebrow">Campaign setup data</span><h2>Settlements</h2></div><span class="eyebrow" id="settlement-count">0</span></div>
-                <form class="entity-form" id="settlement-form"><div class="field"><label for="settlement-name">Settlement name</label><input id="settlement-name" maxlength="70" required placeholder="Name"></div><div class="field"><label for="settlement-description">Starting description</label><textarea id="settlement-description" maxlength="500" placeholder="Known state at campaign start"></textarea></div><button class="button button-primary" type="submit">Add settlement</button></form>
-                <div class="location-list" id="settlement-list"><div class="empty-state">No settlements added.</div></div>
-              </section>
-            </div>
-            <div class="step-footer"><p class="feedback" id="groups-feedback" role="status">No relationship or economy simulation is performed here.</p><div class="button-group"><button class="button" type="button" data-go-step="locations">← Locations</button><button class="button button-primary" type="button" data-go-step="notes">Scenario notes →</button></div></div>
+            <section class="panel"><div class="panel-heading"><div><span class="eyebrow">GM-defined generator</span><h2>Settlement draft</h2></div><span class="eyebrow">Not Fourth Edition rules</span></div><div class="panel-body">
+              <p class="row-description">Uses locations marked Settlement in the Locations step. Generated descriptors are editable scenario ideas, not a rules procedure. Population remains a GM estimate.</p>
+              <form class="entity-form" id="settlement-form">
+                <div class="field"><label for="settlement-location">Settlement location</label><select id="settlement-location" name="locationId" required><option value="">Add a Settlement location in Locations first</option></select><p class="feedback" id="settlement-source-status" role="status">Settlement names and map positions come from the Locations step.</p></div>
+                <button class="button" type="button" id="generate-settlement-draft" disabled>Generate GM draft</button>
+                <p class="feedback" id="settlement-generation-status" role="status">Choose a location, then generate editable scenario descriptors.</p>
+                <div class="form-grid">
+                  <div class="field"><label for="settlement-scale">Scale / GM label</label><select id="settlement-scale"><option value="">Choose scale</option><option>Camp</option><option>Village</option><option>Town</option><option>City</option><option>Major urban center</option></select></div>
+                  <div class="field"><label for="settlement-population">Population estimate / GM entered</label><input id="settlement-population" type="number" min="0" max="100000000" step="1" placeholder="Not estimated"></div>
+                  <div class="field"><label for="settlement-security">Security posture / GM-defined</label><select id="settlement-security"><option value="">Choose posture</option><option>Unsecured</option><option>Local watch</option><option>Controlled perimeter</option><option>Contested</option></select></div>
+                  <div class="field"><label for="settlement-attitude">Local attitude / GM-defined</label><select id="settlement-attitude"><option value="">Choose attitude</option><option>Unknown</option><option>Hostile</option><option>Wary</option><option>Neutral</option><option>Cooperative</option></select></div>
+                  <div class="field full"><label for="settlement-leadership">Local leadership / GM-defined</label><select id="settlement-leadership"><option value="">Choose leadership</option><option>Community council</option><option>Local administrator</option><option>Military command</option><option>Faction-appointed authority</option><option>No clear authority</option></select></div>
+                  <div class="field full"><label for="settlement-situation">Current situation / editable GM prompt</label><textarea id="settlement-situation" maxlength="500" placeholder="Optional situation prompt"></textarea></div>
+                  <div class="field full"><label for="settlement-description">Starting description / GM notes</label><textarea id="settlement-description" maxlength="500" placeholder="Starting campaign detail"></textarea></div>
+                </div>
+                <button class="button button-primary" type="submit">Add settlement</button>
+              </form>
+            </div></section>
+            <div class="location-list" id="settlement-list"><div class="empty-state">No settlements added.</div></div>
+            <div class="step-footer"><p class="feedback" role="status">Starting descriptions only; no settlement simulation is performed here.</p><div class="button-group"><button class="button" type="button" data-go-step="locations">← Locations</button><button class="button button-primary" type="button" data-go-step="factions">Factions →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="factions" aria-labelledby="factions-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">06 / Initial campaign actors</span><h2 id="factions-title">Faction creator</h2></div><span class="eyebrow" id="faction-count">0</span></div>
+          <div class="panel-body">
+            <form class="entity-form" id="faction-form"><div class="field"><label for="faction-name">Faction name</label><input id="faction-name" maxlength="70" required placeholder="Name"></div><div class="field"><label for="faction-description">Starting description</label><textarea id="faction-description" maxlength="500" placeholder="Known presence or identity at campaign start"></textarea></div><button class="button button-primary" type="submit">Create faction</button></form>
+            <div class="location-list" id="faction-list"><div class="empty-state">No factions added.</div></div>
+            <section class="panel" id="faction-setup-panel" hidden><div class="panel-heading"><div><span class="eyebrow">Faction workflow</span><h2 id="faction-setup-title">Configure faction</h2></div><span class="eyebrow">GM-managed / non-exclusive</span></div><div class="panel-body">
+              <p class="row-description">Select every settlement this faction influences. Influence may overlap; prominence order is set on each settlement. Then paint this faction's map area.</p>
+              <div id="faction-settlement-choices" class="faction-settlement-choices"></div>
+              <div class="button-group"><button class="button button-primary" type="button" id="save-faction-settlements">Save settlements</button><button class="button" type="button" id="paint-faction-influence">Paint influence on map →</button><button class="button" type="button" id="finish-faction-setup">Finish faction</button></div>
+              <p class="feedback" id="faction-setup-status" role="status">Choose settlements, then paint influence on the map.</p>
+            </div></section>
+            <div class="step-footer"><p class="feedback" role="status">Create a faction, select settlements, paint its influence, then repeat. Choose “All factions done” when finished.</p><div class="button-group"><button class="button" type="button" data-go-step="settlements">← Settlements</button><button class="button button-primary" type="button" data-go-step="notes">All factions done →</button></div></div>
           </div>
         </section>
 
         <section class="setup-panel" data-panel="notes" aria-labelledby="notes-title" hidden>
-          <div class="panel-heading"><div><span class="eyebrow">04 / GM preparation</span><h2 id="notes-title">Scenario notes</h2></div><span class="private-stamp">GM-only / unpublished</span></div>
+          <div class="panel-heading"><div><span class="eyebrow">07 / GM preparation</span><h2 id="notes-title">Scenario notes</h2></div><span class="private-stamp">GM-only / unpublished</span></div>
           <div class="panel-body">
             <div class="note-layout">
               <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Private setup material</span><h2>Add a scenario note</h2></div></div><div class="panel-body">
@@ -364,12 +397,12 @@
               </div></section>
               <aside class="callout"><strong>Visibility boundary</strong><p>Setup notes remain GM-only in the exported package. The GM Tool must create a separate player-facing projection and publish it explicitly.</p></aside>
             </div>
-            <div class="step-footer"><p class="feedback" id="notes-feedback" role="status"></p><div class="button-group"><button class="button" type="button" data-go-step="groups">← Factions & settlements</button><button class="button button-primary" type="button" data-go-step="package">Review package →</button></div></div>
+            <div class="step-footer"><p class="feedback" id="notes-feedback" role="status"></p><div class="button-group"><button class="button" type="button" data-go-step="factions">← Factions</button><button class="button button-primary" type="button" data-go-step="package">Review package →</button></div></div>
           </div>
         </section>
 
         <section class="setup-panel" data-panel="package" aria-labelledby="package-title" hidden>
-          <div class="panel-heading"><div><span class="eyebrow">05 / Handoff to GM runtime</span><h2 id="package-title">Package review</h2></div><span class="eyebrow">Setup package / schema v2</span></div>
+          <div class="panel-heading"><div><span class="eyebrow">08 / Handoff to GM runtime</span><h2 id="package-title">Package review</h2></div><span class="eyebrow">Setup package / schema v2</span></div>
           <div class="panel-body">
             <div class="package-layout">
               <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Preflight</span><h2>Validation</h2></div><div class="button-group"><button class="button" type="button" id="open-package-file">Open setup JSON</button><input id="package-file" type="file" accept=".json,application/json" hidden><button class="button" type="button" id="validate-package">Validate package</button></div></div><div class="panel-body">
@@ -406,7 +439,7 @@
         swamp: { label: "Swamp", color: "#527b78", speed: "x1/4", driving: "-1", foraging: "-1", hunting: "0", scrounging: "-2", encounter: "2D10x2" },
         ruins: { label: "Ruins", color: "#575856", speed: "x1/2", driving: "0", foraging: "-2", hunting: "-1", scrounging: "+2", encounter: "2D10" }
       };
-      const stepLabels = { brief: "Campaign brief", map: "Import atlas", terrain: "Terrain grid", locations: "Locations", groups: "Factions & settlements", notes: "Scenario notes", package: "Package review" };
+      const stepLabels = { brief: "Campaign brief", map: "Import atlas", terrain: "Terrain grid", locations: "Locations", settlements: "Settlements", factions: "Factions", notes: "Scenario notes", package: "Package review" };
       const panels = [...document.querySelectorAll("[data-panel]")];
       const stepButtons = [...document.querySelectorAll("[data-step]")];
       const campaignNameInput = document.querySelector("#campaign-name");
@@ -416,6 +449,7 @@
       const campaignEraInput = document.querySelector("#campaign-era");
       const locationNameInput = document.querySelector("#location-name");
       const locationKindInput = document.querySelector("#location-kind");
+      const locationVisibilityInput = document.querySelector("#location-visibility");
       const locationDescriptionInput = document.querySelector("#location-description");
       const mapFrame = document.querySelector("#map-frame");
       const mapElement = document.querySelector("#leaflet-map");
@@ -445,6 +479,21 @@
       const clearInfluenceButton = document.querySelector("#clear-influence-cells");
       const influenceFeedback = document.querySelector("#influence-feedback");
       const factionInfluenceList = document.querySelector("#faction-influence-list");
+      const settlementLocationSelect = document.querySelector("#settlement-location");
+      const settlementSourceStatus = document.querySelector("#settlement-source-status");
+      const settlementForm = document.querySelector("#settlement-form");
+      const generateSettlementDraftButton = document.querySelector("#generate-settlement-draft");
+      const saveFactionSettlementsButton = document.querySelector("#save-faction-settlements");
+      const paintFactionInfluenceButton = document.querySelector("#paint-faction-influence");
+      const finishFactionSetupButton = document.querySelector("#finish-faction-setup");
+      const finishFactionInfluenceButton = document.querySelector("#finish-faction-influence");
+      const factionSetupPanel = document.querySelector("#faction-setup-panel");
+      const factionSetupTitle = document.querySelector("#faction-setup-title");
+      const factionSettlementChoices = document.querySelector("#faction-settlement-choices");
+      const factionSetupStatus = document.querySelector("#faction-setup-status");
+      let activeFactionId = null;
+      let returnToFactionSetup = false;
+      let pendingFactionSettlementIds = new Set();
       const exportButton = document.querySelector("#export-package");
       const previewDialog = document.querySelector("#preview-dialog");
       const packageFileInput = document.querySelector("#package-file");
@@ -453,6 +502,21 @@
       const importPackageSummaryElement = document.querySelector("#import-package-summary");
       const applyImportedPackageButton = document.querySelector("#apply-import-package");
       const factionInfluenceColors = ["#b74435", "#487c87", "#a97832", "#687e68", "#6d7196", "#955d78"];
+      const settlementDraftOptions = {
+        scale: ["Camp", "Village", "Town", "City", "Major urban center"],
+        security: ["Unsecured", "Local watch", "Controlled perimeter", "Contested"],
+        attitude: ["Unknown", "Hostile", "Wary", "Neutral", "Cooperative"],
+        leadership: ["Community council", "Local administrator", "Military command", "Faction-appointed authority", "No clear authority"],
+        situations: [
+          "Food stores are running low, and leaders are debating how to ration them.",
+          "A damaged crossing has slowed travel and trade through the area.",
+          "Two local groups disagree over access to a shared resource.",
+          "A recent arrival has put pressure on shelter and supplies.",
+          "A critical repair needs skills or materials the settlement lacks.",
+          "The local leadership is changing, and residents are unsure who is in charge.",
+          "An unresolved security concern has restricted movement after dark."
+        ]
+      };
       let leafletMap = null;
       let locationMarkerLayer = null;
       let hexGridLayer = null;
@@ -714,6 +778,43 @@
           const gridOrigin = isRecord(savedGrid.origin) && isValidCoordinate(savedGrid.origin.lat, savedGrid.origin.lng)
             ? { lat: savedGrid.origin.lat, lng: savedGrid.origin.lng }
             : null;
+          const savedFactions = Array.isArray(parsed.factions) ? parsed.factions.filter(isRecord).map((faction) => ({
+            ...faction,
+            influenceCells: normalizeInfluenceCells(faction.influenceCells)
+          })) : [];
+          const savedSettlements = Array.isArray(parsed.settlements) ? parsed.settlements.filter(isRecord).map((settlement) => {
+            const location = Array.isArray(parsed.locations)
+              ? parsed.locations.find((item) => isRecord(item) && item.id === settlement.locationId)
+              : null;
+            const position = isRecord(location?.position) && isValidCoordinate(location.position.lat, location.position.lng)
+              ? { lat: location.position.lat, lng: location.position.lng }
+              : null;
+            return {
+              ...settlement,
+              locationId: typeof location?.id === "string" ? location.id : null,
+              name: typeof location?.name === "string" ? location.name : typeof settlement.name === "string" ? settlement.name : "Unlinked settlement",
+              gridRef: typeof location?.gridRef === "string" ? location.gridRef : null,
+              position,
+              visibility: location?.visibility === "players" ? "players" : settlement.visibility === "players" ? "players" : "gm-only",
+              prominentFactionIds: Array.isArray(settlement.prominentFactionIds) ? settlement.prominentFactionIds.filter((id) => typeof id === "string") : [],
+              scale: typeof settlement.scale === "string" ? settlement.scale.slice(0, 80) : null,
+              populationEstimate: Number.isSafeInteger(settlement.populationEstimate) && settlement.populationEstimate >= 0 ? settlement.populationEstimate : null,
+              security: typeof settlement.security === "string" ? settlement.security.slice(0, 100) : null,
+              attitude: typeof settlement.attitude === "string" ? settlement.attitude.slice(0, 100) : null,
+              leadership: typeof settlement.leadership === "string" ? settlement.leadership.slice(0, 100) : null,
+              situation: typeof settlement.situation === "string" ? settlement.situation.slice(0, 500) : ""
+            };
+          }) : [];
+          savedSettlements.forEach((settlement) => {
+            settlement.prominentFactionIds = [...new Set(settlement.prominentFactionIds.filter((id) => savedFactions.some((faction) => faction.id === id)))];
+          });
+          savedFactions.forEach((faction) => {
+            if (typeof faction.settlementId === "string") {
+              const legacySettlement = savedSettlements.find((settlement) => settlement.id === faction.settlementId);
+              if (legacySettlement && !legacySettlement.prominentFactionIds.includes(faction.id)) legacySettlement.prominentFactionIds.push(faction.id);
+              delete faction.settlementId;
+            }
+          });
           return {
             schemaVersion: 2,
             campaign: {
@@ -739,12 +840,13 @@
               return {
                 ...location,
                 position: legacySchematic ? null : validPosition,
+                visibility: location.visibility === "players" ? "players" : "gm-only",
                 gridRef: typeof location.gridRef === "string" ? location.gridRef : null,
                 ...(legacySchematic && isRecord(location.position) ? { legacySchematicPosition: { ...location.position } } : {})
               };
             }) : [],
-            factions: Array.isArray(parsed.factions) ? parsed.factions.filter(isRecord).map((faction) => ({ ...faction, influenceCells: normalizeInfluenceCells(faction.influenceCells) })) : [],
-            settlements: Array.isArray(parsed.settlements) ? parsed.settlements.filter(isRecord) : [],
+            factions: savedFactions,
+            settlements: savedSettlements,
             scenarioNotes: Array.isArray(parsed.scenarioNotes) ? parsed.scenarioNotes.filter(isRecord) : []
           };
         } catch (error) {
@@ -826,7 +928,8 @@
         document.querySelector('[data-step-state="map"]').textContent = state.map.atlas ? "Ready" : "Required";
         document.querySelector('[data-step-state="terrain"]').textContent = String(Object.keys(state.map.grid.terrainCells).length);
         document.querySelector('[data-step-state="locations"]').textContent = String(state.locations.length);
-        document.querySelector('[data-step-state="groups"]').textContent = `${state.factions.length} / ${state.settlements.length}`;
+        document.querySelector('[data-step-state="settlements"]').textContent = String(state.settlements.length);
+        document.querySelector('[data-step-state="factions"]').textContent = String(state.factions.length);
         document.querySelector('[data-step-state="notes"]').textContent = String(state.scenarioNotes.length);
         const valid = validatePackage(false).length === 0;
         document.querySelector('[data-step-state="package"]').textContent = valid ? "Ready" : "Check";
@@ -963,18 +1066,18 @@
             const key = `${q},${r}`;
             const terrainType = state.map.grid.terrainCells[key] || "";
             const terrain = TERRAIN_TYPES[terrainType];
+            const influenceColors = influenceByCell.get(key) || [];
             const selectedCell = selectedTerrainCells.has(key) || selectedInfluenceCells.has(key);
             const polygon = L.polygon(vertices, {
-              color: terrain ? terrain.color : "#344a40",
+              color: terrain?.color || (influenceColors.length ? "#344a40" : "#788779"),
               weight: terrainEditing && selectedCell ? 3 : 1,
-              opacity: terrain ? .75 : .3,
-              fill: terrainEditing || Boolean(terrain),
-              fillColor: terrain?.color || "#344a40",
-              fillOpacity: terrain ? .34 : terrainEditing ? .08 : 0,
+              opacity: terrain ? .75 : .7,
+              fill: true,
+              fillColor: terrain?.color || (influenceColors.length ? "#344a40" : "#e4ece2"),
+              fillOpacity: terrain ? .34 : influenceColors.length ? .04 : .12,
               interactive: terrainEditing,
               className: terrainEditing ? "terrain-grid-polygon" : ""
             }).addTo(hexGridLayer);
-            const influenceColors = influenceByCell.get(key) || [];
             influenceColors.forEach((color, index) => {
               L.polygon(vertices, {
                 color,
@@ -1055,7 +1158,7 @@
         influenceBatchModeButton.textContent = influenceBatchMode ? "Finish influence selection" : "Select influence hexes";
         saveInfluenceButton.disabled = !faction || !selectedCount;
         clearInfluenceButton.disabled = !faction || !selectedCount || ![...selectedInfluenceCells.keys()].some((key) => faction.influenceCells?.includes(key));
-        if (!faction) influenceFeedback.textContent = "Add a faction first in Factions & settlements.";
+        if (!faction) influenceFeedback.textContent = "Add a faction in the Factions step first.";
         else if (selectedCount) influenceFeedback.textContent = `${selectedCount} hex(es) selected for ${faction.name}. Save the layer to keep these edits.`;
         else influenceFeedback.textContent = influenceBatchMode ? `Select hexes for ${faction.name}; saved cells stay visible on the map.` : `${faction.name}: ${(faction.influenceCells || []).length} influence hex(es).`;
       }
@@ -1298,6 +1401,7 @@
         editingLocationId = location.id;
         locationNameInput.value = location.name;
         locationKindInput.value = location.kind || "Location";
+        locationVisibilityInput.value = location.visibility === "players" ? "players" : "gm-only";
         locationDescriptionInput.value = location.description || "";
         pendingPosition = location.position ? { ...location.position } : null;
         document.querySelector("#add-location").textContent = "Save location";
@@ -1312,6 +1416,7 @@
         pendingPosition = null;
         locationNameInput.value = "";
         locationKindInput.value = "Location";
+        locationVisibilityInput.value = "gm-only";
         locationDescriptionInput.value = "";
         document.querySelector("#add-location").textContent = "Add to package";
         cancelLocationEditButton.hidden = true;
@@ -1347,6 +1452,10 @@
           const kind = document.createElement("small");
           kind.textContent = location.kind;
           title.append(kind);
+          const visibility = document.createElement("small");
+          visibility.className = `visibility-badge${location.visibility === "players" ? " players" : ""}`;
+          visibility.textContent = location.visibility === "players" ? "Players" : "GM-only";
+          title.append(visibility);
           info.append(title);
           if (location.description) {
             const description = document.createElement("p");
@@ -1391,6 +1500,11 @@
           removeButton.setAttribute("aria-label", `Remove ${location.name}`);
           removeButton.textContent = "×";
           removeButton.addEventListener("click", () => {
+            if (state.settlements.some((settlement) => settlement.locationId === location.id)) {
+              document.querySelector("#location-feedback").className = "feedback error";
+              document.querySelector("#location-feedback").textContent = "This location backs a settlement. Remove that settlement before deleting its location.";
+              return;
+            }
             state.locations.splice(index, 1);
             if (!state.locations.some((item) => item.isStartingLocation) && state.locations[0]) state.locations[0].isStartingLocation = true;
             if (editingLocationId === location.id) cancelLocationEdit();
@@ -1419,6 +1533,157 @@
         document.querySelector("#map-place-hint").textContent = drawingArea ? areaStart ? "First corner saved / choose opposite corner" : "Choose first area corner" : placementMode ? "Placement active / click map to set position" : state.locations.length ? "Initial locations / select marker to edit" : "Search, mark an area, or place a location";
         drawAreaButton.textContent = drawingArea ? "Cancel area" : state.map.bounds ? "Edit area" : "Mark area";
         clearAreaButton.disabled = !state.map.bounds;
+        syncSettlementLocations();
+        renderSettlementLocationOptions();
+        renderEntities("settlement");
+      }
+
+      function syncSettlementLocations() {
+        const claimedLocationIds = new Set();
+        state.settlements.forEach((settlement) => {
+          let location = state.locations.find((item) => item.id === settlement.locationId);
+          if (!location && !settlement.locationId) {
+            const matches = state.locations.filter((item) => item.kind === "Settlement" && item.name === settlement.name && !claimedLocationIds.has(item.id));
+            if (matches.length === 1) location = matches[0];
+          }
+          if (!location) return;
+          if (claimedLocationIds.has(location.id)) return;
+          claimedLocationIds.add(location.id);
+          settlement.locationId = location.id;
+          settlement.name = location.name;
+          settlement.gridRef = location.gridRef || null;
+          settlement.position = location.position ? { ...location.position } : null;
+          settlement.visibility = location.visibility === "players" ? "players" : "gm-only";
+        });
+      }
+
+      function renderSettlementLocationOptions() {
+        const selectedId = settlementLocationSelect.value;
+        const occupiedLocationIds = new Set(state.settlements.map((settlement) => settlement.locationId).filter(Boolean));
+        const availableLocations = state.locations.filter((location) => location.kind === "Settlement"
+          && (!occupiedLocationIds.has(location.id) || location.id === selectedId));
+        settlementLocationSelect.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = availableLocations.length ? "Choose a Settlement location" : "Add a Settlement location in Locations first";
+        settlementLocationSelect.append(placeholder);
+        availableLocations.forEach((location) => {
+          const option = document.createElement("option");
+          option.value = location.id;
+          option.textContent = `${location.name}${location.gridRef ? ` / ${location.gridRef}` : " / map position needed"}`;
+          settlementLocationSelect.append(option);
+        });
+        if (availableLocations.some((location) => location.id === selectedId)) settlementLocationSelect.value = selectedId;
+        generateSettlementDraftButton.disabled = !settlementLocationSelect.value;
+        settlementSourceStatus.textContent = availableLocations.length
+          ? "Names and map positions are inherited from Settlement locations; each location can be used once."
+          : "Create a location with type Settlement in the Locations step first.";
+      }
+
+      function renderFactionSetupPanel() {
+        const faction = state.factions.find((item) => item.id === activeFactionId);
+        factionSetupPanel.hidden = !faction;
+        document.querySelector("#faction-form button[type='submit']").disabled = Boolean(faction);
+        if (!faction) return;
+        factionSetupTitle.textContent = `Configure ${faction.name}`;
+        factionSettlementChoices.replaceChildren();
+        if (!state.settlements.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "Create settlements before assigning faction presence.";
+          factionSettlementChoices.append(empty);
+        }
+        state.settlements.forEach((settlement) => {
+          const label = document.createElement("label");
+          label.className = "faction-settlement-choice";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = settlement.id;
+          checkbox.checked = pendingFactionSettlementIds.has(settlement.id);
+          checkbox.addEventListener("change", () => {
+            if (checkbox.checked) pendingFactionSettlementIds.add(settlement.id);
+            else pendingFactionSettlementIds.delete(settlement.id);
+            factionSetupStatus.textContent = `${pendingFactionSettlementIds.size} settlement(s) selected for ${faction.name}. Save these links before painting influence.`;
+          });
+          const name = document.createElement("span");
+          name.textContent = settlement.name;
+          const gridRef = document.createElement("small");
+          gridRef.textContent = settlement.gridRef || "No Q/R reference";
+          label.append(checkbox, name, gridRef);
+          factionSettlementChoices.append(label);
+        });
+        const assignedCount = state.settlements.filter((settlement) => settlement.prominentFactionIds?.includes(faction.id)).length;
+        factionSetupStatus.textContent = `${assignedCount} settlement(s) currently assigned to ${faction.name}. Select any number; shared influence is allowed.`;
+      }
+
+      function openFactionSetup(factionId) {
+        const faction = state.factions.find((item) => item.id === factionId);
+        if (!faction) return;
+        activeFactionId = faction.id;
+        pendingFactionSettlementIds = new Set(state.settlements
+          .filter((settlement) => settlement.prominentFactionIds?.includes(faction.id))
+          .map((settlement) => settlement.id));
+        renderFactionSetupPanel();
+        document.querySelector('[data-panel="factions"]').scrollIntoView({ block: "start" });
+      }
+
+      function saveFactionSettlementAssignments() {
+        const faction = state.factions.find((item) => item.id === activeFactionId);
+        if (!faction) return;
+        state.settlements.forEach((settlement) => {
+          const existingIds = Array.isArray(settlement.prominentFactionIds) ? [...settlement.prominentFactionIds] : [];
+          const isAssigned = pendingFactionSettlementIds.has(settlement.id);
+          const alreadyAssigned = existingIds.includes(faction.id);
+          if (isAssigned && !alreadyAssigned) existingIds.push(faction.id);
+          if (!isAssigned && alreadyAssigned) settlement.prominentFactionIds = existingIds.filter((id) => id !== faction.id);
+          else settlement.prominentFactionIds = [...new Set(existingIds)];
+        });
+        renderEntities("settlement");
+        renderEntities("faction");
+        saveDraft();
+        factionSetupStatus.textContent = `Saved ${pendingFactionSettlementIds.size} settlement link(s) for ${faction.name}. Existing prominence order was preserved.`;
+      }
+
+      function moveSettlementFaction(settlementId, factionIndex, direction) {
+        const settlement = state.settlements.find((item) => item.id === settlementId);
+        if (!settlement) return;
+        const ids = (settlement.prominentFactionIds || []).filter((id) => state.factions.some((faction) => faction.id === id));
+        const nextIndex = factionIndex + direction;
+        if (nextIndex < 0 || nextIndex >= ids.length) return;
+        [ids[factionIndex], ids[nextIndex]] = [ids[nextIndex], ids[factionIndex]];
+        settlement.prominentFactionIds = ids;
+        saveDraft();
+        renderEntities("settlement");
+        renderEntities("faction");
+        renderHexGrid();
+      }
+
+      function paintActiveFactionOnMap() {
+        const faction = state.factions.find((item) => item.id === activeFactionId);
+        if (!faction) return;
+        saveFactionSettlementAssignments();
+        returnToFactionSetup = true;
+        influenceBatchMode = true;
+        selectedInfluenceCells.clear();
+        influenceFactionSelect.value = faction.id;
+        finishFactionInfluenceButton.hidden = false;
+        showStep("terrain");
+        const button = document.querySelector("#influence-batch-mode");
+        button.setAttribute("aria-pressed", "true");
+        button.classList.add("button-primary");
+        button.textContent = "Finish influence selection";
+        renderInfluenceControls();
+        renderHexGrid();
+        setMapStatus(`Painting influence for ${faction.name}. Overlap with other factions is allowed.`, "success");
+        mapFrame.scrollIntoView({ block: "center" });
+      }
+
+      function finishActiveFactionSetup() {
+        activeFactionId = null;
+        pendingFactionSettlementIds.clear();
+        factionSetupPanel.hidden = true;
+        document.querySelector("#faction-form button[type='submit']").disabled = false;
+        document.querySelector('[data-panel="factions"]').scrollIntoView({ block: "start" });
       }
 
       function renderEntities(type) {
@@ -1439,7 +1704,81 @@
           const name = document.createElement("div");
           name.className = "row-title";
           name.textContent = record.name;
+          if (!isFaction) {
+            const visibility = document.createElement("small");
+            visibility.className = `visibility-badge${record.visibility === "players" ? " players" : ""}`;
+            visibility.textContent = record.visibility === "players" ? "Players" : "GM-only";
+            name.append(visibility);
+          }
           info.append(name);
+          if (isFaction) {
+            const linkedSettlements = state.settlements.filter((settlement) => settlement.prominentFactionIds?.includes(record.id));
+            const presence = document.createElement("p");
+            presence.className = "row-description";
+            presence.textContent = linkedSettlements.length
+              ? `Influences ${linkedSettlements.length} settlement(s): ${linkedSettlements.map((settlement) => settlement.name).join(", ")}`
+              : "No settlements selected";
+            info.append(presence);
+          }
+          if (!isFaction) {
+            const location = state.locations.find((item) => item.id === record.locationId);
+            const details = document.createElement("p");
+            details.className = "row-description";
+            details.textContent = location
+              ? `Location / ${location.gridRef || "map position not set"} · ${record.scale || "Scale not set"}${record.populationEstimate !== null && record.populationEstimate !== undefined ? ` · GM population estimate ${record.populationEstimate}` : ""}`
+              : "No linked Settlement location / legacy or unlinked record";
+            info.append(details);
+            const orderedFactionIds = (record.prominentFactionIds || []).filter((id) => state.factions.some((faction) => faction.id === id));
+            const prominentFaction = state.factions.find((faction) => faction.id === orderedFactionIds[0]);
+            const alignment = document.createElement("p");
+            alignment.className = "row-description";
+            alignment.textContent = `Alignment / ${prominentFaction?.name || "Independent"}`;
+            info.append(alignment);
+            if (record.security || record.attitude || record.leadership || record.situation) {
+              const descriptors = document.createElement("p");
+              descriptors.className = "row-description";
+              descriptors.textContent = [record.security, record.attitude, record.leadership, record.situation].filter(Boolean).join(" · ");
+              info.append(descriptors);
+            }
+            const prominence = document.createElement("div");
+            prominence.className = "settlement-prominence-list";
+            if (!orderedFactionIds.length) {
+              const emptyProminence = document.createElement("small");
+              emptyProminence.className = "row-description";
+              emptyProminence.textContent = "No prominent factions assigned.";
+              prominence.append(emptyProminence);
+            }
+            orderedFactionIds.forEach((factionId, factionIndex) => {
+              const faction = state.factions.find((item) => item.id === factionId);
+              const prominenceRow = document.createElement("div");
+              prominenceRow.className = "settlement-prominence-row";
+              const rank = document.createElement("span");
+              rank.textContent = `${factionIndex + 1}.`;
+              const factionName = document.createElement("span");
+              factionName.textContent = faction?.name || "Unknown faction";
+              const controls = document.createElement("span");
+              const moveUp = document.createElement("button");
+              moveUp.type = "button";
+              moveUp.className = "icon-button";
+              moveUp.textContent = "↑";
+              moveUp.title = `Increase prominence of ${faction?.name || "faction"}`;
+              moveUp.setAttribute("aria-label", moveUp.title);
+              moveUp.disabled = factionIndex === 0;
+              moveUp.addEventListener("click", () => moveSettlementFaction(record.id, factionIndex, -1));
+              const moveDown = document.createElement("button");
+              moveDown.type = "button";
+              moveDown.className = "icon-button";
+              moveDown.textContent = "↓";
+              moveDown.title = `Decrease prominence of ${faction?.name || "faction"}`;
+              moveDown.setAttribute("aria-label", moveDown.title);
+              moveDown.disabled = factionIndex === orderedFactionIds.length - 1;
+              moveDown.addEventListener("click", () => moveSettlementFaction(record.id, factionIndex, 1));
+              controls.append(moveUp, moveDown);
+              prominenceRow.append(rank, factionName, controls);
+              prominence.append(prominenceRow);
+            });
+            info.append(prominence);
+          }
           if (record.description) {
             const description = document.createElement("p");
             description.className = "row-description";
@@ -1453,15 +1792,62 @@
           remove.title = `Remove ${record.name}`;
           remove.textContent = "×";
           remove.addEventListener("click", () => {
-            records.splice(index, 1);
+            const [removed] = records.splice(index, 1);
+            if (isFaction) {
+              state.settlements.forEach((settlement) => {
+                settlement.prominentFactionIds = (settlement.prominentFactionIds || []).filter((id) => id !== removed.id);
+              });
+              if (activeFactionId === removed.id) finishActiveFactionSetup();
+            }
             renderEntities(type);
+            renderSettlementLocationOptions();
+            renderFactionSetupPanel();
             saveDraft();
           });
-          row.append(info, remove);
+          const actions = document.createElement("div");
+          actions.className = "row-action";
+          if (isFaction) {
+            const editSettlements = document.createElement("button");
+            editSettlements.type = "button";
+            editSettlements.className = "button";
+            editSettlements.textContent = "Settlements";
+            editSettlements.title = `Edit settlements for ${record.name}`;
+            editSettlements.addEventListener("click", () => openFactionSetup(record.id));
+            const paintInfluence = document.createElement("button");
+            paintInfluence.type = "button";
+            paintInfluence.className = "button";
+            paintInfluence.textContent = "Paint influence";
+            paintInfluence.title = `Paint influence for ${record.name}`;
+            paintInfluence.addEventListener("click", () => {
+              openFactionSetup(record.id);
+              paintActiveFactionOnMap();
+            });
+            actions.append(editSettlements, paintInfluence);
+          }
+          actions.append(remove);
+          row.append(info, actions);
           list.append(row);
         });
         document.querySelector(isFaction ? "#faction-count" : "#settlement-count").textContent = String(records.length);
         if (isFaction) renderInfluenceFactionOptions();
+        else renderSettlementLocationOptions();
+        renderFactionSetupPanel();
+      }
+
+      function generateSettlementDraft() {
+        const location = state.locations.find((item) => item.id === settlementLocationSelect.value && item.kind === "Settlement");
+        if (!location) {
+          document.querySelector("#settlement-generation-status").textContent = "Choose a Settlement location from the Locations step first.";
+          return;
+        }
+        const choose = (options) => options[Math.floor(Math.random() * options.length)];
+        settlementForm.querySelector("#settlement-scale").value = choose(settlementDraftOptions.scale);
+        settlementForm.querySelector("#settlement-security").value = choose(settlementDraftOptions.security);
+        settlementForm.querySelector("#settlement-attitude").value = choose(settlementDraftOptions.attitude);
+        settlementForm.querySelector("#settlement-leadership").value = choose(settlementDraftOptions.leadership);
+        settlementForm.querySelector("#settlement-situation").value = choose(settlementDraftOptions.situations);
+        document.querySelector("#settlement-generation-status").className = "feedback success";
+        document.querySelector("#settlement-generation-status").textContent = "Generated editable GM scenario descriptors. Enter or revise the population estimate manually.";
       }
 
       function renderNotes() {
@@ -1628,6 +2014,7 @@
             kind: typeof location.kind === "string" ? location.kind.slice(0, 80) : "Location",
             description: typeof location.description === "string" ? location.description.slice(0, 600) : "",
             position,
+            visibility: location.visibility === "players" ? "players" : "gm-only",
             gridRef: typeof location.gridRef === "string" ? location.gridRef.slice(0, 40) : null,
             isStartingLocation: location.isStartingLocation
           };
@@ -1645,14 +2032,64 @@
             };
           });
         };
+        const linkedSettlementLocations = new Set();
+        const settlements = normalizeRecords(input.settlements, "Settlement").map((settlement, index) => {
+          const raw = input.settlements[index];
+          const locationId = typeof raw.locationId === "string" ? raw.locationId : null;
+          const location = locationId ? locations.find((item) => item.id === locationId) : null;
+          if (locationId && (!location || location.kind !== "Settlement")) {
+            throw new Error(`Settlement ${settlement.name} must link to a Settlement location from the Locations step.`);
+          }
+          if (location && linkedSettlementLocations.has(location.id)) {
+            throw new Error(`The Settlement location ${location.name} is linked to more than one settlement record.`);
+          }
+          if (location) linkedSettlementLocations.add(location.id);
+          const populationEstimate = raw.populationEstimate ?? null;
+          if (populationEstimate !== null && (!Number.isSafeInteger(populationEstimate) || populationEstimate < 0 || populationEstimate > 100000000)) {
+            throw new Error(`Settlement ${settlement.name} has an invalid GM population estimate.`);
+          }
+          const prominentFactionIds = raw.prominentFactionIds ?? [];
+          if (!Array.isArray(prominentFactionIds) || prominentFactionIds.length > 500
+            || prominentFactionIds.some((id) => typeof id !== "string")
+            || new Set(prominentFactionIds).size !== prominentFactionIds.length) {
+            throw new Error(`Settlement ${settlement.name} has an invalid prominence order.`);
+          }
+          return {
+            ...settlement,
+            name: location?.name || settlement.name,
+            locationId: location?.id || null,
+            gridRef: location?.gridRef || null,
+            position: location?.position ? { ...location.position } : null,
+            visibility: location?.visibility === "players" ? "players" : raw.visibility === "players" ? "players" : "gm-only",
+            prominentFactionIds: [...prominentFactionIds],
+            scale: typeof raw.scale === "string" ? raw.scale.slice(0, 80) : null,
+            populationEstimate,
+            security: typeof raw.security === "string" ? raw.security.slice(0, 100) : null,
+            attitude: typeof raw.attitude === "string" ? raw.attitude.slice(0, 100) : null,
+            leadership: typeof raw.leadership === "string" ? raw.leadership.slice(0, 100) : null,
+            situation: typeof raw.situation === "string" ? raw.situation.slice(0, 500) : ""
+          };
+        });
         const factions = normalizeRecords(input.factions, "Faction").map((faction, index) => {
-          const influenceCells = input.factions[index].influenceCells ?? [];
+          const raw = input.factions[index];
+          const influenceCells = raw.influenceCells ?? [];
           if (!Array.isArray(influenceCells) || influenceCells.length > 10000) throw new Error("A faction influence layer is invalid or too large.");
           const normalizedCells = normalizeInfluenceCells(influenceCells);
           if (normalizedCells.length !== influenceCells.length) throw new Error(`The influence layer for ${faction.name} contains an invalid or duplicate hex.`);
+          const legacySettlementId = raw.settlementId ?? null;
+          if (legacySettlementId !== null) {
+            const legacySettlement = settlements.find((settlement) => settlement.id === legacySettlementId);
+            if (!legacySettlement) throw new Error(`The legacy prominent settlement for faction ${faction.name} is not in this package.`);
+            if (!legacySettlement.prominentFactionIds.includes(faction.id)) legacySettlement.prominentFactionIds.push(faction.id);
+          }
           return { ...faction, influenceCells: normalizedCells };
         });
-        const settlements = normalizeRecords(input.settlements, "Settlement");
+        const factionIds = new Set(factions.map((faction) => faction.id));
+        settlements.forEach((settlement) => {
+          if (settlement.prominentFactionIds.some((id) => !factionIds.has(id))) {
+            throw new Error(`Settlement ${settlement.name} prominence order references a faction outside this package.`);
+          }
+        });
         if (!Array.isArray(input.scenarioNotes) || input.scenarioNotes.length > 500) throw new Error("The scenario-note list is invalid or too large.");
         const scenarioNotes = input.scenarioNotes.map((note) => {
           if (!isRecord(note) || note.visibility !== "gm-only") throw new Error("Imported scenario notes must be marked GM-only.");
@@ -1748,7 +2185,7 @@
               if (properties.kind) existing.kind = properties.kind;
               updatedLocations += 1;
             } else {
-              state.locations.push({ id: makeId("location"), name, kind: properties.kind || "Location", description: properties.description || properties.note || "Imported from Field Papers", position, isStartingLocation: false });
+              state.locations.push({ id: makeId("location"), name, kind: properties.kind || "Location", description: properties.description || properties.note || "Imported from Field Papers", position, visibility: "gm-only", isStartingLocation: false });
               addedLocations += 1;
             }
             return;
@@ -1778,6 +2215,7 @@
       }
 
       function validatePackage(updateUi = true) {
+        syncSettlementLocations();
         const campaign = {
           name: campaignNameInput.value.trim(),
           setting: campaignSettingInput.value.trim(),
@@ -1794,6 +2232,25 @@
         if (!state.locations.some((location) => location.isStartingLocation && location.position)) errors.push("Add a positioned location and mark it as the starting location.");
         if (state.locations.some((location) => !location.position)) errors.push("Place each listed location on the real-world map before export.");
         if (state.map.bounds && state.locations.some((location) => location.position && !isInsideArea(location.position))) errors.push("Move every location inside the marked campaign area before export.");
+        const locationsById = new Map(state.locations.map((location) => [location.id, location]));
+        const settlementLocationIds = new Set();
+        state.settlements.forEach((settlement) => {
+          const location = locationsById.get(settlement.locationId);
+          if (!location || location.kind !== "Settlement") errors.push(`Settlement ${settlement.name} must use a Settlement location from the Locations step.`);
+          else if (settlementLocationIds.has(location.id)) errors.push(`Settlement location ${location.name} is used by more than one settlement record.`);
+          else settlementLocationIds.add(location.id);
+          if (settlement.populationEstimate !== null && settlement.populationEstimate !== undefined
+            && (!Number.isSafeInteger(settlement.populationEstimate) || settlement.populationEstimate < 0 || settlement.populationEstimate > 100000000)) {
+            errors.push(`Settlement ${settlement.name} has an invalid GM population estimate.`);
+          }
+        });
+        const factionIds = new Set(state.factions.map((faction) => faction.id));
+        state.settlements.forEach((settlement) => {
+          const prominence = settlement.prominentFactionIds || [];
+          if (!Array.isArray(prominence) || new Set(prominence).size !== prominence.length || prominence.some((factionId) => !factionIds.has(factionId))) {
+            errors.push(`Settlement ${settlement.name} has an invalid faction prominence order.`);
+          }
+        });
         const ids = [...state.locations, ...state.factions, ...state.settlements, ...state.scenarioNotes].map((item) => item.id);
         if (new Set(ids).size !== ids.length) errors.push("Every package record must have a unique ID.");
         if (updateUi) renderValidation(errors);
@@ -1803,14 +2260,26 @@
       function renderValidation(errors = validatePackage(false)) {
         const list = document.querySelector("#package-checks");
         list.replaceChildren();
+        const linkedSettlementLocations = new Set();
+        const settlementsLinked = state.settlements.every((settlement) => {
+          const location = state.locations.find((item) => item.id === settlement.locationId);
+          if (!location || location.kind !== "Settlement" || linkedSettlementLocations.has(location.id)) return false;
+          linkedSettlementLocations.add(location.id);
+          return true;
+        });
+        const factionIds = new Set(state.factions.map((faction) => faction.id));
+        const prominenceOrderValid = state.settlements.every((settlement) => {
+          const order = settlement.prominentFactionIds || [];
+          return Array.isArray(order) && new Set(order).size === order.length && order.every((factionId) => factionIds.has(factionId));
+        });
         const checks = [
           { label: "Campaign identity, setting, and premise", ready: Boolean(campaignNameInput.value.trim() && campaignSettingInput.value.trim() && campaignPremiseInput.value.trim()), detail: "Required starting brief" },
           { label: "Field Papers atlas imported", ready: Boolean(state.map.atlas), detail: state.map.atlas?.title || "Import the atlas GeoJSON file" },
           { label: "Real-world campaign area", ready: Boolean(state.map.bounds), detail: state.map.bounds ? "Geographic bounds saved" : "Mark two opposite corners" },
           { label: "Initial locations and starting point", ready: state.locations.length > 0 && state.locations.every((location) => location.position && isInsideArea(location.position)) && state.locations.some((location) => location.isStartingLocation), detail: `${state.locations.length} location${state.locations.length === 1 ? "" : "s"} positioned inside the marked area` },
-          { label: "Factions and settlements", ready: true, detail: `${state.factions.length} factions / ${state.settlements.length} settlements` },
+          { label: "Settlements and faction links", ready: settlementsLinked && prominenceOrderValid, detail: `${linkedSettlementLocations.size} linked settlements / ${state.factions.length} factions` },
           { label: "Scenario notes", ready: true, detail: `${state.scenarioNotes.length} GM-only note${state.scenarioNotes.length === 1 ? "" : "s"}` },
-          { label: "Visibility boundary", ready: true, detail: "No player data is published by Setup" }
+          { label: "Visibility boundary", ready: true, detail: "Per-location visibility is GM-managed; nothing is published by Setup" }
         ];
         checks.forEach((check) => {
           const row = document.createElement("div");
@@ -1836,16 +2305,51 @@
       }
 
       function renderEntitiesAndSave(type, form) {
-        const nameInput = form.querySelector("input");
-        const descriptionInput = form.querySelector("textarea");
         const records = type === "faction" ? state.factions : state.settlements;
-        records.push({
-          id: makeId(type),
-          name: nameInput.value.trim(),
-          description: descriptionInput.value.trim(),
-          ...(type === "faction" ? { influenceCells: [] } : {})
-        });
+        if (type === "settlement") {
+          const location = state.locations.find((item) => item.id === settlementLocationSelect.value && item.kind === "Settlement");
+          if (!location) {
+            settlementSourceStatus.textContent = "Choose a valid Settlement location from the Locations step.";
+            return;
+          }
+          if (state.settlements.some((settlement) => settlement.locationId === location.id)) {
+            settlementSourceStatus.textContent = "This location already has a settlement record. Choose another Settlement location.";
+            return;
+          }
+          const populationInput = form.querySelector("#settlement-population").value.trim();
+          const populationEstimate = populationInput === "" ? null : Number(populationInput);
+          records.push({
+            id: makeId("settlement"),
+            locationId: location.id,
+            name: location.name,
+            gridRef: location.gridRef || null,
+            position: location.position ? { ...location.position } : null,
+            visibility: location.visibility === "players" ? "players" : "gm-only",
+            prominentFactionIds: [],
+            scale: form.querySelector("#settlement-scale").value || null,
+            populationEstimate,
+            security: form.querySelector("#settlement-security").value || null,
+            attitude: form.querySelector("#settlement-attitude").value || null,
+            leadership: form.querySelector("#settlement-leadership").value || null,
+            situation: form.querySelector("#settlement-situation").value.trim(),
+            description: form.querySelector("#settlement-description").value.trim()
+          });
+          form.reset();
+          renderEntities(type);
+          renderSettlementLocationOptions();
+          saveDraft();
+          return;
+        }
+        const faction = {
+          id: makeId("faction"),
+          name: form.querySelector("#faction-name").value.trim(),
+          description: form.querySelector("#faction-description").value.trim(),
+          influenceCells: []
+        };
+        records.push(faction);
         form.reset();
+        activeFactionId = faction.id;
+        pendingFactionSettlementIds.clear();
         renderEntities(type);
         saveDraft();
       }
@@ -1875,7 +2379,13 @@
       }
 
       stepButtons.forEach((button) => button.addEventListener("click", () => showStep(button.dataset.step)));
-      document.querySelectorAll("[data-go-step]").forEach((button) => button.addEventListener("click", () => showStep(button.dataset.goStep)));
+      document.querySelectorAll("[data-go-step]").forEach((button) => button.addEventListener("click", () => {
+        if (button.dataset.goStep === "notes" && activeFactionId) {
+          saveFactionSettlementAssignments();
+          finishActiveFactionSetup();
+        }
+        showStep(button.dataset.goStep);
+      }));
       document.querySelectorAll("#campaign-name,#campaign-setting,#campaign-premise,#map-name,#campaign-era").forEach((input) => input.addEventListener("input", () => {
         saveDraft();
         if (!document.querySelector('[data-panel="package"]').hidden) renderValidation();
@@ -1999,6 +2509,28 @@
         renderInfluenceControls();
         renderHexGrid();
       });
+      saveFactionSettlementsButton.addEventListener("click", saveFactionSettlementAssignments);
+      paintFactionInfluenceButton.addEventListener("click", paintActiveFactionOnMap);
+      finishFactionSetupButton.addEventListener("click", () => {
+        saveFactionSettlementAssignments();
+        finishActiveFactionSetup();
+      });
+      finishFactionInfluenceButton.addEventListener("click", () => {
+        if (selectedInfluenceCells.size) {
+          setMapStatus("Save or clear the staged influence hexes before returning to faction setup.", "error");
+          return;
+        }
+        returnToFactionSetup = false;
+        influenceBatchMode = false;
+        finishFactionInfluenceButton.hidden = true;
+        const modeButton = document.querySelector("#influence-batch-mode");
+        modeButton.setAttribute("aria-pressed", "false");
+        modeButton.classList.remove("button-primary");
+        modeButton.textContent = "Select influence hexes";
+        showStep("factions");
+        renderInfluenceControls();
+        renderHexGrid();
+      });
       saveInfluenceButton.addEventListener("click", () => {
         const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
         if (!faction || !selectedInfluenceCells.size) return;
@@ -2098,13 +2630,21 @@
 
       locationNameInput.addEventListener("input", renderLocationCoordinate);
       cancelLocationEditButton.addEventListener("click", cancelLocationEdit);
+      settlementLocationSelect.addEventListener("change", renderSettlementLocationOptions);
+      generateSettlementDraftButton.addEventListener("click", generateSettlementDraft);
 
       addLocationButton.addEventListener("click", () => {
         if (!pendingPosition || !locationNameInput.value.trim()) return;
         const existing = editingLocationId ? state.locations.find((location) => location.id === editingLocationId) : null;
         if (existing) {
+          if (locationKindInput.value !== "Settlement" && state.settlements.some((settlement) => settlement.locationId === existing.id)) {
+            document.querySelector("#location-feedback").className = "feedback error";
+            document.querySelector("#location-feedback").textContent = "This location backs a settlement and must keep the Settlement type.";
+            return;
+          }
           existing.name = locationNameInput.value.trim();
           existing.kind = locationKindInput.value;
+          existing.visibility = locationVisibilityInput.value === "players" ? "players" : "gm-only";
           existing.description = locationDescriptionInput.value.trim();
           existing.position = { ...pendingPosition };
         } else {
@@ -2113,6 +2653,7 @@
             id: makeId("location"),
             name: locationNameInput.value.trim(),
             kind: locationKindInput.value,
+            visibility: locationVisibilityInput.value === "players" ? "players" : "gm-only",
             description: locationDescriptionInput.value.trim(),
             position: { ...pendingPosition },
             isStartingLocation

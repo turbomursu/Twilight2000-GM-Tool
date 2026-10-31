@@ -222,6 +222,11 @@
     .influence-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 35px; border-bottom: 1px solid #d5ddd3; font: 9px var(--mono); }
     .influence-swatch { width: 10px; height: 10px; border: 2px solid currentColor; background: transparent; }
     .influence-row small { color: var(--muted); font: 8px var(--mono); }
+    .live-settlement-entry { padding: 9px 0; border-top: 1px solid #d5ddd3; }
+    .live-settlement-entry > strong { display: block; margin-bottom: 6px; font-size: 10px; }
+    .live-settlement-entry > small { display: block; margin: -2px 0 6px; color: var(--muted); font: 8px var(--mono); }
+    .live-settlement-faction { display: grid; grid-template-columns: 16px minmax(0,1fr) auto; align-items: center; gap: 6px; min-height: 29px; font-size: 9px; }
+    .live-settlement-faction button { width: 23px; height: 23px; }
     #setup-import-summary { max-height: 190px; overflow: auto; margin: 10px 0; padding: 11px; border: 1px solid var(--line); background: #f4f6ef; font: 10px/1.5 var(--mono); white-space: pre-wrap; }
     #setup-import-summary[hidden] { display: none; }
     .travel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
@@ -439,6 +444,9 @@
                   <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button></div>
                   <p class="feedback" id="live-influence-feedback" role="status">The setup package remains unchanged; live edits are saved in this GM browser.</p>
                   <div class="influence-list" id="live-influence-factions"><div class="empty-state">No influence layers loaded.</div></div>
+                  <div class="section-bar"><div><h2>Settlement prominence</h2><p>Checked factions influence that settlement. Earlier entries are more prominent.</p></div></div>
+                  <div class="influence-list" id="live-settlement-prominence"><div class="empty-state">No settlements loaded.</div></div>
+                  <p class="feedback" id="live-settlement-feedback" role="status">Settlement links and prominence are GM-only live state.</p>
                 </div>
               </section>
             </aside>
@@ -490,6 +498,7 @@
         currentPrompt: "",
         setupPackage: null,
         liveInfluence: {},
+        liveSettlementProminence: {},
         people: [
           { id: 1, name: "Anja Lind", role: "Medic", condition: "Stable", status: "Ready" },
           { id: 2, name: "Erik Dahl", role: "Driver", condition: "Bruised", status: "Worn" },
@@ -533,14 +542,13 @@
         try {
           const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
           if (saved && typeof saved === "object") return { ...structuredClone(defaults), ...saved };
-        } catch (error) {
           console.warn("Could not load the local campaign record.", error);
-        }
+              color: owners.length ? "#344a40" : "#788779",
         return structuredClone(defaults);
-      }
+              opacity: owners.length ? .48 : .7,
       function persist() {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+              fillColor: owners.length ? "#e8ece5" : "#e4ece2",
+              fillOpacity: owners.length ? .05 : .12,
           return true;
         } catch (error) {
           showToast("Browser storage is unavailable; changes may not persist.");
@@ -618,12 +626,14 @@
         const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
-        if (view === "influence") requestAnimationFrame(() => {
+        if (view === "influence") {
           renderLiveInfluenceControls();
-          initializeInfluenceMap();
-          influenceMap?.invalidateSize({ pan: false });
-          renderLiveInfluenceGrid();
-        });
+          requestAnimationFrame(() => {
+            initializeInfluenceMap();
+            influenceMap?.invalidateSize({ pan: false });
+            renderLiveInfluenceGrid();
+          });
+        }
       }
       function drawMap() {
         const canvas = document.getElementById("field-map");
@@ -794,19 +804,175 @@
           if (!isRecord(location) || !isRecord(location.mapPosition)) return [];
           const { lat, lng } = location.mapPosition;
           if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) return [];
-          return [{ name: typeof location.name === "string" ? location.name.slice(0, 160) : "Location", position: { lat, lng } }];
+          return [{
+            id: typeof location.id === "string" ? location.id : null,
+            name: typeof location.name === "string" ? location.name.slice(0, 160) : "Location",
+            kind: typeof location.kind === "string" ? location.kind.slice(0, 80) : "Location",
+            gridRef: typeof location.gridRef === "string" ? location.gridRef.slice(0, 40) : null,
+            position: { lat, lng }
+          }];
         }) : [];
+        if (!Array.isArray(input.settlements) || input.settlements.length > 500) throw new Error("The setup package settlement list is invalid or too large.");
+        const settlements = input.settlements.map((settlement) => {
+          if (!isRecord(settlement)) throw new Error("The setup package contains an invalid settlement.");
+          const id = requireText(settlement.id, "Settlement ID", 120);
+          const locationId = typeof settlement.locationId === "string" ? settlement.locationId : null;
+          const location = locationId ? locations.find((item) => item.id === locationId) : null;
+          if (locationId && (!location || location.kind !== "Settlement")) throw new Error(`Settlement ${settlement.name || id} has an invalid source location.`);
+          const prominentFactionIds = settlement.prominentFactionIds ?? [];
+          if (!Array.isArray(prominentFactionIds) || prominentFactionIds.length > 200
+            || prominentFactionIds.some((factionId) => typeof factionId !== "string")
+            || new Set(prominentFactionIds).size !== prominentFactionIds.length) {
+            throw new Error(`Settlement ${settlement.name || id} has an invalid faction prominence order.`);
+          }
+          return {
+            id,
+            name: location?.name || requireText(settlement.name, "Settlement name", 160),
+            } catch (error) {
+            gridRef: location?.gridRef || (typeof settlement.gridRef === "string" ? settlement.gridRef.slice(0, 40) : null),
+            }
+            return structuredClone(defaults);
+          }
+        });
+          const legacySettlement = settlements.find((settlement) => settlement.id === faction.settlementId);
+          if (!legacySettlement) throw new Error(`Faction ${faction.name || faction.id} references a missing legacy settlement.`);
+          if (!legacySettlement.prominentFactionIds.includes(faction.id)) legacySettlement.prominentFactionIds.push(faction.id);
+        });
+        settlements.forEach((settlement) => {
+          if (settlement.prominentFactionIds.some((factionId) => !factionIds.has(factionId))) {
+            throw new Error(`Settlement ${settlement.name} prominence references a faction outside this package.`);
+          }
+        });
         return {
           packageType: "fieldbook.campaign-setup",
           schemaVersion: 2,
           campaign,
           map: { name: requireText(input.map.name || input.campaign.mapName, "Map name", 80), bounds, center, zoom, grid: { cellKm: 10, coordinateSystem: "axial-q-r", origin, terrainCells }, locations },
-          factions
+          factions,
+          settlements
         };
       }
 
       function liveInfluenceForCampaign() {
         return state.liveInfluence?.[state.setupPackage?.campaign.id] || {};
+      }
+
+      function liveSettlementProminenceForCampaign() {
+        const campaignId = state.setupPackage?.campaign.id;
+        const saved = state.liveSettlementProminence?.[campaignId];
+        if (isRecord(saved)) return saved;
+        return Object.fromEntries((state.setupPackage?.settlements || []).map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
+      }
+
+      function saveLiveSettlementOrder(settlementId, factionIds) {
+        const campaignId = state.setupPackage?.campaign.id;
+        if (!campaignId) return;
+        const previousState = state;
+        const currentOrders = liveSettlementProminenceForCampaign();
+        state = {
+          ...state,
+          liveSettlementProminence: {
+            ...(isRecord(state.liveSettlementProminence) ? state.liveSettlementProminence : {}),
+            [campaignId]: { ...currentOrders, [settlementId]: [...factionIds] }
+          }
+        };
+        if (!persist()) {
+          state = previousState;
+          return;
+        }
+        renderLiveInfluenceControls();
+      }
+
+      function renderLiveSettlementProminence() {
+        const list = document.getElementById("live-settlement-prominence");
+        const feedback = document.getElementById("live-settlement-feedback");
+        list.replaceChildren();
+        const setup = state.setupPackage;
+        if (!setup || !setup.settlements.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = setup ? "No settlements loaded." : "No settlements loaded.";
+          list.append(empty);
+          feedback.textContent = "Import a setup package with settlements to edit GM prominence.";
+          return;
+        }
+        const savedOrders = liveSettlementProminenceForCampaign();
+        setup.settlements.forEach((settlement) => {
+          const entry = document.createElement("section");
+          entry.className = "live-settlement-entry";
+          const heading = document.createElement("strong");
+          heading.textContent = settlement.name;
+          const gridRef = document.createElement("small");
+          gridRef.textContent = settlement.gridRef || "Settlement";
+          const order = (savedOrders[settlement.id] || settlement.prominentFactionIds).filter((id) => setup.factions.some((faction) => faction.id === id));
+          const alignmentFaction = setup.factions.find((faction) => faction.id === order[0]);
+          const alignment = document.createElement("small");
+          alignment.textContent = `Alignment: ${alignmentFaction?.name || "Independent"}`;
+          entry.append(heading, gridRef, alignment);
+          setup.factions.forEach((faction) => {
+            const label = document.createElement("label");
+            label.className = "live-settlement-faction";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = order.includes(faction.id);
+            checkbox.setAttribute("aria-label", `${faction.name} influences ${settlement.name}`);
+            checkbox.addEventListener("change", () => {
+              const nextOrder = order.filter((id) => id !== faction.id);
+              if (checkbox.checked) nextOrder.push(faction.id);
+              saveLiveSettlementOrder(settlement.id, nextOrder);
+            });
+            const factionName = document.createElement("span");
+            factionName.textContent = faction.name;
+            const rank = document.createElement("small");
+            const rankIndex = order.indexOf(faction.id);
+            rank.textContent = rankIndex < 0 ? "Not linked" : `#${rankIndex + 1}`;
+            label.append(checkbox, factionName, rank);
+            entry.append(label);
+          });
+          const ranked = document.createElement("div");
+          ranked.className = "influence-list";
+          order.forEach((factionId, index) => {
+            const faction = setup.factions.find((item) => item.id === factionId);
+            if (!faction) return;
+            const row = document.createElement("div");
+            row.className = "influence-row";
+            const rank = document.createElement("small");
+            rank.textContent = `#${index + 1}`;
+            const name = document.createElement("span");
+            name.textContent = faction.name;
+            const controls = document.createElement("span");
+            const moveUp = document.createElement("button");
+            moveUp.type = "button";
+            moveUp.className = "icon-button";
+            moveUp.textContent = "↑";
+            moveUp.title = `Increase prominence of ${faction.name} at ${settlement.name}`;
+            moveUp.setAttribute("aria-label", moveUp.title);
+            moveUp.disabled = index === 0;
+            moveUp.addEventListener("click", () => {
+              const nextOrder = [...order];
+              [nextOrder[index - 1], nextOrder[index]] = [nextOrder[index], nextOrder[index - 1]];
+              saveLiveSettlementOrder(settlement.id, nextOrder);
+            });
+            const moveDown = document.createElement("button");
+            moveDown.type = "button";
+            moveDown.className = "icon-button";
+            moveDown.textContent = "↓";
+            moveDown.title = `Decrease prominence of ${faction.name} at ${settlement.name}`;
+            moveDown.setAttribute("aria-label", moveDown.title);
+            moveDown.disabled = index === order.length - 1;
+            moveDown.addEventListener("click", () => {
+              const nextOrder = [...order];
+              [nextOrder[index], nextOrder[index + 1]] = [nextOrder[index + 1], nextOrder[index]];
+              saveLiveSettlementOrder(settlement.id, nextOrder);
+            });
+            controls.append(moveUp, moveDown);
+            row.append(rank, name, controls);
+            ranked.append(row);
+          });
+          entry.append(ranked);
+          list.append(entry);
+        });
+        feedback.textContent = "Live settlement associations and prominence are GM-only and saved in this browser; the setup package remains unchanged.";
       }
 
       function liveAxialForPosition(position, origin) {
@@ -893,17 +1059,17 @@
               return [point.lat, point.lng];
             });
             const key = `${q},${r}`;
+            const owners = cellOwners.get(key) || [];
             L.polygon(vertices, {
-              color: "#344a40",
+              color: owners.length ? "#344a40" : "#788779",
               weight: stagedInfluenceCells.has(key) ? 3 : 1,
-              opacity: .48,
+              opacity: owners.length ? .48 : .7,
               fill: true,
-              fillColor: "#e8ece5",
-              fillOpacity: .05,
+              fillColor: owners.length ? "#e8ece5" : "#e4ece2",
+              fillOpacity: owners.length ? .05 : .12,
               interactive: liveInfluenceEditing,
               className: liveInfluenceEditing ? "live-influence-hex" : ""
             }).addTo(influenceHexLayer);
-            const owners = cellOwners.get(key) || [];
             owners.forEach((owner) => {
               L.polygon(vertices, {
                 color: owner.color,
@@ -948,6 +1114,19 @@
 
       function renderLiveInfluenceRows(target, setup, layers) {
         target.replaceChildren();
+        if (target.id === "live-influence-legend") {
+          const freeRow = document.createElement("div");
+          freeRow.className = "influence-row";
+          const swatch = document.createElement("i");
+          swatch.className = "influence-swatch";
+          swatch.style.color = "#788779";
+          const freeLabel = document.createElement("span");
+          freeLabel.textContent = "Free / no faction influence";
+          const freeHint = document.createElement("small");
+          freeHint.textContent = "default";
+          freeRow.append(swatch, freeLabel, freeHint);
+          target.append(freeRow);
+        }
         setup.factions.forEach((faction, index) => {
           const row = document.createElement("div");
           row.className = "influence-row";
@@ -987,6 +1166,7 @@
           document.getElementById("live-influence-legend").replaceChildren();
           document.getElementById("live-influence-factions").replaceChildren();
           document.getElementById("influence-map-status").textContent = "Import a schema-v2 setup package to load a GM influence map.";
+          renderLiveSettlementProminence();
           factionSelect.disabled = true;
           editButton.disabled = true;
           saveButton.disabled = true;
@@ -1008,6 +1188,7 @@
         const layers = liveInfluenceForCampaign();
         renderLiveInfluenceRows(document.getElementById("live-influence-legend"), setup, layers);
         renderLiveInfluenceRows(document.getElementById("live-influence-factions"), setup, layers);
+        renderLiveSettlementProminence();
         const faction = setup.factions.find((item) => item.id === factionSelect.value);
         editButton.disabled = !faction;
         editButton.textContent = liveInfluenceEditing ? "Finish selection" : "Select hexes";
@@ -1109,6 +1290,7 @@
             `Setting: ${setup.campaign.setting}`,
             `Map: ${setup.map.name}`,
             `Factions: ${setup.factions.length}`,
+            `Settlements: ${setup.settlements.length}`,
             `Terrain cells: ${Object.keys(setup.map.grid.terrainCells).length}`,
             `Initial influence layers: ${setup.factions.filter((faction) => faction.influenceCells.length).length}`
           ].join("\n");
@@ -1132,10 +1314,14 @@
         const setupPackage = pendingSetupPackage;
         const previousState = state;
         const liveInfluence = isRecord(state.liveInfluence) ? { ...state.liveInfluence } : {};
+        const liveSettlementProminence = isRecord(state.liveSettlementProminence) ? { ...state.liveSettlementProminence } : {};
         if (!Object.prototype.hasOwnProperty.call(liveInfluence, setupPackage.campaign.id)) {
           liveInfluence[setupPackage.campaign.id] = Object.fromEntries(setupPackage.factions.map((faction) => [faction.id, [...faction.influenceCells]]));
         }
-        state = { ...state, setupPackage, liveInfluence };
+        if (!Object.prototype.hasOwnProperty.call(liveSettlementProminence, setupPackage.campaign.id)) {
+          liveSettlementProminence[setupPackage.campaign.id] = Object.fromEntries(setupPackage.settlements.map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
+        }
+        state = { ...state, setupPackage, liveInfluence, liveSettlementProminence };
         if (!persist()) {
           state = previousState;
           return;
