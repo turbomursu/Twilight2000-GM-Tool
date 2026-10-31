@@ -30,9 +30,11 @@
     button { font: inherit; cursor: pointer; }
     button:focus-visible { outline: 3px solid #d5b86b; outline-offset: 3px; }
     .masthead { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto 14px; color: #e2e8de; }
+    .masthead-actions { display: flex; align-items: center; gap: 14px; }
     .masthead strong { display: block; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; }
     .masthead small { display: block; margin-top: 4px; color: #aeb8ac; font: 9px var(--mono); text-transform: uppercase; }
     .preview-link { color: #c9d4c2; font: 9px var(--mono); text-transform: uppercase; }
+    button.preview-link { padding: 0; border: 0; background: transparent; cursor: pointer; }
     .device { position: relative; max-width: 1120px; min-height: 720px; margin: 0 auto; padding: 20px; border: 2px solid var(--case-edge); border-radius: 8px; background: linear-gradient(145deg, #56615b, #333b37 20%, #414b45 80%, #29312d); box-shadow: inset 0 1px #ffffff45, inset 0 -4px #151b18, 0 12px 30px #11171480; }
     .screw { position: absolute; top: 10px; width: 9px; height: 9px; border: 1px solid #202723; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #c1c7bd, #657067 65%, #303934 66%); }
     .screw.left { left: 10px; }.screw.right { right: 10px; }
@@ -291,7 +293,7 @@
 <body>
   <header class="masthead">
     <div><strong>Fieldbook / Player terminal</strong><small>Selected direction / radio handset</small></div>
-    <a class="preview-link" href="/player-interface-concepts.html">Open four-concept comparison</a>
+    <div class="masthead-actions"><a class="preview-link" href="/player-interface-concepts.html">Open four-concept comparison</a><button class="preview-link" type="button" data-auth-logout>Sign out</button></div>
   </header>
   <main class="device">
     <span class="screw left" aria-hidden="true"></span><span class="screw right" aria-hidden="true"></span>
@@ -482,6 +484,7 @@
     </form>
   </dialog>
   <p class="disclaimer">Character values, inventory quantities, and proposals autosave locally. GM-pushed condition snapshots are read-only and cached until the next push. Authenticated GM publishing, cross-device delivery, rule-based encumbrance, and dice resolution are not connected. <a href="https://www.bing.com/images/search?q=military+communications+equipment+field+radio+handset+display" target="_blank" rel="noreferrer">Visual reference: field handsets and radio displays</a></p>
+  <script src="/auth-client.js" defer></script>
   <script>
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];
     const panels = [...document.querySelectorAll(".player-panel")];

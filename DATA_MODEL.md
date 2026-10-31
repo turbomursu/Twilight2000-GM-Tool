@@ -1,0 +1,106 @@
+# Runtime Data Model and Access Rules
+
+**Status:** Phase 0 design draft. This document defines the first shared-data contract for review; it does not claim that the current browser prototypes implement it.
+
+## Decisions and Boundaries
+
+- The GM-hosted LAN service is authoritative. SQLite on the host stores active campaign state. Browser storage may hold temporary drafts or caches, but it is not authoritative.
+- Setup packages, runtime saves, and player-facing publications are separate versioned formats. JSON is the import, export, and backup format, not a shared live database.
+- Importing a setup package creates a new runtime campaign. It does not keep the runtime linked to later edits of the source package.
+- The initial campaign has one GM owner and zero to four player seats. Each occupied player seat has one authenticated account and one assigned player character.
+- Server-side authorization applies to every read and write. Hiding controls in the browser is not an access boundary.
+- Game rules, campaign state, GM rulings, and player proposals remain separate data. Unverified rule interpretations never become automatic mechanics.
+
+## Versioned Documents
+
+Keep these formats distinct:
+
+| Format | Purpose | Visibility |
+| --- | --- | --- |
+| `fieldbook.campaign-setup`, schema v2 | Initial campaign authored in Campaign Setup; current format is defined by the setup package contract. | GM-only |
+| `fieldbook.campaign-runtime`, schema v1 | Complete authoritative runtime backup, including private state, seats, and audit history. | GM-only; never serve to a player client |
+| `fieldbook.player-view`, schema v1 | Deliberately constructed current publication for a campaign. | Shared with that campaign's player seats |
+
+Every document has a `schemaVersion`. Runtime exports also include `exportedAt`; runtime records carry stable IDs and timestamps. Unknown schema versions are rejected without changing stored data. Imports are validated completely and applied in one database transaction or not at all.
+
+A runtime import generates a new runtime campaign ID, records the source package ID and checksum, and preserves setup record IDs within the new campaign. Re-importing the same setup therefore creates an independent campaign rather than overwriting an existing one. The original setup JSON is retained as an immutable source snapshot for provenance; runtime edits never modify it.
+
+## Runtime Entities
+
+Use normalized SQLite tables and foreign keys for relationships, ownership, and authorization. Store bounded structured payloads such as GeoJSON properties or an imported package snapshot as JSON where that is a natural fit; do not make a whole live campaign one unvalidated JSON blob.
+
+| Entity | Core data and relationships |
+| --- | --- |
+| `campaigns` | Runtime ID, name, setting, premise, era, game date/time, runtime schema version, revision, created/updated timestamps, active state. |
+| `setup_imports` | Campaign ID, source package ID/version, import time, checksum, immutable source JSON. One campaign has one initial setup import. |
+| `accounts` | Account ID, login identifier, password hash, disabled state, timestamps. Never store plaintext passwords or expose password hashes to clients. |
+| `campaign_memberships` | Campaign ID, account ID, role (`gm` or `player`); the initial model allows one GM owner. A player membership must map to exactly one seat. |
+| `player_seats` | Seat ID, campaign ID, account ID, assigned character ID, display label, active state, assignment time. This is the single ownership link; make `(campaign_id, character_id)` unique. Enforce at most four active player seats per campaign. |
+| `characters` | Character ID, campaign ID, identity/backstory, attributes, skills, specialties, CUF, and condition. Characters without an assigned seat are GM-controlled; player ownership is derived from the seat assignment rather than duplicated on the character. |
+| `inventory_items` | Item ID, campaign ID, owner character ID, item fields, quantity, source category (`RB`, `GM`, `UF`), source reference, verification status, and acceptance state. |
+| `maps`, `locations`, `terrain_cells` | Campaign-scoped map metadata, bounds/atlas references, editable map annotations, locations and visibility eligibility, and axial Q/R terrain labels. Retain map-rendering coordinates separately from grid references. |
+| `settlements`, `factions`, `faction_influence_cells`, `settlement_factions` | Campaign-scoped setup/runtime records, independent overlapping faction influence, and explicit per-settlement faction prominence order. These records have no rules effects unless a verified procedure is separately implemented. |
+| `routes`, `waypoints`, `resources`, `journal_entries`, `gm_notes`, `events`, `missions` | Campaign runtime records with stable IDs, timestamps, and explicit visibility. GM notes default to GM-only. Rules-driven effects remain unimplemented until verified. |
+| `change_requests`, `item_proposals` | Player-authored proposals, scoped to the submitting seat and its assigned character/inventory; include status, submission time, reviewer, review time, and decision. |
+| `messages` | COMMS message, sender seat, campaign game date/time, creation time, and delivery status. Visible to the GM and all seats in the same campaign. |
+| `publications` | Immutable versioned player-view snapshots, publisher, publication time, and withdrawal/supersession state. A campaign has at most one current publication. |
+| `audit_events` | Actor account/seat, campaign, action, target record, server time, relevant campaign game time, and outcome. Required for approvals, publication changes, assignments, and dice-governed item actions. |
+
+All IDs are opaque stable strings generated by the service. Relationships are campaign-scoped and enforced with foreign keys/unique constraints. Clients cannot choose another campaign's IDs to gain access.
+
+## Player-View Contract
+
+A player response is assembled by the server from an explicit allow-list. It contains only:
+
+- The current published campaign situation and any map, route, position, or dispatch data explicitly included in that publication.
+- The requesting player's assigned character and that character's accepted inventory.
+- COMMS messages addressed to the campaign group.
+- That player's own pending requests and proposals, with their review status.
+
+It never contains GM notes, unpublished or withdrawn content, hidden threats, another seat's identity/account data, another player's character/inventory, or another player's private submissions. Location visibility eligibility is not publication: eligible content remains hidden until included in a published snapshot. Player-view snapshots are separate from internal campaign records; do not serialize internal rows and try to hide fields in the browser.
+
+## Authorization Rules
+
+| Action | GM owner | Player seat |
+| --- | --- | --- |
+| Read campaign runtime | All records in the owned campaign | Only current player view, own assigned character/inventory, group messages, and own submissions |
+| Edit campaign, map, route, resources, journal, GM notes, seats, assignments | Allowed within owned campaign | Denied |
+| Edit accepted character or inventory state | Allowed; record consequential changes | Denied; submit a change request instead |
+| Submit character or inventory change | Not applicable | Allowed only for own assigned character/inventory |
+| Add a proposed item or edit to item data | Allowed to review and accept | Allowed as a pending proposal only; cannot create accepted rules data |
+| Approve/reject a request or proposal | Allowed; decision is audited | Denied |
+| Build, publish, replace, or withdraw player view | Allowed; each published revision is audited | Denied |
+| Send/read group COMMS | Read and moderate within campaign | Send as self; read messages for own campaign only |
+| Access another campaign or another seat's private data | Denied unless separately assigned a GM role | Denied |
+
+Authenticate the account on the server and derive campaign role and player seat from the authenticated session and database membership. Never trust a client-supplied role, seat ID, character ID, campaign ID, or `RB`/`GM`/`UF` claim as authorization. Check campaign membership and record ownership on every endpoint, including exports and nested resources.
+
+## Mutation and Review Rules
+
+- A player request or item proposal is pending data, not a mutation to accepted campaign state. Only a GM approval action may apply it, in one transaction that also records the reviewer and audit event.
+- Removing or changing a seat assignment is a GM action. It does not silently transfer that player's old local/session identity to another seat.
+- An assigned character is a campaign copy of a player seed. Later edits to the independent GM seed do not alter the assigned character.
+- A player-selected item source category is an unverified claim until the GM checks the cited Fourth Edition source. Keep `sourceCategory`, citation, and verification status distinct. Proposed or unverified item data cannot enter accepted inventory as verified rules data.
+- For dice-governed item actions, record actor, character, action, relevant inputs, roll, outcome, and source/procedure reference. If the applicable procedure is unclear or unverified, leave the action pending GM adjudication; do not automate it.
+- Do not calculate carrying capacity or encumbrance penalties until the Fourth Edition procedure, required character inputs, and item weights are verified. Otherwise label the limitation and keep the effect GM-managed.
+- Every accepted mutation increments the campaign revision and updates server timestamps. Important decisions and publication changes append audit events; audit history is not edited by players.
+
+## SQLite and Recovery Rules
+
+- Use database transactions for setup import, player-request approval, inventory changes, seat assignment, and publication replacement.
+- Enforce foreign keys, unique membership/seat constraints, valid status enums, and campaign ownership in the service and database where practical.
+- Keep runtime schema migrations explicit and ordered. Back up the SQLite database before migration; do not silently discard unknown fields or downgrade newer data.
+- JSON runtime backups include private GM data and must be labeled GM-only. Validate before restore; preview the target campaign and require confirmation before replacing it. Preserve an existing database if validation or restore fails.
+- Player exports, if added, use only `fieldbook.player-view`; they must never be an alternate route to full runtime backups.
+- Keep credentials, session secrets, and password hashes out of JSON exports and logs. Store a database backup separately from the live database and document a restore check before calling backups reliable.
+
+## Phase 0 Verification Gates
+
+Before treating this contract as implemented:
+
+- Round-trip a setup-v2 package into a new runtime campaign without modifying the source package; reject malformed/unsupported packages atomically.
+- Export and restore a runtime save while preserving IDs, revisions, assignments, and GM-only visibility.
+- Exercise one-player and four-player campaigns with separate sessions.
+- Verify server-side denial for unauthenticated access, cross-campaign access, cross-seat character/inventory access, GM-only records, unpublished content, and player attempts to mutate accepted state.
+- Verify that player proposals remain pending until GM approval and that approval/roll/publication records are auditable.
+- Verify that a withdrawn publication disappears from player responses and that an older backup cannot silently overwrite a newer active campaign.

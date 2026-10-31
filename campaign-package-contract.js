@@ -88,5 +88,7 @@
     return true;
   }
 
-  root.FieldbookCampaignPackageContract = Object.freeze({ assertCampaignSetupPackage });
+  const contract = Object.freeze({ assertCampaignSetupPackage });
+  root.FieldbookCampaignPackageContract = contract;
+  if (typeof module !== "undefined" && module.exports) module.exports = contract;
 })(globalThis);

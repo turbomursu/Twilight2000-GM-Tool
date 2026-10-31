@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Player Interface / Design Concepts</title>
+  <script src="/auth-client.js" defer></script>
   <style>
     :root {
       color-scheme: light;
@@ -34,6 +35,7 @@
     .tabs { display: flex; gap: 6px; }
     .tab { min-height: 37px; padding: 0 13px; border: 1px solid #506154; border-radius: 2px; color: #c9d2c8; background: #202e27; font: 10px var(--mono); text-transform: uppercase; }
     .tab[aria-selected="true"] { border-color: #bcc79a; color: #fff; background: #394e40; box-shadow: inset 0 -2px #c5d19f; }
+    .auth-signout { min-height: 37px; padding: 0 13px; border: 1px solid #506154; border-radius: 2px; color: #c9d2c8; background: #202e27; font: 10px var(--mono); text-transform: uppercase; cursor: pointer; }
     .wrap { max-width: 940px; margin: 0 auto; padding: 26px 20px 35px; }
     .concept { display: none; }
     .concept.active { display: block; }
@@ -181,6 +183,7 @@
       <button class="tab" aria-selected="false" data-concept="mapboard">03 / Map display</button>
       <button class="tab" aria-selected="false" data-concept="dossier">04 / Field dossier</button>
     </nav>
+    <button class="auth-signout" type="button" data-auth-logout>Sign out</button>
   </header>
   <main class="wrap">
     <section class="concept active" id="concept-console">

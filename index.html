@@ -114,6 +114,9 @@
     .crumb { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 10px var(--mono); text-transform: uppercase; }
     .crumb b { color: #a5aea3; font-weight: 400; }
     .top-actions { display: flex; align-items: center; gap: 10px; }
+    .runtime-campaign-control { display: grid; min-width: 185px; gap: 3px; }
+    .runtime-campaign-control span { color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .runtime-campaign-control select { width: 100%; min-height: 31px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: #f6f7f2; font-size: 10px; }
     .date-stamp { padding-right: 14px; border-right: 1px solid var(--line); text-align: right; }
     .date-stamp span { display: block; color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
     .date-stamp strong { display: block; margin-top: 4px; font: 12px var(--mono); }
@@ -346,6 +349,7 @@
           <input id="setup-package-file" type="file" accept=".json,application/json" hidden>
           <button class="button button-icon" data-action="export-record" aria-label="Export campaign record" title="Export campaign record">↓</button>
           <button class="button button-primary" data-action="open-note"><span aria-hidden="true">+</span> Log entry</button>
+          <button class="button" type="button" data-auth-logout>Sign out</button>
         </div>
       </header>
 
@@ -432,10 +436,10 @@
           </div>
           <div class="influence-layout">
             <section class="panel" aria-labelledby="influence-map-title">
-              <div class="panel-head"><div><div class="eyebrow" id="influence-campaign-label">No setup map loaded</div><h2 id="influence-map-title">Campaign influence map</h2></div><span class="inline-hint">OSM REFERENCE / GM ONLY</span></div>
+              <div class="panel-head"><div><div class="eyebrow" id="influence-campaign-label">No runtime campaign selected</div><h2 id="influence-map-title">Campaign influence map</h2></div><label class="runtime-campaign-control"><span>Runtime campaign</span><select id="runtime-campaign-select" disabled><option value="">Loading campaigns</option></select></label></div>
               <div class="influence-map-frame"><div id="live-influence-map" aria-label="Editable GM faction influence map"></div></div>
               <div class="panel-body"><div class="influence-list" id="live-influence-legend"></div></div>
-              <p class="influence-map-status" id="influence-map-status" role="status">Import a setup package to load its campaign map and factions.</p>
+              <p class="influence-map-status" id="influence-map-status" role="status">Import a setup package to create a runtime campaign and load its map.</p>
             </section>
             <aside class="side-stack">
               <section class="panel">
@@ -443,7 +447,7 @@
                 <div class="panel-body influence-tools">
                   <label class="field"><span class="eyebrow">Faction layer</span><select id="live-influence-faction" disabled><option value="">Import a setup package</option></select></label>
                   <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button></div>
-                  <p class="feedback" id="live-influence-feedback" role="status">The setup package remains unchanged; live edits are saved in this GM browser.</p>
+                  <p class="feedback" id="live-influence-feedback" role="status">Runtime campaign data is server-backed; influence edits remain in this GM browser.</p>
                   <div class="influence-list" id="live-influence-factions"><div class="empty-state">No influence layers loaded.</div></div>
                   <div class="section-bar"><div><h2>Settlement prominence</h2><p>Checked factions influence that settlement. Earlier entries are more prominent.</p></div></div>
                   <div class="influence-list" id="live-settlement-prominence"><div class="empty-state">No settlements loaded.</div></div>
@@ -478,13 +482,14 @@
     </form>
   </dialog>
   <dialog id="setup-import-dialog" aria-labelledby="setup-import-title">
-    <div class="dialog-head"><div><div class="eyebrow">GM-only setup handoff</div><h2 id="setup-import-title">Load map and factions</h2></div><button class="icon-button" id="close-setup-import" aria-label="Close setup import">×</button></div>
-    <div class="dialog-form"><p id="setup-import-status" class="feedback" role="status">Choose an exported schema-v2 setup package.</p><pre id="setup-import-summary" hidden></pre><p class="row-description">This loads the map and faction layers into a separate GM influence workspace. It does not overwrite the running dashboard record or publish player data.</p><div class="dialog-actions"><button class="button" id="cancel-setup-import" type="button">Cancel</button><button class="button button-primary" id="apply-setup-import" type="button" disabled>Load influence map</button></div></div>
+    <div class="dialog-head"><div><div class="eyebrow">GM-only setup handoff</div><h2 id="setup-import-title">Create runtime campaign</h2></div><button class="icon-button" id="close-setup-import" aria-label="Close setup import">×</button></div>
+    <div class="dialog-form"><p id="setup-import-status" class="feedback" role="status">Choose an exported schema-v2 setup package.</p><pre id="setup-import-summary" hidden></pre><p class="row-description">This creates an independent runtime campaign from the validated setup package. The source remains unchanged; player information is not published. The existing dashboard sample remains separate.</p><div class="dialog-actions"><button class="button" id="cancel-setup-import" type="button">Cancel</button><button class="button button-primary" id="apply-setup-import" type="button" disabled>Create runtime campaign</button></div></div>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="campaign-package-contract.js"></script>
+  <script src="/auth-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -498,6 +503,7 @@
         weatherNote: "Low cloud and steady rain. The gravel roads are softening; visibility is short in the tree line.",
         activeStop: 1,
         currentPrompt: "",
+        runtimeCampaignId: null,
         setupPackage: null,
         liveInfluence: {},
         liveSettlementProminence: {},
@@ -532,9 +538,11 @@
       const setupImportStatus = document.getElementById("setup-import-status");
       const setupImportSummary = document.getElementById("setup-import-summary");
       const applySetupImportButton = document.getElementById("apply-setup-import");
+      const runtimeCampaignSelect = document.getElementById("runtime-campaign-select");
       let state = loadState();
       let toastTimer;
       let pendingSetupPackage = null;
+      let pendingSetupSourceJson = null;
       let influenceMap = null;
       let influenceHexLayer = null;
       let stagedInfluenceCells = new Set();
@@ -853,18 +861,22 @@
       }
 
       function liveInfluenceForCampaign() {
-        return state.liveInfluence?.[state.setupPackage?.campaign.id] || {};
+        return state.liveInfluence?.[activeWorkspaceId()] || {};
+      }
+
+      function activeWorkspaceId() {
+        return state.runtimeCampaignId || state.setupPackage?.campaign.id || null;
       }
 
       function liveSettlementProminenceForCampaign() {
-        const campaignId = state.setupPackage?.campaign.id;
+        const campaignId = activeWorkspaceId();
         const saved = state.liveSettlementProminence?.[campaignId];
         if (isRecord(saved)) return saved;
         return Object.fromEntries((state.setupPackage?.settlements || []).map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
       }
 
       function saveLiveSettlementOrder(settlementId, factionIds) {
-        const campaignId = state.setupPackage?.campaign.id;
+        const campaignId = activeWorkspaceId();
         if (!campaignId) return;
         const previousState = state;
         const currentOrders = liveSettlementProminenceForCampaign();
@@ -1205,6 +1217,94 @@
         if (influenceMap) influenceMap.invalidateSize({ pan: false });
       }
 
+      async function campaignApiRequest(path, options = {}) {
+        let response;
+        try {
+          response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options });
+        } catch {
+          throw new Error("The secure campaign service could not be reached.");
+        }
+        const result = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          location.replace(`/login.html?next=${encodeURIComponent(location.pathname)}`);
+          throw new Error("Your session has expired.");
+        }
+        if (!response.ok) throw new Error(result.error || "The campaign request failed.");
+        return result;
+      }
+
+      function activateRuntimeCampaign(campaign, announce = false) {
+        const setupPackage = normalizeSetupPackageForInfluence(campaign.setupPackage);
+        const runtimeCampaignId = campaign.id;
+        const liveInfluence = isRecord(state.liveInfluence) ? { ...state.liveInfluence } : {};
+        const liveSettlementProminence = isRecord(state.liveSettlementProminence) ? { ...state.liveSettlementProminence } : {};
+        if (!Object.prototype.hasOwnProperty.call(liveInfluence, runtimeCampaignId)) {
+          liveInfluence[runtimeCampaignId] = Object.fromEntries(setupPackage.factions.map((faction) => [faction.id, [...faction.influenceCells]]));
+        }
+        if (!Object.prototype.hasOwnProperty.call(liveSettlementProminence, runtimeCampaignId)) {
+          liveSettlementProminence[runtimeCampaignId] = Object.fromEntries(setupPackage.settlements.map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
+        }
+        state = { ...state, runtimeCampaignId, setupPackage, liveInfluence, liveSettlementProminence };
+        runtimeCampaignSelect.value = runtimeCampaignId;
+        stagedInfluenceCells.clear();
+        liveInfluenceEditing = false;
+        persist();
+        renderLiveInfluenceControls();
+        renderLiveInfluenceGrid();
+        if (influenceMap) influenceMap.fitBounds([[setupPackage.map.bounds.south, setupPackage.map.bounds.west], [setupPackage.map.bounds.north, setupPackage.map.bounds.east]], { padding: [28, 28] });
+        document.getElementById("influence-map-status").textContent = `${setupPackage.campaign.name} loaded from the runtime campaign service. Influence edits remain browser-local.`;
+        if (announce) showToast(`Runtime campaign loaded: ${setupPackage.campaign.name}.`);
+      }
+
+      async function loadRuntimeCampaign(runtimeCampaignId, announce = true) {
+        const { campaign } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}`);
+        activateRuntimeCampaign(campaign, announce);
+      }
+
+      async function refreshRuntimeCampaigns(preferredId = state.runtimeCampaignId) {
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = location.protocol === "https:" ? "Loading campaigns" : "HTTPS service required";
+        runtimeCampaignSelect.replaceChildren(placeholder);
+        if (location.protocol !== "https:") {
+          runtimeCampaignSelect.disabled = true;
+          return;
+        }
+        try {
+          const { campaigns } = await campaignApiRequest("/api/campaigns");
+          runtimeCampaignSelect.replaceChildren();
+          const emptyOption = document.createElement("option");
+          emptyOption.value = "";
+          emptyOption.textContent = campaigns.length ? "Choose a runtime campaign" : "No runtime campaigns";
+          runtimeCampaignSelect.append(emptyOption);
+          campaigns.forEach((campaign) => {
+            const option = document.createElement("option");
+            option.value = campaign.id;
+            option.textContent = `${campaign.name} / ${campaign.setting}`;
+            runtimeCampaignSelect.append(option);
+          });
+          runtimeCampaignSelect.disabled = campaigns.length === 0;
+          const selectedId = campaigns.some((campaign) => campaign.id === preferredId)
+            ? preferredId
+            : campaigns[0]?.id || "";
+          runtimeCampaignSelect.value = selectedId;
+          if (selectedId) await loadRuntimeCampaign(selectedId, false);
+          else document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
+        } catch (error) {
+          runtimeCampaignSelect.disabled = true;
+          runtimeCampaignSelect.replaceChildren();
+          const errorOption = document.createElement("option");
+          errorOption.value = "";
+          errorOption.textContent = "Campaign service unavailable";
+          runtimeCampaignSelect.append(errorOption);
+          document.getElementById("influence-map-status").textContent = error.message;
+        }
+      }
+
+      runtimeCampaignSelect.addEventListener("change", () => {
+        if (runtimeCampaignSelect.value) loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
+      });
+
       function nextId(items) { return items.reduce((largest, item) => Math.max(largest, Number(item.id) || 0), 0) + 1; }
 
       document.addEventListener("click", (event) => {
@@ -1282,7 +1382,8 @@
         setupImportDialog.showModal();
         try {
           if (file.size > 25 * 1024 * 1024) throw new Error("Setup packages must be smaller than 25 MB.");
-          pendingSetupPackage = normalizeSetupPackageForInfluence(JSON.parse(await file.text()));
+          pendingSetupSourceJson = await file.text();
+          pendingSetupPackage = normalizeSetupPackageForInfluence(JSON.parse(pendingSetupSourceJson));
           const setup = pendingSetupPackage;
           setupImportSummary.textContent = [
             `Campaign: ${setup.campaign.name}`,
@@ -1295,7 +1396,7 @@
           ].join("\n");
           setupImportSummary.hidden = false;
           setupImportStatus.className = "feedback success";
-          setupImportStatus.textContent = `Validated ${file.name}. Load this map into the GM-only influence workspace.`;
+          setupImportStatus.textContent = `Validated ${file.name}. Import it as a new GM-owned runtime campaign.`;
           applySetupImportButton.disabled = false;
         } catch (error) {
           setupImportStatus.className = "feedback error";
@@ -1304,34 +1405,33 @@
       });
       const closeSetupImportDialog = () => {
         pendingSetupPackage = null;
+        pendingSetupSourceJson = null;
         setupImportDialog.close();
       };
       document.getElementById("close-setup-import").addEventListener("click", closeSetupImportDialog);
       document.getElementById("cancel-setup-import").addEventListener("click", closeSetupImportDialog);
-      applySetupImportButton.addEventListener("click", () => {
-        if (!pendingSetupPackage) return;
-        const setupPackage = pendingSetupPackage;
-        const previousState = state;
-        const liveInfluence = isRecord(state.liveInfluence) ? { ...state.liveInfluence } : {};
-        const liveSettlementProminence = isRecord(state.liveSettlementProminence) ? { ...state.liveSettlementProminence } : {};
-        if (!Object.prototype.hasOwnProperty.call(liveInfluence, setupPackage.campaign.id)) {
-          liveInfluence[setupPackage.campaign.id] = Object.fromEntries(setupPackage.factions.map((faction) => [faction.id, [...faction.influenceCells]]));
+      applySetupImportButton.addEventListener("click", async () => {
+        if (!pendingSetupPackage || !pendingSetupSourceJson) return;
+        applySetupImportButton.disabled = true;
+        setupImportStatus.className = "feedback";
+        setupImportStatus.textContent = "Creating the runtime campaign…";
+        try {
+          const { campaign } = await campaignApiRequest("/api/campaigns/import-setup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: pendingSetupSourceJson
+          });
+          pendingSetupPackage = null;
+          pendingSetupSourceJson = null;
+          setupImportDialog.close();
+          await refreshRuntimeCampaigns(campaign.id);
+          setView("influence");
+          showToast(`Runtime campaign created: ${campaign.name}.`);
+        } catch (error) {
+          setupImportStatus.className = "feedback error";
+          setupImportStatus.textContent = error.message;
+          applySetupImportButton.disabled = false;
         }
-        if (!Object.prototype.hasOwnProperty.call(liveSettlementProminence, setupPackage.campaign.id)) {
-          liveSettlementProminence[setupPackage.campaign.id] = Object.fromEntries(setupPackage.settlements.map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
-        }
-        state = { ...state, setupPackage, liveInfluence, liveSettlementProminence };
-        if (!persist()) {
-          state = previousState;
-          return;
-        }
-        pendingSetupPackage = null;
-        stagedInfluenceCells.clear();
-        liveInfluenceEditing = false;
-        setupImportDialog.close();
-        if (influenceMap) influenceMap.fitBounds([[setupPackage.map.bounds.south, setupPackage.map.bounds.west], [setupPackage.map.bounds.north, setupPackage.map.bounds.east]], { padding: [28, 28] });
-        setView("influence");
-        showToast("Setup map loaded into the GM-only influence workspace.");
       });
       document.getElementById("live-influence-faction").addEventListener("change", () => {
         stagedInfluenceCells.clear();
@@ -1352,7 +1452,7 @@
         const setup = state.setupPackage;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!setup || !factionId || !stagedInfluenceCells.size) return;
-        const campaignId = setup.campaign.id;
+        const campaignId = activeWorkspaceId();
         const currentCampaignLayers = liveInfluenceForCampaign();
         const currentCells = currentCampaignLayers[factionId] || setup.factions.find((faction) => faction.id === factionId)?.influenceCells || [];
         const nextState = {
@@ -1373,7 +1473,7 @@
         const setup = state.setupPackage;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!setup || !factionId || !stagedInfluenceCells.size) return;
-        const campaignId = setup.campaign.id;
+        const campaignId = activeWorkspaceId();
         const currentCampaignLayers = liveInfluenceForCampaign();
         const currentCells = currentCampaignLayers[factionId] || setup.factions.find((faction) => faction.id === factionId)?.influenceCells || [];
         const staged = new Set(stagedInfluenceCells);
@@ -1407,6 +1507,7 @@
       }));
       window.addEventListener("resize", () => requestAnimationFrame(drawMap));
       render();
+      refreshRuntimeCampaigns();
     })();
   </script>
 </body>

@@ -177,7 +177,7 @@
     .terrain-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border: 1px solid #59665f; vertical-align: -1px; }
     .terrain-grid-polygon { cursor: pointer; }
     .setup-panel[data-panel="locations"] .terrain-grid-polygon { cursor: default; }
-    .terrain-grid-polygon.selected { color: #b74435; weight: 3; }
+    .terrain-grid-polygon.selected { color: #b74435; stroke-width: 3px; }
     .location-list { display: grid; gap: 0; }
     .empty-state { padding: 17px 13px; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .location-row, .entity-row, .note-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; align-items: start; padding: 11px 13px; border-bottom: 1px solid #d5ddd3; }
@@ -266,6 +266,7 @@
           <a class="button" href="player-interface.html">Player preview</a>
           <button class="button" type="button" data-go-step="package">Review package</button>
           <button class="button button-primary" type="button" id="export-package-top">Export setup JSON</button>
+          <button class="button" type="button" data-auth-logout>Sign out</button>
         </div>
       </header>
       <div class="content">
@@ -423,6 +424,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="campaign-package-contract.js"></script>
+  <script src="/auth-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-campaign-setup-draft-v1";

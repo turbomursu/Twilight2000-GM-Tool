@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Sign in | Fieldbook</title>
+  <link rel="stylesheet" href="/login.css">
+  <script src="/login.js" defer></script>
+</head>
+<body>
+  <main class="auth-shell">
+    <header class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">T2K</span>
+      <span><strong>Fieldbook</strong><small>GM access / local network</small></span>
+    </header>
+    <section class="auth-panel" aria-labelledby="auth-title">
+      <div class="panel-kicker"><span class="status-dot" aria-hidden="true"></span><span id="auth-mode-label">SECURE SESSION</span></div>
+      <h1 id="auth-title">Sign in</h1>
+      <p class="auth-description" id="auth-description">Use your Fieldbook account to continue.</p>
+      <form id="login-form" autocomplete="on">
+        <label for="login-username">Username</label>
+        <input id="login-username" name="username" type="text" autocomplete="username" minlength="3" maxlength="32" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" minlength="14" maxlength="128" required>
+        <button class="submit-button" type="submit">Sign in <span aria-hidden="true">→</span></button>
+      </form>
+      <form id="bootstrap-form" autocomplete="on" hidden>
+        <label for="bootstrap-token">One-time setup token</label>
+        <input id="bootstrap-token" name="bootstrapToken" type="password" autocomplete="off" required>
+        <label for="bootstrap-username">GM username</label>
+        <input id="bootstrap-username" name="username" type="text" autocomplete="username" minlength="3" maxlength="32" required>
+        <label for="bootstrap-password">GM password</label>
+        <input id="bootstrap-password" name="password" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
+        <button class="submit-button" type="submit">Create GM account <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
+      <div class="auth-footer"><span>PRIVATE CAMPAIGN WORKSPACE</span><span>HTTPS / SESSION LOCKED</span></div>
+    </section>
+  </main>
+</body>
+</html>
