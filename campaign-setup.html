@@ -422,6 +422,7 @@
   <dialog class="modal" id="import-package-dialog" aria-labelledby="import-package-title"><div class="modal-head"><h2 id="import-package-title">Open setup package</h2><button class="icon-button" type="button" id="close-import-package" aria-label="Close setup package import">×</button></div><div class="modal-body"><p class="feedback" id="import-package-status" role="status"></p><pre id="import-package-summary" hidden></pre><p class="row-description">Applying this package replaces the current browser-local setup draft. It does not change a running campaign or publish player information.</p><div class="dialog-actions"><button class="button" type="button" id="cancel-import-package">Cancel</button><button class="button button-primary" type="button" id="apply-import-package" disabled>Replace local draft</button></div></div></dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="campaign-package-contract.js"></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-campaign-setup-draft-v1";
@@ -1939,6 +1940,7 @@
       }
 
       function normalizeImportedPackage(input) {
+        FieldbookCampaignPackageContract.assertCampaignSetupPackage(input);
         if (!isRecord(input) || input.packageType !== "fieldbook.campaign-setup" || input.schemaVersion !== 2) {
           throw new Error("Choose a Fieldbook campaign setup package using schema version 2.");
         }

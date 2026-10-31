@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node -e \"const f=require\\('fs'\\),v=require\\('vm'\\),x=f\\.readFileSync\\('index\\.html','utf8'\\),a=x\\.indexOf\\('<script>'\\)\\+8,b=x\\.indexOf\\('</script>',a\\);new v\\.Script\\(x\\.slice\\(a,b\\)\\);console\\.log\\('PASS index\\.html inline script'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

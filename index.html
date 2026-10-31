@@ -330,6 +330,7 @@
       </nav>
       <div class="nav-label" style="margin-top: 20px;">Authoring</div>
       <a class="nav-link" href="campaign-setup.html"><span class="nav-icon" aria-hidden="true">06</span>Campaign setup</a>
+      <a class="nav-link" href="player-seeds.html"><span class="nav-icon" aria-hidden="true">07</span>Player seeds</a>
       <div class="rail-bottom">
         <div class="signal-line"><span class="signal-dot"></span>Local record active</div>
         <p>CAMPAIGN FILE<br>FIELDBOOK / 04</p>
@@ -483,6 +484,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="campaign-package-contract.js"></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -542,13 +544,14 @@
         try {
           const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
           if (saved && typeof saved === "object") return { ...structuredClone(defaults), ...saved };
+        } catch (error) {
           console.warn("Could not load the local campaign record.", error);
-              color: owners.length ? "#344a40" : "#788779",
+        }
         return structuredClone(defaults);
-              opacity: owners.length ? .48 : .7,
+      }
       function persist() {
-              fillColor: owners.length ? "#e8ece5" : "#e4ece2",
-              fillOpacity: owners.length ? .05 : .12,
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           return true;
         } catch (error) {
           showToast("Browser storage is unavailable; changes may not persist.");
@@ -738,6 +741,7 @@
       }
 
       function normalizeSetupPackageForInfluence(input) {
+        FieldbookCampaignPackageContract.assertCampaignSetupPackage(input);
         if (!isRecord(input) || input.packageType !== "fieldbook.campaign-setup" || input.schemaVersion !== 2) {
           throw new Error("Choose a Fieldbook setup package using schema version 2.");
         }
@@ -828,15 +832,10 @@
           return {
             id,
             name: location?.name || requireText(settlement.name, "Settlement name", 160),
-            } catch (error) {
             gridRef: location?.gridRef || (typeof settlement.gridRef === "string" ? settlement.gridRef.slice(0, 40) : null),
-            }
-            return structuredClone(defaults);
-          }
-        });
-          const legacySettlement = settlements.find((settlement) => settlement.id === faction.settlementId);
-          if (!legacySettlement) throw new Error(`Faction ${faction.name || faction.id} references a missing legacy settlement.`);
-          if (!legacySettlement.prominentFactionIds.includes(faction.id)) legacySettlement.prominentFactionIds.push(faction.id);
+            locationId: location?.id || null,
+            prominentFactionIds: [...prominentFactionIds]
+          };
         });
         settlements.forEach((settlement) => {
           if (settlement.prominentFactionIds.some((factionId) => !factionIds.has(factionId))) {
