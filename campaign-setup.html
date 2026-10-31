@@ -463,6 +463,7 @@
       let drawingArea = false;
       let selectedTerrainCell = null;
       const selectedTerrainCells = new Map();
+      const selectedInfluenceCells = new Map();
       let terrainBatchMode = false;
       let influenceBatchMode = false;
       let placementMode = false;
@@ -962,9 +963,10 @@
             const key = `${q},${r}`;
             const terrainType = state.map.grid.terrainCells[key] || "";
             const terrain = TERRAIN_TYPES[terrainType];
+            const selectedCell = selectedTerrainCells.has(key) || selectedInfluenceCells.has(key);
             const polygon = L.polygon(vertices, {
               color: terrain ? terrain.color : "#344a40",
-              weight: terrainEditing && selectedTerrainCells.has(key) ? 3 : 1,
+              weight: terrainEditing && selectedCell ? 3 : 1,
               opacity: terrain ? .75 : .3,
               fill: terrainEditing || Boolean(terrain),
               fillColor: terrain?.color || "#344a40",
@@ -976,7 +978,7 @@
             influenceColors.forEach((color, index) => {
               L.polygon(vertices, {
                 color,
-                weight: terrainEditing && selectedTerrainCells.has(key) ? 4 : 2,
+                weight: terrainEditing && selectedInfluenceCells.has(key) ? 4 : 2,
                 opacity: .95,
                 fill: true,
                 fillColor: color,
@@ -1046,13 +1048,13 @@
 
       function renderInfluenceControls() {
         const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
-        const selectedCount = selectedTerrainCells.size;
+        const selectedCount = selectedInfluenceCells.size;
         influenceBatchModeButton.disabled = !faction;
         influenceBatchModeButton.setAttribute("aria-pressed", String(influenceBatchMode));
         influenceBatchModeButton.classList.toggle("button-primary", influenceBatchMode);
         influenceBatchModeButton.textContent = influenceBatchMode ? "Finish influence selection" : "Select influence hexes";
         saveInfluenceButton.disabled = !faction || !selectedCount;
-        clearInfluenceButton.disabled = !faction || !selectedCount || ![...selectedTerrainCells.keys()].some((key) => faction.influenceCells?.includes(key));
+        clearInfluenceButton.disabled = !faction || !selectedCount || ![...selectedInfluenceCells.keys()].some((key) => faction.influenceCells?.includes(key));
         if (!faction) influenceFeedback.textContent = "Add a faction first in Factions & settlements.";
         else if (selectedCount) influenceFeedback.textContent = `${selectedCount} hex(es) selected for ${faction.name}. Save the layer to keep these edits.`;
         else influenceFeedback.textContent = influenceBatchMode ? `Select hexes for ${faction.name}; saved cells stay visible on the map.` : `${faction.name}: ${(faction.influenceCells || []).length} influence hex(es).`;
@@ -1104,9 +1106,8 @@
 
       function selectInfluenceCell(q, r) {
         const key = `${q},${r}`;
-        if (selectedTerrainCells.has(key)) selectedTerrainCells.delete(key);
-        else selectedTerrainCells.set(key, { q, r, key, ref: formatAxialCoordinate(q, r) });
-        renderTerrainSelection();
+        if (selectedInfluenceCells.has(key)) selectedInfluenceCells.delete(key);
+        else selectedInfluenceCells.set(key, { q, r, key, ref: formatAxialCoordinate(q, r) });
         renderInfluenceControls();
         renderHexGrid();
       }
@@ -1968,6 +1969,7 @@
         if (terrainBatchMode) {
           influenceBatchMode = false;
           selectedTerrainCells.clear();
+          selectedInfluenceCells.clear();
         }
         event.currentTarget.setAttribute("aria-pressed", String(terrainBatchMode));
         event.currentTarget.classList.toggle("button-primary", terrainBatchMode);
@@ -1981,6 +1983,7 @@
         if (influenceBatchMode) {
           terrainBatchMode = false;
           selectedTerrainCells.clear();
+          selectedInfluenceCells.clear();
         }
         const terrainModeButton = document.querySelector("#terrain-batch-mode");
         terrainModeButton.setAttribute("aria-pressed", String(terrainBatchMode));
@@ -1992,35 +1995,32 @@
         setMapStatus(influenceBatchMode ? "Influence selection active. Click hexes to add or remove them from this faction's staged layer." : "Influence selection ended.");
       });
       influenceFactionSelect.addEventListener("change", () => {
-        selectedTerrainCells.clear();
-        renderTerrainSelection();
+        selectedInfluenceCells.clear();
         renderInfluenceControls();
         renderHexGrid();
       });
       saveInfluenceButton.addEventListener("click", () => {
         const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
-        if (!faction || !selectedTerrainCells.size) return;
-        const savedCount = selectedTerrainCells.size;
-        faction.influenceCells = [...new Set([...(faction.influenceCells || []), ...selectedTerrainCells.keys()])].sort();
-        selectedTerrainCells.clear();
+        if (!faction || !selectedInfluenceCells.size) return;
+        const savedCount = selectedInfluenceCells.size;
+        faction.influenceCells = [...new Set([...(faction.influenceCells || []), ...selectedInfluenceCells.keys()])].sort();
+        selectedInfluenceCells.clear();
         saveDraft();
         renderInfluenceList();
         renderInfluenceControls();
-        renderTerrainSelection();
         renderHexGrid();
         influenceFeedback.textContent = `Saved ${savedCount} influence hex(es) for ${faction.name}.`;
       });
       clearInfluenceButton.addEventListener("click", () => {
         const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
-        if (!faction || !selectedTerrainCells.size) return;
-        const selected = new Set(selectedTerrainCells.keys());
+        if (!faction || !selectedInfluenceCells.size) return;
+        const selected = new Set(selectedInfluenceCells.keys());
         const removedCount = (faction.influenceCells || []).filter((key) => selected.has(key)).length;
         faction.influenceCells = (faction.influenceCells || []).filter((key) => !selected.has(key));
-        selectedTerrainCells.clear();
+        selectedInfluenceCells.clear();
         saveDraft();
         renderInfluenceList();
         renderInfluenceControls();
-        renderTerrainSelection();
         renderHexGrid();
         influenceFeedback.textContent = `Cleared ${removedCount} influence hex(es) from ${faction.name}.`;
       });
