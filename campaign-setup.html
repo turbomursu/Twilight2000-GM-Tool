@@ -366,7 +366,7 @@
           <div class="panel-heading"><div><span class="eyebrow">05 / Handoff to GM runtime</span><h2 id="package-title">Package review</h2></div><span class="eyebrow">Setup package / schema v2</span></div>
           <div class="panel-body">
             <div class="package-layout">
-              <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Preflight</span><h2>Validation</h2></div><button class="button" type="button" id="validate-package">Validate package</button></div><div class="panel-body">
+              <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Preflight</span><h2>Validation</h2></div><div class="button-group"><button class="button" type="button" id="open-package-file">Open setup JSON</button><input id="package-file" type="file" accept=".json,application/json" hidden><button class="button" type="button" id="validate-package">Validate package</button></div></div><div class="panel-body">
                 <div class="package-checks" id="package-checks"></div>
                 <p class="feedback" id="package-feedback" role="status">Add a campaign name, setting, premise, map name, and a starting location.</p>
                 <div class="step-footer"><button class="button" type="button" data-go-step="notes">← Scenario notes</button><div class="button-group"><button class="button" type="button" id="preview-package">Preview JSON</button><button class="button button-primary" type="button" id="export-package" disabled>Export setup JSON</button></div></div>
@@ -380,6 +380,7 @@
     </main>
   </div>
   <dialog class="modal" id="preview-dialog" aria-labelledby="preview-title"><div class="modal-head"><h2 id="preview-title">Setup package preview</h2><button class="icon-button" type="button" id="close-preview" aria-label="Close package preview">×</button></div><div class="modal-body"><pre id="preview-json"></pre></div></dialog>
+  <dialog class="modal" id="import-package-dialog" aria-labelledby="import-package-title"><div class="modal-head"><h2 id="import-package-title">Open setup package</h2><button class="icon-button" type="button" id="close-import-package" aria-label="Close setup package import">×</button></div><div class="modal-body"><p class="feedback" id="import-package-status" role="status"></p><pre id="import-package-summary" hidden></pre><p class="row-description">Applying this package replaces the current browser-local setup draft. It does not change a running campaign or publish player information.</p><div class="dialog-actions"><button class="button" type="button" id="cancel-import-package">Cancel</button><button class="button button-primary" type="button" id="apply-import-package" disabled>Replace local draft</button></div></div></dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
@@ -434,6 +435,11 @@
       const terrainAssignmentsList = document.querySelector("#terrain-assignments");
       const exportButton = document.querySelector("#export-package");
       const previewDialog = document.querySelector("#preview-dialog");
+      const packageFileInput = document.querySelector("#package-file");
+      const importPackageDialog = document.querySelector("#import-package-dialog");
+      const importPackageStatus = document.querySelector("#import-package-status");
+      const importPackageSummaryElement = document.querySelector("#import-package-summary");
+      const applyImportedPackageButton = document.querySelector("#apply-import-package");
       let leafletMap = null;
       let locationMarkerLayer = null;
       let hexGridLayer = null;
@@ -450,6 +456,7 @@
       let mapSaveTimer = null;
       let pendingFieldPapersFeatures = [];
       let pendingFieldPapersAtlas = null;
+      let pendingImportedPackage = null;
       let storageAvailable = true;
       let state = createBlankState();
 
@@ -1408,6 +1415,156 @@
         };
       }
 
+      function normalizeImportedPackage(input) {
+        if (!isRecord(input) || input.packageType !== "fieldbook.campaign-setup" || input.schemaVersion !== 2) {
+          throw new Error("Choose a Fieldbook campaign setup package using schema version 2.");
+        }
+        if (!isRecord(input.campaign) || !isRecord(input.map) || !isRecord(input.map.grid)) {
+          throw new Error("The setup package is missing its campaign or map data.");
+        }
+
+        const requireText = (value, label, maxLength) => {
+          if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
+            throw new Error(`${label} is missing or exceeds its allowed length.`);
+          }
+          return value.trim();
+        };
+        const campaign = {
+          id: requireText(input.campaign.id, "Campaign ID", 120),
+          name: requireText(input.campaign.name, "Campaign name", 80),
+          setting: requireText(input.campaign.setting, "Campaign setting", 100),
+          premise: requireText(input.campaign.premise, "Campaign premise", 1200),
+          mapName: requireText(input.campaign.mapName, "Initial map name", 80),
+          era: typeof input.campaign.era === "string" && input.campaign.era.length <= 60 ? input.campaign.era.trim() : ""
+        };
+        const bounds = normalizeAreaBounds(input.map.bounds);
+        if (!bounds) throw new Error("The setup package needs valid campaign-area bounds.");
+
+        const atlas = normalizeAtlasMetadata(input.map.fieldPapersAtlas);
+        if (!atlas) throw new Error("The setup package is missing Field Papers atlas metadata.");
+        if (input.map.grid.coordinateSystem !== "axial-q-r" || input.map.grid.cellKm !== TRAVEL_HEX_KM || !Array.isArray(input.map.grid.terrainCells)) {
+          throw new Error("The setup package contains an unsupported terrain-grid format.");
+        }
+        if (input.map.grid.terrainCells.length > 10000) throw new Error("The terrain grid contains too many cells.");
+
+        const terrainCells = {};
+        input.map.grid.terrainCells.forEach((cell) => {
+          if (!isRecord(cell) || !Number.isSafeInteger(cell.q) || !Number.isSafeInteger(cell.r)
+            || Math.abs(cell.q) > 10000 || Math.abs(cell.r) > 10000
+            || !Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, cell.terrainType)) {
+            throw new Error("The setup package contains an invalid terrain-cell assignment.");
+          }
+          const key = `${cell.q},${cell.r}`;
+          if (Object.prototype.hasOwnProperty.call(terrainCells, key)) throw new Error("The terrain grid contains a duplicate cell.");
+          terrainCells[key] = cell.terrainType;
+        });
+
+        const origin = input.map.grid.origin === null
+          ? { lat: bounds.north, lng: bounds.west }
+          : isRecord(input.map.grid.origin) && isValidCoordinate(input.map.grid.origin.lat, input.map.grid.origin.lng)
+          ? { lat: input.map.grid.origin.lat, lng: input.map.grid.origin.lng }
+          : null;
+        if (!origin) throw new Error("The terrain grid has an invalid coordinate origin.");
+
+        const ids = new Set([campaign.id]);
+        const requireUniqueId = (value, label) => {
+          const id = requireText(value, `${label} ID`, 120);
+          if (ids.has(id)) throw new Error(`The setup package contains a duplicate ID: ${id}.`);
+          ids.add(id);
+          return id;
+        };
+        if (!Array.isArray(input.map.locations) || input.map.locations.length < 1 || input.map.locations.length > 500) {
+          throw new Error("The setup package needs between 1 and 500 initial locations.");
+        }
+        let startingLocations = 0;
+        const locations = input.map.locations.map((location) => {
+          if (!isRecord(location)) throw new Error("The setup package contains an invalid location.");
+          const position = isRecord(location.mapPosition) && isValidCoordinate(location.mapPosition.lat, location.mapPosition.lng)
+            ? { lat: location.mapPosition.lat, lng: location.mapPosition.lng }
+            : null;
+          if (!position || !isInsideArea(position, bounds)) throw new Error("Every imported location must have a position inside the campaign area.");
+          if (typeof location.isStartingLocation !== "boolean") throw new Error("Every imported location needs an explicit starting-location value.");
+          if (location.isStartingLocation) startingLocations += 1;
+          return {
+            id: requireUniqueId(location.id, "Location"),
+            name: requireText(location.name, "Location name", 160),
+            kind: typeof location.kind === "string" ? location.kind.slice(0, 80) : "Location",
+            description: typeof location.description === "string" ? location.description.slice(0, 600) : "",
+            position,
+            gridRef: typeof location.gridRef === "string" ? location.gridRef.slice(0, 40) : null,
+            isStartingLocation: location.isStartingLocation
+          };
+        });
+        if (startingLocations !== 1) throw new Error("The setup package must have exactly one starting location.");
+
+        const normalizeRecords = (records, label) => {
+          if (!Array.isArray(records) || records.length > 500) throw new Error(`The ${label.toLowerCase()} list is invalid or too large.`);
+          return records.map((record) => {
+            if (!isRecord(record)) throw new Error(`The setup package contains an invalid ${label.toLowerCase()}.`);
+            return {
+              id: requireUniqueId(record.id, label),
+              name: requireText(record.name, `${label} name`, 160),
+              description: typeof record.description === "string" ? record.description.slice(0, 600) : ""
+            };
+          });
+        };
+        const factions = normalizeRecords(input.factions, "Faction");
+        const settlements = normalizeRecords(input.settlements, "Settlement");
+        if (!Array.isArray(input.scenarioNotes) || input.scenarioNotes.length > 500) throw new Error("The scenario-note list is invalid or too large.");
+        const scenarioNotes = input.scenarioNotes.map((note) => {
+          if (!isRecord(note) || note.visibility !== "gm-only") throw new Error("Imported scenario notes must be marked GM-only.");
+          return {
+            id: requireUniqueId(note.id, "Scenario note"),
+            title: requireText(note.title, "Scenario-note title", 100),
+            body: requireText(note.body, "Scenario-note body", 3000),
+            visibility: "gm-only"
+          };
+        });
+
+        if (!Array.isArray(input.map.offlineAnnotations) || input.map.offlineAnnotations.length > 300) {
+          throw new Error("The setup package contains an invalid map-annotation list.");
+        }
+        const offlineAnnotations = normalizeGeoJSONFeatures(input.map.offlineAnnotations);
+        if (offlineAnnotations.length !== input.map.offlineAnnotations.length) {
+          throw new Error("The setup package contains an invalid map annotation.");
+        }
+        const center = isRecord(input.map.center) && isValidCoordinate(input.map.center.lat, input.map.center.lng)
+          ? { lat: input.map.center.lat, lng: input.map.center.lng }
+          : { lat: (bounds.south + bounds.north) / 2, lng: (bounds.west + bounds.east) / 2 };
+        const zoom = Number.isFinite(input.map.zoom) && input.map.zoom >= 2 && input.map.zoom <= 18 ? input.map.zoom : 10;
+
+        return {
+          schemaVersion: 2,
+          campaign,
+          map: {
+            center,
+            zoom,
+            bounds,
+            grid: { cellKm: TRAVEL_HEX_KM, origin, terrainCells },
+            atlas,
+            offlineAnnotations
+          },
+          locations,
+          factions,
+          settlements,
+          scenarioNotes
+        };
+      }
+
+      function formatImportPackageSummary(importedState) {
+        const start = importedState.locations.find((location) => location.isStartingLocation);
+        return [
+          `Campaign: ${importedState.campaign.name}`,
+          `Setting: ${importedState.campaign.setting}`,
+          `Map: ${importedState.campaign.mapName} / ${importedState.map.atlas.title}`,
+          `Starting location: ${start.name}`,
+          `Locations: ${importedState.locations.length}`,
+          `Terrain cells: ${Object.keys(importedState.map.grid.terrainCells).length}`,
+          `Factions / settlements: ${importedState.factions.length} / ${importedState.settlements.length}`,
+          `GM-only notes: ${importedState.scenarioNotes.length}`
+        ].join("\n");
+      }
+
       function describeImportedFeatures(features) {
         const counts = { points: 0, lines: 0, polygons: 0 };
         features.forEach((feature) => {
@@ -1778,6 +1935,65 @@
         form.reset();
         renderNotes();
         saveDraft();
+      });
+      document.querySelector("#open-package-file").addEventListener("click", () => {
+        packageFileInput.value = "";
+        packageFileInput.click();
+      });
+      packageFileInput.addEventListener("change", async () => {
+        const file = packageFileInput.files?.[0];
+        if (!file) return;
+        pendingImportedPackage = null;
+        applyImportedPackageButton.disabled = true;
+        importPackageSummaryElement.hidden = true;
+        importPackageStatus.className = "feedback";
+        importPackageStatus.textContent = "Checking setup package…";
+        importPackageDialog.showModal();
+        try {
+          if (file.size > 25 * 1024 * 1024) throw new Error("Setup packages must be smaller than 25 MB.");
+          const parsed = JSON.parse(await file.text());
+          pendingImportedPackage = normalizeImportedPackage(parsed);
+          importPackageSummaryElement.textContent = formatImportPackageSummary(pendingImportedPackage);
+          importPackageSummaryElement.hidden = false;
+          importPackageStatus.className = "feedback success";
+          importPackageStatus.textContent = `Validated ${file.name}. Applying it will replace the current local setup draft.`;
+          applyImportedPackageButton.disabled = false;
+        } catch (error) {
+          importPackageStatus.className = "feedback error";
+          importPackageStatus.textContent = error instanceof Error ? error.message : "Could not read this setup package.";
+        }
+      });
+      const closeImportPackageDialog = () => {
+        pendingImportedPackage = null;
+        importPackageDialog.close();
+      };
+      document.querySelector("#close-import-package").addEventListener("click", closeImportPackageDialog);
+      document.querySelector("#cancel-import-package").addEventListener("click", closeImportPackageDialog);
+      document.querySelector("#apply-import-package").addEventListener("click", () => {
+        if (!pendingImportedPackage) return;
+        state = pendingImportedPackage;
+        pendingImportedPackage = null;
+        storageAvailable = true;
+        editingLocationId = null;
+        placementMode = false;
+        pendingPosition = null;
+        restoreFields();
+        if (leafletMap) {
+          leafletMap.setView([state.map.center.lat, state.map.center.lng], state.map.zoom);
+          if (state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
+          renderArea();
+          renderLocations();
+          renderTerrainDataTable();
+          renderTerrainAssignments();
+          leafletMap.invalidateSize({ pan: false });
+        }
+        saveDraft();
+        renderValidation();
+        importPackageDialog.close();
+        setMapStatus(`Setup package opened: ${state.campaign.name}.`, "success");
+      });
+      importPackageDialog.addEventListener("click", (event) => {
+        if (event.target === importPackageDialog) closeImportPackageDialog();
       });
       document.querySelector("#validate-package").addEventListener("click", () => renderValidation());
       document.querySelector("#preview-package").addEventListener("click", showPreview);
