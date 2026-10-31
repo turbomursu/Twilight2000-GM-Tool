@@ -1,5 +1,5 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, getRuntimeCampaign, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, reviewCharacterChangeRequest } = require("./runtime-store.cjs");
+const { createPlayerSeed, getRuntimeCampaign, getRuntimeDashboard, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, reviewCharacterChangeRequest } = require("./runtime-store.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 
@@ -91,6 +91,20 @@ function createCampaignHandler({ database }) {
         const status = error instanceof HttpError ? error.status : error.code?.startsWith("ERR_SQLITE") ? 500 : 422;
         return sendJson(response, status, { error: status === 500 ? "The campaign could not be stored." : error.message });
       }
+    }
+
+    const runtimeMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/runtime$/);
+    if (request.method === "GET" && runtimeMatch) {
+      let campaignId;
+      try {
+        campaignId = decodeURIComponent(runtimeMatch[1]);
+      } catch {
+        return sendJson(response, 400, { error: "Invalid campaign ID." });
+      }
+      const runtime = getRuntimeDashboard(database, account.id, campaignId);
+      return runtime
+        ? sendJson(response, 200, { runtime })
+        : sendJson(response, 404, { error: "Runtime campaign data not found." });
     }
 
     const changeListMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/character-changes$/);

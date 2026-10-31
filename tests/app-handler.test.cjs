@@ -42,6 +42,9 @@ test("redirects anonymous requests to login and serves only public auth assets",
   const projectStatus = await fetch(`${origin}/project-status.html`, { redirect: "manual" });
   assert.equal(projectStatus.status, 302);
   assert.equal(projectStatus.headers.get("location"), "/login.html?next=%2Fproject-status.html");
+  const projectFeatures = await fetch(`${origin}/project-features.html`, { redirect: "manual" });
+  assert.equal(projectFeatures.status, 302);
+  assert.equal(projectFeatures.headers.get("location"), "/login.html?next=%2Fproject-features.html");
 
   const login = await fetch(`${origin}/login.html`);
   assert.equal(login.status, 200);
@@ -71,6 +74,9 @@ test("serves protected pages only for an active session and gates them again aft
   const statusPage = await fetch(`${origin}/project-status.html`, { headers: { Cookie: cookie } });
   assert.equal(statusPage.status, 200);
   assert.match(await statusPage.text(), /Roadmap status/);
+  const featuresPage = await fetch(`${origin}/project-features.html`, { headers: { Cookie: cookie } });
+  assert.equal(featuresPage.status, 200);
+  assert.match(await featuresPage.text(), /Feature status/);
   const roadmap = await fetch(`${origin}/ROADMAP.md`, { headers: { Cookie: cookie } });
   assert.equal(roadmap.status, 200);
   assert.match(roadmap.headers.get("content-type"), /text\/markdown/);

@@ -26,7 +26,7 @@
       background: var(--dark);
     }
     * { box-sizing: border-box; }
-    body { min-width: 1000px; min-height: 100vh; margin: 0; padding: 28px 30px 34px; background: radial-gradient(ellipse at 50% 0%, #46504a, #252b29 70%); }
+    body { min-width: 760px; min-height: 100vh; margin: 0; padding: 28px 30px 34px; background: radial-gradient(ellipse at 50% 0%, #46504a, #252b29 70%); }
     button { font: inherit; cursor: pointer; }
     button:focus-visible { outline: 3px solid #d5b86b; outline-offset: 3px; }
     .masthead { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto 14px; color: #e2e8de; }
@@ -35,41 +35,35 @@
     .masthead small { display: block; margin-top: 4px; color: #aeb8ac; font: 9px var(--mono); text-transform: uppercase; }
     .preview-link { color: #c9d4c2; font: 9px var(--mono); text-transform: uppercase; }
     button.preview-link { padding: 0; border: 0; background: transparent; cursor: pointer; }
-    .player-seed-shell { width: min(760px, 100%); margin: 22px auto; padding: 0 16px; }
-    .player-seed-panel { border: 1px solid #718071; border-top: 3px solid #aebd8a; color: #202b27; background: #e8ece5; box-shadow: inset 0 1px #ffffffb8,0 3px 0 #111b17; }
-    .player-seed-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid #aab5aa; }
-    .player-seed-head h1 { margin: 5px 0 0; font: 700 22px var(--serif); text-transform: uppercase; }
-    .player-seed-head p { margin: 5px 0 0; color: #59665f; font-size: 11px; line-height: 1.5; }
-    .player-seed-body { display: grid; gap: 14px; padding: 18px 20px; }
-    .player-seed-campaign-picker { display: flex; align-items: end; gap: 8px; }
-    .player-seed-campaign { display: grid; flex: 1; gap: 6px; max-width: 440px; }
-    .player-seed-refresh { min-height: 39px; padding: 0 11px; border: 1px solid #718071; border-radius: 2px; color: #202b27; background: #e8ece5; font-size: 10px; text-transform: uppercase; cursor: pointer; }
+    .device-campaign-picker { display: flex; align-items: center; gap: 7px; }
+    .device-campaign-picker label { display: grid; gap: 3px; color: #cbd4c8; font: 7px var(--mono); }
+    .device-campaign-picker select { min-width: 190px; min-height: 28px; padding: 4px 7px; border: 1px solid #879283; border-radius: 2px; color: #202b23; background: #d7dfc7; font: 9px var(--mono); }
+    .player-seed-refresh { min-height: 28px; padding: 0 8px; border: 1px solid #879283; border-radius: 2px; color: #e3e7dd; background: #3a453e; font: 8px var(--mono); text-transform: uppercase; cursor: pointer; }
     .player-seed-refresh:disabled { cursor: not-allowed; opacity: .5; }
-    .player-seed-campaign span, .player-seed-field-label { color: #59665f; font: 9px var(--mono); text-transform: uppercase; }
-    .player-seed-campaign select, .player-seed-field textarea { width: 100%; min-height: 39px; padding: 9px 10px; border: 1px solid #aab5aa; border-radius: 2px; color: #202b27; background: #f7f8f3; font: 12px var(--sans); }
-    .player-seed-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
-    .player-seed-field { display: grid; align-content: start; gap: 6px; min-width: 0; }
-    .player-seed-field.full { grid-column: 1 / -1; }
-    .player-seed-field textarea { min-height: 68px; resize: vertical; line-height: 1.4; }
-    .player-seed-field output { min-height: 38px; padding: 10px; border: 1px solid #c3ccc1; background: #f1f3ed; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .player-seed-status { min-height: 18px; margin: 0; color: #59665f; font: 10px/1.5 var(--mono); }
-    .player-seed-status.error { color: #9b4136; }
-    .player-seed-status.success { color: #356044; }
-    .player-seed-actions { display: flex; justify-content: end; gap: 8px; padding-top: 10px; border-top: 1px solid #c5cec4; }
-    .player-seed-actions button { min-height: 36px; padding: 0 12px; border: 1px solid #7d8b7b; border-radius: 2px; color: #202b27; background: #f0f2ec; font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
-    .player-seed-actions button.primary { border-color: #263a30; color: white; background: #344a40; }
+    .player-seed-body { display: grid; gap: 12px; padding: 4px 2px; }
+    .player-seed-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+    .player-seed-field { display: grid; align-content: start; gap: 5px; min-width: 0; padding: 9px 10px; border: 1px solid #96a087; background: var(--lcd-bright); }
+    .player-seed-field-label { color: #596851; font: 8px var(--mono); text-transform: uppercase; }
+    .player-seed-field textarea { width: 100%; min-height: 55px; padding: 7px 8px; border: 1px solid #9da88f; border-radius: 2px; color: #202b23; background: #e9eedf; font: 11px/1.4 var(--sans); }
+    .player-seed-field textarea:disabled { color: #424d41; background: #d3ddc5; }
+    .player-seed-field output { min-height: 32px; padding: 7px 8px; border: 1px solid #c3ccc1; background: #e0e7d4; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .player-seed-status { min-height: 16px; margin: 0; color: #596851; font: 9px/1.45 var(--mono); }
+    .player-seed-status.error { color: #8d392f; }
+    .player-seed-status.success { color: #3f5d3c; }
+    .player-seed-actions { display: flex; justify-content: end; gap: 7px; padding-top: 8px; border-top: 1px solid #9ca68f; }
+    .player-seed-actions button { min-height: 31px; padding: 0 10px; border: 1px solid #677660; border-radius: 2px; color: #26342a; background: linear-gradient(#e0e8d5,#c3d0b4); font: 8px var(--mono); text-transform: uppercase; cursor: pointer; }
+    .player-seed-actions button.primary { border-color: #394b3b; color: white; background: #405642; }
     .player-seed-actions button:disabled { cursor: not-allowed; opacity: .5; }
-    .player-change-pending { padding: 10px; border-left: 3px solid #a97832; background: #f2e8d6; color: #65502f; font: 10px/1.5 var(--mono); white-space: pre-wrap; }
+    .player-change-pending { padding: 9px; border-left: 3px solid #a97832; color: #65502f; background: #e5dfc7; font: 9px/1.45 var(--mono); white-space: pre-wrap; }
     .player-change-pending[hidden] { display: none; }
-    .player-playable-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; }
-    .player-playable-field { display: grid; gap: 4px; padding: 9px; border-left: 2px solid #687e68; background: #f1f3ed; }
-    .player-playable-field strong { color: #59665f; font: 8px var(--mono); text-transform: uppercase; }
-    .player-playable-field span { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .player-seed-body [hidden] { display: none; }
     .device { position: relative; max-width: 1120px; min-height: 720px; margin: 0 auto; padding: 20px; border: 2px solid var(--case-edge); border-radius: 8px; background: linear-gradient(145deg, #56615b, #333b37 20%, #414b45 80%, #29312d); box-shadow: inset 0 1px #ffffff45, inset 0 -4px #151b18, 0 12px 30px #11171480; }
     .screw { position: absolute; top: 10px; width: 9px; height: 9px; border: 1px solid #202723; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #c1c7bd, #657067 65%, #303934 66%); }
     .screw.left { left: 10px; }.screw.right { right: 10px; }
-    .device-top { display: flex; align-items: center; justify-content: space-between; min-height: 30px; padding: 0 7px 12px; color: #e3e7dd; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .device-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 0 7px 12px; color: #e3e7dd; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .device-campaign-picker { display: flex; align-items: center; gap: 7px; }
+    .device-campaign-picker label { display: grid; gap: 3px; color: #cbd4c8; font: 7px var(--mono); }
+    .device-campaign-picker select { min-width: 190px; min-height: 28px; padding: 4px 7px; border: 1px solid #879283; border-radius: 2px; color: #202b23; background: #d7dfc7; font: 9px var(--mono); }
     .link-state { display: inline-flex; align-items: center; gap: 8px; color: #d6be82; }
     .link-dot { width: 7px; height: 7px; border-radius: 50%; background: #8faa7e; box-shadow: 0 0 0 3px #8faa7e24; }
     .lcd { min-height: 545px; padding: 20px 24px; border: 3px solid #171d19; color: var(--ink); background: var(--lcd); box-shadow: inset 0 0 24px #35452c33; }
@@ -165,6 +159,7 @@
     .dialog-button.primary { border-color: #394b3b; color: #f0f3e8; background: #405642; }
     .dialog-feedback { min-height: 15px; margin: 8px 0 0; color: #73531f; font: 9px var(--mono); }
     .character-record { display: grid; gap: 10px; }
+    .character-record.prototype-sample { display: none; }
     .character-identity { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 15px; border: 1px solid #89957f; background: #d1d9c4; }
     .character-identity h2 { margin: 4px 0 3px; font: 700 20px var(--mono); text-transform: uppercase; }
     .character-role { color: #53614c; font: 9px var(--mono); text-transform: uppercase; }
@@ -314,6 +309,7 @@
     .action-button { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 53px; padding: 0 8px; border: 1px solid #171e1a; border-radius: 3px; color: #e8eee6; background: linear-gradient(180deg, #505b54, #303a34); font: 700 14px var(--mono); letter-spacing: .06em; text-transform: uppercase; box-shadow: inset 0 1px #ffffff35, 0 2px 0 #161c18; }
     .action-button:hover:not(:disabled) { background: linear-gradient(180deg, #647066, #3c493f); }
     .action-button[aria-current="page"] { border-color: #c8d39e; color: #fff; background: linear-gradient(180deg, #586c54, #344a39); box-shadow: inset 0 0 0 1px #d0dba254, 0 2px 0 #161c18; }
+    .action-button.tab-inactive:disabled { border-style: dashed; color: #9da69b; background: linear-gradient(180deg, #3e4741, #2b332e); opacity: .68; }
     .action-button.menu { color: #adb6ac; border-style: dashed; background: #303733; box-shadow: inset 0 1px #ffffff12; }
     .action-button:disabled { cursor: not-allowed; opacity: .78; }
     .hardware-foot { display: flex; justify-content: space-between; gap: 14px; margin-top: 11px; color: #abb5aa; font: 8px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
@@ -323,37 +319,18 @@
 </head>
 <body>
   <header class="masthead">
-    <div><strong>Fieldbook / Player terminal</strong><small>Selected direction / radio handset</small></div>
+    <div><strong>Fieldbook / Player interface</strong><small>Assigned campaign / character record</small></div>
     <div class="masthead-actions"><a class="preview-link" href="/player-interface-concepts.html">Open four-concept comparison</a><button class="preview-link" type="button" data-auth-logout>Sign out</button></div>
   </header>
-  <main class="player-seed-shell" id="player-seed-shell">
-    <section class="player-seed-panel" aria-labelledby="player-seed-title">
-      <header class="player-seed-head"><div><span class="eyebrow">Assigned campaign / player account</span><h1 id="player-seed-title">Your assigned character</h1><p>Select one of your campaigns to review and complete the seed assigned by the GM.</p></div></header>
-      <div class="player-seed-body">
-        <div class="player-seed-campaign-picker"><label class="player-seed-campaign"><span>Campaign</span><select id="player-campaign-select"><option value="">Loading assignments</option></select></label><button class="player-seed-refresh" id="refresh-player-character" type="button" disabled>Refresh</button></div>
-        <p class="player-seed-status" id="player-seed-status" role="status" aria-live="polite">Loading your campaign assignments.</p>
-        <form id="player-seed-form" hidden>
-          <div class="player-seed-fields" id="player-seed-fields"></div>
-          <p class="player-seed-status" id="player-seed-form-note">Only fields left blank by the GM can be completed here. Finalize when the required fields are complete.</p>
-          <section class="player-change-pending" id="player-change-request-summary" hidden></section>
-          <div class="player-seed-actions"><button type="submit" id="save-player-seed">Save progress</button><button class="primary" type="button" id="finalize-player-seed" disabled>Finalize character</button></div>
-        </form>
-        <section id="player-playable-record" hidden>
-          <div class="player-playable-fields" id="player-playable-fields"></div>
-          <p class="player-seed-status success">Character finalized for this campaign. The rest of the player runtime is not connected yet.</p>
-        </section>
-      </div>
-    </section>
-  </main>
-  <main class="device" hidden>
+  <main class="device">
     <span class="screw left" aria-hidden="true"></span><span class="screw right" aria-hidden="true"></span>
-    <div class="device-top"><span>Portable field terminal / operator Lena Fors / seat 02</span><span class="link-state"><i class="link-dot"></i><span id="local-storage-status" aria-live="polite">Browser store / loading</span></span></div>
+    <div class="device-top"><span>Player handset / assigned account</span><div class="device-campaign-picker"><label for="player-campaign-select">Campaign<select id="player-campaign-select"><option value="">Loading assignments</option></select></label><button class="player-seed-refresh" id="refresh-player-character" type="button" disabled>Refresh</button></div></div>
     <section class="lcd" aria-live="polite">
       <header class="lcd-header">
-        <div><span class="eyebrow">The Long Road / campaign copy 02</span><h1 id="screen-title">Situation report</h1></div>
-        <div class="header-meta"><div><span class="eyebrow">Campaign date / game time</span><strong id="campaign-game-clock">11 MAY 2000 / DAY 14 / 08:40</strong></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
+        <div><span class="eyebrow" id="player-record-eyebrow">Player / assigned campaign</span><h1 id="player-seed-title">Character record</h1></div>
+        <div class="header-meta"><div><span class="eyebrow" id="player-record-description">Select an assigned campaign to open your GM-provided character seed.</span></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
       </header>
-      <section class="player-panel active" data-panel="situation" aria-label="Situation report">
+      <section class="player-panel" data-panel="situation" aria-label="Situation report" hidden>
         <div class="sitrep-grid">
           <article class="dispatch"><div class="dispatch-title"><strong>GM-published dispatch / Dalarna sector</strong><span class="dispatch-stamp">Current</span></div><p>North bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.</p></article>
           <div class="status-stack"><div class="status-readout"><span class="eyebrow">Column position</span><strong>Vansbro / Route 26</strong></div><div class="status-readout"><span class="eyebrow">Weather</span><strong>Cold rain</strong></div><div class="status-readout alert"><span class="eyebrow">Road notice</span><strong>Bridge unknown</strong></div></div>
@@ -403,7 +380,21 @@
           <aside class="ledger-note" aria-live="polite"><span class="eyebrow">Personal record / selected item</span><strong id="record-item-name">Field ration</strong><div class="item-record"><div><span class="eyebrow">Item class</span><strong id="record-item-class">Consumable / sample record</strong></div><div><span class="eyebrow">Quantity</span><strong id="record-item-quantity">02</strong></div><div><span class="eyebrow">Source category</span><strong id="record-item-category">UF / Unverified</strong></div><div><span class="eyebrow">Fourth Edition source</span><strong id="record-item-source">No verified citation</strong></div><div><span class="eyebrow">Carrying effects</span><strong id="record-carry-status">Not calculated / rule data missing</strong></div></div><p class="record-note" id="record-item-note">No Fourth Edition mechanics or verified weight are recorded for this illustrative entry.</p></aside>
         </div>
       </section>
-      <section class="player-panel" data-panel="character" aria-label="Character record" hidden>
+      <section class="player-panel active" data-panel="character" aria-label="Character record">
+        <p class="player-seed-status" id="player-seed-status" role="status" aria-live="polite">Loading assigned campaigns.</p>
+        <div class="character-record">
+          <header class="character-identity"><div><span class="eyebrow">Assigned seed / server record</span><h2 id="player-record-name">Select a campaign</h2><span class="character-role" id="player-record-state">Character fields are supplied by your GM.</span></div></header>
+          <div class="player-seed-body">
+            <form id="player-seed-form" hidden>
+              <section class="character-block"><div class="character-block-head"><strong>Character fields</strong><span class="eyebrow">GM-controlled seed</span></div><div class="player-seed-fields" id="player-seed-fields"></div></section>
+              <p class="character-placeholder" id="player-seed-form-note">Complete fields the GM left blank. Finalize when required fields are complete.</p>
+              <section class="player-change-pending" id="player-change-request-summary" hidden></section>
+              <div class="player-seed-actions"><button type="submit" id="save-player-seed">Save progress</button><button class="primary" type="button" id="finalize-player-seed" disabled>Finalize character</button></div>
+            </form>
+            <p class="player-seed-status" id="player-seed-empty" role="status">Choose an assigned campaign to continue.</p>
+          </div>
+        </div>
+        <div class="character-record prototype-sample" hidden>
         <div class="character-record">
           <header class="character-identity"><div><span class="eyebrow">Assigned character / player seat 02</span><h2>Lena Fors</h2><span class="character-role">Scout / The Long Road</span></div><div class="character-actions"><button class="item-button" type="button" data-edit-character>Edit values</button><button class="item-button" type="button" data-send-character disabled>Send to GM</button></div></header>
           <nav class="character-tabs" role="tablist" aria-label="Character record sections">
@@ -508,13 +499,13 @@
       </section>
     </section>
     <nav class="device-controls" aria-label="Player quick access">
-      <div class="control-label"><span>Direct access / player views</span><span>COMMS / connected</span></div>
+      <div class="control-label"><span>Player views</span><span>Inactive views are not connected</span></div>
       <div class="action-bar">
-        <button class="action-button" type="button" data-target="situation" data-title="Situation report" aria-current="page">Sitrep</button>
-        <button class="action-button" type="button" data-target="inventory" data-title="Personal inventory">Inventory</button>
-        <button class="action-button" type="button" data-target="character" data-title="Character record">Character</button>
-        <button class="action-button" type="button" data-target="dispatches" data-title="COMMS">COMMS</button>
-        <button class="action-button" type="button" data-target="map" data-title="Map">Map</button>
+        <button class="action-button tab-inactive" type="button" disabled title="Inactive / GM-published reports are not connected" data-view-state="inactive">Sitrep</button>
+        <button class="action-button tab-inactive" type="button" disabled title="Inactive / player inventory is not connected" data-view-state="inactive">Inventory</button>
+        <button class="action-button" type="button" aria-current="page" title="Current view / assigned character" data-view-state="active">Character</button>
+        <button class="action-button tab-inactive" type="button" disabled title="Inactive / shared COMMS is not connected" data-view-state="inactive">COMMS</button>
+        <button class="action-button tab-inactive" type="button" disabled title="Inactive / published campaign maps are not connected" data-view-state="inactive">Map</button>
       </div>
     </nav>
     <div class="hardware-foot"><span>Player terminal / campaign information controlled by GM</span><span>Fourth Edition rules actions require source verification</span></div>
@@ -537,7 +528,7 @@
   <script src="/auth-client.js" defer></script>
   <script src="/player-seed-client.js" defer></script>
   <script>
-    if (!document.querySelector(".device").hidden) {
+    if (document.body.dataset.enableLocalPlayerPreview === "true") {
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];
     const panels = [...document.querySelectorAll(".player-panel")];
     const title = document.querySelector("#screen-title");

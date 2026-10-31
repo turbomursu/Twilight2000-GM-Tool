@@ -98,7 +98,14 @@ test("player activates, selects assigned campaign, fills only blank seed fields,
 
   const playerPage = await fetch(`${origin}/player-interface.html`, { headers: { Cookie: playerCookie } });
   assert.equal(playerPage.status, 200);
-  assert.match(await playerPage.text(), /id="player-seed-shell"/);
+  const playerPageHtml = await playerPage.text();
+  assert.match(playerPageHtml, /class="device"/);
+  assert.match(playerPageHtml, /id="player-seed-title">Character record/);
+  assert.match(playerPageHtml, /id="player-campaign-select"/);
+  assert.match(playerPageHtml, /aria-current="page" title="Current view \/ assigned character" data-view-state="active">Character/);
+  for (const inactiveTab of ["Sitrep", "Inventory", "COMMS", "Map"]) {
+    assert.match(playerPageHtml, new RegExp(`disabled title="Inactive[^"]*" data-view-state="inactive">${inactiveTab}`));
+  }
   assert.equal((await fetch(`${origin}/player-seed-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   const gmPage = await fetch(`${origin}/index.html`, { headers: { Cookie: playerCookie }, redirect: "manual" });
   assert.equal(gmPage.status, 302);

@@ -206,6 +206,55 @@ const characterChangeSchema = `
     ON character_change_requests(campaign_id, status, submitted_at);
 `;
 
+const runtimeDashboardSchema = `
+  CREATE TABLE runtime_dashboard_state (
+    campaign_id TEXT PRIMARY KEY REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    game_date TEXT NOT NULL,
+    day_number INTEGER NOT NULL CHECK (day_number >= 0),
+    distance_km INTEGER NOT NULL CHECK (distance_km >= 0),
+    rations_days INTEGER NOT NULL CHECK (rations_days >= 0),
+    fuel_units INTEGER NOT NULL CHECK (fuel_units >= 0),
+    weather TEXT NOT NULL,
+    weather_note TEXT NOT NULL,
+    active_stop_index INTEGER NOT NULL DEFAULT 0 CHECK (active_stop_index >= 0),
+    updated_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE TABLE route_stops (
+    campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    location_id TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    km_from_previous INTEGER NOT NULL CHECK (km_from_previous >= 0),
+    PRIMARY KEY (campaign_id, ordinal),
+    UNIQUE (campaign_id, location_id),
+    FOREIGN KEY (campaign_id, location_id) REFERENCES locations(runtime_campaign_id, id)
+  ) STRICT;
+
+  CREATE TABLE personnel (
+    campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    readiness TEXT NOT NULL,
+    sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+    PRIMARY KEY (campaign_id, id),
+    UNIQUE (campaign_id, sort_order)
+  ) STRICT;
+
+  CREATE TABLE journal_entries (
+    campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    entry_date TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (campaign_id, id)
+  ) STRICT;
+`;
+
 function openRuntimeDatabase(path = ":memory:") {
   const database = new DatabaseSync(path);
   database.exec("PRAGMA foreign_keys = ON");
@@ -213,7 +262,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 5) {
+    if (version > 6) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -274,6 +323,18 @@ function openRuntimeDatabase(path = ":memory:") {
     try {
       database.exec(characterChangeSchema);
       database.exec("PRAGMA user_version = 5");
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      database.close();
+      throw error;
+    }
+  }
+  if (version < 6) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(runtimeDashboardSchema);
+      database.exec("PRAGMA user_version = 6");
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
@@ -451,6 +512,37 @@ function getRuntimeCampaign(database, accountId, runtimeId) {
   if (!campaign) return null;
   const { sourceJson, ...summary } = campaign;
   return { ...summary, setupPackage: JSON.parse(sourceJson) };
+}
+
+function getRuntimeDashboard(database, accountId, runtimeId) {
+  const campaign = database.prepare(`SELECT campaigns.runtime_id AS id, campaigns.name, campaigns.setting,
+      campaigns.premise, campaigns.era, campaigns.revision, campaigns.created_at AS createdAt,
+      campaign_memberships.role
+    FROM campaigns JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+    WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ?
+      AND campaign_memberships.role = 'gm' AND campaigns.active = 1`).get(runtimeId, accountId);
+  if (!campaign) return null;
+
+  const dashboard = database.prepare(`SELECT game_date AS gameDate, day_number AS dayNumber,
+      distance_km AS distanceKm, rations_days AS rationsDays, fuel_units AS fuelUnits,
+      weather, weather_note AS weatherNote, active_stop_index AS activeStopIndex, updated_at AS updatedAt
+    FROM runtime_dashboard_state WHERE campaign_id = ?`).get(runtimeId);
+  if (!dashboard) return null;
+
+  const route = database.prepare(`SELECT route_stops.ordinal, route_stops.location_id AS locationId,
+      locations.name, route_stops.detail, route_stops.km_from_previous AS kmFromPrevious,
+      locations.grid_ref AS gridRef, locations.map_position_json AS mapPositionJson
+    FROM route_stops JOIN locations ON locations.runtime_campaign_id = route_stops.campaign_id
+      AND locations.id = route_stops.location_id
+    WHERE route_stops.campaign_id = ? ORDER BY route_stops.ordinal`).all(runtimeId).map(({ mapPositionJson, ...stop }) => ({
+      ...stop,
+      mapPosition: JSON.parse(mapPositionJson)
+    }));
+  const personnel = database.prepare(`SELECT id, name, role, condition, readiness, sort_order AS sortOrder
+    FROM personnel WHERE campaign_id = ? ORDER BY sort_order`).all(runtimeId);
+  const journal = database.prepare(`SELECT id, title, body, entry_date AS entryDate, kind, created_at AS createdAt
+    FROM journal_entries WHERE campaign_id = ? ORDER BY entry_date DESC, created_at DESC, id`).all(runtimeId);
+  return { campaign, dashboard, route, personnel, journal };
 }
 
 function normalizePlayerSeedFields(fields) {
@@ -763,6 +855,7 @@ module.exports = {
   importSetupPackage,
   listRuntimeCampaigns,
   getRuntimeCampaign,
+  getRuntimeDashboard,
   createAssignedUser,
   listAssignedUsers,
   createPlayerSeed,

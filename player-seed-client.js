@@ -4,11 +4,16 @@
   const form = document.querySelector("#player-seed-form");
   const fieldContainer = document.querySelector("#player-seed-fields");
   const finalizeButton = document.querySelector("#finalize-player-seed");
-  const playableRecord = document.querySelector("#player-playable-record");
   const formNote = document.querySelector("#player-seed-form-note");
   const pendingSummary = document.querySelector("#player-change-request-summary");
   const saveButton = document.querySelector("#save-player-seed");
   const refreshButton = document.querySelector("#refresh-player-character");
+  const recordTitle = document.querySelector("#player-seed-title");
+  const recordEyebrow = document.querySelector("#player-record-eyebrow");
+  const recordDescription = document.querySelector("#player-record-description");
+  const recordName = document.querySelector("#player-record-name");
+  const recordState = document.querySelector("#player-record-state");
+  const emptyState = document.querySelector("#player-seed-empty");
   let selectedCampaignId = "";
   let currentCharacter = null;
 
@@ -43,8 +48,15 @@
 
   function renderSeed(character) {
     currentCharacter = character;
+    recordTitle.textContent = character.status === "seed" ? "Character seed" : "Playable character";
+    recordEyebrow.textContent = `${character.displayLabel} / ${character.campaignName} / ${character.setting}`;
+    recordDescription.textContent = character.status === "seed"
+      ? "Complete the fields your GM left open, then finalize this character for the campaign."
+      : "This is your assigned campaign character. Later edits are submitted to your GM for approval.";
+    recordName.textContent = character.displayLabel;
+    recordState.textContent = character.status === "seed" ? "Seed / completion required" : "Playable / changes require GM approval";
+    emptyState.hidden = true;
     form.hidden = false;
-    playableRecord.hidden = true;
     finalizeButton.hidden = character.status !== "seed";
     saveButton.textContent = character.status === "seed" ? "Save progress" : "Submit changes for GM review";
     formNote.textContent = character.status === "seed"
@@ -87,8 +99,9 @@
   async function loadCharacter(campaignId) {
     selectedCampaignId = campaignId;
     form.hidden = true;
-    playableRecord.hidden = true;
     fieldContainer.replaceChildren();
+    emptyState.hidden = false;
+    emptyState.textContent = "Loading assigned character…";
     showStatus("Loading assigned character…");
     try {
       const { character } = await request(`/api/player/campaigns/${encodeURIComponent(campaignId)}/character`);
@@ -96,6 +109,7 @@
       refreshButton.disabled = false;
     } catch (error) {
       showStatus(error.message, "error");
+      emptyState.textContent = error.message;
       refreshButton.disabled = true;
     }
   }
@@ -106,8 +120,9 @@
       selectedCampaignId = "";
       currentCharacter = null;
       form.hidden = true;
-      playableRecord.hidden = true;
       fieldContainer.replaceChildren();
+      emptyState.hidden = false;
+      emptyState.textContent = "Choose an assigned campaign to load your character.";
       showStatus("Choose a campaign assigned by your GM.");
     }
   });
@@ -180,6 +195,9 @@
         campaignSelect.append(option);
       });
       campaignSelect.disabled = campaigns.length === 0;
+      const emptyMessage = campaigns.length ? "Choose an assigned campaign to load your character." : "No player seed is assigned to this account yet.";
+      emptyState.hidden = false;
+      emptyState.textContent = emptyMessage;
       showStatus(campaigns.length ? "Choose a campaign assigned by your GM." : "No player seed is assigned to this account yet.");
     } catch (error) {
       campaignSelect.disabled = true;

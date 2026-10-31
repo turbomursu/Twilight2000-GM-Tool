@@ -30,6 +30,7 @@ Keep the Campaign Setup Tool, GM runtime tool, and Player Interface as distinct 
 
 See `FEATURES.md` for the detailed user and GM feature roadmap and the current prototype status. Keep that overview synchronized when feature scope or implementation status changes.
 See `ROADMAP.md` for the suggested delivery order, dependencies, and phase exit checks. Update it when implementation sequence or product priorities change.
+Keep `project-status.html` and `project-features.html` synchronized with `FEATURES.md` and `ROADMAP.md` whenever implementation or feature status changes. Refresh their update date and next-step prompt when relevant; do not mark a feature complete until its acceptance checks are verified.
 
 ## Ruleset Fidelity
 

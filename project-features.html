@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Feature Status | Fieldbook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --signal: #b74435;
+      --gold: #a97832;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 760px; min-height: 100vh; background: var(--paper); }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #82a9ad; outline-offset: 2px; }
+    .shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
+    .rail { display: flex; flex-direction: column; min-height: 100vh; padding: 23px 15px 18px; color: #e8eee7; background: var(--forest-deep); border-right: 1px solid #526158; box-shadow: inset -4px 0 #111b17; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 26px; }
+    .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid #839783; border-radius: 3px; color: #d4dfcb; background: linear-gradient(145deg,#293d33,#1d2b24); font: 700 11px var(--mono); }
+    .brand-copy strong { display: block; font: 700 15px var(--serif); }
+    .brand-copy small { display: block; margin-top: 3px; color: #a7b5a8; font: 8px var(--mono); text-transform: uppercase; }
+    .rail-label { padding: 0 10px 8px; color: #899a8d; font: 9px var(--mono); text-transform: uppercase; }
+    .rail-link { display: block; padding: 10px; border: 1px solid transparent; color: #c5d0c4; font-size: 11px; text-decoration: none; }
+    .rail-link:hover { color: white; background: #263b30; }
+    .rail-link[aria-current="page"] { border-color: #506354; color: white; background: #344b3d; box-shadow: inset 3px 0 #c2cc91; }
+    .rail-bottom { margin-top: auto; padding: 16px 9px 2px; color: #aab8a9; font: 8px/1.6 var(--mono); text-transform: uppercase; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 62px; gap: 15px; padding: 0 30px; border-bottom: 1px solid var(--line); background: #e2e7df; box-shadow: 0 2px 0 #aeb8ac; }
+    .crumb { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .top-actions { display: flex; gap: 8px; }
+    .button { display: inline-flex; align-items: center; min-height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: linear-gradient(180deg,#f0f2ec,#dfe5dc); font-size: 9px; font-weight: 700; text-decoration: none; text-transform: uppercase; }
+    main { min-width: 0; }
+    .content { width: min(1120px,100%); margin: 0 auto; padding: 27px 30px 46px; background-image: linear-gradient(90deg,#344a4008 1px,transparent 1px),linear-gradient(#344a4008 1px,transparent 1px); background-size: 24px 24px; }
+    .heading { display: flex; align-items: end; justify-content: space-between; gap: 25px; padding-bottom: 18px; border-bottom: 2px solid var(--forest); }
+    .eyebrow { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .heading h1 { margin: 5px 0 0; font: 700 29px/1.05 var(--serif); text-transform: uppercase; }
+    .heading p { max-width: 440px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 17px 0 25px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #e2e7df; }
+    .summary-item { min-height: 81px; padding: 13px 15px; border-right: 1px solid var(--line); }
+    .summary-item:last-child { border-right: 0; }
+    .summary-item strong { display: block; margin-top: 7px; font: 700 14px var(--serif); text-transform: uppercase; }
+    .summary-item p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .section { margin-top: 24px; }
+    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .section-head h2 { margin: 0; font: 700 17px var(--serif); text-transform: uppercase; }
+    .section-head span { color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .checklist { display: grid; }
+    .check-row { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: start; gap: 10px; padding: 10px 8px; border-bottom: 1px solid #b9c3b8; background: #e8ece5bd; }
+    .check-row input { width: 14px; height: 14px; margin: 1px 0 0; accent-color: var(--forest); }
+    .check-row input:indeterminate { accent-color: var(--gold); }
+    .check-copy strong { display: block; font-size: 11px; line-height: 1.4; }
+    .check-copy p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .state { padding-top: 2px; color: var(--muted); font: 8px var(--mono); text-align: right; text-transform: uppercase; white-space: nowrap; }
+    .state.done { color: #356044; }
+    .state.partial { color: #806126; }
+    .notice { margin-top: 23px; padding: 13px 15px; border-left: 3px solid var(--gold); background: #f0e9d8; }
+    .notice strong { display: block; font: 700 10px var(--mono); text-transform: uppercase; }
+    .notice p { margin: 6px 0 0; color: #655538; font-size: 10px; line-height: 1.5; }
+    .footnote { margin-top: 17px; color: var(--muted); font: 8px/1.5 var(--mono); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Project navigation">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">T2K</div><div class="brand-copy"><strong>Fieldbook</strong><small>GM project desk</small></div></div>
+      <div class="rail-label">Workspace</div>
+      <a class="rail-link" href="index.html">GM runtime</a>
+      <a class="rail-link" href="campaign-setup.html">Campaign setup</a>
+      <a class="rail-link" href="player-interface.html">Player interface</a>
+      <a class="rail-link" href="project-status.html">Roadmap status</a>
+      <a class="rail-link" href="project-features.html" aria-current="page">Feature status</a>
+      <a class="rail-link" href="ROADMAP.md">Full roadmap</a>
+      <a class="rail-link" href="FEATURES.md">Feature overview</a>
+      <div class="rail-bottom">Internal reference<br>Updated 01 Nov 2026</div>
+    </aside>
+    <main>
+      <header class="topbar"><div class="crumb">Project control / feature inventory</div><div class="top-actions"><a class="button" href="FEATURES.md">Open full feature overview</a><a class="button" href="ROADMAP.md">Open roadmap</a></div></header>
+      <div class="content">
+        <header class="heading"><div><div class="eyebrow">Current capability snapshot</div><h1>Feature status</h1></div><p>Implemented means the feature has a verified workflow. Partial means an important slice works but the full campaign experience is incomplete. Prototype and planned items are not complete game systems.</p></header>
+        <section class="summary" aria-label="Feature status summary">
+          <div class="summary-item"><span class="eyebrow">Available slices</span><strong>Accounts and seeds</strong><p>GM-created users, campaign seed assignment, and GM-reviewed field edits.</p></div>
+          <div class="summary-item"><span class="eyebrow">Partial surfaces</span><strong>Setup and runtime</strong><p>Setup packages import; dashboard and influence edits remain sample/local.</p></div>
+          <div class="summary-item"><span class="eyebrow">Not connected</span><strong>Player gameplay</strong><p>Published reports, player inventory, COMMS, and full runtime state.</p></div>
+        </section>
+
+        <section class="section" aria-labelledby="surfaces-title">
+          <div class="section-head"><h2>Product surfaces</h2><span>Current status</span></div>
+          <div class="checklist">
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign Setup Tool</strong><p>Atlas, terrain, locations, settlements, factions, and notes author a schema-v2 setup package. Offline basemaps and full rules automation remain out of scope.</p></span><span class="state partial">Prototype</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Authenticated setup import creates an owner-linked SQLite campaign; an opt-in fixture seeds counters, route, personnel, journal, and a sample player seed. The dashboard UI and influence edits are not yet bound to the runtime snapshot API.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player seed lifecycle</strong><p>GM-created usernames, one seed per user per campaign, player completion of open fields, finalization, and approval/rejection of later edits are server-backed in the active handset Character view.</p></span><span class="state done">Working slice</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>GM-published player experience</strong><p>Player situation reports, published maps, inventory, COMMS, and cross-device live campaign play are not connected.</p></span><span class="state">Planned</span></label>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="gm-tools-title">
+          <div class="section-head"><h2>GM tools and campaign systems</h2><span>Prototype work is not full simulation</span></div>
+          <div class="checklist">
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign package handoff</strong><p>Validated setup packages import atomically with source snapshots and GM ownership. Runtime dashboard binding and save/restore remain open.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player seat and character assignment</strong><p>User ownership and the four-seat maximum are enforced; seat administration and full player character runtime are incomplete.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified character and NPC creation</strong><p>Still requires authoritative Fourth Edition procedures, source references, and reviewed GM workflow.</p></span><span class="state">Planned</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Player report publishing</strong><p>Build an explicit GM-controlled projection that excludes GM-only notes, unrevealed state, and other players' data.</p></span><span class="state">Planned</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Logistics, economy, diplomacy, and conflict</strong><p>Underlying campaign dashboards and simulations remain planned; consequential results must stay GM-reviewable.</p></span><span class="state">Planned</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Persistent world simulation and tactical tools</strong><p>Scheduled events, conflict simulation, battle calculations, and dice-governed item actions need verified procedures and tests.</p></span><span class="state">Planned</span></label>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="player-features-title">
+          <div class="section-head"><h2>Player-facing features</h2><span>Separate from the seed workflow</span></div>
+          <div class="checklist">
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Published situation report and map</strong><p>Sitrep and Map quick-access tabs are visible but inactive; authenticated GM publishing and player projection are not connected.</p></span><span class="state">Planned</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Personal inventory and item actions</strong><p>Inventory is visible as an inactive handset tab. Shared inventory, GM approval, verified item references, and rules-governed actions remain open.</p></span><span class="state">Planned</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>COMMS and dispatch delivery</strong><p>COMMS is visible as an inactive handset tab; shared delivery, sender identity, game time, and persistent read state remain open.</p></span><span class="state">Planned</span></label>
+          </div>
+        </section>
+
+        <aside class="notice"><strong>Rules fidelity</strong><p>Where a feature models an actual Twilight: 2000 Fourth Edition procedure, it must be source-verified. Unverified mechanics remain GM-managed; prototypes are not rules engines.</p></aside>
+        <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.querySelectorAll('input[data-progress="partial"]').forEach((checkbox) => { checkbox.indeterminate = true; });
+  </script>
+</body>
+</html>

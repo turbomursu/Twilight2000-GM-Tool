@@ -15,6 +15,7 @@ const PROTECTED_FILES = new Map([
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/campaign-setup.html", ["campaign-setup.html", "text/html; charset=utf-8"]],
   ["/project-status.html", ["project-status.html", "text/html; charset=utf-8"]],
+  ["/project-features.html", ["project-features.html", "text/html; charset=utf-8"]],
   ["/player-interface.html", ["player-interface.html", "text/html; charset=utf-8"]],
   ["/player-interface-concepts.html", ["player-interface-concepts.html", "text/html; charset=utf-8"]],
   ["/ROADMAP.md", ["ROADMAP.md", "text/markdown; charset=utf-8"]],

@@ -84,8 +84,9 @@
       <a class="rail-link" href="campaign-setup.html">Campaign setup</a>
       <a class="rail-link" href="player-interface.html">Player interface</a>
       <a class="rail-link" href="ROADMAP.md">Full roadmap</a>
-      <a class="rail-link" href="FEATURES.md">Feature overview</a>
-      <div class="rail-bottom">Internal reference<br>Updated 31 Oct 2026</div>
+      <a class="rail-link" href="project-features.html">Feature status</a>
+      <a class="rail-link" href="FEATURES.md">Full feature overview</a>
+      <div class="rail-bottom">Internal reference<br>Updated 01 Nov 2026</div>
     </aside>
     <main>
       <header class="topbar"><div class="crumb">Project control / roadmap status</div><div class="top-actions"><a class="button" href="ROADMAP.md">Open roadmap</a><a class="button" href="FEATURES.md">Open features</a></div></header>
@@ -102,6 +103,7 @@
           <div class="checklist">
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Authenticated GM and player accounts</strong><p>GM-created usernames, one-time player activation, role-gated pages, and GM-only user management.</p></span><span class="state done">Done</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Setup package import into SQLite</strong><p>Validated schema-v2 packages create separate GM-owned runtime campaigns and preserve their source snapshot.</p></span><span class="state done">Done</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Development runtime fixture</strong><p>An explicit, idempotent seed command creates dashboard counters, route, personnel, journal, and a sample player seed; the GM-owned runtime snapshot API exposes them.</p></span><span class="state done">Done</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>One player seed per username per campaign</strong><p>GM assignment, campaign selection, blank-field completion, required-field finalization, and four-seat limit.</p></span><span class="state done">Done</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>GM approval for finalized character edits</strong><p>Player changes stay pending; approval applies them, rejection leaves the character unchanged.</p></span><span class="state done">Done</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Focused regression coverage</strong><p>Ownership boundaries, malformed imports, activation, seat limits, pending edits, approval, rejection, and SQLite persistence.</p></span><span class="state done">Done</span></label>
@@ -112,7 +114,7 @@
           <div class="section-head"><h2 id="partial-title">In progress</h2><span>Partially checked</span></div>
           <div class="checklist">
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign setup handoff</strong><p>GM can select imported campaign maps and faction data; the dashboard itself is not yet a view over the runtime database.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player character experience</strong><p>Seed completion and GM-reviewed edits are server-backed; the handset’s situation, inventory, map, and dispatch views remain prototypes.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player character experience</strong><p>Seed completion and GM-reviewed edits are server-backed; Character is active while the visible Sitrep, Inventory, COMMS, and Map tabs are marked inactive.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Runtime persistence</strong><p>Setup import persists, but regular campaign edits, save/restore, backup, and recovery are not wired to runtime state.</p></span><span class="state partial">Partial</span></label>
           </div>
         </section>
@@ -130,6 +132,7 @@
         </section>
 
         <aside class="next-step"><strong>Recommended next milestone</strong><p>Make the dashboard read and write the selected SQLite runtime campaign, then add a round-trip save/restore check. Until that is done, the dashboard’s sample record must stay visibly distinct from imported campaign state.</p></aside>
+        <aside class="next-step"><strong>Suggested next prompt</strong><p>Connect the GM dashboard’s Situation, Personnel, Movement, and Journal views to the selected SQLite runtime campaign using the seeded fixture and owner-scoped runtime snapshot API. Replace local sample state only for supported fields, persist edits, and test authorization, reload, and campaign isolation.</p></aside>
         <p class="footnote">This page is a concise snapshot. The detailed deliverables, dependencies, and exit checks remain in ROADMAP.md and FEATURES.md. Checkboxes are status indicators, not a second editable roadmap.</p>
       </div>
     </main>
