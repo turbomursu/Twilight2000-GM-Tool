@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
+const { mkdtempSync, rmSync } = require("node:fs");
 const http = require("node:http");
+const { tmpdir } = require("node:os");
+const { join } = require("node:path");
 const { once } = require("node:events");
 const test = require("node:test");
 const { createAuthHandler } = require("../server/auth.cjs");
@@ -30,8 +33,22 @@ async function postJson(url, body, headers = {}) {
   });
 }
 
-test("requires TLS configuration before starting a network listener", () => {
-  assert.throws(() => startServer({}), /HTTPS is required/);
+test("starts the LAN service over HTTP without TLS configuration", async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-http-test-"));
+  const server = startServer({
+    FIELDBOOK_HOST: "127.0.0.1",
+    FIELDBOOK_PORT: "0",
+    FIELDBOOK_DB_PATH: join(directory, "runtime.sqlite"),
+    FIELDBOOK_BOOTSTRAP_TOKEN: bootstrapToken
+  });
+  t.after(() => new Promise((resolve) => server.close(() => {
+    rmSync(directory, { recursive: true, force: true });
+    resolve();
+  })));
+  await once(server, "listening");
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/status`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { setupRequired: true });
 });
 
 test("bootstraps one GM account, authenticates sessions, and logs out", async (t) => {
@@ -47,7 +64,7 @@ test("bootstraps one GM account, authenticates sessions, and logs out", async (t
   assert.equal(bootstrap.status, 201);
   const bootstrapBody = await bootstrap.json();
   assert.equal(bootstrapBody.authenticated, true);
-  assert.deepEqual(bootstrapBody.account, { id: bootstrapBody.account.id, username: "gm.user" });
+  assert.deepEqual(bootstrapBody.account, { id: bootstrapBody.account.id, username: "gm.user", role: "gm" });
   assert.equal(Object.hasOwn(bootstrapBody.account, "password_hash"), false);
   const storedPasswordHash = database.prepare("SELECT password_hash FROM accounts WHERE id = ?").get(bootstrapBody.account.id).password_hash;
   assert.match(storedPasswordHash, /^scrypt\$32768\$/);
@@ -56,7 +73,7 @@ test("bootstraps one GM account, authenticates sessions, and logs out", async (t
 
   const bootstrapCookie = bootstrap.headers.get("set-cookie");
   assert.match(bootstrapCookie, /HttpOnly/);
-  assert.match(bootstrapCookie, /Secure/);
+  assert.doesNotMatch(bootstrapCookie, /(?:^|;\s*)Secure(?:;|$)/);
   assert.match(bootstrapCookie, /SameSite=Strict/);
 
   const repeatedBootstrap = await postJson(`${origin}/api/auth/bootstrap`, { bootstrapToken, username: "other-user", password });
@@ -89,6 +106,8 @@ test("bootstraps one GM account, authenticates sessions, and logs out", async (t
 
 test("rejects cross-origin authentication mutations", async (t) => {
   const { origin } = await startTestServer(t);
+  const sameOrigin = await postJson(`${origin}/api/auth/login`, { username: "gm-user", password }, { Origin: origin });
+  assert.equal(sameOrigin.status, 401);
   const response = await postJson(`${origin}/api/auth/login`, { username: "gm-user", password }, { Origin: "https://attacker.example" });
   assert.equal(response.status, 403);
 });

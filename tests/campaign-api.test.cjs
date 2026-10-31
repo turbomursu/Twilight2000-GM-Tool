@@ -97,12 +97,12 @@ test("imports a setup package for its GM and returns only owned campaigns", asyn
   assert.equal(outsiderLogin.status, 200);
   const outsiderCookie = outsiderLogin.headers.get("set-cookie").split(";")[0];
   const outsiderList = await fetch(`${origin}/api/campaigns`, { headers: { Cookie: outsiderCookie } });
-  assert.deepEqual((await outsiderList.json()).campaigns, []);
+  assert.equal(outsiderList.status, 403);
 
   const unauthorizedDetail = await fetch(`${origin}/api/campaigns/${encodeURIComponent(campaign.id)}`, {
     headers: { Cookie: outsiderCookie }
   });
-  assert.equal(unauthorizedDetail.status, 404);
+  assert.equal(unauthorizedDetail.status, 403);
 });
 
 test("rejects malformed setup packages without creating campaigns", async (t) => {

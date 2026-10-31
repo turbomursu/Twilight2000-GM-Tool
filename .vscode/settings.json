@@ -7,6 +7,10 @@
         "/^node --version; npm --version; git status --short; Get-Command node -ErrorAction SilentlyContinue \\| Select-Object -ExpandProperty Source$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node --test$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

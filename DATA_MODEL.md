@@ -5,6 +5,7 @@
 ## Decisions and Boundaries
 
 - The GM-hosted LAN service is authoritative. SQLite on the host stores active campaign state. Browser storage may hold temporary drafts or caches, but it is not authoritative.
+- The service uses plain HTTP only on a trusted LAN. Credentials and session cookies are unencrypted in transit; do not expose the listener to the internet or untrusted networks.
 - Setup packages, runtime saves, and player-facing publications are separate versioned formats. JSON is the import, export, and backup format, not a shared live database.
 - Importing a setup package creates a new runtime campaign. It does not keep the runtime linked to later edits of the source package.
 - The initial campaign has one GM owner and zero to four player seats. Each occupied player seat has one authenticated account and one assigned player character.
@@ -33,20 +34,43 @@ Use normalized SQLite tables and foreign keys for relationships, ownership, and 
 | --- | --- |
 | `campaigns` | Runtime ID, name, setting, premise, era, game date/time, runtime schema version, revision, created/updated timestamps, active state. |
 | `setup_imports` | Campaign ID, source package ID/version, import time, checksum, immutable source JSON. One campaign has one initial setup import. |
-| `accounts` | Account ID, login identifier, password hash, disabled state, timestamps. Never store plaintext passwords or expose password hashes to clients. |
+| `accounts` | Account ID, GM-assigned login identifier, global role (`gm` or `player`), creating GM, password hash, disabled state, timestamps. New player accounts start disabled and are activated with a short-lived, single-use token; there is no public account registration. Never store plaintext passwords or expose password hashes to clients. |
+| `account_invites` | Account ID, one-time token hash, expiry, creation time. Store only a hash; delete the invite when activated or expired. |
 | `campaign_memberships` | Campaign ID, account ID, role (`gm` or `player`); the initial model allows one GM owner. A player membership must map to exactly one seat. |
-| `player_seats` | Seat ID, campaign ID, account ID, assigned character ID, display label, active state, assignment time. This is the single ownership link; make `(campaign_id, character_id)` unique. Enforce at most four active player seats per campaign. |
-| `characters` | Character ID, campaign ID, identity/backstory, attributes, skills, specialties, CUF, and condition. Characters without an assigned seat are GM-controlled; player ownership is derived from the seat assignment rather than duplicated on the character. |
+| `player_seats` | Seat ID, campaign ID, account ID, assigned character ID, display label, active state, assignment time. This is the single ownership link; enforce unique `(campaign_id, account_id)` and `(campaign_id, character_id)` pairs and at most four active player seats per campaign. |
+| `characters` | Character ID, campaign ID, seed/playable status, and bounded character fields. GM-authored seed fields explicitly carry a player-editable flag determined at assignment; only fields left blank by the GM are player-editable. Player ownership is derived from the seat assignment. |
 | `inventory_items` | Item ID, campaign ID, owner character ID, item fields, quantity, source category (`RB`, `GM`, `UF`), source reference, verification status, and acceptance state. |
 | `maps`, `locations`, `terrain_cells` | Campaign-scoped map metadata, bounds/atlas references, editable map annotations, locations and visibility eligibility, and axial Q/R terrain labels. Retain map-rendering coordinates separately from grid references. |
 | `settlements`, `factions`, `faction_influence_cells`, `settlement_factions` | Campaign-scoped setup/runtime records, independent overlapping faction influence, and explicit per-settlement faction prominence order. These records have no rules effects unless a verified procedure is separately implemented. |
 | `routes`, `waypoints`, `resources`, `journal_entries`, `gm_notes`, `events`, `missions` | Campaign runtime records with stable IDs, timestamps, and explicit visibility. GM notes default to GM-only. Rules-driven effects remain unimplemented until verified. |
-| `change_requests`, `item_proposals` | Player-authored proposals, scoped to the submitting seat and its assigned character/inventory; include status, submission time, reviewer, review time, and decision. |
+| `character_change_requests` | Character field edits submitted by the assigned seat after finalization. Store proposed values, `pending`/`approved`/`rejected` status, submitter seat, timestamps, reviewing GM, and review note. Pending requests never alter accepted character data. |
+| `item_proposals` | Player-authored item/data proposals scoped to the submitting seat; include status, submission time, reviewer, review time, and decision. |
 | `messages` | COMMS message, sender seat, campaign game date/time, creation time, and delivery status. Visible to the GM and all seats in the same campaign. |
 | `publications` | Immutable versioned player-view snapshots, publisher, publication time, and withdrawal/supersession state. A campaign has at most one current publication. |
 | `audit_events` | Actor account/seat, campaign, action, target record, server time, relevant campaign game time, and outcome. Required for approvals, publication changes, assignments, and dice-governed item actions. |
 
 All IDs are opaque stable strings generated by the service. Relationships are campaign-scoped and enforced with foreign keys/unique constraints. Clients cannot choose another campaign's IDs to gain access.
+
+## Character Seed Life-Path Shape
+
+The seed editor stores each manually recorded career term in `character.lifePath.careerTerms`, ordered by `termNumber`. This is a record of choices and outcomes, not a rules engine. Rolls, ratings, career eligibility, aging, injuries, promotion, war checks, and gear remain GM-entered until verified against the Players' Manual. Each term has this shape:
+
+```json
+{
+	"id": "term-stable-id",
+	"termNumber": 1,
+	"career": "",
+	"skillAdvances": [],
+	"promotion": { "skill": "", "roll": "", "outcome": "" },
+	"specialties": [],
+	"aging": { "yearsAged": null, "effect": "" },
+	"warCheck": { "roll": "", "outcome": "" },
+	"injuryOutcome": "",
+	"notes": ""
+}
+```
+
+`yearsAged` is a non-negative integer or `null` when not recorded. `skillAdvances` and `specialties` are lists to preserve separate entries. `legacyCareerNotes` temporarily preserves the old schema-v1 free-text career-term field during migration; it can be cleared after its contents are transferred into term records.
 
 ## Player-View Contract
 
@@ -75,9 +99,13 @@ It never contains GM notes, unpublished or withdrawn content, hidden threats, an
 
 Authenticate the account on the server and derive campaign role and player seat from the authenticated session and database membership. Never trust a client-supplied role, seat ID, character ID, campaign ID, or `RB`/`GM`/`UF` claim as authorization. Check campaign membership and record ownership on every endpoint, including exports and nested resources.
 
+A GM may assign at most one player seed to a username in each campaign. New accounts remain disabled until the player activates the GM-issued single-use token and chooses a password. A player selects only from campaigns linked to their own active seat. Seed responses contain only the fields explicitly included by the GM; each field left blank at assignment may be completed by that player. Finalization requires all GM-marked required fields and changes the character from `seed` to `playable`. After finalization, the player may propose edits to character fields; these remain pending until the GM approves or rejects them. Approval applies the proposed fields atomically, rejection leaves the character unchanged, and only one request per character may be pending. These seed fields are identity/backstory data and do not infer or calculate game rules.
+
 ## Mutation and Review Rules
 
 - A player request or item proposal is pending data, not a mutation to accepted campaign state. Only a GM approval action may apply it, in one transaction that also records the reviewer and audit event.
+- Seed assignment and account invitation are one transaction. A player may update only fields marked player-editable while the character status is `seed`; finalization checks required fields and atomically changes status to `playable`.
+- After finalization, player edits are submitted as `character_change_requests`. Only the assigned player can submit; one pending request is allowed per character. GM approval applies the proposed fields atomically and records reviewer/time; rejection records the decision without modifying the character.
 - Removing or changing a seat assignment is a GM action. It does not silently transfer that player's old local/session identity to another seat.
 - An assigned character is a campaign copy of a player seed. Later edits to the independent GM seed do not alter the assigned character.
 - A player-selected item source category is an unverified claim until the GM checks the cited Fourth Edition source. Keep `sourceCategory`, citation, and verification status distinct. Proposed or unverified item data cannot enter accepted inventory as verified rules data.
@@ -101,6 +129,7 @@ Before treating this contract as implemented:
 - Round-trip a setup-v2 package into a new runtime campaign without modifying the source package; reject malformed/unsupported packages atomically.
 - Export and restore a runtime save while preserving IDs, revisions, assignments, and GM-only visibility.
 - Exercise one-player and four-player campaigns with separate sessions.
+- Verify GM-created usernames only, unique user-to-seed assignment per campaign, account activation expiry and single use, blank-only seed completion, required-field finalization, pending post-finalization edits, GM approval/rejection, and denied cross-seat access.
 - Verify server-side denial for unauthenticated access, cross-campaign access, cross-seat character/inventory access, GM-only records, unpublished content, and player attempts to mutate accepted state.
 - Verify that player proposals remain pending until GM approval and that approval/roll/publication records are auditable.
 - Verify that a withdrawn publication disappears from player responses and that an older backup cannot silently overwrite a newer active campaign.

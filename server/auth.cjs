@@ -72,18 +72,23 @@ function parseCookies(header = "") {
 function getAuthenticatedAccount(database, token) {
   if (typeof token !== "string" || !/^[A-Za-z0-9_-]{40,50}$/.test(token)) return null;
   const tokenHash = sha256(token);
-  const row = database.prepare(`SELECT accounts.id, accounts.login_identifier, sessions.expires_at
+  const row = database.prepare(`SELECT accounts.id, accounts.login_identifier, accounts.global_role, sessions.expires_at
     FROM sessions JOIN accounts ON accounts.id = sessions.account_id
     WHERE sessions.token_hash = ? AND accounts.disabled = 0`).get(tokenHash);
   if (row && row.expires_at > new Date().toISOString()) {
-    return { id: row.id, username: row.login_identifier };
+    return { id: row.id, username: row.login_identifier, role: row.global_role };
   }
   database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
   return null;
 }
 
+function getAccountHomePath(database, accountId) {
+  const role = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(accountId)?.global_role;
+  return role === "player" ? "/player-interface.html" : "/index.html";
+}
+
 function setSessionCookie(response, token, maxAgeSeconds = SESSION_LIFETIME_MS / 1000) {
-  response.setHeader("Set-Cookie", `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAgeSeconds}`);
+  response.setHeader("Set-Cookie", `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}`);
 }
 
 function clearSessionCookie(response) {
@@ -121,7 +126,7 @@ function enforceSameOrigin(request) {
   if (!origin) return;
   try {
     const parsed = new URL(origin);
-    if (parsed.protocol !== "https:" || parsed.host !== request.headers.host) throw new HttpError(403, "Cross-origin requests are not allowed.");
+    if (parsed.protocol !== "http:" || parsed.host !== request.headers.host) throw new HttpError(403, "Cross-origin requests are not allowed.");
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(403, "Cross-origin requests are not allowed.");
@@ -194,7 +199,7 @@ function createAuthHandler({ database, bootstrapToken }) {
     response.setHeader("Referrer-Policy", "no-referrer");
 
     try {
-      const url = new URL(request.url, "https://fieldbook.invalid");
+      const url = new URL(request.url, "http://fieldbook.invalid");
       const route = `${request.method} ${url.pathname}`;
       const isMutation = request.method === "POST";
       if (isMutation) enforceSameOrigin(request);
@@ -221,13 +226,50 @@ function createAuthHandler({ database, bootstrapToken }) {
           const currentTokenHash = database.prepare("SELECT value FROM server_config WHERE key = 'bootstrap_token_sha256'").get()?.value;
           if (!safeHexEqual(currentTokenHash, sha256(body.bootstrapToken))) throw new HttpError(401, "Bootstrap authorization failed.");
           const now = new Date().toISOString();
-          database.prepare(`INSERT INTO accounts (id, login_identifier, password_hash, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)`).run(accountId, username, passwordHash, now, now);
+          database.prepare(`INSERT INTO accounts (id, login_identifier, password_hash, created_at, updated_at, global_role)
+            VALUES (?, ?, ?, ?, ?, 'gm')`).run(accountId, username, passwordHash, now, now);
           database.prepare("DELETE FROM server_config WHERE key = 'bootstrap_token_sha256'").run();
           const session = createSession(database, accountId);
           database.exec("COMMIT");
           setSessionCookie(response, session.token);
-          return sendJson(response, 201, { authenticated: true, account: { id: accountId, username } });
+          return sendJson(response, 201, { authenticated: true, homePath: "/index.html", account: { id: accountId, username, role: "gm" } });
+        } catch (error) {
+          database.exec("ROLLBACK");
+          throw error;
+        }
+      }
+
+      if (route === "POST /api/auth/activate") {
+        const body = await readJsonBody(request);
+        if (typeof body.token !== "string" || !/^[A-Za-z0-9_-]{40,50}$/.test(body.token)) {
+          throw new HttpError(400, "A valid player activation token is required.");
+        }
+        const password = validatePassword(body.password);
+        const tokenHash = createHash("sha256").update(body.token).digest("hex");
+        const invite = database.prepare(`SELECT accounts.id, accounts.login_identifier, accounts.disabled, account_invites.expires_at
+          FROM account_invites JOIN accounts ON accounts.id = account_invites.account_id
+          WHERE account_invites.token_hash = ?`).get(tokenHash);
+        if (!invite || !invite.disabled || invite.expires_at <= new Date().toISOString()) {
+          throw new HttpError(401, "Activation token is invalid or expired.");
+        }
+        const passwordHash = await hashPassword(password);
+        database.exec("BEGIN IMMEDIATE");
+        try {
+          const currentInvite = database.prepare(`SELECT account_id FROM account_invites
+            WHERE token_hash = ? AND expires_at > ?`).get(tokenHash, new Date().toISOString());
+          if (!currentInvite || currentInvite.account_id !== invite.id) throw new HttpError(401, "Activation token is invalid or expired.");
+          const now = new Date().toISOString();
+          database.prepare("UPDATE accounts SET password_hash = ?, disabled = 0, updated_at = ? WHERE id = ? AND disabled = 1")
+            .run(passwordHash, now, invite.id);
+          database.prepare("DELETE FROM account_invites WHERE account_id = ?").run(invite.id);
+          const session = createSession(database, invite.id);
+          database.exec("COMMIT");
+          setSessionCookie(response, session.token);
+          return sendJson(response, 201, {
+            authenticated: true,
+            homePath: getAccountHomePath(database, invite.id),
+            account: { id: invite.id, username: invite.login_identifier, role: "player" }
+          });
         } catch (error) {
           database.exec("ROLLBACK");
           throw error;
@@ -254,13 +296,17 @@ function createAuthHandler({ database, bootstrapToken }) {
         database.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(new Date(now).toISOString());
         const session = createSession(database, account.id, now);
         setSessionCookie(response, session.token);
-        return sendJson(response, 200, { authenticated: true, account: { id: account.id, username: account.login_identifier } });
+        return sendJson(response, 200, {
+          authenticated: true,
+          homePath: getAccountHomePath(database, account.id),
+          account: { id: account.id, username: account.login_identifier, role: account.global_role }
+        });
       }
 
       if (route === "GET /api/auth/session") {
         const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
         const account = getAuthenticatedAccount(database, token);
-        if (account) return sendJson(response, 200, { authenticated: true, account });
+        if (account) return sendJson(response, 200, { authenticated: true, homePath: getAccountHomePath(database, account.id), account });
         clearSessionCookie(response);
         return sendJson(response, 401, { authenticated: false });
       }
@@ -281,4 +327,4 @@ function createAuthHandler({ database, bootstrapToken }) {
   };
 }
 
-module.exports = { createAuthHandler, getAuthenticatedAccount, parseCookies };
+module.exports = { createAuthHandler, getAuthenticatedAccount, getAccountHomePath, parseCookies };

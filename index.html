@@ -226,6 +226,22 @@
     .influence-swatch { width: 10px; height: 10px; border: 2px solid currentColor; background: transparent; }
     .influence-row small { color: var(--muted); font: 8px var(--mono); }
     .live-settlement-entry { padding: 9px 0; border-top: 1px solid #d5ddd3; }
+    .player-seed-roster { display: grid; gap: 6px; padding: 10px; border: 1px solid #c5cec4; background: #f1f3ed; }
+    .player-seed-roster h3 { margin: 0; color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .player-seed-roster-row { display: flex; justify-content: space-between; gap: 10px; padding-top: 6px; border-top: 1px solid #d5ddd3; font-size: 10px; }
+    .player-seed-roster-row small { color: var(--muted); font: 8px var(--mono); }
+    .character-change-list { display: grid; gap: 10px; }
+    .character-change-card { display: grid; gap: 10px; padding: 12px; border: 1px solid #c5cec4; background: #f1f3ed; }
+    .character-change-card header { display: flex; justify-content: space-between; gap: 10px; }
+    .character-change-card header strong { font-size: 11px; }
+    .character-change-card header small { color: var(--muted); font: 8px var(--mono); }
+    .character-change-field { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; padding-top: 6px; border-top: 1px solid #d5ddd3; font-size: 10px; }
+    .character-change-field small { display: block; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .character-change-actions { display: flex; justify-content: end; gap: 8px; }
+    #user-activation-token { max-height: 120px; overflow: auto; margin: 0; padding: 10px; border: 1px solid #aab5aa; background: #f1f3ed; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+    #user-list { display: grid; gap: 6px; }
+    .user-list-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px; border-bottom: 1px solid #d5ddd3; font-size: 10px; }
+    .user-list-row small { color: var(--muted); font: 8px var(--mono); }
     .live-settlement-entry > strong { display: block; margin-bottom: 6px; font-size: 10px; }
     .live-settlement-entry > small { display: block; margin: -2px 0 6px; color: var(--muted); font: 8px var(--mono); }
     .live-settlement-faction { display: grid; grid-template-columns: 16px minmax(0,1fr) auto; align-items: center; gap: 6px; min-height: 29px; font-size: 9px; }
@@ -334,6 +350,7 @@
       <div class="nav-label" style="margin-top: 20px;">Authoring</div>
       <a class="nav-link" href="campaign-setup.html"><span class="nav-icon" aria-hidden="true">06</span>Campaign setup</a>
       <a class="nav-link" href="player-seeds.html"><span class="nav-icon" aria-hidden="true">07</span>Player seeds</a>
+      <a class="nav-link" href="project-status.html"><span class="nav-icon" aria-hidden="true">08</span>Roadmap status</a>
       <div class="rail-bottom">
         <div class="signal-line"><span class="signal-dot"></span>Local record active</div>
         <p>CAMPAIGN FILE<br>FIELDBOOK / 04</p>
@@ -346,6 +363,8 @@
         <div class="top-actions">
           <div class="date-stamp"><span>Campaign date</span><strong id="top-date"></strong></div>
           <button class="button" data-action="open-setup-import">Import setup</button>
+          <button class="button" type="button" id="open-users-dialog">Users</button>
+          <button class="button" type="button" id="open-character-changes" disabled>Review changes</button>
           <input id="setup-package-file" type="file" accept=".json,application/json" hidden>
           <button class="button button-icon" data-action="export-record" aria-label="Export campaign record" title="Export campaign record">↓</button>
           <button class="button button-primary" data-action="open-note"><span aria-hidden="true">+</span> Log entry</button>
@@ -445,6 +464,7 @@
               <section class="panel">
                 <div class="panel-head"><div><div class="eyebrow">Live GM record</div><h2>Edit influence</h2></div></div>
                 <div class="panel-body influence-tools">
+                  <button class="button" id="open-player-seed-dialog" type="button" disabled>Assign player seed</button>
                   <label class="field"><span class="eyebrow">Faction layer</span><select id="live-influence-faction" disabled><option value="">Import a setup package</option></select></label>
                   <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button></div>
                   <p class="feedback" id="live-influence-feedback" role="status">Runtime campaign data is server-backed; influence edits remain in this GM browser.</p>
@@ -484,6 +504,38 @@
   <dialog id="setup-import-dialog" aria-labelledby="setup-import-title">
     <div class="dialog-head"><div><div class="eyebrow">GM-only setup handoff</div><h2 id="setup-import-title">Create runtime campaign</h2></div><button class="icon-button" id="close-setup-import" aria-label="Close setup import">×</button></div>
     <div class="dialog-form"><p id="setup-import-status" class="feedback" role="status">Choose an exported schema-v2 setup package.</p><pre id="setup-import-summary" hidden></pre><p class="row-description">This creates an independent runtime campaign from the validated setup package. The source remains unchanged; player information is not published. The existing dashboard sample remains separate.</p><div class="dialog-actions"><button class="button" id="cancel-setup-import" type="button">Cancel</button><button class="button button-primary" id="apply-setup-import" type="button" disabled>Create runtime campaign</button></div></div>
+  </dialog>
+  <dialog id="player-seed-dialog" aria-labelledby="player-seed-dialog-title">
+    <div class="dialog-head"><div><div class="eyebrow">GM-only / campaign seat</div><h2 id="player-seed-dialog-title">Assign player seed</h2></div><button class="icon-button" id="close-player-seed-dialog" type="button" aria-label="Close player seed assignment">×</button></div>
+    <form class="dialog-form" id="player-seed-assignment-form">
+      <label class="field"><span class="eyebrow">Assigned username</span><select id="player-seed-username" name="username" required><option value="">Create a user account first</option></select></label>
+      <label class="field"><span class="eyebrow">Player label</span><input id="player-seed-display-label" name="displayLabel" type="text" maxlength="80" required></label>
+      <label class="field"><span class="eyebrow">Seed fields</span><textarea id="player-seed-field-definitions" name="fields" rows="7" required>Character name || required
+Nationality || optional
+Branch || optional
+Military rank || optional</textarea><span class="row-description">One field per line: label | preset value | required or optional. Leave the preset value empty for the player to complete it. These are character fields, not rules calculations.</span></label>
+      <p class="feedback" id="player-seed-assignment-status" role="status" aria-live="polite"></p>
+      <pre id="player-seed-invite-token" hidden></pre>
+      <section class="player-seed-roster" aria-labelledby="player-seed-roster-title"><h3 id="player-seed-roster-title">Assigned players</h3><div id="player-seed-roster-list">Select a runtime campaign to view assigned seeds.</div></section>
+      <div class="dialog-actions"><button class="button" type="button" id="cancel-player-seed-dialog">Cancel</button><button class="button button-primary" type="submit" id="create-player-seed-button">Assign seed</button></div>
+    </form>
+  </dialog>
+  <dialog id="users-dialog" aria-labelledby="users-dialog-title">
+    <div class="dialog-head"><div><div class="eyebrow">GM-only / local network users</div><h2 id="users-dialog-title">Assigned usernames</h2></div><button class="icon-button" id="close-users-dialog" type="button" aria-label="Close user management">×</button></div>
+    <div class="dialog-form">
+      <form id="create-user-form">
+        <label class="field"><span class="eyebrow">New username</span><input id="new-user-username" name="username" type="text" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" required></label>
+        <div class="dialog-actions"><button class="button button-primary" type="submit" id="create-user-button">Create username</button></div>
+      </form>
+      <p class="feedback" id="user-create-status" role="status" aria-live="polite">Only usernames created here can sign in. Share the one-time activation token with the user through a secure channel.</p>
+      <pre id="user-activation-token" hidden></pre>
+      <section class="player-seed-roster" aria-labelledby="user-list-title"><h3 id="user-list-title">User accounts</h3><div id="user-list">Loading accounts…</div></section>
+      <div class="dialog-actions"><button class="button" type="button" id="done-users-dialog">Done</button></div>
+    </div>
+  </dialog>
+  <dialog id="character-change-dialog" aria-labelledby="character-change-dialog-title">
+    <div class="dialog-head"><div><div class="eyebrow">GM-only / player proposals</div><h2 id="character-change-dialog-title">Character change requests</h2></div><button class="icon-button" id="close-character-change-dialog" type="button" aria-label="Close character change requests">×</button></div>
+    <div class="dialog-form"><p class="feedback" id="character-change-status" role="status" aria-live="polite">Select a runtime campaign to review requests.</p><div class="character-change-list" id="character-change-list"></div><div class="dialog-actions"><button class="button" id="refresh-character-changes" type="button">Refresh</button><button class="button" id="done-character-changes" type="button">Done</button></div></div>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -539,6 +591,8 @@
       const setupImportSummary = document.getElementById("setup-import-summary");
       const applySetupImportButton = document.getElementById("apply-setup-import");
       const runtimeCampaignSelect = document.getElementById("runtime-campaign-select");
+      const openPlayerSeedDialogButton = document.getElementById("open-player-seed-dialog");
+      const openCharacterChangesButton = document.getElementById("open-character-changes");
       let state = loadState();
       let toastTimer;
       let pendingSetupPackage = null;
@@ -1246,6 +1300,8 @@
         }
         state = { ...state, runtimeCampaignId, setupPackage, liveInfluence, liveSettlementProminence };
         runtimeCampaignSelect.value = runtimeCampaignId;
+        openPlayerSeedDialogButton.disabled = false;
+        openCharacterChangesButton.disabled = false;
         stagedInfluenceCells.clear();
         liveInfluenceEditing = false;
         persist();
@@ -1264,9 +1320,9 @@
       async function refreshRuntimeCampaigns(preferredId = state.runtimeCampaignId) {
         const placeholder = document.createElement("option");
         placeholder.value = "";
-        placeholder.textContent = location.protocol === "https:" ? "Loading campaigns" : "HTTPS service required";
+        placeholder.textContent = location.protocol === "http:" ? "Loading campaigns" : "LAN HTTP service required";
         runtimeCampaignSelect.replaceChildren(placeholder);
-        if (location.protocol !== "https:") {
+        if (location.protocol !== "http:") {
           runtimeCampaignSelect.disabled = true;
           return;
         }
@@ -1288,10 +1344,14 @@
             ? preferredId
             : campaigns[0]?.id || "";
           runtimeCampaignSelect.value = selectedId;
+          openPlayerSeedDialogButton.disabled = !selectedId;
+          openCharacterChangesButton.disabled = !selectedId;
           if (selectedId) await loadRuntimeCampaign(selectedId, false);
           else document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
         } catch (error) {
           runtimeCampaignSelect.disabled = true;
+          openPlayerSeedDialogButton.disabled = true;
+          openCharacterChangesButton.disabled = true;
           runtimeCampaignSelect.replaceChildren();
           const errorOption = document.createElement("option");
           errorOption.value = "";
@@ -1303,6 +1363,275 @@
 
       runtimeCampaignSelect.addEventListener("change", () => {
         if (runtimeCampaignSelect.value) loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
+      });
+
+      const characterChangeDialog = document.getElementById("character-change-dialog");
+      const characterChangeStatus = document.getElementById("character-change-status");
+      const characterChangeList = document.getElementById("character-change-list");
+      async function refreshCharacterChangeRequests() {
+        const campaignId = runtimeCampaignSelect.value;
+        characterChangeList.replaceChildren();
+        if (!campaignId) {
+          characterChangeStatus.textContent = "Select a runtime campaign to review requests.";
+          return;
+        }
+        characterChangeStatus.className = "feedback";
+        characterChangeStatus.textContent = "Loading pending requests…";
+        try {
+          const { requests } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/character-changes`);
+          if (!requests.length) {
+            characterChangeStatus.textContent = "No character change requests are waiting for review.";
+            return;
+          }
+          characterChangeStatus.textContent = `${requests.length} pending character change request${requests.length === 1 ? "" : "s"}.`;
+          requests.forEach((request) => {
+            const card = document.createElement("article");
+            card.className = "character-change-card";
+            const header = document.createElement("header");
+            const identity = document.createElement("strong");
+            identity.textContent = `${request.displayLabel} / ${request.username}`;
+            const submitted = document.createElement("small");
+            submitted.textContent = new Date(request.submittedAt).toLocaleString();
+            header.append(identity, submitted);
+            card.append(header);
+            request.fields.forEach((field) => {
+              const row = document.createElement("div");
+              row.className = "character-change-field";
+              const label = document.createElement("strong");
+              label.textContent = field.label;
+              const current = document.createElement("span");
+              const currentLabel = document.createElement("small");
+              currentLabel.textContent = "Current";
+              current.append(currentLabel, document.createTextNode(field.oldValue || "(blank)"));
+              const proposed = document.createElement("span");
+              const proposedLabel = document.createElement("small");
+              proposedLabel.textContent = "Proposed";
+              proposed.append(proposedLabel, document.createTextNode(field.value || "(blank)"));
+              row.append(label, current, proposed);
+              card.append(row);
+            });
+            const actions = document.createElement("div");
+            actions.className = "character-change-actions";
+            ["rejected", "approved"].forEach((decision) => {
+              const button = document.createElement("button");
+              button.type = "button";
+              button.className = decision === "approved" ? "button button-primary" : "button";
+              button.textContent = decision === "approved" ? "Approve" : "Reject";
+              button.addEventListener("click", async () => {
+                actions.querySelectorAll("button").forEach((action) => { action.disabled = true; });
+                try {
+                  await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/character-changes/${encodeURIComponent(request.id)}/review`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ decision })
+                  });
+                  await refreshCharacterChangeRequests();
+                  showToast(`Character change ${decision}.`);
+                } catch (error) {
+                  characterChangeStatus.className = "feedback error";
+                  characterChangeStatus.textContent = error.message;
+                  actions.querySelectorAll("button").forEach((action) => { action.disabled = false; });
+                }
+              });
+              actions.append(button);
+            });
+            card.append(actions);
+            characterChangeList.append(card);
+          });
+        } catch (error) {
+          characterChangeStatus.className = "feedback error";
+          characterChangeStatus.textContent = error.message;
+        }
+      }
+      openCharacterChangesButton.addEventListener("click", () => {
+        characterChangeDialog.showModal();
+        refreshCharacterChangeRequests();
+      });
+      const closeCharacterChanges = () => characterChangeDialog.close();
+      document.getElementById("close-character-change-dialog").addEventListener("click", closeCharacterChanges);
+      document.getElementById("done-character-changes").addEventListener("click", closeCharacterChanges);
+      document.getElementById("refresh-character-changes").addEventListener("click", refreshCharacterChangeRequests);
+
+      const playerSeedDialog = document.getElementById("player-seed-dialog");
+      const playerSeedAssignmentForm = document.getElementById("player-seed-assignment-form");
+      const playerSeedAssignmentStatus = document.getElementById("player-seed-assignment-status");
+      const playerSeedInviteToken = document.getElementById("player-seed-invite-token");
+      const playerSeedRosterList = document.getElementById("player-seed-roster-list");
+      const usersDialog = document.getElementById("users-dialog");
+      const userList = document.getElementById("user-list");
+      const userCreateStatus = document.getElementById("user-create-status");
+      const userActivationToken = document.getElementById("user-activation-token");
+      const playerUsernameSelect = document.getElementById("player-seed-username");
+      let assignedUsers = [];
+
+      function renderAssignedUsers() {
+        userList.replaceChildren();
+        playerUsernameSelect.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = assignedUsers.length ? "Choose a created username" : "Create a username first";
+        playerUsernameSelect.append(placeholder);
+        playerUsernameSelect.disabled = assignedUsers.length === 0;
+        assignedUsers.forEach((user) => {
+          const option = document.createElement("option");
+          option.value = user.username;
+          option.textContent = user.username;
+          playerUsernameSelect.append(option);
+
+          const row = document.createElement("div");
+          row.className = "user-list-row";
+          const username = document.createElement("span");
+          username.textContent = user.username;
+          const state = document.createElement("small");
+          state.textContent = user.activationPending ? "AWAITING ACTIVATION" : `${user.campaignAssignments} CAMPAIGN(S)`;
+          row.append(username, state);
+          userList.append(row);
+        });
+        if (!assignedUsers.length) userList.textContent = "No users created yet.";
+      }
+
+      async function refreshAssignedUsers() {
+        userList.textContent = "Loading accounts…";
+        try {
+          const { users } = await campaignApiRequest("/api/users");
+          assignedUsers = users;
+          renderAssignedUsers();
+        } catch (error) {
+          assignedUsers = [];
+          renderAssignedUsers();
+          userList.textContent = error.message;
+        }
+      }
+
+      document.getElementById("open-users-dialog").addEventListener("click", () => {
+        userCreateStatus.className = "feedback";
+        userCreateStatus.textContent = "Only usernames created here can sign in. Share the one-time activation token through a secure channel.";
+        userActivationToken.hidden = true;
+        userActivationToken.textContent = "";
+        usersDialog.showModal();
+        refreshAssignedUsers();
+      });
+      const closeUsersDialog = () => usersDialog.close();
+      document.getElementById("close-users-dialog").addEventListener("click", closeUsersDialog);
+      document.getElementById("done-users-dialog").addEventListener("click", closeUsersDialog);
+      document.getElementById("create-user-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const username = document.getElementById("new-user-username").value.trim();
+        const button = document.getElementById("create-user-button");
+        button.disabled = true;
+        userCreateStatus.className = "feedback";
+        userCreateStatus.textContent = "Creating username…";
+        userActivationToken.hidden = true;
+        userActivationToken.textContent = "";
+        try {
+          const { user } = await campaignApiRequest("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username })
+          });
+          userCreateStatus.className = "feedback success";
+          userCreateStatus.textContent = `Username ${user.username} created. Give its one-time activation token to the player securely.`;
+          userActivationToken.textContent = `Activation page: ${location.origin}/login.html?activate=1\nUsername: ${user.username}\nOne-time activation token: ${user.activationToken}\nExpires in 7 days.`;
+          userActivationToken.hidden = false;
+          event.currentTarget.reset();
+          await refreshAssignedUsers();
+        } catch (error) {
+          userCreateStatus.className = "feedback error";
+          userCreateStatus.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      async function refreshPlayerSeedRoster(campaignId) {
+        playerSeedRosterList.textContent = "Loading assigned players…";
+        try {
+          const { seeds } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/player-seeds`);
+          playerSeedRosterList.replaceChildren();
+          if (!seeds.length) {
+            playerSeedRosterList.textContent = "No player seeds assigned.";
+            return;
+          }
+          seeds.forEach((seed) => {
+            const row = document.createElement("div");
+            row.className = "player-seed-roster-row";
+            const identity = document.createElement("span");
+            identity.textContent = `${seed.displayLabel} / ${seed.username}`;
+            const state = document.createElement("small");
+            state.textContent = seed.status === "playable" ? "PLAYABLE" : "SEED";
+            row.append(identity, state);
+            playerSeedRosterList.append(row);
+          });
+        } catch (error) {
+          playerSeedRosterList.textContent = error.message;
+        }
+      }
+      const closePlayerSeedDialog = () => playerSeedDialog.close();
+      openPlayerSeedDialogButton.addEventListener("click", () => {
+        if (!runtimeCampaignSelect.value) return;
+        playerSeedAssignmentForm.reset();
+        playerSeedAssignmentStatus.textContent = "";
+        playerSeedAssignmentStatus.className = "feedback";
+        playerSeedInviteToken.hidden = true;
+        playerSeedInviteToken.textContent = "";
+        playerSeedDialog.showModal();
+        refreshAssignedUsers();
+        refreshPlayerSeedRoster(runtimeCampaignSelect.value);
+      });
+      document.getElementById("close-player-seed-dialog").addEventListener("click", closePlayerSeedDialog);
+      document.getElementById("cancel-player-seed-dialog").addEventListener("click", closePlayerSeedDialog);
+      playerSeedAssignmentForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const campaignId = runtimeCampaignSelect.value;
+        if (!campaignId) return;
+        const username = playerUsernameSelect.value;
+        if (!username) {
+          playerSeedAssignmentStatus.className = "feedback error";
+          playerSeedAssignmentStatus.textContent = "Create or select a GM-assigned username first.";
+          return;
+        }
+        const displayLabel = document.getElementById("player-seed-display-label").value.trim();
+        const definitionLines = document.getElementById("player-seed-field-definitions").value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        const keys = new Set();
+        let fields;
+        try {
+          fields = definitionLines.map((line) => {
+            const [rawLabel, rawValue = "", rawRequired = "optional", ...extra] = line.split("|");
+            const label = rawLabel.trim();
+            const requiredMode = rawRequired.trim().toLowerCase();
+            const key = label.split(/[^A-Za-z0-9]+/).filter(Boolean).map((part, index) => index === 0
+              ? part[0].toLowerCase() + part.slice(1)
+              : part[0].toUpperCase() + part.slice(1)).join("");
+            if (!label || !key || keys.has(key) || extra.length || !["required", "optional"].includes(requiredMode)) {
+              throw new Error("Use unique lines in the form: label | preset value | required or optional.");
+            }
+            keys.add(key);
+            return { key, label, value: rawValue.trim(), required: requiredMode === "required" };
+          });
+        } catch (error) {
+          playerSeedAssignmentStatus.className = "feedback error";
+          playerSeedAssignmentStatus.textContent = error.message;
+          return;
+        }
+        const submitButton = document.getElementById("create-player-seed-button");
+        submitButton.disabled = true;
+        playerSeedAssignmentStatus.className = "feedback";
+        playerSeedAssignmentStatus.textContent = "Assigning seed…";
+        try {
+          const { seed } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/player-seeds`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, displayLabel, fields })
+          });
+          playerSeedAssignmentStatus.className = "feedback success";
+          playerSeedAssignmentStatus.textContent = `Seed assigned to ${seed.username}.`;
+          refreshPlayerSeedRoster(campaignId);
+        } catch (error) {
+          playerSeedAssignmentStatus.className = "feedback error";
+          playerSeedAssignmentStatus.textContent = error.message;
+        } finally {
+          submitButton.disabled = false;
+        }
       });
 
       function nextId(items) { return items.reduce((largest, item) => Math.max(largest, Number(item.id) || 0), 0) + 1; }

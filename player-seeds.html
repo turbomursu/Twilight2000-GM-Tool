@@ -109,6 +109,11 @@
     .skill-line output { color: var(--muted); font: 8px var(--mono); text-align: right; }
     .rule-note { padding: 11px 13px; border-left: 3px solid var(--gold); color: #4c5a51; background: #e7e6d9; font-size: 10px; line-height: 1.5; }
     .rule-note strong { display: block; margin-bottom: 4px; color: #4d583f; font: 9px var(--mono); text-transform: uppercase; }
+    .career-terms-list { display: grid; gap: 12px; }
+    .career-term { display: grid; gap: 12px; padding: 12px; border: 1px solid #c4cec1; background: #e2e8dd; }
+    .career-term-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .career-term-head h4 { margin: 0; font: 700 12px var(--serif); text-transform: uppercase; }
+    .career-term .field textarea { min-height: 58px; }
     .checklist { display: grid; gap: 7px; }
     .check-row { display: flex; align-items: start; gap: 8px; color: #47554d; font-size: 10px; line-height: 1.4; }
     .check-row input { margin: 1px 0 0; accent-color: var(--forest); }
@@ -208,7 +213,12 @@
                   <div class="rule-note"><strong>Rules checkpoint</strong>The life-path aid starts an 18-year-old with attributes at C and CUF at D. Record final values only after resolving the character's choices and rolls against the Players' Manual (character creation, pp. 31-40). This template does not calculate career results, aging, injuries, promotion, or equipment.</div>
                   <div class="fields">
                     <div class="field full"><label for="childhood">Childhood / background and outcomes</label><textarea id="childhood" name="childhood" maxlength="1600"></textarea></div>
-                    <div class="field full"><label for="career-terms">Career terms / choices, rolls, and outcomes</label><textarea id="career-terms" name="careerTerms" maxlength="3000" placeholder="Record each term separately, including the career and the result of each required roll."></textarea></div>
+                    <div class="field full">
+                      <span class="field-label">Career terms / manual record</span>
+                      <div class="career-terms-list" id="career-terms-list" aria-live="polite"></div>
+                      <button class="button" id="add-career-term" type="button">+ Add career term</button>
+                    </div>
+                    <div class="field full" id="legacy-career-notes-field" hidden><label for="legacy-career-notes">Earlier career notes / preserved from previous version</label><textarea id="legacy-career-notes" name="legacyCareerNotes" maxlength="3000"></textarea></div>
                     <div class="field full"><label for="at-war-term">At-war term / outcomes and starting gear</label><textarea id="at-war-term" name="atWarTerm" maxlength="1600"></textarea></div>
                     <div class="field"><label for="cuf">Coolness Under Fire (CUF)</label><select id="cuf" name="cuf"><option value="">Not recorded</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output id="cuf-die">Not recorded</output></div>
                     <div class="field"><label for="starting-gear">Gear reference / manual entry</label><input id="starting-gear" name="startingGear" maxlength="500" placeholder="Verify against the final career term"></div>

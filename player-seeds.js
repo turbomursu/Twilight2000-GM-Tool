@@ -3,6 +3,7 @@
 
   const SEED_STORE_KEY = "fieldbook-player-seeds-v1";
   const CAMPAIGN_STORE_KEY = "fieldbook-twilight-2000-v1";
+  const SEED_SCHEMA_VERSION = 2;
   const ATTRIBUTE_NAMES = ["Strength", "Agility", "Intelligence", "Empathy"];
   const SKILL_GROUPS = [
     { attribute: "Strength", skills: ["Close Combat", "Heavy Weapons", "Stamina"] },
@@ -35,14 +36,70 @@
     return `${prefix}-${value}`;
   }
 
+  function textList(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, 20);
+  }
+
+  function normalizeCareerTerm(value, index) {
+    const term = isRecord(value) ? value : {};
+    const promotion = isRecord(term.promotion) ? term.promotion : {};
+    const aging = isRecord(term.aging) ? term.aging : {};
+    const warCheck = isRecord(term.warCheck) ? term.warCheck : {};
+    const text = (input) => typeof input === "string" ? input : "";
+    const yearsAged = aging.yearsAged === "" || aging.yearsAged === null || aging.yearsAged === undefined
+      ? null
+      : Number(aging.yearsAged);
+    return {
+      id: typeof term.id === "string" && term.id ? term.id : createId("term"),
+      termNumber: index + 1,
+      career: text(term.career),
+      skillAdvances: textList(term.skillAdvances),
+      promotion: {
+        skill: text(promotion.skill),
+        roll: text(promotion.roll),
+        outcome: text(promotion.outcome)
+      },
+      specialties: textList(term.specialties),
+      aging: {
+        yearsAged: Number.isSafeInteger(yearsAged) && yearsAged >= 0 ? yearsAged : null,
+        effect: text(aging.effect)
+      },
+      warCheck: {
+        roll: text(warCheck.roll),
+        outcome: text(warCheck.outcome)
+      },
+      injuryOutcome: text(term.injuryOutcome),
+      notes: text(term.notes)
+    };
+  }
+
+  function normalizeSeed(seed) {
+    if (!isRecord(seed) || !isRecord(seed.character)) return seed;
+    const character = { ...seed.character };
+    const lifePath = isRecord(character.lifePath) ? character.lifePath : {};
+    const legacyCareerNotes = typeof character.careerTerms === "string"
+      ? character.careerTerms
+      : typeof lifePath.legacyCareerNotes === "string" ? lifePath.legacyCareerNotes : "";
+    const careerTerms = Array.isArray(lifePath.careerTerms)
+      ? lifePath.careerTerms.map(normalizeCareerTerm)
+      : [];
+    delete character.careerTerms;
+    character.lifePath = { careerTerms, legacyCareerNotes };
+    return { ...seed, character };
+  }
+
   function readSeedStore() {
     const raw = localStorage.getItem(SEED_STORE_KEY);
-    if (!raw) return { schemaVersion: 1, seeds: [] };
+    if (!raw) return { schemaVersion: SEED_SCHEMA_VERSION, seeds: [] };
     const saved = JSON.parse(raw);
-    if (!isRecord(saved) || saved.schemaVersion !== 1 || !Array.isArray(saved.seeds)) {
+    if (!isRecord(saved) || ![1, SEED_SCHEMA_VERSION].includes(saved.schemaVersion) || !Array.isArray(saved.seeds)) {
       throw new Error("The player seed store is not a supported version.");
     }
-    return saved;
+    return {
+      schemaVersion: SEED_SCHEMA_VERSION,
+      seeds: saved.seeds.map(normalizeSeed)
+    };
   }
 
   function readCampaignRecord() {
@@ -78,6 +135,7 @@
 
   function saveSeedStore() {
     try {
+      seedStore.schemaVersion = SEED_SCHEMA_VERSION;
       localStorage.setItem(SEED_STORE_KEY, JSON.stringify(seedStore));
       storageState.textContent = "Local store saved";
       storageState.classList.remove("error");
@@ -214,6 +272,8 @@
 
   function clearForm() {
     form.reset();
+    renderCareerTerms([]);
+    renderLegacyCareerNotes("");
     updateDiceDisplays();
   }
 
@@ -261,6 +321,9 @@
     SKILL_GROUPS.forEach((group) => group.skills.forEach((skill) => {
       form.elements[skill].value = seed.character.skills?.[skill] || "";
     }));
+    const lifePath = isRecord(seed.character.lifePath) ? seed.character.lifePath : {};
+    renderCareerTerms(Array.isArray(lifePath.careerTerms) ? lifePath.careerTerms : []);
+    renderLegacyCareerNotes(lifePath.legacyCareerNotes);
     form.elements.playerName.value = seed.playerName;
     CREATION_STEPS.forEach((name) => {
       form.elements[name].checked = Boolean(seed.creationSteps?.[name]);
@@ -286,6 +349,116 @@
     form.elements.playerName.focus();
   }
 
+  function makeTermField(index, key, labelText, value, options = {}) {
+    const wrapper = document.createElement("div");
+    wrapper.className = `field${options.full ? " full" : ""}`;
+    const id = `career-term-${index}-${key.replace(/[^a-z0-9]+/gi, "-")}`;
+    const label = makeFieldLabel(labelText, id);
+    let control;
+    if (options.choices) {
+      control = document.createElement("select");
+      options.choices.forEach(([choiceValue, choiceLabel]) => control.add(new Option(choiceLabel, choiceValue)));
+    } else if (options.multiline) {
+      control = document.createElement("textarea");
+      control.rows = 2;
+      if (options.placeholder) control.placeholder = options.placeholder;
+    } else {
+      control = document.createElement("input");
+      control.type = options.type || "text";
+      if (options.type === "number") {
+        control.min = "0";
+        control.max = "99";
+        control.step = "1";
+      }
+    }
+    control.id = id;
+    control.dataset.termField = key;
+    control.value = value ?? "";
+    wrapper.append(label, control);
+    return wrapper;
+  }
+
+  function linesFromField(card, key) {
+    return (card.querySelector(`[data-term-field="${key}"]`)?.value || "")
+      .split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 20);
+  }
+
+  function readCareerTermsFromForm() {
+    return [...document.querySelectorAll("[data-career-term]")].map((card, index) => {
+      const read = (key) => card.querySelector(`[data-term-field="${key}"]`)?.value.trim() || "";
+      return normalizeCareerTerm({
+        id: card.dataset.termId,
+        career: read("career"),
+        skillAdvances: linesFromField(card, "skillAdvances"),
+        promotion: { skill: read("promotion.skill"), roll: read("promotion.roll"), outcome: read("promotion.outcome") },
+        specialties: linesFromField(card, "specialties"),
+        aging: { yearsAged: read("aging.yearsAged"), effect: read("aging.effect") },
+        warCheck: { roll: read("warCheck.roll"), outcome: read("warCheck.outcome") },
+        injuryOutcome: read("injuryOutcome"),
+        notes: read("notes")
+      }, index);
+    });
+  }
+
+  function renderCareerTerms(terms) {
+    const container = document.getElementById("career-terms-list");
+    container.replaceChildren();
+    if (!terms.length) {
+      const empty = document.createElement("p");
+      empty.className = "assignment-note";
+      empty.textContent = "No career terms recorded.";
+      container.append(empty);
+      return;
+    }
+    terms.forEach((value, index) => {
+      const term = normalizeCareerTerm(value, index);
+      const card = document.createElement("section");
+      card.className = "career-term";
+      card.dataset.careerTerm = "true";
+      card.dataset.termId = term.id;
+      const head = document.createElement("header");
+      head.className = "career-term-head";
+      const title = document.createElement("h4");
+      title.textContent = `Term ${index + 1}`;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-danger";
+      remove.textContent = "Remove";
+      remove.setAttribute("aria-label", `Remove career term ${index + 1}`);
+      remove.addEventListener("click", () => {
+        const remaining = readCareerTermsFromForm();
+        remaining.splice(index, 1);
+        renderCareerTerms(remaining);
+      });
+      head.append(title, remove);
+      const fields = document.createElement("div");
+      fields.className = "fields";
+      fields.append(
+        makeTermField(index, "career", "Career / term", term.career),
+        makeTermField(index, "skillAdvances", "Skill advances / one per line", term.skillAdvances.join("\n"), { multiline: true, placeholder: "Record the skill and resulting rating manually." }),
+        makeTermField(index, "promotion.skill", "Promotion skill", term.promotion.skill),
+        makeTermField(index, "promotion.roll", "Promotion roll / result", term.promotion.roll),
+        makeTermField(index, "promotion.outcome", "Promotion outcome", term.promotion.outcome, { choices: [["", "Not recorded"], ["success", "Success"], ["failure", "Failure"], ["not-applicable", "Not applicable"]] }),
+        makeTermField(index, "specialties", "Specialties / one per line", term.specialties.join("\n"), { multiline: true }),
+        makeTermField(index, "aging.yearsAged", "Years aged this term", term.aging.yearsAged, { type: "number" }),
+        makeTermField(index, "aging.effect", "Aging effect / outcome", term.aging.effect, { multiline: true }),
+        makeTermField(index, "warCheck.roll", "War check roll / target", term.warCheck.roll),
+        makeTermField(index, "warCheck.outcome", "War check outcome", term.warCheck.outcome, { choices: [["", "Not recorded"], ["no-outbreak", "War did not break out"], ["war-broke-out", "War broke out"], ["not-applicable", "Not applicable"]] }),
+        makeTermField(index, "injuryOutcome", "Injury / other outcomes", term.injuryOutcome, { multiline: true, full: true }),
+        makeTermField(index, "notes", "GM notes for this term", term.notes, { multiline: true, full: true })
+      );
+      card.append(head, fields);
+      container.append(card);
+    });
+  }
+
+  function renderLegacyCareerNotes(value) {
+    const field = document.getElementById("legacy-career-notes-field");
+    const textarea = document.getElementById("legacy-career-notes");
+    textarea.value = value || "";
+    field.hidden = !textarea.value;
+  }
+
   function readFormValue(name) {
     return String(new FormData(form).get(name) || "").trim();
   }
@@ -294,12 +467,16 @@
     const values = {};
     [
       "characterName", "nationality", "age", "branch", "militaryRank", "specialties", "childhood",
-      "careerTerms", "atWarTerm", "cuf", "startingGear", "appearance", "moralCode", "bigDream",
+      "atWarTerm", "cuf", "startingGear", "appearance", "moralCode", "bigDream",
       "buddy", "howMetGroup", "gmNotes"
     ].forEach((name) => { values[name] = readFormValue(name); });
     values.age = values.age ? Number(values.age) : "";
     values.attributes = Object.fromEntries(ATTRIBUTE_NAMES.map((name) => [name, form.elements[name].value]));
     values.skills = Object.fromEntries(SKILL_GROUPS.flatMap((group) => group.skills.map((skill) => [skill, form.elements[skill].value])));
+    values.lifePath = {
+      careerTerms: readCareerTermsFromForm(),
+      legacyCareerNotes: readFormValue("legacyCareerNotes")
+    };
     return values;
   }
 
@@ -385,11 +562,12 @@
   function initialize() {
     renderRatingFields();
     renderSkillFields();
+    renderCareerTerms([]);
     try {
       seedStore = readSeedStore();
     } catch (error) {
       storageAvailable = false;
-      seedStore = { schemaVersion: 1, seeds: [] };
+      seedStore = { schemaVersion: SEED_SCHEMA_VERSION, seeds: [] };
       storageState.textContent = "Seed store needs review";
       storageState.classList.add("error");
       setStatus(error.message, true);
@@ -405,6 +583,11 @@
     form.addEventListener("change", updateDiceDisplays);
     assignButton.addEventListener("click", assignSelectedSeed);
     document.getElementById("delete-seed").addEventListener("click", deleteSelectedSeed);
+    document.getElementById("add-career-term").addEventListener("click", () => {
+      const terms = readCareerTermsFromForm();
+      terms.push(normalizeCareerTerm({}, terms.length));
+      renderCareerTerms(terms);
+    });
     if (!storageAvailable) {
       document.getElementById("new-seed").disabled = true;
       document.getElementById("empty-new-seed").disabled = true;

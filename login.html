@@ -34,8 +34,15 @@
         <input id="bootstrap-password" name="password" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
         <button class="submit-button" type="submit">Create GM account <span aria-hidden="true">→</span></button>
       </form>
+      <form id="activation-form" autocomplete="on" hidden>
+        <label for="activation-token">Player activation token</label>
+        <input id="activation-token" name="token" type="password" autocomplete="off" required>
+        <label for="activation-password">Choose password</label>
+        <input id="activation-password" name="password" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
+        <button class="submit-button" type="submit">Activate player account <span aria-hidden="true">→</span></button>
+      </form>
       <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
-      <div class="auth-footer"><span>PRIVATE CAMPAIGN WORKSPACE</span><span>HTTPS / SESSION LOCKED</span></div>
+      <div class="auth-footer"><span>PRIVATE LAN WORKSPACE</span><span>HTTP / SESSION LOCKED</span></div>
     </section>
   </main>
 </body>

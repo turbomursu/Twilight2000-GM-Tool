@@ -80,12 +80,13 @@ test("persists the runtime campaign and source snapshot across database reopen",
     database = openRuntimeDatabase(databasePath);
     const result = importSetupPackage(database, sourceJson, { idFactory: () => "runtime-persistent-1" });
     database.close();
+    database = null;
 
     database = openRuntimeDatabase(databasePath);
     assert.equal(database.prepare("SELECT name FROM campaigns WHERE runtime_id = ?").get(result.runtimeCampaignId).name, "Northbound");
     assert.equal(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(result.runtimeCampaignId).source_json, sourceJson);
   } finally {
-    database?.close();
+    if (database) database.close();
     rmSync(directory, { recursive: true, force: true });
   }
 });
