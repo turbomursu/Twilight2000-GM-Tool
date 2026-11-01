@@ -135,7 +135,7 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(updatedRuntime.dashboard.rationsDays, 5);
   assert.equal(updatedRuntime.dashboard.weather, "Fog");
   assert.equal(updatedRuntime.personnel[0].readiness, "Alert");
-  assert.equal(updatedRuntime.campaign.revision, 1);
+  assert.equal(updatedRuntime.campaign.revision, 3);
 
   const reloaded = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
   assert.equal((await reloaded.json()).runtime.dashboard.rationsDays, 5);

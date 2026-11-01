@@ -305,30 +305,31 @@ test("faction layer and prominence edits persist without changing setup and reje
   try {
     createGm(database, "gm-owner", "gm-owner");
     const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const initialRevision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
     ["guard", "locals"].forEach((id) => database.prepare("INSERT INTO factions (runtime_campaign_id, id, name, description) VALUES (?, ?, ?, '')").run(campaignId, id, id));
     database.prepare("INSERT INTO settlements (runtime_campaign_id, id, source_location_id, name, situation) VALUES (?, 'town', 'sample-location-vansbro', 'Vansbro', '')").run(campaignId);
     const source = database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId).source_json;
-    let layers = updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 0, factionId: "guard", cells: ["1,-2", "2,3"] });
+    let layers = updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision, factionId: "guard", cells: ["1,-2", "2,3"] });
     assert.deepEqual(layers.influence.guard, ["1,-2", "2,3"]);
-    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 0, factionId: "guard", cells: [] }), /revision changed/);
-    layers = updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 1, settlementId: "town", factionIds: ["locals", "guard"] });
+    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision, factionId: "guard", cells: [] }), /revision changed/);
+    layers = updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision + 1, settlementId: "town", factionIds: ["locals", "guard"] });
     assert.deepEqual(layers.prominence.town, ["locals", "guard"]);
-    assert.equal(layers.revision, 2);
-    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 2, settlementId: "town", factionIds: ["outside"] }), /in this campaign/);
-    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 2, factionId: "guard", cells: ["1,2", "01,2"] }), /duplicate/);
-    assert.throws(() => updateRuntimeFactionLayers(database, "other-owner", campaignId, { expectedRevision: 2, factionId: "guard", cells: [] }), /not found/);
+    assert.equal(layers.revision, initialRevision + 2);
+    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision + 2, settlementId: "town", factionIds: ["outside"] }), /in this campaign/);
+    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision + 2, factionId: "guard", cells: ["1,2", "01,2"] }), /duplicate/);
+    assert.throws(() => updateRuntimeFactionLayers(database, "other-owner", campaignId, { expectedRevision: initialRevision + 2, factionId: "guard", cells: [] }), /not found/);
     assert.deepEqual(getRuntimeFactionLayers(database, "gm-owner", campaignId), layers);
     assert.equal(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId).source_json, source);
     const backup = exportRuntimeSave(database, "gm-owner", campaignId);
-    updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 2, factionId: "guard", cells: [] });
-    updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 3, settlementId: "town", factionIds: [] });
-    restoreRuntimeSave(database, "gm-owner", campaignId, backup, { expectedRevision: 4, confirmReplace: true, confirmOlderBackup: true });
+    updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision + 2, factionId: "guard", cells: [] });
+    updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: initialRevision + 3, settlementId: "town", factionIds: [] });
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup, { expectedRevision: initialRevision + 4, confirmReplace: true, confirmOlderBackup: true });
     database.close();
     database = openRuntimeDatabase(path);
     const restored = getRuntimeFactionLayers(database, "gm-owner", campaignId);
     assert.deepEqual(restored.influence, layers.influence);
     assert.deepEqual(restored.prominence, layers.prominence);
-    assert.equal(restored.revision, 5);
+    assert.equal(restored.revision, initialRevision + 5);
   } finally {
     database.close();
     rmSync(directory, { recursive: true, force: true });
@@ -555,11 +556,12 @@ test("file-backed recovery preserves rows and does not modify another campaign o
     const backup = exportRuntimeSave(database, "gm-owner", seeded.campaignId);
     const independent = exportRuntimeSave(database, "gm-owner", second.runtimeCampaignId);
     updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, { dashboard: { rationsDays: 0 } });
+    const currentRevision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(seeded.campaignId).revision;
     assert.throws(() => restoreRuntimeSave(database, "gm-owner", second.runtimeCampaignId, backup, {
       confirmReplace: true, expectedRevision: 0
     }), /does not match/);
     restoreRuntimeSave(database, "gm-owner", seeded.campaignId, backup, {
-      confirmReplace: true, confirmOlderBackup: true, expectedRevision: 1
+      confirmReplace: true, confirmOlderBackup: true, expectedRevision: currentRevision
     });
     database.close();
     database = openRuntimeDatabase(path);
@@ -569,7 +571,7 @@ test("file-backed recovery preserves rows and does not modify another campaign o
     }
     assert.equal(recovered.data.auditEvents.at(-1).action, "campaign.restore");
     backup.data.auditEvents.forEach((event) => assert.ok(recovered.data.auditEvents.some((saved) => saved.id === event.id)));
-    assert.equal(recovered.sourceRevision, 2);
+    assert.equal(recovered.sourceRevision, currentRevision + 1);
     assert.deepEqual(exportRuntimeSave(database, "gm-owner", second.runtimeCampaignId, {
       now: () => independent.exportedAt
     }), independent);

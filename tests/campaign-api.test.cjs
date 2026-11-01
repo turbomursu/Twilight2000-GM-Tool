@@ -61,8 +61,9 @@ test("six-hour advance API rejects stale duplicates and charges daily rations on
   const send = (revision, headers = {}) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie, ...headers }, body: JSON.stringify({ expectedRevision: revision }) });
   assert.equal((await fetch(path, { method: "POST" })).status, 401);
   assert.equal((await fetch(path, { headers: { Cookie: cookie } })).status, 405);
-  assert.equal((await send(0, { Origin: "http://untrusted.example" })).status, 403);
-  const responses = await Promise.all([send(0), send(0)]);
+  const initial = (await (await fetch(`${origin}/api/campaigns/${campaignId}/runtime`, { headers: { Cookie: cookie } })).json()).runtime;
+  assert.equal((await send(initial.campaign.revision - 1, { Origin: "http://untrusted.example" })).status, 403);
+  const responses = await Promise.all([send(initial.campaign.revision), send(initial.campaign.revision)]);
   assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
   const morning = (await (await fetch(`${origin}/api/campaigns/${campaignId}/runtime`, { headers: { Cookie: cookie } })).json()).runtime;
   assert.equal(morning.dashboard.gameTime, "06:00");
@@ -107,7 +108,9 @@ test("audit API is owner-only, read-only, paginated, and does not expose or forg
   const first = await (await fetch(`${path}?limit=1`, { headers: { Cookie: cookie } })).json();
   assert.equal(first.events[0].action, "conditions.clear"); assert.equal(first.events[0].actor.label, "gm-user");
   const next = await (await fetch(`${path}?limit=1&before=${first.nextBefore}`, { headers: { Cookie: cookie } })).json();
-  assert.equal(next.events[0].action, "conditions.save"); assert.equal(next.nextBefore, null);
+  assert.equal(next.events[0].action, "conditions.save"); assert(next.nextBefore !== null);  // There's one more event (seat.assign)
+  const third = await (await fetch(`${path}?limit=1&before=${next.nextBefore}`, { headers: { Cookie: cookie } })).json();
+  assert.equal(third.events[0].action, "seat.assign"); assert.equal(third.nextBefore, null);
   assert.doesNotMatch(JSON.stringify([first, next]), /PRIVATE GM PLAN|Public note|Private character field|password/);
   for (const query of ["limit=101", "limit=0", "before=-1", "limit=1&limit=2", "actor=forged"]) {
     assert.equal((await fetch(`${path}?${query}`, { headers: { Cookie: cookie } })).status, 422);
@@ -115,7 +118,7 @@ test("audit API is owner-only, read-only, paginated, and does not expose or forg
   database.exec("CREATE TRIGGER fail_http_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT, 'audit storage failure'); END;");
   assert.equal((await write({ ...update, expectedRevision: 2 })).status, 422);
   assert.equal(database.prepare("SELECT revision FROM character_conditions WHERE character_id = ?").get(characterId).revision, 2);
-  assert.equal((await (await fetch(path, { headers: { Cookie: cookie } })).json()).events.length, 2);
+  assert.equal((await (await fetch(path, { headers: { Cookie: cookie } })).json()).events.length, 3);
 });
 
 test("GM condition records project only each active player's values and exclude private GM notes", async (t) => {
@@ -594,6 +597,7 @@ test("faction layer API persists and clears campaign-scoped edits with revision 
   };
   const campaignId = await importCampaign("layer-source-one");
   const otherCampaign = await importCampaign("layer-source-two");
+  const initialRevision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
   const path = `${origin}/api/campaigns/${campaignId}/faction-layers`;
   const getLayers = async (id) => (await (await fetch(`${origin}/api/campaigns/${id}/faction-layers`, { headers: { Cookie: cookie } })).json()).layers;
   const untouched = await getLayers(otherCampaign);
@@ -601,15 +605,15 @@ test("faction layer API persists and clears campaign-scoped edits with revision 
   const put = (body, headers = {}) => fetch(path, {
     method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie, ...headers }, body: JSON.stringify(body)
   });
-  assert.equal((await put({ expectedRevision: 0, factionId: "faction-1", cells: [] }, { Origin: "http://untrusted.example" })).status, 403);
-  const changed = await put({ expectedRevision: 0, factionId: "faction-1", cells: ["-3,4", "2,5"] });
+  assert.equal((await put({ expectedRevision: initialRevision, factionId: "faction-1", cells: [] }, { Origin: "http://untrusted.example" })).status, 403);
+  const changed = await put({ expectedRevision: initialRevision, factionId: "faction-1", cells: ["-3,4", "2,5"] });
   assert.equal(changed.status, 200);
   assert.deepEqual((await changed.json()).layers.influence["faction-1"], ["-3,4", "2,5"]);
-  assert.equal((await put({ expectedRevision: 0, factionId: "faction-1", cells: [] })).status, 409);
-  assert.equal((await put({ expectedRevision: 1, settlementId: "settlement-1", factionIds: [] })).status, 200);
+  assert.equal((await put({ expectedRevision: initialRevision, factionId: "faction-1", cells: [] })).status, 409);
+  assert.equal((await put({ expectedRevision: initialRevision + 1, settlementId: "settlement-1", factionIds: [] })).status, 200);
   assert.deepEqual((await getLayers(campaignId)).prominence["settlement-1"], []);
-  assert.equal((await put({ expectedRevision: 2, factionId: "outside", cells: [] })).status, 422);
-  assert.equal((await put({ expectedRevision: 2, factionId: "faction-1", cells: [] })).status, 200);
+  assert.equal((await put({ expectedRevision: initialRevision + 2, factionId: "outside", cells: [] })).status, 422);
+  assert.equal((await put({ expectedRevision: initialRevision + 2, factionId: "faction-1", cells: [] })).status, 200);
   assert.deepEqual((await getLayers(campaignId)).influence["faction-1"], []);
   assert.deepEqual(await getLayers(otherCampaign), untouched);
   const source = JSON.parse(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId).source_json);

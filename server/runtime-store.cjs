@@ -939,7 +939,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("terrain_cells", ["runtime_campaign_id", "q", "r", "terrain_type"], data.terrainCells);
     insertRows("locations", ["runtime_campaign_id", "id", "name", "kind", "description", "grid_ref", "coordinates_json", "map_position_json", "visibility_eligibility", "is_starting_location"], data.locations);
     insertRows("settlements", ["runtime_campaign_id", "id", "source_location_id", "name", "scale", "population_estimate", "security", "attitude", "leadership", "situation"], data.settlements);
-    insertRows("factions", ["runtime_campaign_id", "id", "name", "description", "color"], data.factions);
+    insertRows("factions", ["runtime_campaign_id", "id", "name", "description", "color", "faction_type", "is_player_controlled", "current_location_id", "morale_rating", "resources_json"], data.factions);
     insertRows("faction_influence_cells", ["runtime_campaign_id", "faction_id", "q", "r"], data.factionInfluenceCells);
     insertRows("settlement_factions", ["runtime_campaign_id", "settlement_id", "faction_id", "prominence_rank"], data.settlementFactions);
     insertRows("gm_notes", ["runtime_campaign_id", "id", "title", "body", "visibility"], data.gmNotes);
@@ -1246,6 +1246,15 @@ function updateRuntimeFactionLayers(database, accountId, runtimeId, input) {
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(new Date().toISOString(), runtimeId);
     const layers = getRuntimeFactionLayers(database, accountId, runtimeId);
+    if (isInfluence) {
+      require("./audit.cjs").appendAuditEvent(database, accountId, runtimeId, {
+        action: "faction.influence.update", targetType: "faction_influence", targetId: input.factionId
+      });
+    } else {
+      require("./audit.cjs").appendAuditEvent(database, accountId, runtimeId, {
+        action: "faction.prominence.update", targetType: "faction_prominence", targetId: input.settlementId
+      });
+    }
     database.exec("COMMIT");
     return layers;
   } catch (error) {
@@ -1352,14 +1361,29 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
         return { id: String(entry.id), title: entry.title.trim(), body: entry.body, date: entry.date, kind: entry.kind.trim() };
       });
       if (new Set(rows.map((entry) => entry.id)).size !== rows.length) throw new Error("Journal entry IDs must be unique within the campaign.");
+      const existingJournal = new Set(current.journal.map((e) => e.id));
       database.prepare("DELETE FROM journal_entries WHERE campaign_id = ?").run(runtimeId);
       const insert = database.prepare(`INSERT INTO journal_entries
         (campaign_id, id, title, body, entry_date, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
       rows.forEach((entry) => insert.run(runtimeId, entry.id, entry.title, entry.body, entry.date, entry.kind, timestamp));
+      database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+        .run(timestamp, runtimeId);
+      for (const row of rows) {
+        const action = existingJournal.has(row.id) ? "journal.update" : "journal.create";
+        require("./audit.cjs").appendAuditEvent(database, accountId, runtimeId, {
+          action, targetType: "journal_entry", targetId: row.id
+        });
+      }
     }
 
-    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
-      .run(timestamp, runtimeId);
+    if (Object.hasOwn(input, "dashboard")) {
+      database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+        .run(timestamp, runtimeId);
+      require("./audit.cjs").appendAuditEvent(database, accountId, runtimeId, {
+        action: "dashboard.update", targetType: "dashboard", targetId: runtimeId
+      });
+    }
+
     database.exec("COMMIT");
     return getRuntimeDashboard(database, accountId, runtimeId);
   } catch (error) {
@@ -1725,6 +1749,11 @@ function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}
       VALUES (?, ?, 'seed', ?, ?, ?)`).run(characterId, campaignId, JSON.stringify(fields), timestamp, timestamp);
     database.prepare(`INSERT INTO player_seats (id, campaign_id, account_id, character_id, display_label, active, assigned_at)
       VALUES (?, ?, ?, ?, ?, 1, ?)`).run(seatId, campaignId, accountId, characterId, displayLabel, timestamp);
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    require("./audit.cjs").appendAuditEvent(database, gmAccountId, campaignId, {
+      action: "seat.assign", targetType: "player_seat", targetId: seatId, characterId
+    });
     database.exec("COMMIT");
     return {
       seatId,
@@ -1864,6 +1893,10 @@ function reviewCharacterChangeRequest(database, gmAccountId, campaignId, request
       SET status = ?, reviewer_account_id = ?, reviewed_at = ?, review_note = ?
       WHERE id = ? AND campaign_id = ? AND status = 'pending'`)
       .run(decision, gmAccountId, timestamp, reviewNote.trim(), requestId, campaignId);
+    const action = decision === "approved" ? "character.review.approve" : "character.review.reject";
+    require("./audit.cjs").appendAuditEvent(database, gmAccountId, campaignId, {
+      action, targetType: "character_review", targetId: request.characterId, characterId: request.characterId
+    });
     database.exec("COMMIT");
     return { id: requestId, campaignId, characterId: request.characterId, status: decision, reviewedAt: timestamp, reviewNote: reviewNote.trim() };
   } catch (error) {

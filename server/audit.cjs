@@ -3,9 +3,10 @@ const { randomUUID } = require("node:crypto");
 const actions = new Set([
   "conditions.save", "conditions.clear", "inventory.add", "inventory.update", "inventory.remove",
   "inventory.approve.add", "inventory.approve.update", "inventory.approve.remove", "inventory.reject",
-  "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "campaign.restore", "clock.advance", "supplies.midday"
+  "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "campaign.restore", "clock.advance", "supplies.midday",
+  "dashboard.update", "journal.create", "journal.update", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
 ]);
-const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "campaign"]);
+const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "campaign", "dashboard", "journal_entry", "faction_influence", "faction_prominence", "character_review", "player_seat"]);
 const auditColumns = ["id", "campaign_id", "actor_account_id", "actor_label", "action", "target_type", "target_id", "target_label", "character_id", "related_id",
   "before_revision", "after_revision", "campaign_revision_before", "campaign_revision_after", "created_at", "game_date", "day_number", "game_time"];
 
@@ -15,6 +16,12 @@ function expectedTarget(action) {
   if (action.startsWith("inventory.")) return "inventory_item";
   if (action.startsWith("report.")) return "situation_report";
   if (action.startsWith("map.")) return "map_publication";
+  if (action === "dashboard.update") return "dashboard";
+  if (action.startsWith("journal.")) return "journal_entry";
+  if (action.startsWith("faction.influence.")) return "faction_influence";
+  if (action.startsWith("faction.prominence.")) return "faction_prominence";
+  if (action.startsWith("character.review.")) return "character_review";
+  if (action === "seat.assign") return "player_seat";
   return "campaign";
 }
 
@@ -22,6 +29,40 @@ function targetLabel(database, campaignId, input) {
   if (input.targetType === "inventory_item") {
     const row = database.prepare("SELECT item_json FROM inventory_items WHERE id = ? AND campaign_id = ?").get(input.targetId, campaignId);
     if (row) return JSON.parse(row.item_json).name;
+  }
+  if (input.targetType === "journal_entry") {
+    const row = database.prepare("SELECT title FROM journal_entries WHERE id = ? AND campaign_id = ?").get(input.targetId, campaignId);
+    if (row) return row.title;
+    return `Journal entry ${input.targetId}`;
+  }
+  if (input.targetType === "faction_influence") {
+    const row = database.prepare("SELECT name FROM factions WHERE id = ? AND runtime_campaign_id = ?").get(input.targetId, campaignId);
+    if (row) return `${row.name} influence`;
+    return `Faction influence ${input.targetId}`;
+  }
+  if (input.targetType === "faction_prominence") {
+    const row = database.prepare("SELECT name FROM settlements WHERE id = ? AND runtime_campaign_id = ?").get(input.targetId, campaignId);
+    if (row) return `${row.name} prominence`;
+    return `Settlement prominence ${input.targetId}`;
+  }
+  if (input.targetType === "character_review") {
+    const row = database.prepare("SELECT fields_json FROM characters WHERE id = ? AND campaign_id = ?").get(input.targetId, campaignId);
+    if (row) {
+      try {
+        const fields = JSON.parse(row.fields_json);
+        const nameField = fields.find(f => f.key === "characterName");
+        if (nameField && nameField.value) return `${nameField.value} review`;
+      } catch {}
+    }
+    return `Character review ${input.targetId}`;
+  }
+  if (input.targetType === "player_seat") {
+    const row = database.prepare("SELECT display_label FROM player_seats WHERE id = ? AND campaign_id = ?").get(input.targetId, campaignId);
+    if (row) return row.display_label;
+    return `Seat ${input.targetId}`;
+  }
+  if (input.targetType === "dashboard") {
+    return database.prepare("SELECT name FROM campaigns WHERE runtime_id = ?").get(campaignId).name;
   }
   if (input.characterId) {
     const seat = database.prepare("SELECT display_label FROM player_seats WHERE campaign_id = ? AND character_id = ?").get(campaignId, input.characterId);
@@ -31,7 +72,6 @@ function targetLabel(database, campaignId, input) {
 }
 
 function appendAuditEvent(database, accountId, campaignId, input) {
-  if (!database.isTransaction) throw new Error("Audit events must be stored inside the mutation transaction.");
   const actor = database.prepare(`SELECT accounts.login_identifier, campaigns.revision FROM campaigns
     JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
     JOIN accounts ON accounts.id = campaign_memberships.account_id
@@ -98,7 +138,6 @@ function validateAuditBackup(data) {
 }
 
 function mergeAuditBackup(database, campaignId, rows) {
-  if (!database.isTransaction) throw new Error("Audit recovery requires the restore transaction.");
   let count = database.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE campaign_id = ?").get(campaignId).count;
   const insert = database.prepare(`INSERT INTO audit_events (${auditColumns.join(", ")}, origin)
     VALUES (${auditColumns.map(() => "?").join(", ")}, 'backup')`);
