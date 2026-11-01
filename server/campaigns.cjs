@@ -366,7 +366,7 @@ function createCampaignHandler({ database }) {
       } catch (error) {
         const status = error instanceof HttpError ? error.status
           : error.code?.startsWith("ERR_SQLITE_CONSTRAINT") || /constraint failed/i.test(error.message) || /already|no more than four|cannot also/.test(error.message) ? 409
-            : /GM ownership|Campaign not found/.test(error.message) ? 404 : 422;
+            : /GM ownership|Campaign not found|Player seed template not found/.test(error.message) ? 404 : 422;
         return sendJson(response, status, { error: error.message });
       }
     }

@@ -14,6 +14,7 @@ const PUBLIC_FILES = new Map([
 const PROTECTED_FILES = new Map([
   ["/index.html", ["index.html", "text/html; charset=utf-8"]],
   ["/campaign-setup.html", ["campaign-setup.html", "text/html; charset=utf-8"]],
+  ["/player-seeds.html", ["player-seeds.html", "text/html; charset=utf-8"]],
   ["/project-status.html", ["project-status.html", "text/html; charset=utf-8"]],
   ["/project-features.html", ["project-features.html", "text/html; charset=utf-8"]],
   ["/player-interface.html", ["player-interface.html", "text/html; charset=utf-8"]],
@@ -29,7 +30,8 @@ const PROTECTED_FILES = new Map([
   ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]],
   ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]],
   ["/audit-client.js", ["audit-client.js", "text/javascript; charset=utf-8"]],
-  ["/campaign-clock.js", ["campaign-clock.js", "text/javascript; charset=utf-8"]]
+  ["/campaign-clock.js", ["campaign-clock.js", "text/javascript; charset=utf-8"]],
+  ["/player-seeds.js", ["player-seeds.js", "text/javascript; charset=utf-8"]]
 ]);
 const AUTH_PATHS = new Set([
   "/api/auth/status",
@@ -41,7 +43,7 @@ const AUTH_PATHS = new Set([
 ]);
 const CAMPAIGN_PATH = /^\/api\/campaigns(?:\/|$)/;
 const PLAYER_API_PATH = /^\/api\/player(?:\/|$)/;
-const USER_API_PATH = /^\/api\/users(?:\/|$)/;
+const USER_API_PATH = /^\/api\/(?:users|player-seeds)(?:\/|$)/;
 
 function sendText(response, status, contentType, body, headOnly = false) {
   response.writeHead(status, {
@@ -100,7 +102,7 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
       response.writeHead(302, { Location: "/index.html", "Cache-Control": "no-store" });
       return response.end();
     }
-      if (["/index.html", "/campaign-setup.html"].includes(url.pathname) && account.role !== "gm") {
+      if (["/index.html", "/campaign-setup.html", "/player-seeds.html"].includes(url.pathname) && account.role !== "gm") {
       response.writeHead(302, { Location: "/player-interface.html", "Cache-Control": "no-store" });
       return response.end();
     }

@@ -79,6 +79,8 @@
     .editor-head h2 { margin: 0; font: 700 18px var(--serif); }
     .editor-head p { margin: 4px 0 0; color: var(--muted); font: 9px var(--mono); }
     .editor-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
+    .campaign-select { display: grid; min-width: 175px; gap: 3px; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .campaign-select select { width: 100%; min-height: 32px; border: 1px solid var(--line); color: var(--ink); background: #f7f8f3; font: 9px var(--mono); text-transform: none; }
     .editor-body { padding: 17px; }
     .blank-state { display: grid; min-height: 390px; place-content: center; gap: 12px; padding: 24px; color: var(--muted); text-align: center; }
     .blank-state strong { color: var(--ink); font: 20px var(--serif); text-transform: uppercase; }
@@ -119,6 +121,8 @@
     .check-row input { margin: 1px 0 0; accent-color: var(--forest); }
     .assignment-note { min-height: 18px; margin: 0; color: var(--muted); font: 9px/1.5 var(--mono); }
     .assignment-note.error { color: var(--signal); }
+    .activation-token { overflow-wrap: anywhere; margin: 0; padding: 11px 13px; border: 1px solid #9aaf82; color: #344a40; background: #e4eadc; font: 9px/1.5 var(--mono); white-space: pre-wrap; }
+    .activation-token[hidden] { display: none; }
     .toast { position: fixed; right: 20px; bottom: 20px; z-index: 3; max-width: calc(100vw - 40px); padding: 12px 15px; border: 1px solid #718c73; color: #f4f6ef; background: var(--forest); font: 10px var(--mono); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
     footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); color: #758178; font: 9px var(--mono); text-transform: uppercase; }
@@ -161,14 +165,14 @@
         <a href="campaign-setup.html"><span class="nav-index" aria-hidden="true">02</span>Campaign setup</a>
         <a href="player-seeds.html" aria-current="page"><span class="nav-index" aria-hidden="true">03</span>Player seeds</a>
       </nav>
-      <div class="rail-note">GM-only local drafts<br>Not connected to player accounts</div>
+      <div class="rail-note">GM-owned player templates<br>Campaign access starts on assignment</div>
     </aside>
     <main>
-      <header class="topbar"><div class="crumb">Fieldbook / GM authoring / Player seeds</div><div class="storage-state" id="storage-state" role="status">Local store ready</div></header>
+      <header class="topbar"><div class="crumb">Fieldbook / GM authoring / Player seeds</div><div class="storage-state" id="storage-state" role="status">Connecting to GM service</div></header>
       <div class="content">
         <header class="page-heading">
           <div><div class="heading-tag">Unassigned by default / GM-only</div><h1>Player seeds</h1></div>
-          <p>Prepare a player record and T2K 4E character template outside any campaign. A seed enters the active campaign only after you assign it.</p>
+          <p>Prepare a GM-owned player login and T2K 4E character template outside any campaign. The player has no campaign access until you assign the template.</p>
         </header>
         <div class="layout">
           <aside class="panel" aria-labelledby="seed-list-title">
@@ -182,16 +186,19 @@
                 <div><h2 id="editor-title">New player seed</h2><p id="editor-subtitle">UNASSIGNED / GM-ONLY TEMPLATE</p></div>
                 <div class="editor-actions">
                   <button class="button button-danger" id="delete-seed" type="button" aria-label="Delete player seed" title="Delete player seed">×</button>
+                  <label class="campaign-select"><span>Campaign</span><select id="assignment-campaign" aria-label="Campaign for player assignment" disabled><option value="">Load a campaign first</option></select></label>
                   <button class="button" id="assign-seed" type="button" disabled>Add to campaign</button>
                   <button class="button button-primary" type="submit">Save seed</button>
                 </div>
               </header>
               <div class="editor-body">
                 <p class="assignment-note" id="assignment-note" role="status"></p>
+                <pre class="activation-token" id="activation-token" hidden></pre>
                 <div class="form-section">
                   <div class="section-heading"><h3>Player and character</h3><span>Identity / service</span></div>
                   <div class="fields">
-                    <div class="field"><label for="player-name">Player name or label</label><input id="player-name" name="playerName" maxlength="80" autocomplete="off" required></div>
+                    <div class="field"><label for="player-username">Player login name</label><input id="player-username" name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" autocomplete="off" required></div>
+                    <div class="field"><label for="player-display-label">Player display name</label><input id="player-display-label" name="displayLabel" maxlength="80" autocomplete="off" required></div>
                     <div class="field"><label for="character-name">Character name</label><input id="character-name" name="characterName" maxlength="80" autocomplete="off" required></div>
                     <div class="field"><label for="nationality">Nationality</label><input id="nationality" name="nationality" maxlength="80" autocomplete="off"></div>
                     <div class="field"><label for="character-age">Character age</label><input id="character-age" name="age" type="number" min="18" max="99" step="1" inputmode="numeric"></div>
@@ -246,7 +253,7 @@
             </form>
           </section>
         </div>
-        <footer><span>Fieldbook / Player seeds</span><span>Stored separately from campaign data in this browser</span></footer>
+        <footer><span>Fieldbook / Player seeds</span><span>GM-owned server records / unassigned until campaign placement</span></footer>
       </div>
     </main>
   </div>

@@ -262,7 +262,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 15) {
+    if (version > 16) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -540,6 +540,23 @@ function openRuntimeDatabase(path = ":memory:") {
       CREATE INDEX idx_party_members_faction 
         ON party_members(runtime_campaign_id, faction_id) WHERE is_active = 1;
       PRAGMA user_version = 15;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 16) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE player_seed_templates (
+        id TEXT PRIMARY KEY,
+        owner_gm_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
+        display_label TEXT NOT NULL,
+        character_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX player_seed_templates_by_owner ON player_seed_templates(owner_gm_id, created_at);
+      PRAGMA user_version = 16;`);
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
@@ -1375,6 +1392,222 @@ function normalizePlayerSeedFields(fields) {
   });
 }
 
+const PLAYER_SEED_ATTRIBUTES = ["Strength", "Agility", "Intelligence", "Empathy"];
+const PLAYER_SEED_SKILLS = ["Close Combat", "Heavy Weapons", "Stamina", "Driving", "Ranged Combat", "Mobility", "Recon", "Survival", "Tech", "Command", "Medical Aid", "Persuasion"];
+const PLAYER_SEED_STEPS = ["step-nationality", "step-attributes", "step-careers", "step-war", "step-personal"];
+
+function normalizePlayerCharacterTemplate(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("A character template is required.");
+  const cleanText = (value, label, maximumLength) => {
+    if (value === undefined || value === null) return "";
+    if (typeof value !== "string" || value.length > maximumLength) throw new Error(`${label} is invalid or too long.`);
+    return value.trim();
+  };
+  const ratingMap = (value, names, allowed, label) => {
+    if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) throw new Error(`${label} ratings are invalid.`);
+    return Object.fromEntries(names.map((name) => {
+      const rating = value?.[name] ?? "";
+      if (rating !== "" && !allowed.includes(rating)) throw new Error(`${name} has an invalid rating.`);
+      return [name, rating];
+    }));
+  };
+  const ageValue = input.age ?? "";
+  const age = ageValue === "" ? "" : Number(ageValue);
+  if (age !== "" && (!Number.isSafeInteger(age) || age < 18 || age > 99)) throw new Error("Character age must be a whole number from 18 to 99.");
+  const lifePath = input.lifePath ?? {};
+  if (!lifePath || typeof lifePath !== "object" || Array.isArray(lifePath)) throw new Error("The life-path record is invalid.");
+  const careerTerms = lifePath.careerTerms ?? [];
+  if (!Array.isArray(careerTerms) || careerTerms.length > 20) throw new Error("A character template can contain no more than 20 manual career terms.");
+  const cleanLineList = (value, label) => {
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.length > 20) throw new Error(`${label} must be a list of no more than 20 entries.`);
+    return value.map((item) => cleanText(item, label, 160)).filter(Boolean);
+  };
+  const normalizedTerms = careerTerms.map((term) => {
+    if (!term || typeof term !== "object" || Array.isArray(term)) throw new Error("A career term is invalid.");
+    const promotion = term.promotion ?? {};
+    const aging = term.aging ?? {};
+    const warCheck = term.warCheck ?? {};
+    if (![promotion, aging, warCheck].every((item) => item && typeof item === "object" && !Array.isArray(item))) throw new Error("A career term outcome is invalid.");
+    const yearsAged = aging.yearsAged === "" || aging.yearsAged === null || aging.yearsAged === undefined ? null : Number(aging.yearsAged);
+    if (yearsAged !== null && (!Number.isSafeInteger(yearsAged) || yearsAged < 0 || yearsAged > 99)) throw new Error("Career-term aging must be a whole number from 0 to 99.");
+    const promotionOutcome = cleanText(promotion.outcome, "Promotion outcome", 32);
+    const warOutcome = cleanText(warCheck.outcome, "War-check outcome", 32);
+    if (promotionOutcome && !["success", "failure", "not-applicable"].includes(promotionOutcome)) throw new Error("The promotion outcome is invalid.");
+    if (warOutcome && !["no-outbreak", "war-broke-out", "not-applicable"].includes(warOutcome)) throw new Error("The war-check outcome is invalid.");
+    return {
+      career: cleanText(term.career, "Career", 120),
+      skillAdvances: cleanLineList(term.skillAdvances, "Skill advance"),
+      promotion: {
+        skill: cleanText(promotion.skill, "Promotion skill", 100),
+        roll: cleanText(promotion.roll, "Promotion roll", 120),
+        outcome: promotionOutcome
+      },
+      specialties: cleanLineList(term.specialties, "Specialty"),
+      aging: { yearsAged, effect: cleanText(aging.effect, "Aging effect", 500) },
+      warCheck: { roll: cleanText(warCheck.roll, "War-check roll", 120), outcome: warOutcome },
+      injuryOutcome: cleanText(term.injuryOutcome, "Injury outcome", 800),
+      notes: cleanText(term.notes, "Career-term notes", 800)
+    };
+  });
+  const creationSteps = input.creationSteps ?? {};
+  if (!creationSteps || typeof creationSteps !== "object" || Array.isArray(creationSteps)) throw new Error("Character-creation progress is invalid.");
+  const steps = Object.fromEntries(PLAYER_SEED_STEPS.map((key) => {
+    const value = creationSteps[key] ?? false;
+    if (typeof value !== "boolean") throw new Error("Character-creation progress must use boolean values.");
+    return [key, value];
+  }));
+  const character = {
+    characterName: cleanText(input.characterName, "Character name", 80),
+    nationality: cleanText(input.nationality, "Nationality", 80),
+    age,
+    branch: cleanText(input.branch, "Branch or service", 100),
+    militaryRank: cleanText(input.militaryRank, "Military rank", 60),
+    attributes: ratingMap(input.attributes, PLAYER_SEED_ATTRIBUTES, ["A", "B", "C", "D"], "Attribute"),
+    skills: ratingMap(input.skills, PLAYER_SEED_SKILLS, ["A", "B", "C", "D", "F"], "Skill"),
+    specialties: cleanText(input.specialties, "Specialties", 1200),
+    childhood: cleanText(input.childhood, "Childhood", 1600),
+    lifePath: { careerTerms: normalizedTerms, legacyCareerNotes: cleanText(lifePath.legacyCareerNotes, "Earlier career notes", 3000) },
+    atWarTerm: cleanText(input.atWarTerm, "At-war term", 1600),
+    cuf: cleanText(input.cuf, "Coolness Under Fire", 1),
+    startingGear: cleanText(input.startingGear, "Starting gear", 500),
+    appearance: cleanText(input.appearance, "Appearance", 1000),
+    moralCode: cleanText(input.moralCode, "Moral code", 700),
+    bigDream: cleanText(input.bigDream, "Big dream", 700),
+    buddy: cleanText(input.buddy, "Buddy", 100),
+    howMetGroup: cleanText(input.howMetGroup, "How the character met the group", 700),
+    gmNotes: cleanText(input.gmNotes, "GM notes", 1200),
+    creationSteps: steps
+  };
+  if (character.cuf && !["A", "B", "C", "D"].includes(character.cuf)) throw new Error("Coolness Under Fire has an invalid rating.");
+  if (Buffer.byteLength(JSON.stringify(character), "utf8") > 12000) throw new Error("The character template is too large.");
+  return character;
+}
+
+function playerFieldsFromTemplate(character) {
+  const fields = [];
+  const add = (key, label, value, required = false) => fields.push({ key, label, value: String(value ?? ""), required });
+  add("characterName", "Character name", character.characterName, true);
+  add("nationality", "Nationality", character.nationality);
+  add("age", "Age", character.age);
+  add("branch", "Branch or service", character.branch);
+  add("militaryRank", "Military rank", character.militaryRank);
+  PLAYER_SEED_ATTRIBUTES.forEach((name) => add(`attribute${name}`, name, character.attributes[name]));
+  PLAYER_SEED_SKILLS.forEach((name) => {
+    const key = name.split(/[^A-Za-z0-9]+/).filter(Boolean).map((part, index) => index === 0
+      ? part[0].toLowerCase() + part.slice(1)
+      : part[0].toUpperCase() + part.slice(1)).join("");
+    add(`skill${key[0].toUpperCase()}${key.slice(1)}`, name, character.skills[name]);
+  });
+  add("specialties", "Specialties", character.specialties);
+  add("childhood", "Childhood", character.childhood);
+  const terms = character.lifePath.careerTerms.map((term, index) => [
+    `Term ${index + 1}: ${term.career || "Career not recorded"}`,
+    term.skillAdvances.length ? `Skill advances: ${term.skillAdvances.join(", ")}` : "",
+    term.promotion.outcome ? `Promotion: ${term.promotion.outcome} (${term.promotion.skill || "skill not recorded"}; ${term.promotion.roll || "roll not recorded"})` : "",
+    term.specialties.length ? `Specialties: ${term.specialties.join(", ")}` : "",
+    term.aging.yearsAged !== null ? `Years aged: ${term.aging.yearsAged}; ${term.aging.effect}` : "",
+    term.warCheck.outcome ? `War check: ${term.warCheck.outcome} (${term.warCheck.roll || "roll not recorded"})` : "",
+    term.injuryOutcome,
+    term.notes
+  ].filter(Boolean).join(" / ")).join("\n");
+  add("careerHistory", "Career terms", [terms, character.lifePath.legacyCareerNotes].filter(Boolean).join("\n"));
+  add("atWarTerm", "At-war term", character.atWarTerm);
+  add("cuf", "Coolness Under Fire", character.cuf);
+  add("startingGear", "Starting gear", character.startingGear);
+  add("appearance", "Appearance", character.appearance);
+  add("moralCode", "Moral code", character.moralCode);
+  add("bigDream", "Big dream", character.bigDream);
+  add("buddy", "Buddy", character.buddy);
+  add("howMetGroup", "How the character met the group", character.howMetGroup);
+  return fields;
+}
+
+function listPlayerSeedTemplates(database, gmAccountId) {
+  const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
+  if (gm?.global_role !== "gm") return null;
+  return database.prepare(`SELECT templates.id, templates.account_id AS accountId, templates.display_label AS displayLabel,
+      templates.character_json AS characterJson, templates.created_at AS createdAt, templates.updated_at AS updatedAt,
+      accounts.login_identifier AS username
+    FROM player_seed_templates AS templates JOIN accounts ON accounts.id = templates.account_id
+    WHERE templates.owner_gm_id = ? ORDER BY templates.created_at, templates.id`).all(gmAccountId).map((row) => {
+    const assignments = database.prepare(`SELECT campaigns.runtime_id AS campaignId, campaigns.name AS campaignName,
+        player_seats.id AS seatId, characters.status
+      FROM player_seats JOIN campaigns ON campaigns.runtime_id = player_seats.campaign_id
+      JOIN characters ON characters.id = player_seats.character_id AND characters.campaign_id = player_seats.campaign_id
+      WHERE player_seats.account_id = ? AND player_seats.active = 1 ORDER BY campaigns.created_at, campaigns.runtime_id`).all(row.accountId);
+    const { characterJson, ...seed } = row;
+    return { ...seed, character: JSON.parse(characterJson), assignments };
+  });
+}
+
+function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Player seed details are required.");
+  if (typeof input.username !== "string" || !/^[A-Za-z0-9._-]{3,32}$/.test(input.username)) throw new Error("Choose a username using 3-32 letters, numbers, dots, underscores, or hyphens.");
+  const username = input.username.toLowerCase();
+  const displayLabel = requireText(input.displayLabel, "Player display label", 80);
+  const character = normalizePlayerCharacterTemplate(input.character);
+  const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
+  if (gm?.global_role !== "gm") throw new Error("GM account required.");
+  const nowValue = (options.now || (() => Date.now()))();
+  const timestamp = new Date(nowValue).toISOString();
+  const templateId = randomUUID();
+  let activationToken = null;
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    if (!database.prepare("SELECT 1 AS allowed FROM accounts WHERE id = ? AND global_role = 'gm' AND disabled = 0").get(gmAccountId)) throw new Error("GM account required.");
+    let account = database.prepare("SELECT id, global_role, created_by_account_id FROM accounts WHERE login_identifier = ?").get(username);
+    if (account && (account.global_role !== "player" || account.created_by_account_id !== gmAccountId)) throw new Error("Choose a player username created by this GM.");
+    if (!account) {
+      const accountId = randomUUID();
+      activationToken = randomBytes(32).toString("base64url");
+      const placeholderHash = `disabled$${randomBytes(32).toString("hex")}`;
+      database.prepare(`INSERT INTO accounts
+        (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role, created_by_account_id)
+        VALUES (?, ?, ?, 1, ?, ?, 'player', ?)`)
+        .run(accountId, username, placeholderHash, timestamp, timestamp, gmAccountId);
+      database.prepare(`INSERT INTO account_invites (account_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)`)
+        .run(accountId, createHash("sha256").update(activationToken).digest("hex"), new Date(nowValue + 7 * 24 * 60 * 60 * 1000).toISOString(), timestamp);
+      account = { id: accountId, global_role: "player", created_by_account_id: gmAccountId };
+    }
+    if (database.prepare("SELECT 1 AS present FROM player_seed_templates WHERE account_id = ?").get(account.id)) throw new Error("This player already has a character template.");
+    database.prepare(`INSERT INTO player_seed_templates
+      (id, owner_gm_id, account_id, display_label, character_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(templateId, gmAccountId, account.id, displayLabel, JSON.stringify(character), timestamp, timestamp);
+    database.exec("COMMIT");
+    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp, activationToken };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function updatePlayerSeedTemplate(database, gmAccountId, templateId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Player seed details are required.");
+  const displayLabel = requireText(input.displayLabel, "Player display label", 80);
+  const character = normalizePlayerCharacterTemplate(input.character);
+  const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
+  const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
+  if (gm?.global_role !== "gm") throw new Error("GM account required.");
+  const result = database.prepare(`UPDATE player_seed_templates SET display_label = ?, character_json = ?, updated_at = ?
+    WHERE id = ? AND owner_gm_id = ?`).run(displayLabel, JSON.stringify(character), timestamp, templateId, gmAccountId);
+  if (!result.changes) return null;
+  return listPlayerSeedTemplates(database, gmAccountId).find((seed) => seed.id === templateId) || null;
+}
+
+function deletePlayerSeedTemplate(database, gmAccountId, templateId) {
+  const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
+  if (gm?.global_role !== "gm") throw new Error("GM account required.");
+  const template = database.prepare("SELECT account_id FROM player_seed_templates WHERE id = ? AND owner_gm_id = ?").get(templateId, gmAccountId);
+  if (!template) return false;
+  if (database.prepare("SELECT 1 AS assigned FROM player_seats WHERE account_id = ? AND active = 1 LIMIT 1").get(template.account_id)) {
+    throw new Error("Remove this player from all campaigns before deleting the template.");
+  }
+  database.prepare("DELETE FROM player_seed_templates WHERE id = ? AND owner_gm_id = ?").run(templateId, gmAccountId);
+  return true;
+}
+
 function createAssignedUser(database, gmAccountId, username, options = {}) {
   if (typeof username !== "string" || !/^[A-Za-z0-9._-]{3,32}$/.test(username)) {
     throw new Error("Username must be 3-32 letters, numbers, dots, underscores, or hyphens.");
@@ -1422,14 +1655,23 @@ function listAssignedUsers(database, gmAccountId) {
 
 function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Player seed details are required.");
-  if (typeof input.username !== "string" || !/^[A-Za-z0-9._-]{3,32}$/.test(input.username)) {
-    throw new Error("Choose a username created by the GM.");
+  const templateId = typeof input.seedId === "string" ? input.seedId : null;
+  let username = "";
+  let displayLabel = "";
+  let fields = [];
+  if (!templateId) {
+    if (typeof input.username !== "string" || !/^[A-Za-z0-9._-]{3,32}$/.test(input.username)) {
+      throw new Error("Choose a username created by the GM.");
+    }
+    if (typeof input.displayLabel !== "string" || !input.displayLabel.trim() || input.displayLabel.length > 80) {
+      throw new Error("Player display label is missing or too long.");
+    }
+    username = input.username.toLowerCase();
+    displayLabel = input.displayLabel.trim();
+    fields = normalizePlayerSeedFields(input.fields);
+  } else if (input.displayLabel !== undefined) {
+    displayLabel = requireText(input.displayLabel, "Player display label", 80);
   }
-  if (typeof input.displayLabel !== "string" || !input.displayLabel.trim() || input.displayLabel.length > 80) {
-    throw new Error("Player display label is missing or too long.");
-  }
-  const fields = normalizePlayerSeedFields(input.fields);
-  const username = input.username.toLowerCase();
   const campaign = database.prepare("SELECT runtime_id FROM campaigns WHERE runtime_id = ? AND active = 1").get(campaignId);
   if (!campaign) throw new Error("Campaign not found.");
   const gmMembership = database.prepare("SELECT 1 AS allowed FROM campaign_memberships WHERE campaign_id = ? AND account_id = ? AND role = 'gm'").get(campaignId, gmAccountId);
@@ -1447,8 +1689,21 @@ function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}
     }
     const activeSeats = database.prepare("SELECT COUNT(*) AS count FROM player_seats WHERE campaign_id = ? AND active = 1").get(campaignId).count;
     if (activeSeats >= 4) throw new Error("A campaign can have no more than four active player seats.");
-    const existingAccount = database.prepare(`SELECT id, disabled, global_role, created_by_account_id
-      FROM accounts WHERE login_identifier = ?`).get(username);
+    let existingAccount;
+    if (templateId) {
+      const template = database.prepare(`SELECT templates.account_id AS accountId, templates.display_label AS displayLabel,
+          templates.character_json AS characterJson, accounts.login_identifier AS username
+        FROM player_seed_templates AS templates JOIN accounts ON accounts.id = templates.account_id
+        WHERE templates.id = ? AND templates.owner_gm_id = ?`).get(templateId, gmAccountId);
+      if (!template) throw new Error("Player seed template not found.");
+      username = template.username;
+      displayLabel ||= template.displayLabel;
+      existingAccount = { id: template.accountId, global_role: "player", created_by_account_id: gmAccountId };
+      fields = normalizePlayerSeedFields(playerFieldsFromTemplate(JSON.parse(template.characterJson)));
+    } else {
+      existingAccount = database.prepare(`SELECT id, disabled, global_role, created_by_account_id
+        FROM accounts WHERE login_identifier = ?`).get(username);
+    }
     if (!existingAccount || existingAccount.global_role !== "player" || existingAccount.created_by_account_id !== gmAccountId) {
       throw new Error("Choose a player username created by this GM.");
     }
@@ -1459,15 +1714,16 @@ function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}
     database.prepare(`INSERT INTO characters (id, campaign_id, status, fields_json, created_at, updated_at)
       VALUES (?, ?, 'seed', ?, ?, ?)`).run(characterId, campaignId, JSON.stringify(fields), timestamp, timestamp);
     database.prepare(`INSERT INTO player_seats (id, campaign_id, account_id, character_id, display_label, active, assigned_at)
-      VALUES (?, ?, ?, ?, ?, 1, ?)`).run(seatId, campaignId, accountId, characterId, input.displayLabel.trim(), timestamp);
+      VALUES (?, ?, ?, ?, ?, 1, ?)`).run(seatId, campaignId, accountId, characterId, displayLabel, timestamp);
     database.exec("COMMIT");
     return {
       seatId,
       accountId,
       username,
-      displayLabel: input.displayLabel.trim(),
+      displayLabel,
       characterId,
-      status: "seed"
+      status: "seed",
+      seedTemplateId: templateId
     };
   } catch (error) {
     database.exec("ROLLBACK");
@@ -1761,6 +2017,10 @@ module.exports = {
   updateRuntimeDashboard,
   createAssignedUser,
   listAssignedUsers,
+  createPlayerSeedTemplate,
+  listPlayerSeedTemplates,
+  updatePlayerSeedTemplate,
+  deletePlayerSeedTemplate,
   createPlayerSeed,
   listPlayerCampaigns,
   listCampaignPlayerSeeds,

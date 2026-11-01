@@ -1,9 +1,6 @@
 (function () {
   "use strict";
 
-  const SEED_STORE_KEY = "fieldbook-player-seeds-v1";
-  const CAMPAIGN_STORE_KEY = "fieldbook-twilight-2000-v1";
-  const SEED_SCHEMA_VERSION = 2;
   const ATTRIBUTE_NAMES = ["Strength", "Agility", "Intelligence", "Empathy"];
   const SKILL_GROUPS = [
     { attribute: "Strength", skills: ["Close Combat", "Heavy Weapons", "Stamina"] },
@@ -19,14 +16,33 @@
   const storageState = document.getElementById("storage-state");
   const assignmentNote = document.getElementById("assignment-note");
   const assignButton = document.getElementById("assign-seed");
+  const campaignSelect = document.getElementById("assignment-campaign");
+  const activationToken = document.getElementById("activation-token");
   const toast = document.getElementById("toast");
-  let seedStore;
+  let seedStore = { seeds: [] };
+  let campaigns = [];
   let selectedSeedId = null;
   let storageAvailable = true;
   let toastTimer;
 
   function isRecord(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  async function apiRequest(path, options = {}) {
+    let response;
+    try {
+      response = await fetch(path, { credentials: "same-origin", ...options });
+    } catch (error) {
+      throw new Error("The GM service is unavailable. Open this page through the authenticated Fieldbook server.");
+    }
+    if (response.status === 401) {
+      location.replace(`/login.html?next=${encodeURIComponent(location.pathname)}`);
+      throw new Error("Sign in again to manage player seeds.");
+    }
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `GM service returned ${response.status}.`);
+    return body;
   }
 
   function createId(prefix) {
@@ -74,79 +90,16 @@
     };
   }
 
-  function normalizeSeed(seed) {
-    if (!isRecord(seed) || !isRecord(seed.character)) return seed;
-    const character = { ...seed.character };
-    const lifePath = isRecord(character.lifePath) ? character.lifePath : {};
-    const legacyCareerNotes = typeof character.careerTerms === "string"
-      ? character.careerTerms
-      : typeof lifePath.legacyCareerNotes === "string" ? lifePath.legacyCareerNotes : "";
-    const careerTerms = Array.isArray(lifePath.careerTerms)
-      ? lifePath.careerTerms.map(normalizeCareerTerm)
-      : [];
-    delete character.careerTerms;
-    character.lifePath = { careerTerms, legacyCareerNotes };
-    return { ...seed, character };
-  }
-
-  function readSeedStore() {
-    const raw = localStorage.getItem(SEED_STORE_KEY);
-    if (!raw) return { schemaVersion: SEED_SCHEMA_VERSION, seeds: [] };
-    const saved = JSON.parse(raw);
-    if (!isRecord(saved) || ![1, SEED_SCHEMA_VERSION].includes(saved.schemaVersion) || !Array.isArray(saved.seeds)) {
-      throw new Error("The player seed store is not a supported version.");
-    }
-    return {
-      schemaVersion: SEED_SCHEMA_VERSION,
-      seeds: saved.seeds.map(normalizeSeed)
-    };
-  }
-
-  function readCampaignRecord() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(CAMPAIGN_STORE_KEY));
-      if (!isRecord(saved) || !isRecord(saved.setupPackage) || !isRecord(saved.setupPackage.campaign)
-        || typeof saved.setupPackage.campaign.id !== "string" || typeof saved.setupPackage.campaign.name !== "string") return null;
-      return saved;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function currentCampaign(record) {
-    if (!isRecord(record) || !isRecord(record.setupPackage) || !isRecord(record.setupPackage.campaign)) return null;
-    const campaign = record.setupPackage.campaign;
-    return typeof campaign.id === "string" && typeof campaign.name === "string"
-      ? { id: campaign.id, name: campaign.name }
-      : null;
-  }
-
-  function currentSeats(record) {
-    return Array.isArray(record?.playerSeats) ? record.playerSeats.filter(isRecord) : [];
-  }
-
   function selectedSeed() {
     return seedStore.seeds.find((seed) => seed.id === selectedSeedId) || null;
   }
 
-  function assignedSeat(seedId, record) {
-    return currentSeats(record).find((seat) => seat.seedId === seedId) || null;
+  function selectedCampaign() {
+    return campaigns.find((campaign) => campaign.id === campaignSelect.value) || null;
   }
 
-  function saveSeedStore() {
-    try {
-      seedStore.schemaVersion = SEED_SCHEMA_VERSION;
-      localStorage.setItem(SEED_STORE_KEY, JSON.stringify(seedStore));
-      storageState.textContent = "Local store saved";
-      storageState.classList.remove("error");
-      storageAvailable = true;
-      return true;
-    } catch (error) {
-      storageState.textContent = "Local storage unavailable";
-      storageState.classList.add("error");
-      storageAvailable = false;
-      return false;
-    }
+  function assignedToCampaign(seed, campaignId) {
+    return seed?.assignments?.find((assignment) => assignment.campaignId === campaignId) || null;
   }
 
   function setStatus(message, isError) {
@@ -243,7 +196,6 @@
   function renderSeedList() {
     seedList.replaceChildren();
     document.getElementById("seed-count").textContent = `${seedStore.seeds.length} ${seedStore.seeds.length === 1 ? "template" : "templates"}`;
-    const campaignRecord = readCampaignRecord();
     if (!seedStore.seeds.length) {
       const empty = document.createElement("div");
       empty.className = "empty-list";
@@ -253,17 +205,18 @@
     }
     seedStore.seeds.forEach((seed) => {
       const button = document.createElement("button");
-      const seat = assignedSeat(seed.id, campaignRecord);
       button.className = "seed-row";
       button.type = "button";
       button.setAttribute("aria-current", String(seed.id === selectedSeedId));
       const player = document.createElement("strong");
-      player.textContent = seed.playerName;
+      player.textContent = `${seed.displayLabel} / ${seed.username}`;
       const character = document.createElement("span");
       character.textContent = seed.character.characterName || "Character name not set";
       const status = document.createElement("span");
-      status.className = seat ? "assigned" : "";
-      status.textContent = seat ? `In ${currentCampaign(campaignRecord)?.name || "campaign"}` : "Independent / unassigned";
+      status.className = seed.assignments?.length ? "assigned" : "";
+      status.textContent = seed.assignments?.length
+        ? `Assigned / ${seed.assignments.map((assignment) => assignment.campaignName).join(", ")}`
+        : "Independent / unassigned";
       button.append(player, character, status);
       button.addEventListener("click", () => selectSeed(seed.id));
       seedList.append(button);
@@ -282,29 +235,40 @@
     form.hidden = !isVisible;
   }
 
-  function updateAssignmentControls() {
-    const campaignRecord = readCampaignRecord();
-    const campaign = currentCampaign(campaignRecord);
+  async function updateAssignmentControls() {
+    const campaign = selectedCampaign();
     const seed = selectedSeed();
-    const seat = seed ? assignedSeat(seed.id, campaignRecord) : null;
+    const assignment = seed && campaign ? assignedToCampaign(seed, campaign.id) : null;
     assignButton.disabled = !storageAvailable || !seed || !campaign;
-    document.getElementById("delete-seed").disabled = !storageAvailable || !seed || Boolean(seat);
+    document.getElementById("delete-seed").disabled = !storageAvailable || !seed || Boolean(seed.assignments?.length);
+    if (seed && seed.assignments?.length) {
+      setStatus("This template has campaign assignments. The GM can edit the template independently; assigned campaign characters remain unchanged.", false);
+    }
     if (!campaign) {
       assignButton.textContent = "Add to campaign";
-      setStatus("Independent seed. Import a setup package into the GM runtime before assigning it to a campaign.", false);
+      if (!seed?.assignments?.length) setStatus("Choose a campaign to assign this independent player template.", false);
       return;
     }
-    if (seat) {
-      assignButton.textContent = "Remove from campaign";
-      setStatus(`Assigned to ${campaign.name} as a separate campaign copy. Editing this seed will not change the assigned copy.`, false);
+    if (assignment) {
+      assignButton.textContent = "Already assigned";
+      assignButton.disabled = true;
+      setStatus(`${seed.displayLabel} is already assigned to ${campaign.name}.`, false);
       return;
     }
-    assignButton.textContent = "Add to campaign";
-    const seats = currentSeats(campaignRecord);
-    setStatus(seats.length >= 4
-      ? `${campaign.name} already has four player seats.`
-      : `Independent seed. Active campaign: ${campaign.name} / ${seats.length} of 4 seats used.`, seats.length >= 4);
-    assignButton.disabled = !storageAvailable || !seed || seats.length >= 4;
+    if (!seed) return;
+    assignButton.textContent = `Add to ${campaign.name}`;
+    try {
+      const { seeds } = await apiRequest(`/api/campaigns/${encodeURIComponent(campaign.id)}/player-seeds`);
+      if (selectedSeedId !== seed.id || campaignSelect.value !== campaign.id) return;
+      const seatsFull = seeds.length >= 4;
+      assignButton.disabled = !storageAvailable || seatsFull;
+      setStatus(seatsFull ? `${campaign.name} already has four player seats.` : `${campaign.name} / ${seeds.length} of 4 seats used.`, seatsFull);
+    } catch (error) {
+      if (selectedSeedId === seed.id && campaignSelect.value === campaign.id) {
+        assignButton.disabled = true;
+        setStatus(error.message, true);
+      }
+    }
   }
 
   function selectSeed(seedId) {
@@ -324,12 +288,16 @@
     const lifePath = isRecord(seed.character.lifePath) ? seed.character.lifePath : {};
     renderCareerTerms(Array.isArray(lifePath.careerTerms) ? lifePath.careerTerms : []);
     renderLegacyCareerNotes(lifePath.legacyCareerNotes);
-    form.elements.playerName.value = seed.playerName;
+    form.elements.username.value = seed.username;
+    form.elements.username.disabled = true;
+    form.elements.displayLabel.value = seed.displayLabel;
     CREATION_STEPS.forEach((name) => {
       form.elements[name].checked = Boolean(seed.creationSteps?.[name]);
     });
-    document.getElementById("editor-title").textContent = seed.character.characterName || seed.playerName;
+    document.getElementById("editor-title").textContent = seed.character.characterName || seed.displayLabel;
     document.getElementById("editor-subtitle").textContent = `SEED ${seed.id.slice(-8).toUpperCase()} / GM-ONLY TEMPLATE`;
+    activationToken.hidden = true;
+    activationToken.textContent = "";
     setFormVisible(true);
     updateDiceDisplays();
     updateAssignmentControls();
@@ -339,6 +307,9 @@
   function startNewSeed() {
     selectedSeedId = null;
     clearForm();
+    form.elements.username.disabled = false;
+    activationToken.hidden = true;
+    activationToken.textContent = "";
     document.getElementById("editor-title").textContent = "New player seed";
     document.getElementById("editor-subtitle").textContent = "UNASSIGNED / GM-ONLY TEMPLATE";
     setFormVisible(true);
@@ -346,7 +317,7 @@
     assignButton.disabled = true;
     document.getElementById("delete-seed").disabled = true;
     renderSeedList();
-    form.elements.playerName.focus();
+    form.elements.username.focus();
   }
 
   function makeTermField(index, key, labelText, value, options = {}) {
@@ -477,123 +448,135 @@
       careerTerms: readCareerTermsFromForm(),
       legacyCareerNotes: readFormValue("legacyCareerNotes")
     };
+    values.creationSteps = Object.fromEntries(CREATION_STEPS.map((name) => [name, form.elements[name].checked]));
     return values;
   }
 
-  function saveCurrentSeed(event) {
+  async function saveCurrentSeed(event) {
     event.preventDefault();
     if (!storageAvailable || !form.reportValidity()) return;
-    const playerName = readFormValue("playerName");
-    const character = characterFromForm();
-    const now = new Date().toISOString();
     const existing = selectedSeed();
-    const seed = {
-      id: existing?.id || createId("seed"),
-      createdAt: existing?.createdAt || now,
-      updatedAt: now,
-      playerName,
-      character,
-      creationSteps: Object.fromEntries(CREATION_STEPS.map((name) => [name, form.elements[name].checked]))
-    };
-    if (existing) seedStore.seeds = seedStore.seeds.map((item) => item.id === seed.id ? seed : item);
-    else seedStore.seeds.unshift(seed);
-    selectedSeedId = seed.id;
-    if (!saveSeedStore()) return;
-    document.getElementById("editor-title").textContent = character.characterName || playerName;
-    document.getElementById("editor-subtitle").textContent = `SEED ${seed.id.slice(-8).toUpperCase()} / GM-ONLY TEMPLATE`;
-    renderSeedList();
-    updateAssignmentControls();
-    showToast("Player seed saved.");
-  }
-
-  function assignSelectedSeed() {
-    const seed = selectedSeed();
-    const campaignRecord = readCampaignRecord();
-    const campaign = currentCampaign(campaignRecord);
-    if (!seed || !campaignRecord || !campaign) return;
-    const seats = currentSeats(campaignRecord);
-    const existingSeat = seats.find((seat) => seat.seedId === seed.id);
-    if (existingSeat) {
-      campaignRecord.playerSeats = seats.filter((seat) => seat.seedId !== seed.id);
-      try {
-        localStorage.setItem(CAMPAIGN_STORE_KEY, JSON.stringify(campaignRecord));
-        showToast(`Removed ${seed.playerName} from ${campaign.name}.`);
-      } catch (error) {
-        setStatus("The campaign record could not be saved. No assignment was changed.", true);
-      }
-      updateAssignmentControls();
-      renderSeedList();
-      return;
-    }
-    if (seats.length >= 4) {
-      updateAssignmentControls();
-      return;
-    }
-    campaignRecord.playerSeats = [...seats, {
-      id: createId("seat"),
-      seedId: seed.id,
-      playerName: seed.playerName,
-      character: structuredClone(seed.character),
-      assignedAt: new Date().toISOString()
-    }];
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    setStatus("Saving GM-owned template…", false);
     try {
-      localStorage.setItem(CAMPAIGN_STORE_KEY, JSON.stringify(campaignRecord));
-      showToast(`Added ${seed.playerName} to ${campaign.name}.`);
+      const payload = {
+        username: existing?.username || readFormValue("username"),
+        displayLabel: readFormValue("displayLabel"),
+        character: characterFromForm()
+      };
+      const path = existing ? `/api/player-seeds/${encodeURIComponent(existing.id)}` : "/api/player-seeds";
+      const { seed } = await apiRequest(path, {
+        method: existing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      seedStore.seeds = existing
+        ? seedStore.seeds.map((item) => item.id === seed.id ? seed : item)
+        : [seed, ...seedStore.seeds];
+      selectedSeedId = seed.id;
+      document.getElementById("editor-title").textContent = seed.character.characterName || seed.displayLabel;
+      document.getElementById("editor-subtitle").textContent = `SEED ${seed.id.slice(-8).toUpperCase()} / GM-ONLY TEMPLATE`;
+      if (seed.activationToken) {
+        activationToken.textContent = `Activation page: ${location.origin}/login.html?activate=1\nUsername: ${seed.username}\nOne-time activation token: ${seed.activationToken}\nExpires in 7 days. Share this token with the player through a secure channel.`;
+        activationToken.hidden = false;
+      }
+      form.elements.username.disabled = true;
+      storageState.textContent = "GM service saved";
+      renderSeedList();
+      await updateAssignmentControls();
+      showToast(existing ? "Player seed updated." : "Player seed and player login created.");
     } catch (error) {
-      setStatus("The campaign record could not be saved. No assignment was changed.", true);
+      setStatus(error.message, true);
+      showToast("Player seed was not saved.");
+    } finally {
+      submit.disabled = false;
     }
-    updateAssignmentControls();
-    renderSeedList();
   }
 
-  function deleteSelectedSeed() {
+  async function assignSelectedSeed() {
     const seed = selectedSeed();
-    if (!seed || assignedSeat(seed.id, readCampaignRecord())) return;
-    if (!window.confirm(`Delete the seed for ${seed.playerName}?`)) return;
-    seedStore.seeds = seedStore.seeds.filter((item) => item.id !== seed.id);
-    if (!saveSeedStore()) return;
-    selectedSeedId = null;
-    setFormVisible(false);
-    renderSeedList();
-    updateAssignmentControls();
-    showToast("Player seed deleted.");
+    const campaign = selectedCampaign();
+    if (!seed || !campaign || assignedToCampaign(seed, campaign.id)) return;
+    assignButton.disabled = true;
+    setStatus(`Adding ${seed.displayLabel} to ${campaign.name}…`, false);
+    try {
+      await apiRequest(`/api/campaigns/${encodeURIComponent(campaign.id)}/player-seeds`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seedId: seed.id })
+      });
+      const { seeds } = await apiRequest("/api/player-seeds");
+      seedStore.seeds = seeds;
+      renderSeedList();
+      await updateAssignmentControls();
+      showToast(`Added ${seed.displayLabel} to ${campaign.name}.`);
+    } catch (error) {
+      setStatus(error.message, true);
+      assignButton.disabled = false;
+    }
   }
 
-  function initialize() {
+  async function deleteSelectedSeed() {
+    const seed = selectedSeed();
+    if (!seed || seed.assignments?.length) return;
+    if (!window.confirm(`Delete the player template and login for ${seed.username}?`)) return;
+    try {
+      await apiRequest(`/api/player-seeds/${encodeURIComponent(seed.id)}`, { method: "DELETE" });
+      seedStore.seeds = seedStore.seeds.filter((item) => item.id !== seed.id);
+      selectedSeedId = null;
+      setFormVisible(false);
+      renderSeedList();
+      await updateAssignmentControls();
+      showToast("Player seed deleted.");
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  }
+
+  async function initialize() {
     renderRatingFields();
     renderSkillFields();
     renderCareerTerms([]);
-    try {
-      seedStore = readSeedStore();
-    } catch (error) {
-      storageAvailable = false;
-      seedStore = { schemaVersion: SEED_SCHEMA_VERSION, seeds: [] };
-      storageState.textContent = "Seed store needs review";
-      storageState.classList.add("error");
-      setStatus(error.message, true);
-    }
-    if (storageAvailable) {
-      storageState.textContent = "Local seed store ready";
-      renderSeedList();
-    }
     updateDiceDisplays();
     document.getElementById("new-seed").addEventListener("click", startNewSeed);
     document.getElementById("empty-new-seed").addEventListener("click", startNewSeed);
     form.addEventListener("submit", saveCurrentSeed);
     form.addEventListener("change", updateDiceDisplays);
     assignButton.addEventListener("click", assignSelectedSeed);
+    campaignSelect.addEventListener("change", updateAssignmentControls);
     document.getElementById("delete-seed").addEventListener("click", deleteSelectedSeed);
     document.getElementById("add-career-term").addEventListener("click", () => {
       const terms = readCareerTermsFromForm();
       terms.push(normalizeCareerTerm({}, terms.length));
       renderCareerTerms(terms);
     });
-    if (!storageAvailable) {
+    try {
+      const [seedResponse, campaignResponse] = await Promise.all([
+        apiRequest("/api/player-seeds"),
+        apiRequest("/api/campaigns")
+      ]);
+      seedStore.seeds = seedResponse.seeds;
+      campaigns = campaignResponse.campaigns;
+      campaignSelect.replaceChildren(new Option(campaigns.length ? "Choose campaign" : "No campaigns available", ""));
+      campaigns.forEach((campaign) => campaignSelect.add(new Option(`${campaign.name} / ${campaign.setting}`, campaign.id)));
+      campaignSelect.disabled = campaigns.length === 0;
+      storageState.textContent = "GM service connected";
+      storageState.classList.remove("error");
+      storageAvailable = true;
+      renderSeedList();
+      updateAssignmentControls();
+    } catch (error) {
+      storageAvailable = false;
+      storageState.textContent = "GM service unavailable";
+      storageState.classList.add("error");
+      setStatus(error.message, true);
       document.getElementById("new-seed").disabled = true;
       document.getElementById("empty-new-seed").disabled = true;
+      campaignSelect.disabled = true;
       form.hidden = true;
       blankState.hidden = false;
-      blankState.querySelector("p").textContent = "The stored seed data could not be read safely. Existing data was left untouched.";
+      blankState.querySelector("p").textContent = "Sign in to the GM service to create and assign server-owned player templates.";
       blankState.querySelector("button").hidden = true;
     }
   }

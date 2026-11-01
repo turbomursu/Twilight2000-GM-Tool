@@ -223,6 +223,72 @@ test("player activates, selects assigned campaign, fills only blank seed fields,
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM player_seats WHERE campaign_id = ? AND account_id = ?").get(campaignId, seed.accountId).count, 1);
 });
 
+test("GM player templates stay independent until campaign assignment", async (t) => {
+  const { origin } = await startTestServer(t);
+  const gmBootstrap = await postJson(origin, "/api/auth/bootstrap", { bootstrapToken, username: "gm-user", password });
+  const gmCookie = gmBootstrap.headers.get("set-cookie").split(";")[0];
+  const templateResponse = await postJson(origin, "/api/player-seeds", {
+    username: "seed-player",
+    displayLabel: "Maja Lind",
+    character: {
+      characterName: "Maja Lind",
+      nationality: "Swedish",
+      age: 18,
+      attributes: { Strength: "C", Agility: "C", Intelligence: "C", Empathy: "C" },
+      skills: { "Ranged Combat": "D", "Close Combat": "F" },
+      cuf: "D",
+      lifePath: { careerTerms: [{ career: "Scout", skillAdvances: ["Recon to C"], promotion: { outcome: "failure" } }] },
+      creationSteps: { "step-nationality": true, "step-attributes": true }
+    }
+  }, gmCookie);
+  assert.equal(templateResponse.status, 201);
+  const { seed: template } = await templateResponse.json();
+  assert.equal(template.assignments.length, 0);
+  assert.equal(typeof template.activationToken, "string");
+  assert.equal(Object.hasOwn(template, "campaignId"), false);
+
+  const gmTemplates = await fetch(`${origin}/api/player-seeds`, { headers: { Cookie: gmCookie } });
+  assert.equal((await gmTemplates.json()).seeds.length, 1);
+  const activated = await postJson(origin, "/api/auth/activate", { token: template.activationToken, password });
+  assert.equal(activated.status, 201);
+  const playerCookie = activated.headers.get("set-cookie").split(";")[0];
+  assert.deepEqual((await (await fetch(`${origin}/api/player/campaigns`, { headers: { Cookie: playerCookie } })).json()).campaigns, []);
+  assert.equal((await fetch(`${origin}/api/player-seeds`, { headers: { Cookie: playerCookie } })).status, 403);
+
+  const importResponse = await fetch(`${origin}/api/campaigns/import-setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: gmCookie },
+    body: JSON.stringify(validSetupPackage())
+  });
+  assert.equal(importResponse.status, 201);
+  const campaignId = (await importResponse.json()).campaign.id;
+  const assignment = await postJson(origin, `/api/campaigns/${campaignId}/player-seeds`, {
+    seedId: template.id
+  }, gmCookie);
+  assert.equal(assignment.status, 201);
+  assert.equal((await (await fetch(`${origin}/api/player/campaigns`, { headers: { Cookie: playerCookie } })).json()).campaigns.length, 1);
+
+  const assignedSeeds = await fetch(`${origin}/api/campaigns/${campaignId}/player-seeds`, { headers: { Cookie: gmCookie } });
+  const assignedSeed = (await assignedSeeds.json()).seeds[0];
+  assert.equal(assignedSeed.displayLabel, "Maja Lind");
+  assert.equal(assignedSeed.fields.find(({ key }) => key === "attributeStrength").value, "C");
+  assert.match(assignedSeed.fields.find(({ key }) => key === "careerHistory").value, /Recon to C/);
+
+  const editedTemplate = await fetch(`${origin}/api/player-seeds/${encodeURIComponent(template.id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: gmCookie },
+    body: JSON.stringify({
+      displayLabel: "Maja Lind",
+      character: { ...template.character, characterName: "Maja Updated" }
+    })
+  });
+  assert.equal(editedTemplate.status, 200);
+  assert.equal((await editedTemplate.json()).seed.character.characterName, "Maja Updated");
+  const unchangedAssignment = await fetch(`${origin}/api/campaigns/${campaignId}/player-seeds`, { headers: { Cookie: gmCookie } });
+  assert.equal((await unchangedAssignment.json()).seeds[0].fields.find(({ key }) => key === "characterName").value, "Maja Lind");
+  assert.equal((await fetch(`${origin}/api/player-seeds/${encodeURIComponent(template.id)}`, { method: "DELETE", headers: { Cookie: gmCookie } })).status, 409);
+});
+
 test("a player cannot access another player's campaign seed", async (t) => {
   const { origin } = await startTestServer(t);
   const response = await fetch(`${origin}/api/player/campaigns/not-assigned/character`);
