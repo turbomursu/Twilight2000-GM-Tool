@@ -113,7 +113,7 @@ function createCampaignHandler({ database }) {
         let campaignId;
         try { campaignId = decodeURIComponent(conditionMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
         const result = request.method === "GET" ? { conditions: getGMConditions(database, account.id, campaignId) }
-          : updateGMConditions(database, account.id, campaignId, await readJsonBody(request));
+          : updateGMConditions(database, account.id, campaignId, await readJsonBody(request, 64 * 1024));
         return result.conditions ? sendJson(response, 200, result) : sendJson(response, 404, { error: "Runtime campaign not found." });
       } catch (error) {
         const status = error instanceof HttpError ? error.status : /not found/.test(error.message) ? 404

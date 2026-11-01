@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-Supported campaign records, publications, COMMS, inventories, and proposals use owner-scoped SQLite APIs. All five handset views are connected. Player inventory additions, edits, quantities, and removals stay pending until GM approval; the GM can also stock/correct inventories. Source classification is explicitly GM-reviewed and UF stays unverified. Four-seat isolation, stale reviews, source checks, persistence, and recovery pass tests; synthetic browser checks verify proposal/approval/quantity workflows and safe text. Rules-governed item actions, condition publishing, offline maps, and full audit/history remain planned. Next priority: GM-managed condition records and own-seat projection without unverified rules effects.
+Supported campaign state, conditions, inventories/proposals, publications, and COMMS use owner-scoped SQLite APIs. All five handset views are connected. GM-managed conditions have public fields and private notes; players read only their active assigned character's public record. Four-seat privacy, query-spoof rejection, stale saves, clear markers, and atomic persistence/recovery pass tests; browser checks verify saves, unknown/present/absent values, inert notes, conflicts, and clearing. Conditions/carrying rules automation, offline maps, and full audit/history remain planned. Next priority: owner-only audit history for authoritative GM changes and publication actions.
 
 ## Delivery Principles
 
@@ -90,6 +90,7 @@ Supported campaign records, publications, COMMS, inventories, and proposals use 
 - Implemented single-line slice: authenticated player/GM broadcast endpoints, 240-character/control-character validation, server sender and date/day snapshots, immutable message IDs/order, and a shared latest-200 view for the GM and four seats. Full stored archives participate in backup/restore. Visible views poll every 15 seconds; push delivery, per-player receipts, moderation, and time-of-day clock support remain planned.
 - Support 1-4 authenticated player seats, each assigned one character and an independent browser session.
 - Show each player only their own character and inventory, alongside GM-published situation information.
+- Implemented manual-condition slice: owning GM complete-record saves/clear, distinct public/private notes, and active own-seat GET-only projection. Null values remain unknown; no derived capacity, penalty, or recovery is calculated. Condition revisions advance during restore, including empty markers when an older backup omits them. Broader rules automation and actor audit history remain planned.
 - From the GM Tool, let the GM add, remove, edit, preview, publish, and withdraw report information; show whether changes are drafts or published.
 - Keep GM notes, hidden threats, unrevealed state, and other players' private data out of player-facing output by default.
 - Allow players to submit change requests only for their own assigned character and inventory. Keep requests pending until the GM reviews and applies them; route dice-governed actions through the rules-verified item-action workflow planned in Phase 4.

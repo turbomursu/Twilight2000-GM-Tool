@@ -80,7 +80,10 @@ function validateConditionBackup(data) {
       || typeof row.gm_notes !== "string" || row.gm_notes.length > 4000
       || typeof row.updated_at !== "string" || !Number.isFinite(Date.parse(row.updated_at))) throw new Error("Invalid condition ownership or metadata in runtime backup.");
     if (typeof row.conditions_json !== "string") throw new Error("Invalid condition data in runtime backup.");
-    validateConditions(JSON.parse(row.conditions_json)); ids.add(row.character_id);
+    const values = validateConditions(JSON.parse(row.conditions_json));
+    if (row.active === 0 && (row.gm_notes !== "" || Object.entries(values).some(([key, value]) =>
+      [...numericFields, ...flagFields].includes(key) ? value !== null : value !== ""))) throw new Error("Cleared condition records must contain no public or private values.");
+    ids.add(row.character_id);
   }
 }
 

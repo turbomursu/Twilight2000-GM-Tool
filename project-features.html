@@ -96,7 +96,7 @@
         <section class="summary" aria-label="Feature status summary">
           <div class="summary-item"><span class="eyebrow">Available slices</span><strong>Accounts and seeds</strong><p>GM-created users, campaign seed assignment, and GM-reviewed field edits.</p></div>
           <div class="summary-item"><span class="eyebrow">Partial surfaces</span><strong>Setup and runtime</strong><p>Dashboard, publications, COMMS, and owned inventory/GM review work; broader rules-governed gameplay remains open.</p></div>
-          <div class="summary-item"><span class="eyebrow">Not connected</span><strong>Player gameplay</strong><p>Condition publication, verified item actions, and carrying effects.</p></div>
+          <div class="summary-item"><span class="eyebrow">Not connected</span><strong>Player gameplay</strong><p>Verified item/condition effects, carrying, and full actor audit history.</p></div>
         </section>
 
         <section class="section" aria-labelledby="surfaces-title">
@@ -128,10 +128,11 @@
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Published point-layer campaign map</strong><p>Selected locations, point markings, route, and position use a read-only four-seat projection. API/recovery and browser tiles, zoom/reset, inert-label, and withdrawal checks pass as of 01 Nov 2026. Offline basemaps and polygons remain planned.</p></span><span class="state done">Point slice</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Owned inventory and GM review</strong><p>Inventory shows accepted RB/GM/UF items and pending proposals. GM stocking, source confirmation, quantity/removal approval, isolation, and recovery pass tests; browser flows verified on 01 Nov 2026. Verified catalogs, transfers, carrying, and dice-governed actions remain planned.</p></span><span class="state done">Bookkeeping slice</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Single-line COMMS</strong><p>Player broadcasts and GM replies persist with server sender/date/day stamps. Four-seat isolation, validation, spoofing, archive/recovery, and browser checks pass as of 01 Nov 2026. Latest 200 shown; push and read receipts remain planned.</p></span><span class="state done">Single-line slice</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Own-seat GM condition records</strong><p>Read-only Character conditions exclude private GM notes and other seats. Owner/revision, unknown-value, clear, persistence/recovery, and synthetic browser checks pass as of 01 Nov 2026. Derived rules effects and capacities remain planned.</p></span><span class="state done">Manual slice</span></label>
           </div>
         </section>
 
-        <aside class="notice"><strong>Suggested next prompt</strong><p>Implement GM-managed character condition records and an own-seat player projection, with revision checks and backup coverage. Keep condition and carrying rules effects GM-managed until verified against Fourth Edition sources.</p></aside>
+        <aside class="notice"><strong>Suggested next prompt</strong><p>Implement campaign audit history for GM condition/inventory changes and publication actions. Record server-derived actor, target, revisions, and timestamp; enforce owner-only access and include history in runtime backups.</p></aside>
         <aside class="notice"><strong>Rules fidelity</strong><p>Where a feature models an actual Twilight: 2000 Fourth Edition procedure, it must be source-verified. Unverified mechanics remain GM-managed; prototypes are not rules engines.</p></aside>
         <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
       </div>

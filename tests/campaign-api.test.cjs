@@ -108,6 +108,8 @@ test("GM condition records project only each active player's values and exclude 
     assert.doesNotMatch(JSON.stringify(response), /SECRET GM|gmNotes|gm_notes|PRIVATE CHARACTER|updated_by|characterId|setupPackage|factions/);
   }
   const gmResult = await (await fetch(gmPath, { headers: { Cookie: cookie } })).json();
+  const redirected = await (await fetch(`${playerPath}?characterId=${characterIds[3]}`, { headers: { Cookie: cookies[0] } })).json();
+  assert.equal(redirected.record.conditions.damage, 1);
   assert.equal(gmResult.conditions.characters[0].gmNotes, "SECRET GM PLAN");
   assert.equal((await write(update)).status, 409);
   assert.equal((await write({ characterId: characterIds[0], expectedRevision: 1, clear: true })).status, 200);
