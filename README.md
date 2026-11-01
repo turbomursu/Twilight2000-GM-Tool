@@ -12,7 +12,7 @@ Run the dependency-free test suite with `node --test`. Node is only required for
 
 ## LAN Auth API
 
-The Node service serves the login page, gates browser surfaces by GM/player roles, and exposes owner-scoped runtime campaign, account, seed, and character-review endpoints. There is no public registration: a GM creates the username and shares its one-time activation token, then assigns at most one seed per username per campaign. Players select an assigned campaign, complete GM-left-blank seed fields, and finalize required fields. The Player Interface shows that server-owned character record; post-finalization edits remain pending until GM approval. The sample GM dashboard and live influence edits remain browser-local, and player situation reports, inventory, published maps, dispatches, and shared play are not connected. The service requires Node 24 or newer and a first-run bootstrap token. The HTTP listener binds to all network interfaces on port 8080 by default. HTTP does not encrypt passwords or session cookies; use only on a trusted LAN and do not expose the port to the internet or untrusted networks.
+The Node service enforces GM/player roles and campaign ownership. Dashboard records, factions, prominence, report drafts, and map drafts persist in SQLite. GMs explicitly publish or withdraw reports and selected map layers shown to assigned players. Inventory, COMMS, and broader gameplay remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 and does not encrypt passwords or cookies. Use only on a trusted LAN, never the internet or untrusted networks.
 
 In PowerShell, configure a one-time bootstrap token before starting the service:
 
@@ -68,7 +68,50 @@ The command prints the runtime campaign ID and, when it creates the `sample-play
 }
 ```
 
-These are development/sample campaign values, not rules-derived results. General save, backup, and restore workflows are still planned.
+These are development/sample campaign values, not rules-derived results.
+
+### Runtime Backup And Restore
+
+For a loaded runtime campaign, use **Backup** in the GM dashboard to download GM-only JSON. **Restore** previews a selected backup's campaign, export time, checksum, and revision; replacement requires confirmation. Older backups require a second confirmation. The server validates the data and replaces campaign rows in one transaction; failed validation, ownership checks, or database writes leave existing data intact.
+
+- `GET /api/campaigns/:id/backup` returns `{ "backup": ... }`. The downloaded document uses `backupType: "fieldbook.campaign-runtime"`, `schemaVersion: 1`, `campaignId`, `sourceRevision`, `exportedAt`, `data`, and `checksum`.
+- `POST /api/campaigns/:id/restore` accepts `{ "backup": ..., "expectedRevision": 3, "confirmReplace": true, "confirmOlderBackup": false }`. The expected revision is captured when the restore dialog opens. A concurrent revision change returns `409`; invalid data or missing confirmation returns `422`; inaccessible campaigns return `404`.
+
+Backups preserve database campaign rows, faction cells, settlement prominence ranks, characters, seats, and review requests. The immutable setup snapshot cannot change. Credentials and sessions are excluded, so referenced accounts must exist on the host. Old browser overlays are not automatically migrated or backed up. The SHA-256 checksum detects accidental modification, not authenticity or encryption. Keep these private files away from players and untrusted users.
+
+Restore retains the saved revision as `restoredFromRevision` and advances the live revision to `max(currentRevision, sourceRevision) + 1`, preventing revision rollback. Scheduled backups and cross-host account recovery remain planned.
+
+Report and map backups include saved drafts, not publication authorization. Restore withdraws both publications and advances their revisions; the GM must review and publish again. Older runtime-v1 backups without these optional records recover empty drafts. Invalid map references/coordinates and failed restores leave current drafts and publications unchanged.
+
+### Faction Layers API
+
+`GET /api/campaigns/:id/faction-layers` returns `{ "layers": { "campaignId": "...", "revision": 4, "influence": { "faction-id": ["1,-2"] }, "prominence": { "settlement-id": ["faction-id"] } } }` for the owning GM. Empty arrays are authoritative empty layers, not setup defaults.
+
+`PUT` accepts either `{ "expectedRevision": 4, "factionId": "faction-id", "cells": ["1,-2"] }` or `{ "expectedRevision": 4, "settlementId": "settlement-id", "factionIds": ["faction-id"] }`. Each call atomically replaces only that target's records and advances the campaign revision. Hexes must be bounded axial integers; faction IDs must be unique and campaign-scoped. An empty list clears that layer/association. Responses: `401` unauthenticated, `403` player role, `404` non-owner campaign, `409` stale revision, `422` invalid data.
+
+**Save layer**, **Clear selected**, and prominence controls now save to SQLite. **Reload layers** discards staged hex selections and fetches authoritative state after conflicts. The setup source never changes. Old browser overlays are ignored for server campaigns; desired old edits must be recreated explicitly rather than silently overwriting SQLite.
+
+### Situation Reports API
+
+Select a runtime campaign in the GM toolbar. In **Situation**, use **Save draft**, **Preview draft**, **Publish**, or **Withdraw**. Preview saves pending edits first, then shows the server's allowed player fields. Publish is enabled after preview and disabled by further editing. The current published copy is displayed separately; saving a draft does not change it. Reload fetches the saved draft after a conflict.
+
+- GM `GET /api/campaigns/:id/situation-report` returns `{ "report": { "campaignId": "...", "campaignRevision": 3, "revision": 2, "draft": { "title": "North road", "body": "Wait at the bridge.", "gameTime": "Day 14 / 08:00" }, "published": null, "publishedAt": null } }`.
+- GM `PUT` accepts `{ "action": "draft", "expectedRevision": 2, "draft": { "title": "...", "body": "...", "gameTime": "..." } }`, or `preview`, `publish`, `withdraw` actions with `expectedRevision` and no draft. Preview returns `{ "preview": { ... }, "revision": 2 }` without changing publication. Mutations return the updated report and advance both report and campaign revisions.
+- Only the owning GM may act. Unknown fields and excessive lengths are rejected. Title/body are required for publishing; limits are 160/12000/120 characters for title/body/game time. Stale report revisions return `409`; invalid content returns `422`; inaccessible campaigns return `404`. Mutations enforce same origin.
+- Player `GET /api/player/campaigns/:id/situation-report` requires an active assigned seat and returns only `{ "report": { "title": "...", "body": "...", "gameTime": "..." }, "publishedAt": "..." }`, or both values `null` when unpublished/withdrawn. Player writes are rejected. No setup snapshot, GM notes, draft, inventory, or character data is included.
+
+The handset **Sitrep** refreshes on opening, **Refresh**, returning to the page, and every 15 seconds while visible. Withdrawal becomes visible on the next successful refresh, not as an instantaneous push. Responses are `no-store`; reports are not stored in browser storage and clear on campaign changes or failed refreshes. Text is literal, not HTML. Publication history, push delivery, and structured sections remain planned.
+
+### Map Publication API
+
+Select a runtime campaign, then open **Player map** on the GM desk. Check the locations to reveal, add/reorder/remove route waypoints, add/edit/remove labeled point markings, and enter player latitude/longitude or choose a selected location. Use **Save map draft**, **Preview map**, **Publish map**, or **Withdraw map**. Preview saves pending changes first; Publish is disabled until preview and after further edits. Publishing confirms that selected source GM-only locations will be revealed. Saving a draft never alters the current player snapshot.
+
+- GM `GET /api/campaigns/:id/map-publication` returns `{ "map": { "campaignId": "...", "campaignRevision": 4, "revision": 1, "catalog": { "name": "...", "bounds": { "south": 59, "west": 13, "north": 61, "east": 15 }, "locations": [ ... ] }, "draft": { ... }, "published": null, "publishedAt": null } }`.
+- GM `PUT` uses `action: "draft" | "preview" | "publish" | "withdraw"` and a map-specific `expectedRevision`. Only `draft` accepts a draft object: `{ "locationIds": ["town-id"], "markings": [{ "id": "checkpoint", "label": "Checkpoint", "position": { "lat": 60, "lng": 14 } }], "routeLocationIds": ["town-id"], "playerPosition": { "lat": 60, "lng": 14 } }`. Preview returns `{ "preview": ... , "revision": 1 }`; mutations return the updated GM map record.
+- Limits: 500 unique campaign locations, 300 point markings with unique IDs and labels up to 160 characters, and 200 ordered route entries. Routes can revisit a location, but every waypoint must be selected. Coordinates must be within campaign bounds. Position may be unset in a draft but is required to publish. Unknown fields, foreign IDs, and invalid coordinates return `422`; stale map revisions return `409`; non-owner campaigns return `404`. Mutations enforce same origin.
+- Player `GET /api/player/campaigns/:id/map` requires an active assigned seat. It returns `{ "map": { "schemaVersion": 1, "name": "...", "bounds": { ... }, "locations": [{ "id": "...", "name": "...", "kind": "...", "position": { "lat": 60, "lng": 14 } }], "markings": [ ... ], "route": [{ "id": "...", "name": "...", "position": { ... } }], "playerPosition": { ... } }, "publishedAt": "..." }`, or both values `null` when unpublished/withdrawn. Player writes are rejected. Setup snapshots, drafts, source visibility, descriptions, notes, terrain/faction data, atlas data, and unselected locations are never included.
+
+The handset Map opens/resets at the GM position, supports panning and zoom from 25% to 200%, and cannot edit campaign layers. It refreshes on opening, Refresh, return, and every 15 seconds while visible; unchanged publications preserve the current view. Withdrawal clears the map on the next refresh; failures and campaign switches clear stale layers. No map snapshot is stored in browser storage. Leaflet/OSM reference tiles require internet. Public geographic labels are not concealed by omitting campaign locations; fog masking, offline basemaps, polygon/line markings, and publication history remain planned. Map browsing does not resolve travel rules.
 
 ## Included
 
@@ -77,9 +120,9 @@ These are development/sample campaign values, not rules-derived results. General
 - Travel day, waypoint, distance, food, fuel, and weather tracking
 - Field journal entries
 - Browser-local autosave and JSON campaign export
-- Standalone [Campaign Setup Tool prototype](campaign-setup.html) with Field Papers atlas import, batch terrain, GM-managed location visibility, a location-backed GM-defined settlement generator, overlapping faction influence, multi-settlement faction links with prominence order, and schema-v2 package export/reopen. The GM Tool imports packages into GM-owned SQLite runtime records and can select their maps; its sample dashboard and live influence edits remain browser-local, while player publication remains planned.
+- Standalone [Campaign Setup Tool prototype](campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
 - Optional development fixture seeds a separate SQLite `The Long Road` runtime with clock/resources, route stops, personnel, journal, and a sample player seed for testing the runtime read API.
-- Standalone [radio-handset Player Interface prototype](player-interface.html) with a separate browser-local store and a read-only GM condition-snapshot receiver; authenticated GM publishing and cross-device delivery are not connected
+- Authenticated [Player Interface](player-interface.html) with assigned Character and GM-published Sitrep and Map views. Inventory and COMMS remain inactive; legacy samples are not connected runtime data.
 
 ## Ruleset Fidelity
 

@@ -22,7 +22,9 @@ const PROTECTED_FILES = new Map([
   ["/FEATURES.md", ["FEATURES.md", "text/markdown; charset=utf-8"]],
   ["/campaign-package-contract.js", ["campaign-package-contract.js", "text/javascript; charset=utf-8"]],
   ["/auth-client.js", ["auth-client.js", "text/javascript; charset=utf-8"]],
-  ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]]
+  ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]],
+  ["/situation-report-client.js", ["situation-report-client.js", "text/javascript; charset=utf-8"]],
+  ["/map-publication-client.js", ["map-publication-client.js", "text/javascript; charset=utf-8"]]
 ]);
 const AUTH_PATHS = new Set([
   "/api/auth/status",

@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#252b29">
   <title>Player Terminal | Fieldbook</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
+    .published-map-canvas { width: 100%; height: 420px; min-width: 0; border: 1px solid #89957f; background: #d7dfca; }
+    #player-map-name { min-width: 0; overflow-wrap: anywhere; }
     :root {
       color-scheme: light;
       --ink: #202b23;
@@ -331,28 +334,20 @@
         <div class="header-meta"><div><span class="eyebrow" id="player-record-description">Select an assigned campaign to open your GM-provided character seed.</span></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
       </header>
       <section class="player-panel" data-panel="situation" aria-label="Situation report" hidden>
-        <div class="sitrep-grid">
-          <article class="dispatch"><div class="dispatch-title"><strong>GM-published dispatch / Dalarna sector</strong><span class="dispatch-stamp">Current</span></div><p>North bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.</p></article>
-          <div class="status-stack"><div class="status-readout"><span class="eyebrow">Column position</span><strong>Vansbro / Route 26</strong></div><div class="status-readout"><span class="eyebrow">Weather</span><strong>Cold rain</strong></div><div class="status-readout alert"><span class="eyebrow">Road notice</span><strong>Bridge unknown</strong></div></div>
-        </div>
-        <div class="route-heading"><span class="eyebrow">Northbound route / published</span><span class="eyebrow">86 km logged</span></div>
-        <div class="route-strip"><div class="route-point"><strong>Sälen</strong><small>Departure</small></div><i class="route-track"></i><div class="route-point current"><strong>Vansbro</strong><small>Current position</small></div><i class="route-track"></i><div class="route-point"><strong>Mora</strong><small>Next waypoint</small></div></div>
-        <div class="info-ribbon"><span>Published by campaign control / 07:55</span><span>Player view / GM-selected information</span></div>
+        <h2>Situation report</h2>
+        <p id="player-report-status" role="status">Select an assigned campaign.</p>
+        <article class="dispatch" id="player-published-report" hidden><div class="dispatch-title" style="flex-wrap:wrap"><strong id="player-report-title" style="min-width:0;overflow-wrap:anywhere"></strong><span class="dispatch-stamp" id="player-report-time" style="max-width:100%;white-space:normal;overflow-wrap:anywhere"></span></div><p id="player-report-body" style="white-space:pre-wrap;overflow-wrap:anywhere"></p></article>
+        <p class="info-ribbon" id="player-report-published-at"></p>
       </section>
       <section class="player-panel" data-panel="map" aria-label="Published campaign map" hidden>
         <div class="map-record">
-          <div class="map-record-head"><div><span class="eyebrow">GM-controlled map / Dalarna sector</span><h2>Player map</h2></div><div class="map-legend"><span><i class="map-key-dot current"></i>Current position</span><span><i class="map-key-line"></i>Published route</span></div></div>
-          <div class="map-controls" aria-label="Map zoom controls"><button type="button" data-map-zoom="-0.25" aria-label="Zoom out" title="Zoom out">−</button><output class="map-zoom-level" id="map-zoom-level">75%</output><button type="button" data-map-zoom="0.25" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-map-reset title="Reset map view">Reset view</button><span class="map-browse-hint">Scroll to browse / GM markings are read-only</span></div>
-          <div class="map-viewport" id="map-viewport" role="region" tabindex="0" aria-label="Scrollable GM-published campaign map">
-            <div class="map-surface" id="map-surface"><div class="map-art" id="map-art" role="img" aria-label="Schematic route from Sälen through the current position at Vansbro toward Mora">
-              <span class="map-grid-label">Dalarna / route 26 / schematic</span><div class="map-water" aria-hidden="true"></div><div class="map-route-segment first" aria-hidden="true"></div><div class="map-route-segment second" aria-hidden="true"></div>
-              <div class="map-marker salen"><i></i><div><strong>Sälen</strong><small>Departure</small></div></div>
-              <div class="map-marker vansbro current"><i></i><div><strong>Vansbro</strong><small>Current position</small></div></div>
-              <div class="map-marker mora"><i></i><div><strong>Mora</strong><small>Next waypoint</small></div></div>
-              <div class="map-north"><strong>↑</strong>N</div>
-            </div></div>
+          <div class="map-record-head"><h2 id="player-map-name">Player map</h2><span class="eyebrow">GM publication</span></div>
+          <p id="player-map-status" role="status">Select an assigned campaign.</p>
+          <div id="player-map-content" hidden>
+            <div class="map-controls" aria-label="Map zoom controls"><button type="button" id="player-map-minus" aria-label="Zoom out" title="Zoom out">&#8722;</button><output class="map-zoom-level" id="player-map-percent">100%</output><button type="button" id="player-map-plus" aria-label="Zoom in" title="Zoom in">+</button><button type="button" id="player-map-reset" title="Center on player position">Reset view</button></div>
+            <div class="published-map-canvas" id="published-player-map" role="region" tabindex="0" aria-label="Published campaign map"></div>
+            <div class="map-record-foot"><span id="published-player-position"></span><span id="player-map-published-at"></span></div>
           </div>
-          <div class="map-record-foot"><span>Player position set by GM / Vansbro</span><span>Map created in setup / markings published by GM</span></div>
         </div>
       </section>
       <section class="player-panel" data-panel="inventory" aria-label="Personal inventory" hidden>
@@ -501,11 +496,11 @@
     <nav class="device-controls" aria-label="Player quick access">
       <div class="control-label"><span>Player views</span><span>Inactive views are not connected</span></div>
       <div class="action-bar">
-        <button class="action-button tab-inactive" type="button" disabled title="Inactive / GM-published reports are not connected" data-view-state="inactive">Sitrep</button>
+        <button class="action-button" id="player-sitrep-tab" type="button" title="Situation report" data-view-state="active">Sitrep</button>
         <button class="action-button tab-inactive" type="button" disabled title="Inactive / player inventory is not connected" data-view-state="inactive">Inventory</button>
-        <button class="action-button" type="button" aria-current="page" title="Current view / assigned character" data-view-state="active">Character</button>
+        <button class="action-button" id="player-character-tab" type="button" aria-current="page" title="Assigned character" data-view-state="active">Character</button>
         <button class="action-button tab-inactive" type="button" disabled title="Inactive / shared COMMS is not connected" data-view-state="inactive">COMMS</button>
-        <button class="action-button tab-inactive" type="button" disabled title="Inactive / published campaign maps are not connected" data-view-state="inactive">Map</button>
+        <button class="action-button" id="player-map-tab" type="button" title="Published campaign map" data-view-state="active">Map</button>
       </div>
     </nav>
     <div class="hardware-foot"><span>Player terminal / campaign information controlled by GM</span><span>Fourth Edition rules actions require source verification</span></div>
@@ -527,6 +522,9 @@
   <p class="disclaimer" hidden>Character values, inventory quantities, and proposals autosave locally. GM-pushed condition snapshots are read-only and cached until the next push. Authenticated GM publishing, cross-device delivery, rule-based encumbrance, and dice resolution are not connected. <a href="https://www.bing.com/images/search?q=military+communications+equipment+field+radio+handset+display" target="_blank" rel="noreferrer">Visual reference: field handsets and radio displays</a></p>
   <script src="/auth-client.js" defer></script>
   <script src="/player-seed-client.js" defer></script>
+  <script src="/situation-report-client.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="/map-publication-client.js" defer></script>
   <script>
     if (document.body.dataset.enableLocalPlayerPreview === "true") {
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];

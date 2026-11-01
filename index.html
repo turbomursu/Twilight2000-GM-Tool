@@ -277,6 +277,23 @@
     .field label { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
     .field input, .field textarea, .field select { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: #fff; font-size: 12px; }
     .field textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+    .report-workspace { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .report-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
+    .report-fields .report-body, .report-fields .report-actions { grid-column: 1 / -1; }
+    .report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .report-actions button:disabled { opacity: .5; cursor: not-allowed; }
+    .published-map-canvas { width: 100%; height: 420px; min-width: 0; border: 1px solid var(--line); background: #e2e7e0; }
+    .map-publication-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; min-width: 0; padding: 0; border: 0; }
+    .map-publication-fields .wide { grid-column: 1 / -1; }
+    .map-edit-locations { display: grid; gap: 8px; max-height: 220px; overflow: auto; padding: 8px 0; }
+    .map-edit-locations label { display: flex; align-items: start; gap: 8px; font-size: 12px; overflow-wrap: anywhere; }
+    .map-marking-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; margin-bottom: 8px; }
+    .map-marking-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); }
+    .map-route-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+    .map-route-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .report-copy { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+    .report-preview { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .topbar, .top-actions { flex-wrap: wrap; }
     .dialog-actions { display: flex; justify-content: end; gap: 8px; padding-top: 4px; }
     .toast { position: fixed; right: 20px; bottom: 20px; z-index: 3; max-width: calc(100vw - 40px); padding: 12px 15px; border: 1px solid #718c73; color: #f4f6ef; background: var(--forest); font: 11px var(--mono); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
@@ -342,6 +359,7 @@
       <div class="nav-label">Campaign desk</div>
       <nav class="nav-list" aria-label="Views">
         <button class="nav-item" data-view="situation" aria-current="page"><span class="nav-icon" aria-hidden="true">01</span>Situation</button>
+        <button class="nav-item" data-view="publication"><span class="nav-icon" aria-hidden="true">06</span>Player map</button>
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
@@ -362,6 +380,7 @@
       <header class="topbar">
         <div class="crumb"><span id="top-campaign-name">The Long Road</span><b>/</b><span id="crumb-view">Situation</span><small id="dashboard-data-mode">LOCAL SAMPLE</small></div>
         <div class="top-actions">
+          <label class="runtime-campaign-control"><span>Runtime campaign</span><select id="runtime-campaign-select" disabled><option value="">Loading campaigns</option></select></label>
           <div class="date-stamp"><span>Campaign date</span><strong id="top-date"></strong></div>
           <button class="button" data-action="open-setup-import">Import setup</button>
           <button class="button" type="button" id="open-users-dialog">Users</button>
@@ -416,6 +435,37 @@
               <div class="panel-body"><div class="log-list" id="recent-log"></div></div>
             </section>
           </div>
+          <section class="report-workspace" id="gm-report-workspace" aria-labelledby="gm-report-title">
+            <div class="section-bar"><div><h2 id="gm-report-title">Player situation report</h2></div><button class="button" id="reload-situation-report" type="button" disabled>Reload report</button></div>
+            <p class="feedback" id="gm-report-status" role="status">Select a runtime campaign.</p>
+            <form id="gm-report-form">
+              <fieldset class="report-fields" disabled>
+                <div class="field"><label for="report-title">Title</label><input id="report-title" maxlength="160"></div>
+                <div class="field"><label for="report-game-time">Campaign game time</label><input id="report-game-time" maxlength="120"></div>
+                <div class="field report-body"><label for="report-body">Player report</label><textarea id="report-body" maxlength="12000" rows="6"></textarea></div>
+                <div class="report-actions"><button class="button" type="submit">Save draft</button><button class="button" id="preview-situation-report" type="button">Preview draft</button><button class="button button-primary" id="publish-situation-report" type="button" disabled>Publish</button><button class="button button-danger" id="withdraw-situation-report" type="button" disabled>Withdraw</button></div>
+              </fieldset>
+            </form>
+            <div class="report-preview" id="situation-report-preview" hidden><span class="eyebrow">Player preview / unpublished draft</span><h3 id="report-preview-title" class="report-copy"></h3><p id="report-preview-time" class="report-copy"></p><p id="report-preview-body" class="report-copy"></p></div>
+            <div class="report-preview" id="situation-report-published" hidden><span class="eyebrow">Currently published</span><h3 id="report-published-title" class="report-copy"></h3><p id="report-published-time" class="report-copy"></p><p id="report-published-body" class="report-copy"></p></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-publication" aria-labelledby="map-publication-title">
+          <div class="page-heading"><div><div class="heading-tag">GM publication</div><h1 id="map-publication-title">Player map</h1></div><button class="button" id="reload-map-publication" type="button" disabled>Reload draft</button></div>
+          <p class="feedback" id="gm-map-publication-status" role="status">Select a runtime campaign.</p>
+          <form id="gm-map-publication-form">
+            <fieldset class="map-publication-fields" disabled>
+              <section><h2>Allowed locations</h2><div class="map-edit-locations" id="map-allowed-locations"></div></section>
+              <section><h2>Published route</h2><div id="map-route-entries"></div><div class="field"><label for="map-route-location">Waypoint</label><select id="map-route-location"></select></div><button class="button" id="add-map-waypoint" type="button">Add waypoint</button></section>
+              <section class="wide"><div class="section-bar"><h2>Point markings</h2><button class="button" id="add-map-marking" type="button">Add marking</button></div><div id="map-marking-entries"></div></section>
+              <div class="field"><label for="map-player-latitude">Player position / latitude</label><input id="map-player-latitude" type="number" step="any"></div>
+              <div class="field"><label for="map-player-longitude">Player position / longitude</label><input id="map-player-longitude" type="number" step="any"></div>
+              <div class="wide field"><label for="map-position-location">Position at location</label><select id="map-position-location"><option value="">Choose location</option></select></div>
+              <div class="wide report-actions"><button class="button" type="submit">Save map draft</button><button class="button" id="preview-map-publication" type="button">Preview map</button><button class="button button-primary" id="publish-map-publication" type="button" disabled>Publish map</button><button class="button button-danger" id="withdraw-map-publication" type="button" disabled>Withdraw map</button></div>
+            </fieldset>
+          </form>
+          <section id="gm-map-preview" hidden><p class="eyebrow" id="gm-map-preview-label">Draft preview</p><div class="published-map-canvas" id="gm-map-preview-canvas" role="region" aria-label="Player map preview"></div></section>
         </section>
 
         <section class="view" id="view-roster" aria-labelledby="roster-title">
@@ -459,7 +509,7 @@
           </div>
           <div class="influence-layout">
             <section class="panel" aria-labelledby="influence-map-title">
-              <div class="panel-head"><div><div class="eyebrow" id="influence-campaign-label">No runtime campaign selected</div><h2 id="influence-map-title">Campaign influence map</h2></div><label class="runtime-campaign-control"><span>Runtime campaign</span><select id="runtime-campaign-select" disabled><option value="">Loading campaigns</option></select></label></div>
+              <div class="panel-head"><div><div class="eyebrow" id="influence-campaign-label">No runtime campaign selected</div><h2 id="influence-map-title">Campaign influence map</h2></div></div>
               <div class="influence-map-frame"><div id="live-influence-map" aria-label="Editable GM faction influence map"></div></div>
               <div class="panel-body"><div class="influence-list" id="live-influence-legend"></div></div>
               <p class="influence-map-status" id="influence-map-status" role="status">Import a setup package to create a runtime campaign and load its map.</p>
@@ -470,8 +520,8 @@
                 <div class="panel-body influence-tools">
                   <button class="button" id="open-player-seed-dialog" type="button" disabled>Assign player seed</button>
                   <label class="field"><span class="eyebrow">Faction layer</span><select id="live-influence-faction" disabled><option value="">Import a setup package</option></select></label>
-                  <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button></div>
-                  <p class="feedback" id="live-influence-feedback" role="status">Runtime campaign data is server-backed; influence edits remain in this GM browser.</p>
+                  <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button><button class="button" id="reload-faction-layers" type="button">Reload layers</button></div>
+                  <p class="feedback" id="live-influence-feedback" role="status">Faction edits are GM-only SQLite state; the setup source remains unchanged.</p>
                   <div class="influence-list" id="live-influence-factions"><div class="empty-state">No influence layers loaded.</div></div>
                   <div class="section-bar"><div><h2>Settlement prominence</h2><p>Checked factions influence that settlement. Earlier entries are more prominent.</p></div></div>
                   <div class="influence-list" id="live-settlement-prominence"><div class="empty-state">No settlements loaded.</div></div>
@@ -542,6 +592,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
     <div class="dialog-form"><p class="feedback" id="character-change-status" role="status" aria-live="polite">Select a runtime campaign to review requests.</p><div class="character-change-list" id="character-change-list"></div><div class="dialog-actions"><button class="button" id="refresh-character-changes" type="button">Refresh</button><button class="button" id="done-character-changes" type="button">Done</button></div></div>
   </dialog>
   <dialog id="runtime-restore-dialog" aria-labelledby="runtime-restore-title">
+    <p class="feedback" style="margin:16px 20px">Recovery restores saved report and map drafts and withdraws both publications. Review and publish again before players can see them.</p>
     <div class="dialog-head"><div><div class="eyebrow">GM-only / campaign recovery</div><h2 id="runtime-restore-title">Restore runtime campaign</h2></div><button class="icon-button" id="close-runtime-restore" type="button" aria-label="Close runtime restore">×</button></div>
     <div class="dialog-form">
       <label class="field"><span class="eyebrow">Runtime backup JSON</span><input id="runtime-backup-file" type="file" accept=".json,application/json"></label>
@@ -557,6 +608,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="campaign-package-contract.js"></script>
   <script src="/auth-client.js" defer></script>
+  <script src="/situation-report-client.js" defer></script>
+  <script src="/map-publication-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -620,6 +673,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let stagedInfluenceCells = new Set();
       let liveInfluenceEditing = false;
       let runtimeDataLoaded = false;
+      let runtimeFactionLayers = null;
+      let factionSavePending = false;
 
       function loadState() {
         try {
@@ -802,7 +857,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
         if (view === "influence") {
@@ -1029,6 +1084,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function liveInfluenceForCampaign() {
+        if (state.runtimeCampaignId) return runtimeFactionLayers?.campaignId === state.runtimeCampaignId ? runtimeFactionLayers.influence : {};
         return state.liveInfluence?.[activeWorkspaceId()] || {};
       }
 
@@ -1037,29 +1093,48 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function liveSettlementProminenceForCampaign() {
+        if (state.runtimeCampaignId) return runtimeFactionLayers?.campaignId === state.runtimeCampaignId ? runtimeFactionLayers.prominence : {};
         const campaignId = activeWorkspaceId();
         const saved = state.liveSettlementProminence?.[campaignId];
         if (isRecord(saved)) return saved;
         return Object.fromEntries((state.setupPackage?.settlements || []).map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
       }
 
-      function saveLiveSettlementOrder(settlementId, factionIds) {
-        const campaignId = activeWorkspaceId();
-        if (!campaignId) return;
-        const previousState = state;
-        const currentOrders = liveSettlementProminenceForCampaign();
-        state = {
-          ...state,
-          liveSettlementProminence: {
-            ...(isRecord(state.liveSettlementProminence) ? state.liveSettlementProminence : {}),
-            [campaignId]: { ...currentOrders, [settlementId]: [...factionIds] }
+      async function saveRuntimeFactionEdit(update) {
+        const campaignId = state.runtimeCampaignId;
+        if (!campaignId || runtimeFactionLayers?.campaignId !== campaignId || factionSavePending) return false;
+        factionSavePending = true;
+        document.querySelectorAll("#live-settlement-prominence input, #live-settlement-prominence button, #live-influence-save, #live-influence-clear, #live-influence-edit, #reload-faction-layers")
+          .forEach((control) => { control.disabled = true; });
+        try {
+          const { layers } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/faction-layers`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...update, expectedRevision: runtimeFactionLayers.revision })
+          });
+          if (state.runtimeCampaignId !== campaignId) return false;
+          runtimeFactionLayers = layers;
+          state.runtimeRevision = layers.revision;
+          renderLiveInfluenceControls();
+          renderLiveInfluenceGrid();
+          showToast("Faction edits saved to SQLite.");
+          return true;
+        } catch (error) {
+          if (state.runtimeCampaignId === campaignId) {
+            renderLiveInfluenceControls();
+            document.getElementById("live-settlement-feedback").textContent = `Not saved: ${error.message}`;
+            document.getElementById("live-influence-feedback").textContent = `Not saved: ${error.message}`;
           }
-        };
-        if (!persist()) {
-          state = previousState;
-          return;
+          showToast(`Faction edits were not saved: ${error.message}`);
+          return false;
+        } finally {
+          factionSavePending = false;
+          document.getElementById("reload-faction-layers").disabled = false;
         }
-        renderLiveInfluenceControls();
+      }
+
+      function saveLiveSettlementOrder(settlementId, factionIds) {
+        return saveRuntimeFactionEdit({ settlementId, factionIds: [...factionIds] });
       }
 
       function renderLiveSettlementProminence() {
@@ -1151,7 +1226,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           entry.append(ranked);
           list.append(entry);
         });
-        feedback.textContent = "Live settlement associations and prominence are GM-only and saved in this browser; the setup package remains unchanged.";
+        feedback.textContent = "Settlement prominence is saved in SQLite for this campaign; the setup source remains unchanged.";
       }
 
       function liveAxialForPosition(position, origin) {
@@ -1280,7 +1355,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function handleLiveInfluenceMapClick(event) {
-        if (!liveInfluenceEditing || !state.setupPackage || !event.originalEvent.target.closest?.(".live-influence-hex")) return;
+        if (factionSavePending || !liveInfluenceEditing || !state.setupPackage || !event.originalEvent.target.closest?.(".live-influence-hex")) return;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!factionId) return;
         const { q, r } = liveAxialForPosition(event.latlng, state.setupPackage.map.grid.origin);
@@ -1401,18 +1476,24 @@ Military rank || optional</textarea><span class="row-description">One field per 
         return result;
       }
 
-      function activateRuntimeCampaign(campaign, announce = false) {
+      document.addEventListener("fieldbook:report-saved", (event) => {
+        if (state.runtimeCampaignId === event.detail.campaignId) {
+          state.runtimeRevision = event.detail.campaignRevision;
+          persist();
+        }
+      });
+      document.addEventListener("fieldbook:map-saved", (event) => {
+        if (state.runtimeCampaignId === event.detail.campaignId) {
+          state.runtimeRevision = event.detail.campaignRevision;
+          persist();
+        }
+      });
+
+      function activateRuntimeCampaign(campaign, layers, announce = false) {
         const setupPackage = normalizeSetupPackageForInfluence(campaign.setupPackage);
         const runtimeCampaignId = campaign.id;
-        const liveInfluence = isRecord(state.liveInfluence) ? { ...state.liveInfluence } : {};
-        const liveSettlementProminence = isRecord(state.liveSettlementProminence) ? { ...state.liveSettlementProminence } : {};
-        if (!Object.prototype.hasOwnProperty.call(liveInfluence, runtimeCampaignId)) {
-          liveInfluence[runtimeCampaignId] = Object.fromEntries(setupPackage.factions.map((faction) => [faction.id, [...faction.influenceCells]]));
-        }
-        if (!Object.prototype.hasOwnProperty.call(liveSettlementProminence, runtimeCampaignId)) {
-          liveSettlementProminence[runtimeCampaignId] = Object.fromEntries(setupPackage.settlements.map((settlement) => [settlement.id, [...settlement.prominentFactionIds]]));
-        }
-        state = { ...state, runtimeCampaignId, setupPackage, liveInfluence, liveSettlementProminence };
+        runtimeFactionLayers = layers;
+        state = { ...state, runtimeCampaignId, setupPackage };
         runtimeCampaignSelect.value = runtimeCampaignId;
         openPlayerSeedDialogButton.disabled = false;
         openCharacterChangesButton.disabled = false;
@@ -1422,15 +1503,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
         renderLiveInfluenceControls();
         renderLiveInfluenceGrid();
         if (influenceMap) influenceMap.fitBounds([[setupPackage.map.bounds.south, setupPackage.map.bounds.west], [setupPackage.map.bounds.north, setupPackage.map.bounds.east]], { padding: [28, 28] });
-        document.getElementById("influence-map-status").textContent = `${setupPackage.campaign.name} loaded from the runtime campaign service. Influence edits remain browser-local.`;
+        document.getElementById("influence-map-status").textContent = `${setupPackage.campaign.name} / faction influence and settlement prominence saved in SQLite.`;
+        document.dispatchEvent(new CustomEvent("fieldbook:campaign-selected", { detail: { campaignId: runtimeCampaignId } }));
         if (announce) showToast(`Runtime campaign loaded: ${setupPackage.campaign.name}.`);
       }
 
       async function loadRuntimeCampaign(runtimeCampaignId, announce = true) {
         const { campaign } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}`);
-        activateRuntimeCampaign(campaign, announce);
+        const { layers } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/faction-layers`);
+        if (runtimeCampaignSelect.value !== runtimeCampaignId) return;
+        activateRuntimeCampaign(campaign, layers, announce);
         const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/runtime`);
-        applyRuntimeSnapshot(runtime);
+        if (state.runtimeCampaignId === runtimeCampaignId) applyRuntimeSnapshot(runtime);
       }
 
       async function refreshRuntimeCampaigns(preferredId = state.runtimeCampaignId) {
@@ -1486,6 +1570,20 @@ Military rank || optional</textarea><span class="row-description">One field per 
       runtimeCampaignSelect.addEventListener("change", () => {
         if (runtimeCampaignSelect.value) loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
       });
+      document.getElementById("reload-faction-layers").addEventListener("click", async () => {
+        const campaignId = state.runtimeCampaignId;
+        if (!campaignId || factionSavePending) return;
+        try {
+          const { layers } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/faction-layers`);
+          if (state.runtimeCampaignId !== campaignId) return;
+          runtimeFactionLayers = layers;
+          state.runtimeRevision = layers.revision;
+          stagedInfluenceCells.clear();
+          renderLiveInfluenceControls();
+          renderLiveInfluenceGrid();
+          showToast("Faction layers reloaded from SQLite.");
+        } catch (error) { showToast(error.message); }
+      });
 
       exportRuntimeBackupButton.addEventListener("click", async () => {
         const campaignId = runtimeCampaignSelect.value;
@@ -1519,13 +1617,17 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const confirmOlderBackupRow = document.getElementById("confirm-older-backup-row");
       const confirmOlderBackup = document.getElementById("confirm-older-backup");
       const applyRuntimeRestoreButton = document.getElementById("apply-runtime-restore");
+      let restoreCampaignId = null;
+      let restoreExpectedRevision = null;
       function updateRuntimeRestoreAvailability() {
-        const isOlder = Boolean(pendingRuntimeBackup && Number.isSafeInteger(state.runtimeRevision)
-          && pendingRuntimeBackup.sourceRevision < state.runtimeRevision);
+        const isOlder = Boolean(pendingRuntimeBackup && Number.isSafeInteger(restoreExpectedRevision)
+          && pendingRuntimeBackup.sourceRevision < restoreExpectedRevision);
         confirmOlderBackupRow.hidden = !isOlder;
         applyRuntimeRestoreButton.disabled = !pendingRuntimeBackup || !confirmRuntimeReplace.checked || (isOlder && !confirmOlderBackup.checked);
       }
       openRuntimeRestoreButton.addEventListener("click", () => {
+        restoreCampaignId = runtimeCampaignSelect.value;
+        restoreExpectedRevision = state.runtimeRevision;
         pendingRuntimeBackup = null;
         runtimeBackupFile.value = "";
         runtimeBackupSummary.hidden = true;
@@ -1551,7 +1653,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (file.size > 100 * 1024 * 1024) throw new Error("Runtime backups must be smaller than 100 MiB.");
           const backup = JSON.parse(await file.text());
           if (backup.backupType !== "fieldbook.campaign-runtime" || backup.schemaVersion !== 1
-            || backup.campaignId !== runtimeCampaignSelect.value || !Number.isSafeInteger(backup.sourceRevision)
+            || backup.campaignId !== restoreCampaignId || !Number.isSafeInteger(backup.sourceRevision)
             || typeof backup.checksum !== "string") {
             throw new Error("Choose a schema-v1 runtime backup for the selected campaign.");
           }
@@ -1559,7 +1661,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeBackupSummary.textContent = [
             `Campaign: ${backup.data?.campaign?.name || "Unknown"}`,
             `Backup revision: ${backup.sourceRevision}`,
-            `Current revision: ${state.runtimeRevision ?? "Unknown"}`,
+            `Current revision: ${restoreExpectedRevision ?? "Unknown"}`,
             `Exported: ${backup.exportedAt || "Unknown"}`,
             `Checksum: ${backup.checksum}`
           ].join("\n");
@@ -1577,7 +1679,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       confirmRuntimeReplace.addEventListener("change", updateRuntimeRestoreAvailability);
       confirmOlderBackup.addEventListener("change", updateRuntimeRestoreAvailability);
       applyRuntimeRestoreButton.addEventListener("click", async () => {
-        const campaignId = runtimeCampaignSelect.value;
+        const campaignId = restoreCampaignId;
         if (!campaignId || !pendingRuntimeBackup) return;
         applyRuntimeRestoreButton.disabled = true;
         runtimeRestoreStatus.className = "feedback";
@@ -1590,7 +1692,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
               backup: pendingRuntimeBackup,
               confirmReplace: confirmRuntimeReplace.checked,
               confirmOlderBackup: confirmOlderBackup.checked,
-              expectedRevision: state.runtimeRevision
+              expectedRevision: restoreExpectedRevision
             })
           });
           runtimeRestoreDialog.close();
@@ -2045,44 +2147,27 @@ Military rank || optional</textarea><span class="row-description">One field per 
           : "Selection mode ended. Save or clear the staged hexes.";
         event.currentTarget.setAttribute("aria-pressed", String(liveInfluenceEditing));
       });
-      document.getElementById("live-influence-save").addEventListener("click", () => {
+      document.getElementById("live-influence-save").addEventListener("click", async () => {
         const setup = state.setupPackage;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!setup || !factionId || !stagedInfluenceCells.size) return;
-        const campaignId = activeWorkspaceId();
         const currentCampaignLayers = liveInfluenceForCampaign();
         const currentCells = currentCampaignLayers[factionId] || setup.factions.find((faction) => faction.id === factionId)?.influenceCells || [];
-        const nextState = {
-          ...state,
-          liveInfluence: {
-            ...(isRecord(state.liveInfluence) ? state.liveInfluence : {}),
-            [campaignId]: { ...currentCampaignLayers, [factionId]: [...new Set([...currentCells, ...stagedInfluenceCells])].sort() }
-          }
-        };
-        const previousState = state;
-        state = nextState;
-        if (!persist()) { state = previousState; return; }
+        const saved = await saveRuntimeFactionEdit({ factionId, cells: [...new Set([...currentCells, ...stagedInfluenceCells])].sort() });
+        if (!saved) return;
         stagedInfluenceCells.clear();
         renderLiveInfluenceControls();
         renderLiveInfluenceGrid();
       });
-      document.getElementById("live-influence-clear").addEventListener("click", () => {
+      document.getElementById("live-influence-clear").addEventListener("click", async () => {
         const setup = state.setupPackage;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!setup || !factionId || !stagedInfluenceCells.size) return;
-        const campaignId = activeWorkspaceId();
         const currentCampaignLayers = liveInfluenceForCampaign();
         const currentCells = currentCampaignLayers[factionId] || setup.factions.find((faction) => faction.id === factionId)?.influenceCells || [];
         const staged = new Set(stagedInfluenceCells);
-        const previousState = state;
-        state = {
-          ...state,
-          liveInfluence: {
-            ...(isRecord(state.liveInfluence) ? state.liveInfluence : {}),
-            [campaignId]: { ...currentCampaignLayers, [factionId]: currentCells.filter((key) => !staged.has(key)) }
-          }
-        };
-        if (!persist()) { state = previousState; return; }
+        const saved = await saveRuntimeFactionEdit({ factionId, cells: currentCells.filter((key) => !staged.has(key)) });
+        if (!saved) return;
         stagedInfluenceCells.clear();
         renderLiveInfluenceControls();
         renderLiveInfluenceGrid();

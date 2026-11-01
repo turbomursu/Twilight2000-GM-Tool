@@ -1,5 +1,7 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
 const { createCharacterChangeRequest, finalizePlayerSeed, getPlayerCharacter, listPlayerCampaigns, updatePlayerSeed } = require("./runtime-store.cjs");
+const { getPlayerReport } = require("./situation-reports.cjs");
+const { getPlayerMap } = require("./map-publications.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -65,7 +67,24 @@ function createPlayerHandler({ database }) {
       return sendJson(response, 200, { campaigns: listPlayerCampaigns(database, account.id) });
     }
 
-    const match = new URL(request.url, "http://fieldbook.invalid").pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/character(?:\/(finalize))?$/);
+    const pathname = new URL(request.url, "http://fieldbook.invalid").pathname;
+    const mapMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map$/);
+    if (mapMatch) {
+      if (request.method !== "GET") return sendJson(response, 405, { error: "Read-only player map." });
+      let campaignId;
+      try { campaignId = decodeURIComponent(mapMatch[1]); } catch { return sendJson(response, 400, { error: "Invalid campaign ID." }); }
+      const result = getPlayerMap(database, account.id, campaignId);
+      return result ? sendJson(response, 200, result) : sendJson(response, 404, { error: "Assigned campaign not found." });
+    }
+    const reportMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/situation-report$/);
+    if (reportMatch) {
+      if (request.method !== "GET") return sendJson(response, 405, { error: "Read-only player report." });
+      let campaignId;
+      try { campaignId = decodeURIComponent(reportMatch[1]); } catch { return sendJson(response, 400, { error: "Invalid campaign ID." }); }
+      const result = getPlayerReport(database, account.id, campaignId);
+      return result ? sendJson(response, 200, result) : sendJson(response, 404, { error: "Assigned campaign not found." });
+    }
+    const match = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/character(?:\/(finalize))?$/);
     if (!match) return sendJson(response, 404, { error: "Not found." });
     let campaignId;
     try {

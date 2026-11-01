@@ -3,10 +3,16 @@ const { createHash, randomBytes } = require("node:crypto");
 const http = require("node:http");
 const { once } = require("node:events");
 const test = require("node:test");
-const { openRuntimeDatabase, getRuntimeDashboard, exportRuntimeSave, restoreRuntimeSave, updateRuntimeDashboard } = require("../server/runtime-store.cjs");
-const { seedSampleRuntime } = require("../server/sample-data.cjs");
+const { openRuntimeDatabase, getRuntimeDashboard, exportRuntimeSave, restoreRuntimeSave, updateRuntimeDashboard, importSetupPackage } = require("../server/runtime-store.cjs");
+const { seedSampleRuntime, sampleSetupPackage } = require("../server/sample-data.cjs");
+const { mkdtempSync, rmSync } = require("node:fs");
+const { tmpdir } = require("node:os");
+const { join } = require("node:path");
 const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
+const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("../server/runtime-store.cjs");
+const { getGMReport, updateGMReport, getPlayerReport } = require("../server/situation-reports.cjs");
+const { getGMMap, updateGMMap, getPlayerMap } = require("../server/map-publications.cjs");
 
 function createGm(database, id, username) {
   const timestamp = new Date().toISOString();
@@ -14,6 +20,153 @@ function createGm(database, id, username) {
     (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role)
     VALUES (?, ?, ?, 0, ?, ?, 'gm')`).run(id, username, "test-only-hash", timestamp, timestamp);
 }
+
+test("map selections persist and recovery withdraws publication atomically", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-map-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database = openRuntimeDatabase(path);
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const playerId = database.prepare("SELECT account_id FROM player_seats WHERE campaign_id = ?").get(campaignId).account_id;
+    const catalog = getGMMap(database, "gm-owner", campaignId).catalog;
+    const draft = { locationIds: catalog.locations.slice(0, 2).map((location) => location.id),
+      markings: [{ id: "checkpoint", label: "Checkpoint", position: catalog.locations[0].position }],
+      routeLocationIds: catalog.locations.slice(0, 2).map((location) => location.id), playerPosition: catalog.locations[0].position };
+    updateGMMap(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft });
+    updateGMMap(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
+    const published = getPlayerMap(database, playerId, campaignId);
+    database.close();
+    database = openRuntimeDatabase(path);
+    assert.deepEqual(getPlayerMap(database, playerId, campaignId), published);
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    assert.deepEqual(JSON.parse(backup.data.mapPublication.draft_json), draft);
+    assert.equal(Object.hasOwn(backup.data.mapPublication, "published_json"), false);
+    const revision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    database.exec(`CREATE TRIGGER fail_map_restore BEFORE UPDATE ON map_publications
+      BEGIN SELECT RAISE(ABORT, 'map restore failure'); END;`);
+    assert.throws(() => restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, expectedRevision: revision }), /map restore failure/);
+    assert.deepEqual(getPlayerMap(database, playerId, campaignId), published);
+    assert.equal(getGMMap(database, "gm-owner", campaignId).revision, 2);
+    database.exec("DROP TRIGGER fail_map_restore");
+    updateGMMap(database, "gm-owner", campaignId, { action: "withdraw", expectedRevision: 2 });
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup, { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision + 1 });
+    assert.deepEqual(getPlayerMap(database, playerId, campaignId), { map: null, publishedAt: null });
+    assert.deepEqual(getGMMap(database, "gm-owner", campaignId).draft, draft);
+    assert.equal(getGMMap(database, "gm-owner", campaignId).revision, 4);
+    assert.throws(() => updateGMMap(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 2 }), /revision changed/);
+    database.close();
+    database = openRuntimeDatabase(path);
+    assert.deepEqual(getPlayerMap(database, playerId, campaignId), { map: null, publishedAt: null });
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("situation drafts persist and backup recovery cannot republish withdrawn content", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-report-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database = openRuntimeDatabase(path);
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const playerId = database.prepare("SELECT account_id FROM player_seats WHERE campaign_id = ?").get(campaignId).account_id;
+    const draft = { title: "Hold position", body: "Await further orders.", gameTime: "2000-04-14 / 08:00" };
+    updateGMReport(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft });
+    updateGMReport(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
+    database.close();
+    database = openRuntimeDatabase(path);
+    assert.deepEqual(getPlayerReport(database, playerId, campaignId).report, draft);
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    assert.deepEqual(JSON.parse(backup.data.situationReport.draft_json), draft);
+    assert.equal(Object.hasOwn(backup.data.situationReport, "published_json"), false);
+    database.exec(`CREATE TRIGGER fail_report_update BEFORE UPDATE ON situation_reports
+      BEGIN SELECT RAISE(ABORT, 'report write failure'); END;`);
+    assert.throws(() => updateGMReport(database, "gm-owner", campaignId, { action: "withdraw", expectedRevision: 2 }), /report write failure/);
+    assert.equal(getGMReport(database, "gm-owner", campaignId).revision, 2);
+    assert.deepEqual(getPlayerReport(database, playerId, campaignId).report, draft);
+    database.exec("DROP TRIGGER fail_report_update");
+    updateGMReport(database, "gm-owner", campaignId, { action: "withdraw", expectedRevision: 2 });
+    const revision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup, { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision });
+    assert.deepEqual(getPlayerReport(database, playerId, campaignId), { report: null, publishedAt: null });
+    assert.deepEqual(getGMReport(database, "gm-owner", campaignId).draft, draft);
+    assert.equal(getGMReport(database, "gm-owner", campaignId).revision, 4);
+    assert.throws(() => updateGMReport(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 2 }), /revision changed/);
+    database.close();
+    database = openRuntimeDatabase(path);
+    assert.deepEqual(getPlayerReport(database, playerId, campaignId), { report: null, publishedAt: null });
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("faction layer and prominence edits persist without changing setup and reject stale or foreign writes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-layer-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database = openRuntimeDatabase(path);
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    ["guard", "locals"].forEach((id) => database.prepare("INSERT INTO factions (runtime_campaign_id, id, name, description) VALUES (?, ?, ?, '')").run(campaignId, id, id));
+    database.prepare("INSERT INTO settlements (runtime_campaign_id, id, source_location_id, name, situation) VALUES (?, 'town', 'sample-location-vansbro', 'Vansbro', '')").run(campaignId);
+    const source = database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId).source_json;
+    let layers = updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 0, factionId: "guard", cells: ["1,-2", "2,3"] });
+    assert.deepEqual(layers.influence.guard, ["1,-2", "2,3"]);
+    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 0, factionId: "guard", cells: [] }), /revision changed/);
+    layers = updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 1, settlementId: "town", factionIds: ["locals", "guard"] });
+    assert.deepEqual(layers.prominence.town, ["locals", "guard"]);
+    assert.equal(layers.revision, 2);
+    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 2, settlementId: "town", factionIds: ["outside"] }), /in this campaign/);
+    assert.throws(() => updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 2, factionId: "guard", cells: ["1,2", "01,2"] }), /duplicate/);
+    assert.throws(() => updateRuntimeFactionLayers(database, "other-owner", campaignId, { expectedRevision: 2, factionId: "guard", cells: [] }), /not found/);
+    assert.deepEqual(getRuntimeFactionLayers(database, "gm-owner", campaignId), layers);
+    assert.equal(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId).source_json, source);
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 2, factionId: "guard", cells: [] });
+    updateRuntimeFactionLayers(database, "gm-owner", campaignId, { expectedRevision: 3, settlementId: "town", factionIds: [] });
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup, { expectedRevision: 4, confirmReplace: true, confirmOlderBackup: true });
+    database.close();
+    database = openRuntimeDatabase(path);
+    const restored = getRuntimeFactionLayers(database, "gm-owner", campaignId);
+    assert.deepEqual(restored.influence, layers.influence);
+    assert.deepEqual(restored.prominence, layers.prominence);
+    assert.equal(restored.revision, 5);
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function withChecksum(backup) {
+  const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]`
+    : value && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`
+      : JSON.stringify(value);
+  const { checksum, ...payload } = backup;
+  return { ...payload, checksum: createHash("sha256").update(canonical(payload)).digest("hex") };
+}
+
+test("rejects malformed embedded JSON and broken seat ownership even with a recomputed checksum", () => {
+  const database = openRuntimeDatabase();
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const seeded = seedSampleRuntime(database, "gm-owner");
+    const backup = exportRuntimeSave(database, "gm-owner", seeded.campaignId);
+    const invalidJson = structuredClone(backup);
+    invalidJson.data.characters[0].fields_json = "broken JSON";
+    const invalidSeat = structuredClone(backup);
+    invalidSeat.data.playerSeats[0].account_id = "gm-owner";
+    for (const invalid of [invalidJson, invalidSeat]) {
+      assert.throws(() => restoreRuntimeSave(database, "gm-owner", seeded.campaignId, withChecksum(invalid), {
+        confirmReplace: true, expectedRevision: 0
+      }), /Invalid/);
+      assert.deepEqual(exportRuntimeSave(database, "gm-owner", seeded.campaignId, { now: () => backup.exportedAt }), backup);
+    }
+  } finally { database.close(); }
+});
 
 test("runtime backup round-trips dashboard and preserves record IDs and monotonic revision", () => {
   const database = openRuntimeDatabase();
@@ -179,7 +332,53 @@ test("runtime backup HTTP routes export and restore only for the owning GM", asy
       body: JSON.stringify({ backup, confirmReplace: true, confirmOlderBackup: true, expectedRevision: currentRevision + 1 })
     });
     assert.equal(otherRestore.status, 404);
+
+    const restored = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${ownerToken}` },
+      body: JSON.stringify({ backup, confirmReplace: true, confirmOlderBackup: true, expectedRevision: currentRevision + 1 })
+    });
+    assert.equal(restored.status, 200);
+    assert.equal((await restored.json()).restore.revision, currentRevision + 2);
+    assert.equal(getRuntimeDashboard(database, "gm-owner", seeded.campaignId).dashboard.rationsDays, 6);
   } finally {
     database.close();
+  }
+});
+
+test("file-backed recovery preserves rows and does not modify another campaign owned by the same GM", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-backup-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database;
+  try {
+    database = openRuntimeDatabase(path);
+    createGm(database, "gm-owner", "gm-owner");
+    const seeded = seedSampleRuntime(database, "gm-owner");
+    const setup = sampleSetupPackage();
+    setup.campaign.id = "independent-setup";
+    setup.campaign.name = "Independent campaign";
+    const second = importSetupPackage(database, JSON.stringify(setup), { ownerAccountId: "gm-owner" });
+    const backup = exportRuntimeSave(database, "gm-owner", seeded.campaignId);
+    const independent = exportRuntimeSave(database, "gm-owner", second.runtimeCampaignId);
+    updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, { dashboard: { rationsDays: 0 } });
+    assert.throws(() => restoreRuntimeSave(database, "gm-owner", second.runtimeCampaignId, backup, {
+      confirmReplace: true, expectedRevision: 0
+    }), /does not match/);
+    restoreRuntimeSave(database, "gm-owner", seeded.campaignId, backup, {
+      confirmReplace: true, confirmOlderBackup: true, expectedRevision: 1
+    });
+    database.close();
+    database = openRuntimeDatabase(path);
+    const recovered = exportRuntimeSave(database, "gm-owner", seeded.campaignId);
+    for (const key of Object.keys(backup.data).filter((key) => key !== "campaign")) {
+      assert.deepEqual(recovered.data[key], backup.data[key], `${key} survived recovery`);
+    }
+    assert.equal(recovered.sourceRevision, 2);
+    assert.deepEqual(exportRuntimeSave(database, "gm-owner", second.runtimeCampaignId, {
+      now: () => independent.exportedAt
+    }), independent);
+  } finally {
+    database?.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 });

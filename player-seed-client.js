@@ -55,6 +55,14 @@
       : "This is your assigned campaign character. Later edits are submitted to your GM for approval.";
     recordName.textContent = character.displayLabel;
     recordState.textContent = character.status === "seed" ? "Seed / completion required" : "Playable / changes require GM approval";
+    if (document.querySelector("#player-sitrep-tab")?.getAttribute("aria-current") === "page") {
+      recordTitle.textContent = "Situation report";
+      recordDescription.textContent = "";
+    }
+    if (document.querySelector("#player-map-tab")?.getAttribute("aria-current") === "page") {
+      recordTitle.textContent = "Player map";
+      recordDescription.textContent = "";
+    }
     emptyState.hidden = true;
     form.hidden = false;
     finalizeButton.hidden = character.status !== "seed";

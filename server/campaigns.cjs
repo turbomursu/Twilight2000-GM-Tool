@@ -3,6 +3,9 @@ const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashb
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
+const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("./runtime-store.cjs");
+const { getGMReport, updateGMReport } = require("./situation-reports.cjs");
+const { getGMMap, updateGMMap } = require("./map-publications.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -46,13 +49,13 @@ async function readSetupPackage(request) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function readJsonBody(request) {
+async function readJsonBody(request, maximumBytes = 32 * 1024) {
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers["content-type"] || "")) throw new HttpError(415, "Content-Type must be application/json.");
   const chunks = [];
   let bytes = 0;
   for await (const chunk of request) {
     bytes += chunk.length;
-    if (bytes > 32 * 1024) throw new HttpError(413, "Request body is too large.");
+    if (bytes > maximumBytes) throw new HttpError(413, "Request body is too large.");
     chunks.push(chunk);
   }
   try {
@@ -99,6 +102,53 @@ function createCampaignHandler({ database }) {
 
     if (request.method === "GET" && url.pathname === "/api/campaigns") {
       return sendJson(response, 200, { campaigns: listRuntimeCampaigns(database, account.id) });
+    }
+    const mapMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/map-publication$/);
+    if (mapMatch && ["GET", "PUT"].includes(request.method)) {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(mapMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const result = request.method === "GET" ? { map: getGMMap(database, account.id, campaignId) }
+          : updateGMMap(database, account.id, campaignId, await readJsonBody(request, 256 * 1024));
+        return result.map === null ? sendJson(response, 404, { error: "Runtime campaign not found." }) : sendJson(response, 200, result);
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : /Runtime campaign not found/.test(error.message) ? 404
+          : /revision changed/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+    const reportMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/situation-report$/);
+    if (reportMatch && ["GET", "PUT"].includes(request.method)) {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(reportMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const result = request.method === "GET"
+          ? { report: getGMReport(database, account.id, campaignId) }
+          : updateGMReport(database, account.id, campaignId, await readJsonBody(request, 64 * 1024));
+        return result.report === null ? sendJson(response, 404, { error: "Runtime campaign not found." })
+          : sendJson(response, 200, result);
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Runtime campaign not found/.test(error.message) ? 404
+            : /revision changed/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+    const layerMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/faction-layers$/);
+    if (layerMatch && ["GET", "PUT"].includes(request.method)) {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(layerMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const layers = request.method === "GET"
+          ? getRuntimeFactionLayers(database, account.id, campaignId)
+          : updateRuntimeFactionLayers(database, account.id, campaignId, await readJsonBody(request, 256 * 1024));
+        return layers ? sendJson(response, 200, { layers }) : sendJson(response, 404, { error: "Runtime campaign not found." });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Runtime campaign not found/.test(error.message) ? 404
+            : /revision changed/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
     }
     const backupMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup$/);
     if (backupMatch && request.method === "GET") {
