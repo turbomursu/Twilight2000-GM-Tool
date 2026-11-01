@@ -1,5 +1,5 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard } = require("./runtime-store.cjs");
+const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard } = require("./runtime-store.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
@@ -271,6 +271,19 @@ function createCampaignHandler({ database }) {
           : /Runtime campaign not found|GM owner|does not preserve the current GM owner/.test(error.message) ? 404
             : /revision changed/.test(error.message) ? 409 : 422;
         return sendJson(response, status, { error: error.message });
+      }
+    }
+    if (request.method === "POST" && url.pathname === "/api/campaigns/import-backup") {
+      try {
+        const body = await readRuntimeRestoreBody(request);
+        const result = importRuntimeBackup(database, account.id, body.backup, body.playerAccountMap);
+        const campaign = getRuntimeCampaign(database, account.id, result.campaignId);
+        return sendJson(response, 201, { campaign, import: result });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Active GM account/.test(error.message) ? 403
+            : /database is locked|SQLITE_BUSY|ERR_SQLITE/.test(error.message) ? 500 : 422;
+        return sendJson(response, status, { error: status === 500 ? "The runtime backup could not be imported." : error.message });
       }
     }
     if (request.method === "POST" && url.pathname === "/api/campaigns/import-setup") {

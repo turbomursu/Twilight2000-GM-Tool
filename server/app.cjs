@@ -4,6 +4,8 @@ const { getAccountHomePath, getAuthenticatedAccount, parseCookies } = require(".
 const { createCampaignHandler } = require("./campaigns.cjs");
 const { createPlayerHandler } = require("./player.cjs");
 const { createUserHandler } = require("./users.cjs");
+const { uploadOfflineBasemap, getOfflineBasemapMetadata, sendOfflineBasemap, ASSET_ID_PATTERN } = require("./offline-basemaps.cjs");
+const { getPlayerMap } = require("./map-publications.cjs");
 
 const ROOT = join(__dirname, "..");
 const PUBLIC_FILES = new Map([
@@ -17,6 +19,9 @@ const PROTECTED_FILES = new Map([
   ["/player-seeds.html", ["player-seeds.html", "text/html; charset=utf-8"]],
   ["/player-interface.html", ["player-interface.html", "text/html; charset=utf-8"]],
   ["/player-interface-concepts.html", ["player-interface-concepts.html", "text/html; charset=utf-8"]],
+  ["/vendor/leaflet.js", ["node_modules/leaflet/dist/leaflet.js", "text/javascript; charset=utf-8"]],
+  ["/vendor/leaflet.css", ["node_modules/leaflet/dist/leaflet.css", "text/css; charset=utf-8"]],
+  ["/vendor/pmtiles.js", ["node_modules/pmtiles/dist/pmtiles.js", "text/javascript; charset=utf-8"]],
   ["/campaign-package-contract.js", ["campaign-package-contract.js", "text/javascript; charset=utf-8"]],
   ["/auth-client.js", ["auth-client.js", "text/javascript; charset=utf-8"]],
   ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]],
@@ -48,18 +53,55 @@ function sendText(response, status, contentType, body, headOnly = false) {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https:; connect-src 'self' https://unpkg.com https://nominatim.openstreetmap.org; font-src 'self' data: https://unpkg.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://nominatim.openstreetmap.org; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   });
   response.end(headOnly ? undefined : body);
 }
 
-function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT }) {
+function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "offline-basemaps") }) {
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);
     if (CAMPAIGN_PATH.test(url.pathname)) return campaignHandler(request, response);
+    const playerBasemapMatch = url.pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map-basemap$/);
+    if (playerBasemapMatch) {
+      if (!new Set(["GET", "HEAD"]).has(request.method)) return sendText(response, 405, "application/json; charset=utf-8", JSON.stringify({ error: "Method not allowed." }));
+      const account = getAuthenticatedAccount(database, parseCookies(request.headers.cookie)["fieldbook_session"]);
+      if (!account) return sendText(response, 401, "application/json; charset=utf-8", JSON.stringify({ error: "Authentication required." }));
+      if (account.role !== "player") return sendText(response, 403, "application/json; charset=utf-8", JSON.stringify({ error: "Player account required." }));
+      let campaignId;
+      try { campaignId = decodeURIComponent(playerBasemapMatch[1]); } catch { return sendText(response, 400, "application/json; charset=utf-8", JSON.stringify({ error: "Invalid campaign ID." })); }
+      const publication = getPlayerMap(database, account.id, campaignId);
+      const assetId = publication?.map?.offlineBasemap?.assetId;
+      if (!assetId) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", request.method === "HEAD");
+      if (sendOfflineBasemap(request, response, offlineBasemapDir, assetId, request.method === "HEAD")) return;
+      return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", request.method === "HEAD");
+    }
     if (PLAYER_API_PATH.test(url.pathname)) return playerHandler(request, response);
     if (USER_API_PATH.test(url.pathname)) return userHandler(request, response);
+
+    if (url.pathname === "/api/offline-basemaps") {
+      if (request.method !== "POST") return sendText(response, 405, "application/json; charset=utf-8", JSON.stringify({ error: "Method not allowed." }));
+      const origin = request.headers.origin;
+      if (origin) {
+        try {
+          const parsed = new URL(origin);
+          if (parsed.protocol !== "http:" || parsed.host !== request.headers.host) throw new Error();
+        } catch {
+          return sendText(response, 403, "application/json; charset=utf-8", JSON.stringify({ error: "Cross-origin requests are not allowed." }));
+        }
+      }
+      const account = getAuthenticatedAccount(database, parseCookies(request.headers.cookie)["fieldbook_session"]);
+      if (!account) return sendText(response, 401, "application/json; charset=utf-8", JSON.stringify({ error: "Authentication required." }));
+      if (account.role !== "gm") return sendText(response, 403, "application/json; charset=utf-8", JSON.stringify({ error: "GM account required." }));
+      try {
+        const asset = await uploadOfflineBasemap(request, offlineBasemapDir, account.id);
+        return sendText(response, 201, "application/json; charset=utf-8", JSON.stringify({ asset }));
+      } catch (error) {
+        const status = /larger than/.test(error.message) ? 413 : /Content-Type/.test(error.message) ? 415 : 422;
+        return sendText(response, status, "application/json; charset=utf-8", JSON.stringify({ error: error.message }));
+      }
+    }
 
     if (request.method !== "GET" && request.method !== "HEAD") {
       return sendText(response, 405, "application/json; charset=utf-8", JSON.stringify({ error: "Method not allowed." }));
@@ -68,6 +110,16 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
     const cookieToken = parseCookies(request.headers.cookie)["fieldbook_session"];
     const account = getAuthenticatedAccount(database, cookieToken);
     const homePath = account ? getAccountHomePath(database, account.id) : "/index.html";
+
+    const basemapMatch = url.pathname.match(/^\/offline-basemaps\/([0-9a-f-]{36})\.pmtiles$/i);
+    if (basemapMatch) {
+      if (!account) return sendText(response, 401, "text/plain; charset=utf-8", "Authentication required.", headOnly);
+      if (!ASSET_ID_PATTERN.test(basemapMatch[1])) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+      const metadata = getOfflineBasemapMetadata(offlineBasemapDir, basemapMatch[1]);
+      if (!metadata || metadata.ownerAccountId !== account.id) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+      if (sendOfflineBasemap(request, response, offlineBasemapDir, basemapMatch[1])) return;
+      return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+    }
 
     if (url.pathname === "/" || url.pathname === "/login") {
       const location = account ? homePath : "/login.html";

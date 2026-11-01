@@ -1,10 +1,14 @@
 const assert = require("node:assert/strict");
 const http = require("node:http");
+const { mkdtempSync, rmSync, writeFileSync } = require("node:fs");
+const { tmpdir } = require("node:os");
+const { join } = require("node:path");
 const { once } = require("node:events");
 const test = require("node:test");
 const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { openRuntimeDatabase, createPlayerSeed } = require("../server/runtime-store.cjs");
+const { validateMapDraft } = require("../server/map-publications.cjs");
 const { emptyConditions } = require("../server/conditions.cjs");
 const { seedSampleRuntime } = require("../server/sample-data.cjs");
 
@@ -19,6 +23,7 @@ function validSetupPackage() {
     map: {
       id: "map-1", name: "Vansbro sector",
       bounds: { south: 59, west: 13, north: 61, east: 15 }, center: { lat: 60, lng: 14 }, zoom: 8,
+      offlineBasemap: { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Local map provider / license" },
       fieldPapersAtlas: { id: "atlas-1" }, attribution: "© OpenStreetMap contributors", offlineAnnotations: [],
       grid: { coordinateSystem: "axial-q-r", cellKm: 10, terrainCells: [{ q: 1, r: -2, terrainType: "forest" }] },
       locations: [{ id: "location-1", name: "Vansbro", kind: "Settlement", description: "Starting town", gridRef: "1,-2", coordinates: { q: 1, r: -2 }, mapPosition: { lat: 60, lng: 14 }, visibility: "gm-only", isStartingLocation: true }]
@@ -31,15 +36,17 @@ function validSetupPackage() {
 
 async function startTestServer(t) {
   const database = openRuntimeDatabase();
+  const offlineBasemapDir = mkdtempSync(join(tmpdir(), "fieldbook-campaign-basemap-"));
   const authHandler = createAuthHandler({ database, bootstrapToken });
-  const server = http.createServer(createAppHandler({ database, authHandler }));
+  const server = http.createServer(createAppHandler({ database, authHandler, offlineBasemapDir }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => new Promise((resolve) => server.close(() => {
     database.close();
+    rmSync(offlineBasemapDir, { recursive: true, force: true });
     resolve();
   })));
-  return { origin: `http://127.0.0.1:${server.address().port}`, database };
+  return { origin: `http://127.0.0.1:${server.address().port}`, database, offlineBasemapDir };
 }
 
 async function bootstrapGM(origin) {
@@ -360,9 +367,14 @@ test("COMMS broadcasts single-line messages with server-owned identity and game 
 });
 
 test("GM-selected maps exclude hidden records and publish read-only to all four assigned players", async (t) => {
-  const { origin, database } = await startTestServer(t);
+  const { origin, database, offlineBasemapDir } = await startTestServer(t);
   const cookie = await bootstrapGM(origin);
   const source = validSetupPackage();
+  const basemapArchive = Buffer.alloc(256);
+  basemapArchive.write("PMTiles", 0, "ascii");
+  basemapArchive[7] = 3;
+  for (let index = 127; index < basemapArchive.length; index += 1) basemapArchive[index] = index % 251;
+  writeFileSync(join(offlineBasemapDir, `${source.map.offlineBasemap.assetId}.pmtiles`), basemapArchive);
   source.map.locations.push({ ...source.map.locations[0], id: "hidden-location", name: "Hidden base",
     description: "Secret ambush", isStartingLocation: false, mapPosition: { lat: 60.5, lng: 14.5 } });
   const imported = await fetch(`${origin}/api/campaigns/import-setup`, { method: "POST",
@@ -370,6 +382,7 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   assert.equal(imported.status, 201);
   const { campaign } = await imported.json();
   const gm = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  writeFileSync(join(offlineBasemapDir, `${source.map.offlineBasemap.assetId}.json`), JSON.stringify({ assetId: source.map.offlineBasemap.assetId, ownerAccountId: gm.id, byteLength: basemapArchive.length }));
   const accounts = database.prepare(`INSERT INTO accounts
     (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -393,6 +406,7 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   const otherGMCookie = await login("map-other-gm");
   const gmPath = `${origin}/api/campaigns/${campaign.id}/map-publication`;
   const playerPath = `${origin}/api/player/campaigns/${campaign.id}/map`;
+  const playerBasemapPath = `${origin}/api/player/campaigns/${campaign.id}/map-basemap`;
   const readPlayer = async (authCookie = playerCookies[0]) => (await fetch(playerPath, { headers: { Cookie: authCookie } })).json();
   const action = (input, authCookie = cookie, extraHeaders = {}) => fetch(gmPath, { method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: authCookie, ...extraHeaders }, body: JSON.stringify(input) });
@@ -401,16 +415,24 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   assert.equal((await fetch(gmPath, { headers: { Cookie: otherGMCookie } })).status, 404);
   assert.equal((await action({ action: "withdraw", expectedRevision: 0 }, otherGMCookie)).status, 404);
   assert.equal((await fetch(playerPath, { headers: { Cookie: outsiderCookie } })).status, 404);
+  assert.equal((await fetch(playerBasemapPath, { headers: { Cookie: playerCookies[0], Range: "bytes=0-7" } })).status, 404);
   assert.equal((await fetch(playerPath, { method: "PUT", headers: { Cookie: playerCookies[0] } })).status, 405);
   assert.equal((await action({ action: "withdraw", expectedRevision: 0 }, cookie, { Origin: "http://untrusted.example" })).status, 403);
   assert.deepEqual(await readPlayer(), { map: null, publishedAt: null });
   assert.equal((await action({ action: "publish", expectedRevision: 0 })).status, 422);
   const draft = { locationIds: ["location-1"], markings: [{ id: "road-notice", label: "Bridge closed <img src=x>", position: { lat: 60.1, lng: 14.1 } }],
+    geometries: [
+      { id: "north-road", label: "North road", geometry: { type: "LineString", coordinates: [[13.9, 60], [14.2, 60.2]] } },
+      { id: "camp-area", label: "Camp area", geometry: { type: "Polygon", coordinates: [[[13.9, 59.9], [14.1, 59.9], [14.1, 60.1], [13.9, 60.1], [13.9, 59.9]]] } }
+    ],
     routeLocationIds: ["location-1"], playerPosition: { lat: 60, lng: 14 } };
   for (const invalid of [{ ...draft, gmNotes: "SECRET" }, { ...draft, locationIds: ["foreign-location"] },
     { ...draft, locationIds: ["location-1", "location-1"] }, { ...draft, routeLocationIds: ["hidden-location"] },
     { ...draft, playerPosition: { lat: 70, lng: 14 } },
-    { ...draft, markings: [{ ...draft.markings[0], secret: "SECRET" }] }]) {
+    { ...draft, markings: [{ ...draft.markings[0], secret: "SECRET" }] },
+    { ...draft, geometries: [{ ...draft.geometries[0], geometry: { type: "LineString", coordinates: [[13.9, 60], [16, 60]] } }] },
+    { ...draft, geometries: [{ ...draft.geometries[1], geometry: { type: "Polygon", coordinates: [[[13.9, 59.9], [14.1, 59.9], [14.1, 60.1], [13.9, 60.1]]] } }] },
+    { ...draft, geometries: [{ ...draft.geometries[0], geometry: { type: "MultiPolygon", coordinates: [] } }] }]) {
     assert.equal((await action({ action: "draft", expectedRevision: 0, draft: invalid })).status, 422);
   }
   assert.equal((await action({ action: "draft", expectedRevision: 0, draft })).status, 200);
@@ -421,8 +443,15 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   assert.equal((await action({ action: "publish", expectedRevision: 0 })).status, 409);
   assert.equal((await action({ action: "publish", expectedRevision: 1 })).status, 200);
   const published = await readPlayer();
-  assert.deepEqual(published.map, preview.preview);
-  assert.deepEqual(Object.keys(published.map).sort(), ["bounds", "locations", "markings", "name", "playerPosition", "route", "schemaVersion"]);
+  assert.deepEqual(published.map, { ...preview.preview, offlineBasemap: { ...preview.preview.offlineBasemap,
+    assetUrl: `/api/player/campaigns/${campaign.id}/map-basemap` } });
+  assert.deepEqual(Object.keys(published.map).sort(), ["bounds", "geometries", "locations", "markings", "name", "offlineBasemap", "playerPosition", "route", "schemaVersion"]);
+  assert.deepEqual(published.map.offlineBasemap, { ...source.map.offlineBasemap, assetUrl: `/api/player/campaigns/${campaign.id}/map-basemap` });
+  const playerBasemap = await fetch(`${origin}${published.map.offlineBasemap.assetUrl}`, { headers: { Cookie: playerCookies[0], Range: "bytes=0-15" } });
+  assert.equal(playerBasemap.status, 206);
+  assert.deepEqual(Buffer.from(await playerBasemap.arrayBuffer()), basemapArchive.subarray(0, 16));
+  assert.equal((await fetch(`${origin}${published.map.offlineBasemap.assetUrl}`, { headers: { Cookie: outsiderCookie, Range: "bytes=0-7" } })).status, 404);
+  assert.deepEqual(published.map.geometries, draft.geometries);
   assert.deepEqual(Object.keys(published.map.locations[0]).sort(), ["id", "kind", "name", "position"]);
   assert.doesNotMatch(JSON.stringify(published), /Hidden base|hidden-location|Secret ambush|Status unknown|gm-only|Private character|atlas|terrain|faction|description|setupPackage/);
   for (const authCookie of playerCookies) assert.deepEqual(await readPlayer(authCookie), published);
@@ -431,6 +460,7 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   assert.equal((await action({ action: "withdraw", expectedRevision: 2 })).status, 409);
   assert.equal((await action({ action: "withdraw", expectedRevision: 3 })).status, 200);
   for (const authCookie of playerCookies) assert.deepEqual(await readPlayer(authCookie), { map: null, publishedAt: null });
+  assert.equal((await fetch(`${origin}${published.map.offlineBasemap.assetUrl}`, { headers: { Cookie: playerCookies[0], Range: "bytes=0-7" } })).status, 404);
   assert.deepEqual(JSON.parse(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaign.id).source_json), source);
   database.prepare("UPDATE player_seats SET active = 0 WHERE account_id = 'map-player-1'").run();
   assert.equal((await fetch(playerPath, { headers: { Cookie: playerCookies[0] } })).status, 404);
@@ -630,4 +660,17 @@ test("faction layer API persists and clears campaign-scoped edits with revision 
   const outsiderCookie = login.headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(path, { headers: { Cookie: outsiderCookie } })).status, 404);
   assert.equal((await put({ expectedRevision: 3, factionId: "faction-1", cells: [] }, { Cookie: outsiderCookie })).status, 404);
+});
+
+test("map publication normalizes legacy point-only drafts and validates line/polygon geometry", () => {
+  const bounds = { south: 59, west: 13, north: 61, east: 15 };
+  const locations = [{ id: "location-1", position: { lat: 60, lng: 14 } }];
+  const legacy = { locationIds: ["location-1"], markings: [], routeLocationIds: ["location-1"], playerPosition: null };
+  assert.deepEqual(validateMapDraft(legacy, bounds, locations).geometries, []);
+  const withGeometry = validateMapDraft({ ...legacy, geometries: [
+    { id: "line-1", label: "Track", geometry: { type: "LineString", coordinates: [[13.5, 59.5], [14, 60]] } },
+    { id: "area-1", label: "Marked area", geometry: { type: "Polygon", coordinates: [[[13.5, 59.5], [14, 59.5], [14, 60], [13.5, 60], [13.5, 59.5]]] } }
+  ] }, bounds, locations);
+  assert.equal(withGeometry.geometries.length, 2);
+  assert.throws(() => validateMapDraft({ ...legacy, geometries: [{ id: "line-1", label: "Bad track", geometry: { type: "LineString", coordinates: [[13, 60]] } }] }, bounds, locations), /2 to 500 vertices/);
 });

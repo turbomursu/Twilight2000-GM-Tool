@@ -21,8 +21,40 @@ function mapBounds(bounds) {
   return { south: bounds.south, west: bounds.west, north: bounds.north, east: bounds.east };
 }
 
+function boundedGeoCoordinate(coordinate, bounds) {
+  if (!Array.isArray(coordinate) || coordinate.length !== 2
+    || !coordinate.every(Number.isFinite)) throw new Error("Map geometry coordinates must be longitude/latitude pairs.");
+  const [lng, lat] = coordinate;
+  boundedPoint({ lat, lng }, bounds);
+  return [lng, lat];
+}
+
+function validateGeometry(geometry, bounds) {
+  if (!record(geometry, ["type", "coordinates"])) throw new Error("Invalid map geometry.");
+  if (geometry.type === "LineString") {
+    if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length < 2 || geometry.coordinates.length > 500) {
+      throw new Error("A map line needs 2 to 500 vertices.");
+    }
+    return { type: "LineString", coordinates: geometry.coordinates.map((coordinate) => boundedGeoCoordinate(coordinate, bounds)) };
+  }
+  if (geometry.type === "Polygon") {
+    if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length !== 1
+      || !Array.isArray(geometry.coordinates[0]) || geometry.coordinates[0].length < 4 || geometry.coordinates[0].length > 500) {
+      throw new Error("A map area needs one closed ring with 4 to 500 vertices.");
+    }
+    const ring = geometry.coordinates[0].map((coordinate) => boundedGeoCoordinate(coordinate, bounds));
+    if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
+      throw new Error("A map area ring must end where it starts.");
+    }
+    return { type: "Polygon", coordinates: [ring] };
+  }
+  throw new Error("Map geometry must be a LineString or Polygon.");
+}
+
 function validateMapDraft(draft, bounds, locations) {
-  if (!record(draft, ["locationIds", "markings", "routeLocationIds", "playerPosition"])) throw new Error("Invalid map draft fields.");
+  const legacyDraft = record(draft, ["locationIds", "markings", "routeLocationIds", "playerPosition"]);
+  const hasGeometryDraft = record(draft, ["locationIds", "markings", "routeLocationIds", "playerPosition", "geometries"]);
+  if (!legacyDraft && !hasGeometryDraft) throw new Error("Invalid map draft fields.");
   const ids = new Set(locations.map((location) => location.id));
   if (!Array.isArray(draft.locationIds) || draft.locationIds.length > 500
     || new Set(draft.locationIds).size !== draft.locationIds.length
@@ -40,15 +72,33 @@ function validateMapDraft(draft, bounds, locations) {
     markingIds.add(marking.id);
     return { id: marking.id, label: marking.label, position: boundedPoint(marking.position, bounds) };
   });
-  return { locationIds: [...draft.locationIds], markings, routeLocationIds: [...draft.routeLocationIds],
+  const rawGeometries = draft.geometries ?? [];
+  if (!Array.isArray(rawGeometries) || rawGeometries.length > 100) throw new Error("Too many map geometries.");
+  let totalVertices = 0;
+  const geometries = rawGeometries.map((entry) => {
+    if (!record(entry, ["id", "label", "geometry"]) || typeof entry.id !== "string"
+      || !/^[A-Za-z0-9_-]{1,120}$/.test(entry.id) || markingIds.has(entry.id)
+      || typeof entry.label !== "string" || !entry.label.trim() || entry.label.length > 160) {
+      throw new Error("Invalid or duplicate map geometry.");
+    }
+    markingIds.add(entry.id);
+    const geometry = validateGeometry(entry.geometry, bounds);
+    totalVertices += geometry.type === "LineString" ? geometry.coordinates.length : geometry.coordinates[0].length;
+    if (totalVertices > 10000) throw new Error("Map geometry contains too many vertices.");
+    return { id: entry.id, label: entry.label.trim(), geometry };
+  });
+  return { locationIds: [...draft.locationIds], markings, geometries, routeLocationIds: [...draft.routeLocationIds],
     playerPosition: draft.playerPosition === null ? null : boundedPoint(draft.playerPosition, bounds) };
 }
 
-function projectMap(map) {
+function projectMap(map, offlineBasemapUrl = null) {
   return {
-    schemaVersion: 1, name: map.name, bounds: mapBounds(map.bounds),
+    schemaVersion: 2, name: map.name, bounds: mapBounds(map.bounds),
+    offlineBasemap: map.offlineBasemap ? { format: "raster-pmtiles", assetId: map.offlineBasemap.assetId,
+      attribution: map.offlineBasemap.attribution, assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.pmtiles` } : null,
     locations: map.locations.map((location) => ({ id: location.id, name: location.name, kind: location.kind, position: point(location.position) })),
     markings: map.markings.map((marking) => ({ id: marking.id, label: marking.label, position: point(marking.position) })),
+    geometries: (map.geometries || []).map((entry) => ({ id: entry.id, label: entry.label, geometry: entry.geometry })),
     route: map.route.map((location) => ({ id: location.id, name: location.name, position: point(location.position) })),
     playerPosition: map.playerPosition ? point(map.playerPosition) : null
   };
@@ -58,6 +108,8 @@ function getGMMap(database, accountId, campaignId) {
   const campaign = getRuntimeCampaign(database, accountId, campaignId);
   if (!campaign) return null;
   const source = database.prepare("SELECT name, bounds_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
+  const setup = database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId);
+  const offlineBasemap = setup ? JSON.parse(setup.source_json).map.offlineBasemap ?? null : null;
   const locations = database.prepare(`SELECT id, name, kind, map_position_json, visibility_eligibility
     FROM locations WHERE runtime_campaign_id = ? ORDER BY name, id`).all(campaignId).map((location) => ({
     id: location.id, name: location.name, kind: location.kind,
@@ -66,8 +118,8 @@ function getGMMap(database, accountId, campaignId) {
   const row = database.prepare("SELECT * FROM map_publications WHERE campaign_id = ?").get(campaignId);
   return {
     campaignId, campaignRevision: campaign.revision, revision: row?.revision ?? 0,
-    catalog: { name: source.name, bounds: mapBounds(JSON.parse(source.bounds_json)), locations },
-    draft: row ? JSON.parse(row.draft_json) : { locationIds: [], markings: [], routeLocationIds: [], playerPosition: null },
+    catalog: { name: source.name, bounds: mapBounds(JSON.parse(source.bounds_json)), locations, offlineBasemap },
+    draft: row ? JSON.parse(row.draft_json) : { locationIds: [], markings: [], geometries: [], routeLocationIds: [], playerPosition: null },
     published: row?.published_json ? projectMap(JSON.parse(row.published_json)) : null,
     publishedAt: row?.published_at ?? null
   };
@@ -77,7 +129,8 @@ function buildMapPreview(map) {
   const draft = validateMapDraft(map.draft, map.catalog.bounds, map.catalog.locations);
   const locations = new Map(map.catalog.locations.map((location) => [location.id, location]));
   return projectMap({ name: map.catalog.name, bounds: map.catalog.bounds,
-    locations: draft.locationIds.map((id) => locations.get(id)), markings: draft.markings,
+    offlineBasemap: map.catalog.offlineBasemap,
+    locations: draft.locationIds.map((id) => locations.get(id)), markings: draft.markings, geometries: draft.geometries,
     route: draft.routeLocationIds.map((id) => locations.get(id)), playerPosition: draft.playerPosition });
 }
 
@@ -124,7 +177,7 @@ function updateGMMap(database, accountId, campaignId, input) {
 function getPlayerMap(database, accountId, campaignId) {
   if (!getPlayerCharacter(database, accountId, campaignId)) return null;
   const row = database.prepare("SELECT published_json, published_at FROM map_publications WHERE campaign_id = ?").get(campaignId);
-  return { map: row?.published_json ? projectMap(JSON.parse(row.published_json)) : null,
+  return { map: row?.published_json ? projectMap(JSON.parse(row.published_json), `/api/player/campaigns/${encodeURIComponent(campaignId)}/map-basemap`) : null,
     publishedAt: row?.published_json ? row.published_at : null };
 }
 

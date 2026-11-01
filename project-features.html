@@ -95,17 +95,18 @@
         <header class="heading"><div><div class="eyebrow">Feature snapshot / 01 Nov 2026</div><h1>Feature status</h1></div><p>Green means a verified slice is ready. Red means unfinished or partial; it is not a complete system.</p></header>
         <section class="summary" aria-label="Feature status summary">
           <div class="summary-item"><span class="eyebrow">Ready slices</span><strong>Identity and publishing</strong><p>Accounts, seats, reports, map projection, COMMS, review workflows.</p></div>
-          <div class="summary-item"><span class="eyebrow">Partial</span><strong>GM runtime</strong><p>Supported SQLite panels and same-host backup/restore.</p></div>
-          <div class="summary-item"><span class="eyebrow">Unfinished</span><strong>Rules and simulation</strong><p>Character generation, action resolution, world systems, cross-host recovery.</p></div>
+          <div class="summary-item"><span class="eyebrow">Partial</span><strong>GM runtime</strong><p>Supported SQLite panels, same-host restore, and cross-host mapped import.</p></div>
+          <div class="summary-item"><span class="eyebrow">Unfinished</span><strong>Rules and simulation</strong><p>Character generation, action resolution, world systems, scheduled backups.</p></div>
         </section>
 
         <section class="section" aria-labelledby="surfaces-title">
           <div class="section-head"><h2>Product surfaces</h2><span>Current status</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign Setup Tool</strong><p>Authors and imports schema-v2 packages; offline basemaps remain planned.</p></span><span class="state partial">Prototype</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported fields use owner-scoped, revision-checked SQLite; route/map editing and broader recovery remain incomplete.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign Setup Tool</strong><p>Authors and imports schema-v2 packages; draggable/numeric bounds and licensed raster PMTiles upload are implemented. Browser round-trip and real-archive rendering remain to verify.</p></span><span class="state partial">Prototype</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported fields use owner-scoped, revision-checked SQLite; campaign era/premise are shown in Situation. Cross-host backup import maps accounts locally; scheduled backups, map browser acceptance, and offline asset migration remain incomplete.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player Interface</strong><p>Reports, map projection, COMMS, character/inventory bookkeeping; rules-governed actions remain planned.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player seed lifecycle and route preview</strong><p>Campaign assignment/review and the GM's read-only SQLite route preview are verified.</p></span><span class="state done">Ready slices</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player seed lifecycle</strong><p>Campaign assignment/review and the four-seat limit are verified.</p></span><span class="state done">Ready slice</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Runtime route and map editing</strong><p>GM route order/legs and location coordinates are editable, audited, and backed up. Setup source and current player publication remain unchanged.</p></span><span class="state done">Ready slice</span></label>
           </div>
         </section>
 
@@ -114,7 +115,7 @@
           <div class="checklist">
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Personnel add/edit/remove</strong><p>Revision conflicts refresh authoritative records and preserve the open draft.</p></span><span class="state done">Ready</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Weather control</strong><p>GM notes and cited effects display; weather rolls and duration tracking remain unimplemented.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign package recovery</strong><p>Same-host restore works; scheduled backups and cross-host account recovery remain open.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign package recovery</strong><p>Same-host restore and cross-host account-mapped import are available; scheduled backups remain open.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified character/NPC generation and rules resolution</strong><p>Requires authoritative procedures, source references, and regression examples.</p></span><span class="state">Open</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Logistics, economy, diplomacy, conflict, simulation</strong><p>Not implemented; consequential changes must remain GM-reviewed.</p></span><span class="state">Open</span></label>
           </div>
@@ -123,12 +124,12 @@
         <section class="section" aria-labelledby="player-features-title">
           <div class="section-head"><h2>Player-facing features</h2><span>Separate from the seed workflow</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player reports, map projection, and COMMS</strong><p>Published data is allow-listed; private GM state stays hidden.</p></span><span class="state done">Ready</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player reports, map projection, and COMMS</strong><p>Published data is allow-listed; private GM state stays hidden. Map API includes bounded line/area geometry and optional raster PMTiles metadata.</p></span><span class="state done">Ready</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Owned inventory and manual conditions</strong><p>Player proposals require GM review; condition data is read-only to players.</p></span><span class="state done">Ready slice</span></label>
           </div>
         </section>
 
-        <aside class="notice"><strong>Verification</strong><p>64 automated tests pass. Restore and browser workflows verified 01 Nov 2026. Rules effects remain limited to sourced, explicitly described guidance.</p></aside>
+        <aside class="notice"><strong>Verification</strong><p>Full automated run: 69 passed, 0 failed. PMTiles upload/range handling and geometry validation have synthetic API coverage; real licensed archive rendering, authenticated map browser round-trip, and cross-host asset migration are not yet verified. Cross-host account mapping passed integration and browser verification on 01 Nov 2026. Rules effects remain limited to sourced, explicitly described guidance.</p></aside>
         <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
       </div>
     </main>

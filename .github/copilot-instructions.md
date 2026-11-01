@@ -16,6 +16,10 @@ The website's required functionality includes:
 - A GM runtime tool that imports campaign packages and manages the live campaign state.
 - A Player Interface with a situation report whose displayed information the GM can add, remove, edit, and publish from the GM Tool.
 - The Campaign Setup Tool creates campaign maps. The GM controls map markings, published route, and player position from the GM Tool; players can browse the full published map with scroll and zoom up to 200%, reset centered on their GM-set position, but cannot change campaign map state.
+- Keep setup bounds editable and validate every published line/area geometry against them at the authoritative data boundary. Support only explicitly validated geometry types.
+- Use only GM-provided, licensed offline raster PMTiles archives with required attribution; serve archives locally with byte-range support, exclude them from source control, and document backup/migration sidecars. Do not bulk-download public OSM tiles.
+- Keep campaign area bounds editable in the Campaign Setup Tool and enforce geometry vertex bounds in the GM publication API. Support labeled line and single-ring polygon markings without exposing unselected source geometry.
+- Offline basemaps use GM-provided, licensed raster PMTiles archives with required attribution. Serve them locally with byte-range support; do not bulk-download public OSM tiles. Keep archive files separate from editable GeoJSON and document their sidecar transfer requirements.
 - A browser-accessible Player Interface for 1-4 players, with a separate assigned character and inventory for each player.
 - Players can manage their own character's inventory and items; dice-governed actions must follow verified Fourth Edition procedures wherever applicable.
 - In the Player Interface handset layout, use labeled lower-bar shortcuts for common views and actions; omit Select and reserve Menu for future features.

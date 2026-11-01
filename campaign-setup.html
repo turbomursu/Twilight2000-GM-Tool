@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#18251e">
   <title>Campaign Setup | Fieldbook</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/vendor/leaflet.css">
   <style>
     :root {
       color-scheme: light;
@@ -131,6 +131,10 @@
     .fieldpapers-atlas-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
     .fieldpapers-atlas-meta a { color: #355d61; }
     .fieldpapers-preview { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 7px; border-top: 1px solid #c1cbbf; }
+    .offline-basemap-tools { display: grid; gap: 10px; margin-top: 12px; padding: 13px; border: 1px solid #96a394; background: #e5eae2; }
+    .offline-basemap-tools h3 { margin: 0; font: 700 12px var(--mono); text-transform: uppercase; }
+    .offline-basemap-tools p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .offline-basemap-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.3fr) auto; align-items: end; gap: 9px; }
     .fieldpapers-preview[hidden] { display: none; }
     .map-workspace[hidden] { display: none; }
     #fieldpapers-file { display: none; }
@@ -297,7 +301,11 @@
 
         <section class="setup-panel" data-panel="map" aria-labelledby="map-title" hidden>
           <div class="panel-heading"><div><span class="eyebrow">02 / Base map</span><h2 id="map-title">Import atlas</h2></div><span class="eyebrow">Field Papers GeoJSON</span></div>
-          <div class="panel-body"><section class="fieldpapers-tools" aria-label="Field Papers atlas import"><div><strong>Import the base atlas</strong><p>Choose the atlas GeoJSON downloaded from Field Papers. It supplies the geographic bounds and page layout; the printable PDF is the offline map image.</p></div><div class="fieldpapers-actions"><button class="button button-primary" type="button" id="choose-fieldpapers-file">Import atlas GeoJSON</button><input id="fieldpapers-file" type="file" accept=".json,.geojson,application/json,application/geo+json"></div><p class="fieldpapers-status" id="fieldpapers-status" role="status">Import a Field Papers atlas GeoJSON to continue.</p><div class="fieldpapers-atlas-meta" id="fieldpapers-atlas-meta" hidden></div><div class="fieldpapers-preview" id="fieldpapers-import-preview" hidden><span class="fieldpapers-status" id="fieldpapers-import-summary"></span><button class="button button-primary" type="button" id="apply-fieldpapers-import" disabled>Apply imported atlas</button></div></section><div class="step-footer"><p class="feedback">Import the atlas before terrain assignment or location entry. The imported map stays in campaign data.</p><div class="button-group"><button class="button" type="button" data-go-step="brief">← Brief</button><button class="button button-primary" type="button" id="continue-to-terrain" data-go-step="terrain" disabled>Terrain →</button></div></div></div>
+          <div class="panel-body">
+            <section class="fieldpapers-tools" aria-label="Field Papers atlas import"><div><strong>Import the base atlas</strong><p>Choose the atlas GeoJSON downloaded from Field Papers. It supplies the geographic bounds and page layout; the printable PDF is the offline map image.</p></div><div class="fieldpapers-actions"><button class="button button-primary" type="button" id="choose-fieldpapers-file">Import atlas GeoJSON</button><input id="fieldpapers-file" type="file" accept=".json,.geojson,application/json,application/geo+json"></div><p class="fieldpapers-status" id="fieldpapers-status" role="status">Import a Field Papers atlas GeoJSON to continue.</p><div class="fieldpapers-atlas-meta" id="fieldpapers-atlas-meta" hidden></div><div class="fieldpapers-preview" id="fieldpapers-import-preview" hidden><span class="fieldpapers-status" id="fieldpapers-import-summary"></span><button class="button button-primary" type="button" id="apply-fieldpapers-import" disabled>Apply imported atlas</button></div></section>
+            <section class="offline-basemap-tools" aria-label="Offline basemap asset"><div><h3>Offline interactive basemap / raster PMTiles</h3><p>Upload a licensed raster PMTiles archive. It is stored locally on this GM server and can be used without public map tiles. Keep the provider attribution with the archive.</p></div><div class="offline-basemap-fields"><label class="field"><span class="field-label">Required attribution</span><input id="offline-basemap-attribution" maxlength="300" placeholder="Map provider / license"></label><label class="field"><span class="field-label">PMTiles archive / max 50 MiB</span><input id="offline-basemap-file" type="file" accept=".pmtiles,application/vnd.pmtiles,application/octet-stream"></label><button class="button button-primary" type="button" id="upload-offline-basemap" disabled>Upload and use</button></div><div class="button-group"><button class="button" type="button" id="use-online-basemap">Use online OSM reference</button></div><p class="fieldpapers-status" id="offline-basemap-status" role="status">No offline basemap selected. Online OSM remains the reference layer.</p></section>
+            <div class="step-footer"><p class="feedback">Import the atlas before terrain assignment or location entry. The imported map stays in campaign data.</p><div class="button-group"><button class="button" type="button" data-go-step="brief">← Brief</button><button class="button button-primary" type="button" id="continue-to-terrain" data-go-step="terrain" disabled>Terrain →</button></div></div>
+          </div>
         </section>
 
         <section class="setup-panel" data-panel="locations" aria-labelledby="locations-title" hidden>
@@ -321,6 +329,7 @@
           <div class="panel-heading"><div><span class="eyebrow">03 / Strategic play / Referee Aid</span><h2 id="terrain-title">Assign terrain by travel hex</h2></div><span class="eyebrow">10 km per hex / campaign data only</span></div>
           <div class="panel-body">
             <form class="map-controls" id="map-search-form"><div class="field"><label for="map-search-input">Find a real-world place</label><div class="map-search"><input id="map-search-input" type="search" maxlength="120" placeholder="City, region, or coordinates"><button class="button" type="submit" id="map-search-button">Find</button></div></div><button class="button" type="button" id="draw-area">Mark area</button><button class="button" type="button" id="clear-area" disabled>Clear area</button></form>
+            <form class="map-bounds-editor" id="map-bounds-form" aria-label="Edit campaign map bounds"><span class="eyebrow">Campaign bounds / latitude and longitude</span><div class="map-bounds-fields"><label class="field"><span class="field-label">South</span><input id="map-bound-south" type="number" step="any" min="-90" max="90" required></label><label class="field"><span class="field-label">West</span><input id="map-bound-west" type="number" step="any" min="-180" max="180" required></label><label class="field"><span class="field-label">North</span><input id="map-bound-north" type="number" step="any" min="-90" max="90" required></label><label class="field"><span class="field-label">East</span><input id="map-bound-east" type="number" step="any" min="-180" max="180" required></label><button class="button" type="submit" id="apply-map-bounds">Apply bounds</button></div><p class="feedback">You can also drag the two map corners. Bounds must contain all campaign locations.</p></form>
             <p class="map-status" id="terrain-map-status" data-map-status role="status">Select a hex to assign a strategic terrain type.</p>
             <div class="terrain-editor-grid">
               <section class="panel" aria-label="Terrain assignment map"><div id="terrain-map-host"><div class="map-frame" id="map-frame"><div id="leaflet-map" aria-label="Imported campaign map with 10 km hex grid"></div><span class="map-grid-label" id="map-grid-label">UNNAMED AREA / INITIAL MAP</span><span class="map-place-hint" id="map-place-hint">Select a hex to assign terrain</span></div></div><p class="map-usage-note">Grid origin is the imported atlas northwest corner. Hexes are 10 km travel-scale cells. Terrain entries are campaign labels; no tactical effects are applied.</p><div class="map-usage-note"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap licensing</a> / <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noreferrer">Tile policy</a></div></section>
@@ -422,7 +431,8 @@
   <dialog class="modal" id="preview-dialog" aria-labelledby="preview-title"><div class="modal-head"><h2 id="preview-title">Setup package preview</h2><button class="icon-button" type="button" id="close-preview" aria-label="Close package preview">×</button></div><div class="modal-body"><pre id="preview-json"></pre></div></dialog>
   <dialog class="modal" id="import-package-dialog" aria-labelledby="import-package-title"><div class="modal-head"><h2 id="import-package-title">Open setup package</h2><button class="icon-button" type="button" id="close-import-package" aria-label="Close setup package import">×</button></div><div class="modal-body"><p class="feedback" id="import-package-status" role="status"></p><pre id="import-package-summary" hidden></pre><p class="row-description">Applying this package replaces the current browser-local setup draft. It does not change a running campaign or publish player information.</p><div class="dialog-actions"><button class="button" type="button" id="cancel-import-package">Cancel</button><button class="button button-primary" type="button" id="apply-import-package" disabled>Replace local draft</button></div></div></dialog>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/vendor/leaflet.js"></script>
+  <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
   <script src="/auth-client.js" defer></script>
   <script>
@@ -462,10 +472,22 @@
       const mapSearchButton = document.querySelector("#map-search-button");
       const drawAreaButton = document.querySelector("#draw-area");
       const clearAreaButton = document.querySelector("#clear-area");
+      const boundsForm = document.querySelector("#map-bounds-form");
+      const boundsInputs = {
+        south: document.querySelector("#map-bound-south"),
+        west: document.querySelector("#map-bound-west"),
+        north: document.querySelector("#map-bound-north"),
+        east: document.querySelector("#map-bound-east")
+      };
       const addLocationButton = document.querySelector("#add-location");
       const cancelLocationEditButton = document.querySelector("#cancel-location-edit");
       const chooseFieldPapersFileButton = document.querySelector("#choose-fieldpapers-file");
       const fieldPapersFileInput = document.querySelector("#fieldpapers-file");
+      const offlineBasemapAttributionInput = document.querySelector("#offline-basemap-attribution");
+      const offlineBasemapFileInput = document.querySelector("#offline-basemap-file");
+      const uploadOfflineBasemapButton = document.querySelector("#upload-offline-basemap");
+      const useOnlineBasemapButton = document.querySelector("#use-online-basemap");
+      const offlineBasemapStatus = document.querySelector("#offline-basemap-status");
       const fieldPapersStatus = document.querySelector("#fieldpapers-status");
       const fieldPapersAtlasMeta = document.querySelector("#fieldpapers-atlas-meta");
       const fieldPapersImportPreview = document.querySelector("#fieldpapers-import-preview");
@@ -521,6 +543,8 @@
         ]
       };
       let leafletMap = null;
+      let baseMapLayer = null;
+      let baseMapLayer = null;
       let locationMarkerLayer = null;
       let hexGridLayer = null;
       let areaLayer = null;
@@ -552,7 +576,7 @@
         return {
           schemaVersion: 2,
           campaign: { id: makeId("campaign"), name: "", setting: "", premise: "", mapName: "", era: "" },
-          map: { center: { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng }, zoom: DEFAULT_MAP_VIEW.zoom, bounds: null, grid: { cellKm: TRAVEL_HEX_KM, origin: null, terrainCells: {} }, atlas: null, offlineAnnotations: [] },
+          map: { center: { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng }, zoom: DEFAULT_MAP_VIEW.zoom, bounds: null, grid: { cellKm: TRAVEL_HEX_KM, origin: null, terrainCells: {} }, atlas: null, offlineAnnotations: [], offlineBasemap: null },
           locations: [],
           factions: [],
           settlements: [],
@@ -577,6 +601,11 @@
         const { south, west, north, east } = bounds;
         if (![south, west, north, east].every(Number.isFinite) || south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) return null;
         return { south, west, north, east };
+      }
+
+      function renderBoundsFields() {
+        const bounds = state.map.bounds;
+        Object.entries(boundsInputs).forEach(([key, input]) => { input.value = bounds ? String(bounds[key]) : ""; });
       }
 
       function normalizeTerrainCells(cells) {
@@ -687,6 +716,15 @@
         };
       }
 
+      function normalizeOfflineBasemap(basemap) {
+        if (basemap === null || basemap === undefined) return null;
+        if (!isRecord(basemap) || Object.keys(basemap).length !== 3
+          || !Object.hasOwn(basemap, "format") || basemap.format !== "raster-pmtiles"
+          || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
+          || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) return null;
+        return { format: "raster-pmtiles", assetId: basemap.assetId, attribution: basemap.attribution.trim() };
+      }
+
       function renderFieldPapersAtlas() {
         const atlas = state.map.atlas;
         fieldPapersAtlasMeta.replaceChildren();
@@ -711,6 +749,39 @@
           pdfLink.textContent = "Open printable PDF";
           fieldPapersAtlasMeta.append(pdfLink);
         }
+      }
+
+      function renderOfflineBasemapControls() {
+        const basemap = state.map.offlineBasemap;
+        if (basemap) {
+          offlineBasemapAttributionInput.value = basemap.attribution;
+          offlineBasemapStatus.textContent = `Offline raster archive selected / ${basemap.assetId}.pmtiles / ${basemap.attribution}`;
+        } else {
+          offlineBasemapStatus.textContent = "No offline basemap selected. Online OSM remains the reference layer.";
+        }
+        uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim();
+      }
+
+      function renderMapBaseLayer() {
+        if (!leafletMap) return;
+        if (baseMapLayer) leafletMap.removeLayer(baseMapLayer);
+        baseMapLayer = null;
+        if (state.map.offlineBasemap) {
+          if (!window.pmtiles?.PMTiles || !window.pmtiles?.leafletRasterLayer) {
+            setMapStatus("PMTiles renderer unavailable. Restore the local map libraries and reload.", "error");
+            return;
+          }
+          const archiveUrl = `/offline-basemaps/${encodeURIComponent(state.map.offlineBasemap.assetId)}.pmtiles`;
+          const archive = new window.pmtiles.PMTiles(archiveUrl);
+          baseMapLayer = window.pmtiles.leafletRasterLayer(archive, { attribution: escapeHtml(state.map.offlineBasemap.attribution) }).addTo(leafletMap);
+          baseMapLayer.on("tileerror", () => setMapStatus("Offline PMTiles archive is unavailable on this server.", "error"));
+          return;
+        }
+        baseMapLayer = L.tileLayer(MAP_TILE_URL, {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+        }).addTo(leafletMap);
+        baseMapLayer.on("tileerror", () => setMapStatus("Map tiles could not be loaded. Check your connection or try again later.", "error"));
       }
 
       function isValidCoordinateTree(coordinates) {
@@ -834,7 +905,8 @@
               bounds: normalizeAreaBounds(savedMap.bounds),
               grid: { cellKm: TRAVEL_HEX_KM, origin: legacySchematic ? null : gridOrigin, terrainCells: legacySchematic ? {} : normalizeTerrainCells(savedGrid.terrainCells) },
               atlas: legacySchematic ? null : normalizeAtlasMetadata(savedMap.atlas),
-              offlineAnnotations: legacySchematic ? [] : normalizeGeoJSONFeatures(savedMap.offlineAnnotations)
+              offlineAnnotations: legacySchematic ? [] : normalizeGeoJSONFeatures(savedMap.offlineAnnotations),
+              offlineBasemap: legacySchematic ? null : normalizeOfflineBasemap(savedMap.offlineBasemap)
             },
             locations: Array.isArray(parsed.locations) ? parsed.locations.filter(isRecord).map((location) => {
               const validPosition = isRecord(location.position) && isValidCoordinate(location.position.lat, location.position.lng)
@@ -906,6 +978,7 @@
         mapNameInput.value = state.campaign.mapName;
         campaignEraInput.value = state.campaign.era;
         renderFieldPapersAtlas();
+        renderOfflineBasemapControls();
         document.querySelector("#continue-to-terrain").disabled = !state.map.atlas;
         fieldPapersStatus.textContent = state.map.atlas
           ? "Saved Field Papers atlas restored. Add campaign locations or import offline markup."
@@ -997,11 +1070,7 @@
         }
 
         leafletMap = L.map(mapElement, { minZoom: 2, maxZoom: 18 }).setView([state.map.center.lat, state.map.center.lng], state.map.zoom);
-        const tiles = L.tileLayer(MAP_TILE_URL, {
-          maxZoom: 19,
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
-        }).addTo(leafletMap);
-        tiles.on("tileerror", () => setMapStatus("Map tiles could not be loaded. Check your connection or try again later.", "error"));
+        renderMapBaseLayer();
         L.control.scale({ metric: true, imperial: true, maxWidth: 140 }).addTo(leafletMap);
         locationMarkerLayer = L.layerGroup().addTo(leafletMap);
         hexGridLayer = L.layerGroup().addTo(leafletMap);
@@ -1323,6 +1392,7 @@
           return;
         }
         state.map.bounds = { south, west, north, east };
+        renderBoundsFields();
         areaRectangle?.setBounds([[south, west], [north, east]]);
         renderHexGrid();
         scheduleMapSave();
@@ -1334,6 +1404,7 @@
         if (!leafletMap) return;
         clearAreaLayers();
         const bounds = normalizeAreaBounds(state.map.bounds);
+        renderBoundsFields();
         clearAreaButton.disabled = !bounds;
         if (bounds) {
           const southWest = [bounds.south, bounds.west];
@@ -1908,7 +1979,7 @@
           map: {
             id: `${state.campaign.id}-map`,
             name: state.campaign.mapName,
-            provider: "OpenStreetMap",
+            provider: state.map.offlineBasemap ? "PMTiles raster" : "OpenStreetMap",
             center: { ...state.map.center },
             zoom: state.map.zoom,
             bounds: state.map.bounds ? { ...state.map.bounds } : null,
@@ -1923,7 +1994,8 @@
               })
             },
             fieldPapersAtlas: state.map.atlas ? { ...state.map.atlas } : null,
-            attribution: "© OpenStreetMap contributors",
+            offlineBasemap: state.map.offlineBasemap ? { ...state.map.offlineBasemap } : null,
+            attribution: state.map.offlineBasemap?.attribution || "© OpenStreetMap contributors",
             offlineAnnotations: normalizeGeoJSONFeatures(state.map.offlineAnnotations),
             locations: state.locations.map(({ legacySchematicPosition, position, ...location }) => {
               const grid = position ? gridCoordinatesForPosition(position) : null;
@@ -2126,7 +2198,8 @@
             bounds,
             grid: { cellKm: TRAVEL_HEX_KM, origin, terrainCells },
             atlas,
-            offlineAnnotations
+            offlineAnnotations,
+            offlineBasemap: normalizeOfflineBasemap(input.map.offlineBasemap)
           },
           locations,
           factions,
@@ -2475,9 +2548,62 @@
         saveDraft();
         setMapStatus("Campaign area cleared. Mark an area before export.");
       });
+      boundsForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const bounds = normalizeAreaBounds(Object.fromEntries(Object.entries(boundsInputs).map(([key, input]) => [key, Number(input.value)])));
+        if (!bounds) {
+          setMapStatus("Enter valid bounds with south below north and west below east.", "error");
+          return;
+        }
+        const outsideLocation = state.locations.find((location) => location.position && !isInsideArea(location.position, bounds));
+        if (outsideLocation) {
+          setMapStatus(`The new bounds exclude ${outsideLocation.name}. Move that location before shrinking the campaign area.`, "error");
+          return;
+        }
+        state.map.bounds = bounds;
+        renderArea();
+        leafletMap?.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]], { padding: [28, 28] });
+        saveDraft();
+        setMapStatus("Campaign bounds updated and saved.", "success");
+      });
 
       chooseFieldPapersFileButton.addEventListener("click", () => fieldPapersFileInput.click());
       applyFieldPapersImportButton.addEventListener("click", applyFieldPapersFeatures);
+      offlineBasemapAttributionInput.addEventListener("input", renderOfflineBasemapControls);
+      offlineBasemapFileInput.addEventListener("change", renderOfflineBasemapControls);
+      uploadOfflineBasemapButton.addEventListener("click", async () => {
+        const file = offlineBasemapFileInput.files[0];
+        const attribution = offlineBasemapAttributionInput.value.trim();
+        if (!file || !attribution) {
+          offlineBasemapStatus.textContent = "Choose an archive and enter its required attribution first.";
+          return;
+        }
+        uploadOfflineBasemapButton.disabled = true;
+        offlineBasemapStatus.textContent = "Uploading and validating raster PMTiles archive...";
+        try {
+          const response = await fetch("/api/offline-basemaps", { method: "POST",
+            headers: { "Content-Type": "application/vnd.pmtiles" }, body: file });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Basemap upload failed.");
+          state.map.offlineBasemap = { format: "raster-pmtiles", assetId: result.asset.assetId, attribution };
+          saveDraft();
+          renderOfflineBasemapControls();
+          renderMapBaseLayer();
+          offlineBasemapStatus.textContent = `Offline basemap ready / ${result.asset.byteLength} bytes / ${attribution}`;
+        } catch (error) {
+          offlineBasemapStatus.textContent = `Basemap not installed: ${error.message}`;
+        } finally {
+          uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim();
+        }
+      });
+      useOnlineBasemapButton.addEventListener("click", () => {
+        state.map.offlineBasemap = null;
+        offlineBasemapFileInput.value = "";
+        offlineBasemapAttributionInput.value = "";
+        saveDraft();
+        renderOfflineBasemapControls();
+        renderMapBaseLayer();
+      });
       document.querySelector("#terrain-batch-mode").addEventListener("click", (event) => {
         terrainBatchMode = !terrainBatchMode;
         if (terrainBatchMode) {

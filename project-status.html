@@ -95,24 +95,25 @@
         <header class="heading"><div><div class="eyebrow">Delivery snapshot / 01 Nov 2026</div><h1>Roadmap status</h1></div><p>Core campaign handoff and multiplayer bookkeeping work. The GM runtime remains partial; rules automation and broad simulation are not ready.</p></header>
         <section class="summary" aria-label="Roadmap summary">
           <div class="summary-item"><span class="eyebrow">Phases 0-3</span><strong>Partial</strong><p>Identity, setup handoff, runtime, and publication slices are active.</p></div>
-          <div class="summary-item"><span class="eyebrow">Verified</span><strong>64 / 64</strong><p>Automated tests pass on Node 26.</p></div>
-          <div class="summary-item"><span class="eyebrow">Next</span><strong>Runtime coverage</strong><p>Finish supported GM panels and recovery.</p></div>
+          <div class="summary-item"><span class="eyebrow">Test suite</span><strong>69 / 69 pass</strong><p>Full Node suite passes, including map publication and recovery checks.</p></div>
+          <div class="summary-item"><span class="eyebrow">Next</span><strong>Verify map workflow</strong><p>Exercise Setup-to-player publishing in a browser with a licensed raster archive.</p></div>
         </section>
 
         <section class="section" aria-labelledby="done-title">
           <div class="section-head"><h2 id="done-title">Delivered slices</h2><span>Checked means implemented and tested</span></div>
           <div class="checklist">
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Accounts, seats, and character review</strong><p>Owner-scoped accounts, assignments, and GM-reviewed edits.</p></span><span class="state done">Ready</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Setup import and same-host recovery</strong><p>Validated packages and campaign backups preserve supported state.</p></span><span class="state done">Ready</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Setup import and runtime recovery</strong><p>Same-host restore and cross-host account-mapped import preserve supported state.</p></span><span class="state done">Ready slices</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Published player surfaces</strong><p>Report, point map, COMMS, and own-seat inventory/conditions.</p></span><span class="state done">Ready</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Runtime bookkeeping</strong><p>Personnel editing, journal, weather notes, clock, and read-only route preview.</p></span><span class="state done">Verified slices</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Runtime briefing and bookkeeping</strong><p>Campaign era/premise, Personnel editing, journal, weather notes, clock, and route preview use persisted data.</p></span><span class="state done">Verified slices</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Runtime route and map editing</strong><p>GM can reorder stops/edit leg details and distances, and move location points within imported bounds. Changes are audited, revision-checked, backed up, and do not auto-publish.</p></span><span class="state done">Verified slice</span></label>
           </div>
         </section>
 
         <section class="section" aria-labelledby="partial-title">
           <div class="section-head"><h2 id="partial-title">In progress</h2><span>Partially checked</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported records persist; remaining dashboard panels, route/map editing, scheduled backups, and cross-host recovery are incomplete.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported records persist; remaining dashboard panels, scheduled backups, map browser acceptance, and offline asset migration are incomplete.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified rules workflows</strong><p>Character generation, derived effects, and dice-governed actions need source-checked procedures.</p></span><span class="state">Not ready</span></label>
           </div>
         </section>
@@ -120,15 +121,14 @@
         <section class="section" aria-labelledby="todo-title">
           <div class="section-head"><h2 id="todo-title">Unfinished</h2><span>Not yet ready</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Cross-host recovery and scheduled backups</strong></span><span class="state">Open</span></label>
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Route/map editing and offline basemaps</strong></span><span class="state">Open</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Scheduled backups</strong><p>Cross-host backup import with explicit local-account mapping is available.</p></span><span class="state">Open</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Map authoring acceptance and offline asset portability</strong><p>Setup bounds, server-validated geometry, and raster PMTiles upload/range serving are implemented; browser round-trip, real-archive rendering, and migration sidecars remain unverified.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified character creation and rules resolution</strong></span><span class="state">Open</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Logistics, economy, diplomacy, conflict, and simulation</strong></span><span class="state">Open</span></label>
           </div>
         </section>
-        <aside class="next-step"><strong>Next prompt</strong><p>Choose one remaining supported runtime panel, connect it to persisted state, and verify owner/revision, recovery, and browser behavior.</p></aside>
-        <p class="footnote">Automated suite: 64 passed. Full scope and acceptance checks are in ROADMAP.md and FEATURES.md.</p>
-        <p class="footnote">This page is a concise snapshot. The detailed deliverables, dependencies, and exit checks remain in ROADMAP.md and FEATURES.md. Checkboxes are status indicators, not a second editable roadmap.</p>
+        <aside class="next-step"><strong>Next prompt</strong><p>Verify Setup bounds, GM geometry editing, publication privacy, and raster rendering in an authenticated browser flow; then document and test PMTiles sidecar migration.</p></aside>
+        <p class="footnote">Full automated run: 69 passed, 0 failed. Real licensed archive rendering and cross-host PMTiles migration are not yet verified. Full scope and acceptance checks are in ROADMAP.md and FEATURES.md; this snapshot is read-only.</p>
       </div>
     </main>
   </div>

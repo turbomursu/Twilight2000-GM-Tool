@@ -27,8 +27,21 @@
       if (!globalThis.L) throw new Error("Map library unavailable. Reload when connected.");
       clear(); current = snapshot;
       map = L.map(container, { zoomControl: false, zoomSnap: .25, zoomDelta: .25 });
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+      if (snapshot.offlineBasemap) {
+        if (!globalThis.pmtiles?.PMTiles || !globalThis.pmtiles?.leafletRasterLayer) throw new Error("Local PMTiles renderer is unavailable.");
+        const attributionText = document.createElement("span");
+        attributionText.textContent = snapshot.offlineBasemap.attribution;
+        const archiveUrl = snapshot.offlineBasemap.assetUrl || `/offline-basemaps/${encodeURIComponent(snapshot.offlineBasemap.assetId)}.pmtiles`;
+        const archive = new globalThis.pmtiles.PMTiles(archiveUrl);
+        const basemapLayer = globalThis.pmtiles.leafletRasterLayer(archive, { attribution: attributionText.innerHTML }).addTo(map);
+        basemapLayer.on("tileerror", () => {
+          const status = document.querySelector("#player-map-status");
+          if (status) status.textContent = "Offline PMTiles archive is unavailable on this server.";
+        });
+      } else {
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+      }
       const bounds = [[snapshot.bounds.south, snapshot.bounds.west], [snapshot.bounds.north, snapshot.bounds.east]];
       baseZoom = Math.min(18, Math.max(0, map.getBoundsZoom(bounds)));
       map.setMinZoom(Math.max(0, baseZoom - 2)); map.setMaxZoom(baseZoom + 1);
@@ -37,6 +50,15 @@
         .bindTooltip(label(location.name)).addTo(map));
       snapshot.markings.forEach((marking) => L.circleMarker(center(marking.position), { radius: 7, color: "#a16822", fillColor: "#f0d6a0", fillOpacity: 1 })
         .bindTooltip(label(marking.label)).addTo(map));
+      (snapshot.geometries || []).forEach((entry) => {
+        const coordinates = entry.geometry.type === "LineString"
+          ? entry.geometry.coordinates.map(([lng, lat]) => [lat, lng])
+          : entry.geometry.coordinates.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
+        const options = { color: entry.geometry.type === "Polygon" ? "#a16822" : "#315a48", weight: 3,
+          fillColor: "#d8ae68", fillOpacity: entry.geometry.type === "Polygon" ? .16 : 0 };
+        const layer = entry.geometry.type === "Polygon" ? L.polygon(coordinates, options) : L.polyline(coordinates, options);
+        layer.bindTooltip(label(entry.label)).addTo(map);
+      });
       if (snapshot.route.length > 1) L.polyline(snapshot.route.map((location) => center(location.position)), { color: "#a13e35", weight: 3, dashArray: "8 5" }).addTo(map);
       if (snapshot.playerPosition) L.circleMarker(center(snapshot.playerPosition), { radius: 10, color: "#922e29", fillColor: "#db5c45", fillOpacity: .8 })
         .bindTooltip(label("Player position"), { permanent: true }).addTo(map);
@@ -62,6 +84,11 @@
     const longitude = document.querySelector("#map-player-longitude");
     const routeChoice = document.querySelector("#map-route-location");
     const positionChoice = document.querySelector("#map-position-location");
+    const geometryType = document.querySelector("#map-geometry-type");
+    const geometryLabel = document.querySelector("#map-geometry-label");
+    const geometryCoordinates = document.querySelector("#map-geometry-coordinates");
+    const geometryEntries = document.querySelector("#map-geometry-entries");
+    const addGeometryButton = document.querySelector("#add-map-geometry");
     let publication = null;
     let draft = null;
     let id = "";
@@ -85,6 +112,16 @@
       return { locationIds: [...form.querySelectorAll("[data-map-location]:checked")].map((input) => input.value),
         markings: [...form.querySelectorAll("[data-marking-id]")].map((row) => ({ id: row.dataset.markingId, label: row.querySelector("[data-mark-label]").value,
           position: { lat: number(row.querySelector("[data-mark-lat]")), lng: number(row.querySelector("[data-mark-lng]")) } })),
+        geometries: [...form.querySelectorAll("[data-geometry-id]")].map((row) => {
+          const type = row.querySelector("[data-geometry-type]").value;
+          const vertices = row.querySelector("[data-geometry-coordinates]").value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+            .map((line) => line.split(",").map((value) => Number(value.trim())));
+          const coordinates = type === "Polygon" ? [vertices] : vertices;
+          if (type === "Polygon" && vertices.length && (vertices[0][0] !== vertices[vertices.length - 1][0]
+            || vertices[0][1] !== vertices[vertices.length - 1][1])) vertices.push([...vertices[0]]);
+          return { id: row.dataset.geometryId, label: row.querySelector("[data-geometry-label]").value,
+            geometry: { type, coordinates: type === "Polygon" ? [vertices] : vertices } };
+        }),
         routeLocationIds: [...draft.routeLocationIds],
         playerPosition: !latitude.value && !longitude.value ? null : { lat: number(latitude), lng: number(longitude) } };
     }
@@ -118,8 +155,40 @@
         row.append(icon("\u00d7", "Remove marking", () => { draft = readDraft(); draft.markings.splice(index, 1); markings(); invalidate(); })); container.append(row);
       });
     }
+    function renderGeometries() {
+      geometryEntries.replaceChildren();
+      (draft.geometries || []).forEach((geometry, index) => {
+        const row = document.createElement("div");
+        row.className = "map-geometry-row";
+        row.dataset.geometryId = geometry.id;
+        const labelInput = document.createElement("input");
+        labelInput.dataset.geometryLabel = "";
+        labelInput.setAttribute("aria-label", "Geometry label");
+        labelInput.maxLength = 160;
+        labelInput.value = geometry.label;
+        const typeSelect = document.createElement("select");
+        typeSelect.dataset.geometryType = "";
+        typeSelect.setAttribute("aria-label", "Geometry type");
+        ["LineString", "Polygon"].forEach((type) => typeSelect.add(new Option(type === "LineString" ? "Line" : "Area", type)));
+        typeSelect.value = geometry.geometry.type;
+        const coordinateInput = document.createElement("textarea");
+        coordinateInput.dataset.geometryCoordinates = "";
+        coordinateInput.setAttribute("aria-label", "Geometry vertices / longitude,latitude per line");
+        const vertices = geometry.geometry.type === "Polygon" ? geometry.geometry.coordinates[0] : geometry.geometry.coordinates;
+        coordinateInput.value = vertices.map(([lng, lat]) => `${lng},${lat}`).join("\n");
+        const remove = icon("×", "Remove geometry", () => {
+          draft = readDraft();
+          draft.geometries.splice(index, 1);
+          renderGeometries();
+          invalidate();
+        });
+        row.append(labelInput, typeSelect, coordinateInput, remove);
+        geometryEntries.append(row);
+      });
+    }
     function renderDraft() {
       draft = structuredClone(publication.draft);
+      draft.geometries ||= [];
       const locations = document.querySelector("#map-allowed-locations"); locations.replaceChildren();
       publication.catalog.locations.forEach((location) => {
         const label = document.createElement("label"); const input = document.createElement("input"); input.type = "checkbox";
@@ -130,11 +199,11 @@
           draft.routeLocationIds = draft.routeLocationIds.filter((locationId) => selected.has(locationId)); routes(); choices(); invalidate(); });
       });
       latitude.value = draft.playerPosition?.lat ?? ""; longitude.value = draft.playerPosition?.lng ?? "";
-      routes(); markings(); choices(); controls();
+      routes(); markings(); renderGeometries(); choices(); controls();
     }
     async function load(campaignId) {
       const token = ++generation; id = campaignId; publication = null; draft = null; invalidate(); form.reset();
-      ["map-allowed-locations", "map-route-entries", "map-marking-entries"].forEach((key) => document.getElementById(key).replaceChildren());
+      ["map-allowed-locations", "map-route-entries", "map-marking-entries", "map-geometry-entries"].forEach((key) => document.getElementById(key).replaceChildren());
       status.textContent = id ? "Loading map draft..." : "Select a runtime campaign.";
       if (!id) return;
       try { const result = await request(`/api/campaigns/${encodeURIComponent(id)}/map-publication`);
@@ -182,6 +251,23 @@
       draft = readDraft(); const bounds = publication.catalog.bounds;
       draft.markings.push({ id: `mark-${Date.now()}-${markingCounter++}`, label: "Marking",
         position: draft.playerPosition || { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 } }); markings(); invalidate();
+    });
+    addGeometryButton.addEventListener("click", () => {
+      const vertices = geometryCoordinates.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+        .map((line) => line.split(",").map((value) => Number(value.trim())));
+      if (!geometryLabel.value.trim() || vertices.some((coordinate) => coordinate.length !== 2 || !coordinate.every(Number.isFinite))) {
+        status.textContent = "Add a geometry label and valid longitude,latitude pairs.";
+        return;
+      }
+      if (geometryType.value === "Polygon" && vertices.length && (vertices[0][0] !== vertices[vertices.length - 1][0]
+        || vertices[0][1] !== vertices[vertices.length - 1][1])) vertices.push([...vertices[0]]);
+      draft = readDraft();
+      draft.geometries.push({ id: `geometry-${crypto.randomUUID()}`, label: geometryLabel.value.trim(),
+        geometry: { type: geometryType.value, coordinates: geometryType.value === "Polygon" ? [vertices] : vertices } });
+      renderGeometries();
+      geometryLabel.value = "";
+      geometryCoordinates.value = "";
+      invalidate();
     });
     positionChoice.addEventListener("change", () => { const location = publication.catalog.locations.find((item) => item.id === positionChoice.value);
       if (location) { latitude.value = location.position.lat; longitude.value = location.position.lng; invalidate(); } });

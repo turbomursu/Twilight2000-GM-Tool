@@ -4,9 +4,9 @@ const actions = new Set([
   "conditions.save", "conditions.clear", "inventory.add", "inventory.update", "inventory.remove",
   "inventory.approve.add", "inventory.approve.update", "inventory.approve.remove", "inventory.reject",
   "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "campaign.restore", "clock.advance", "supplies.midday",
-  "dashboard.update", "journal.create", "journal.update", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
+  "dashboard.update", "journal.create", "journal.update", "route.update", "map.locations.update", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
 ]);
-const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "campaign", "dashboard", "journal_entry", "faction_influence", "faction_prominence", "character_review", "player_seat"]);
+const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "map_catalog", "route", "campaign", "dashboard", "journal_entry", "faction_influence", "faction_prominence", "character_review", "player_seat"]);
 const auditColumns = ["id", "campaign_id", "actor_account_id", "actor_label", "action", "target_type", "target_id", "target_label", "character_id", "related_id",
   "before_revision", "after_revision", "campaign_revision_before", "campaign_revision_after", "created_at", "game_date", "day_number", "game_time"];
 
@@ -15,9 +15,11 @@ function expectedTarget(action) {
   if (action === "inventory.reject") return "inventory_proposal";
   if (action.startsWith("inventory.")) return "inventory_item";
   if (action.startsWith("report.")) return "situation_report";
+  if (action === "map.locations.update") return "map_catalog";
   if (action.startsWith("map.")) return "map_publication";
   if (action === "dashboard.update") return "dashboard";
   if (action.startsWith("journal.")) return "journal_entry";
+  if (action === "route.update") return "route";
   if (action.startsWith("faction.influence.")) return "faction_influence";
   if (action.startsWith("faction.prominence.")) return "faction_prominence";
   if (action.startsWith("character.review.")) return "character_review";
@@ -64,6 +66,8 @@ function targetLabel(database, campaignId, input) {
   if (input.targetType === "dashboard") {
     return database.prepare("SELECT name FROM campaigns WHERE runtime_id = ?").get(campaignId).name;
   }
+  if (input.targetType === "route") return `${database.prepare("SELECT name FROM campaigns WHERE runtime_id = ?").get(campaignId).name} route`;
+  if (input.targetType === "map_catalog") return `${database.prepare("SELECT name FROM campaigns WHERE runtime_id = ?").get(campaignId).name} map locations`;
   if (input.characterId) {
     const seat = database.prepare("SELECT display_label FROM player_seats WHERE campaign_id = ? AND character_id = ?").get(campaignId, input.characterId);
     if (seat) return seat.display_label;

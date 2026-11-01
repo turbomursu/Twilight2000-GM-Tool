@@ -29,6 +29,25 @@ test("accepts a valid schema-v2 setup package", () => {
   assert.equal(assertCampaignSetupPackage(validPackage()), true);
 });
 
+test("accepts optional offline raster PMTiles metadata with attribution", () => {
+  const input = validPackage();
+  input.map.offlineBasemap = { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Licensed map provider" };
+  assert.equal(assertCampaignSetupPackage(input), true);
+});
+
+test("rejects unsafe or incomplete offline basemap metadata", () => {
+  for (const offlineBasemap of [
+    { format: "raster-pmtiles", assetId: "../private", attribution: "Map" },
+    { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: " " },
+    { format: "vector-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Map" },
+    { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Map", url: "https://example.test/tiles.pmtiles" }
+  ]) {
+    const input = validPackage();
+    input.map.offlineBasemap = offlineBasemap;
+    assert.throws(() => assertCampaignSetupPackage(input), /offline basemap/);
+  }
+});
+
 test("rejects unsupported package versions", () => {
   const input = validPackage();
   input.schemaVersion = 1;

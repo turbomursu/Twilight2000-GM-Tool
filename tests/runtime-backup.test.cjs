@@ -3,13 +3,14 @@ const { createHash, randomBytes } = require("node:crypto");
 const http = require("node:http");
 const { once } = require("node:events");
 const test = require("node:test");
-const { openRuntimeDatabase, getRuntimeDashboard, exportRuntimeSave, restoreRuntimeSave, updateRuntimeDashboard, importSetupPackage } = require("../server/runtime-store.cjs");
+const { openRuntimeDatabase, getRuntimeDashboard, exportRuntimeSave, restoreRuntimeSave, importRuntimeBackup, updateRuntimeDashboard, importSetupPackage } = require("../server/runtime-store.cjs");
 const { seedSampleRuntime, sampleSetupPackage } = require("../server/sample-data.cjs");
 const { mkdtempSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
+const { listAuditEvents } = require("../server/audit.cjs");
 const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("../server/runtime-store.cjs");
 const { getGMReport, updateGMReport, getPlayerReport } = require("../server/situation-reports.cjs");
 const { getGMMap, updateGMMap, getPlayerMap } = require("../server/map-publications.cjs");
@@ -48,7 +49,7 @@ test("combined campaign recovery preserves character/inventory requests, conditi
     updateGMReport(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft: report });
     updateGMReport(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
     const catalog = getGMMap(database, "gm-owner", campaignId).catalog;
-    const map = { locationIds: catalog.locations.slice(0, 2).map((location) => location.id), markings: [],
+    const map = { locationIds: catalog.locations.slice(0, 2).map((location) => location.id), markings: [], geometries: [],
       routeLocationIds: catalog.locations.slice(0, 2).map((location) => location.id), playerPosition: catalog.locations[0].position };
     updateGMMap(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft: map });
     updateGMMap(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
@@ -225,7 +226,7 @@ test("map selections persist and recovery withdraws publication atomically", () 
     const playerId = database.prepare("SELECT account_id FROM player_seats WHERE campaign_id = ?").get(campaignId).account_id;
     const catalog = getGMMap(database, "gm-owner", campaignId).catalog;
     const draft = { locationIds: catalog.locations.slice(0, 2).map((location) => location.id),
-      markings: [{ id: "checkpoint", label: "Checkpoint", position: catalog.locations[0].position }],
+      markings: [{ id: "checkpoint", label: "Checkpoint", position: catalog.locations[0].position }], geometries: [],
       routeLocationIds: catalog.locations.slice(0, 2).map((location) => location.id), playerPosition: catalog.locations[0].position };
     updateGMMap(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft });
     updateGMMap(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
@@ -374,13 +375,17 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     const originalPersonnelIds = database.prepare("SELECT id FROM personnel WHERE campaign_id = ? ORDER BY sort_order").all(seeded.campaignId).map(({ id }) => id);
     const backup = exportRuntimeSave(database, "gm-owner", seeded.campaignId, { now: () => "2026-11-01T10:00:00.000Z" });
 
+    const updatedRoute = before.route.map(({ locationId, detail, kmFromPrevious }) => ({ locationId, detail, kmFromPrevious }));
+    [updatedRoute[1], updatedRoute[2]] = [updatedRoute[2], updatedRoute[1]];
     updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, {
       expectedRevision: before.campaign.revision,
       dashboard: { rationsDays: 2, weather: "Rain/Snow", weatherNote: "Weather shift ends after tonight." },
       personnel: before.personnel.map((person, index) => index === 0
         ? { ...person, name: "Anja Updated", condition: "Recovering", readiness: "Alert" }
         : person),
-      journal: []
+      journal: [],
+      route: updatedRoute,
+      locations: [{ id: before.locations[0].id, mapPosition: { lat: 60.6, lng: 14.1 } }]
     }, { now: () => Date.parse("2026-11-01T10:10:00.000Z") });
     const changed = getRuntimeDashboard(database, "gm-owner", seeded.campaignId);
     assert.equal(changed.dashboard.rationsDays, 2);
@@ -390,6 +395,8 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     assert.equal(changed.personnel[0].name, "Anja Updated");
     assert.equal(changed.personnel[0].condition, "Recovering");
     assert.equal(changed.personnel[0].readiness, "Alert");
+    assert.equal(changed.route[1].locationId, before.route[2].locationId);
+    assert.deepEqual(changed.locations[0].mapPosition, { lat: 60.6, lng: 14.1 });
     assert.equal(changed.journal.length, 0);
 
     assert.throws(() => restoreRuntimeSave(database, "gm-owner", seeded.campaignId, backup, {
@@ -412,10 +419,14 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     });
     const restored = getRuntimeDashboard(database, "gm-owner", seeded.campaignId);
     assert.equal(result.restoredFromRevision, before.campaign.revision);
+    assert.equal(restored.campaign.premise, before.campaign.premise);
+    assert.equal(restored.campaign.era, before.campaign.era);
     assert.equal(restored.dashboard.rationsDays, before.dashboard.rationsDays);
     assert.equal(restored.dashboard.weather, before.dashboard.weather);
     assert.equal(restored.dashboard.weatherNote, before.dashboard.weatherNote);
     assert.deepEqual(restored.route.map(({ mapPosition }) => mapPosition), before.route.map(({ mapPosition }) => mapPosition));
+    assert.deepEqual(restored.route.map(({ locationId }) => locationId), before.route.map(({ locationId }) => locationId));
+    assert.deepEqual(restored.locations.map(({ mapPosition }) => mapPosition), before.locations.map(({ mapPosition }) => mapPosition));
     assert.deepEqual(restored.personnel, before.personnel);
     assert.equal(restored.journal.length, before.journal.length);
     assert.deepEqual(restored.journal.map(({ title }) => title), before.journal.map(({ title }) => title));
@@ -474,6 +485,101 @@ test("runtime backups and restores are isolated to the campaign owner", () => {
     }), /Runtime campaign not found/);
   } finally {
     database.close();
+  }
+});
+
+test("cross-host runtime import remaps source GM and player account references", async (t) => {
+  const source = openRuntimeDatabase();
+  const target = openRuntimeDatabase();
+  let server;
+  try {
+    createGm(source, "source-gm", "source-gm");
+    const sourceCampaign = seedSampleRuntime(source, "source-gm");
+    const sourceSeat = source.prepare("SELECT * FROM player_seats WHERE campaign_id = ? AND active = 1").get(sourceCampaign.campaignId);
+    updateGMConditions(source, "source-gm", sourceCampaign.campaignId, {
+      characterId: sourceSeat.character_id,
+      expectedRevision: 0,
+      conditions: { ...emptyConditions(), damage: 1, notes: "Mapped public condition" },
+      gmNotes: "PRIVATE source note"
+    });
+    sendComms(source, sourceSeat.account_id, sourceCampaign.campaignId, "player", { text: "Source player message" });
+    createInventoryProposal(source, sourceSeat.account_id, sourceCampaign.campaignId, { kind: "add", item: {
+      name: "Mapped ration", quantity: 1, carryLocation: "backpack", sourceCategory: "GM", sourceReference: "Campaign", details: "Test item"
+    } });
+    const backup = exportRuntimeSave(source, "source-gm", sourceCampaign.campaignId);
+    assert.ok(backup.data.accountReferences.some((reference) => reference.accountId === "source-gm" && reference.role === "gm"));
+
+    createGm(target, "target-gm", "target-gm");
+    createGm(target, "other-gm", "other-gm");
+    const timestamp = new Date().toISOString();
+    const addPlayer = (id, username, ownerId) => target.prepare(`INSERT INTO accounts
+      (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role, created_by_account_id)
+      VALUES (?, ?, ?, 0, ?, ?, 'player', ?)`).run(id, username, "test-only-hash", timestamp, timestamp, ownerId);
+    addPlayer("mapped-player", "mapped-player", "target-gm");
+    addPlayer("foreign-player", "foreign-player", "other-gm");
+    const gmToken = randomBytes(32).toString("base64url");
+    const playerToken = randomBytes(32).toString("base64url");
+    target.prepare("INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
+      .run(createHash("sha256").update(gmToken).digest("hex"), "target-gm", timestamp, "2099-01-01T00:00:00.000Z");
+    target.prepare("INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
+      .run(createHash("sha256").update(playerToken).digest("hex"), "mapped-player", timestamp, "2099-01-01T00:00:00.000Z");
+    server = http.createServer(createAppHandler({ database: target, authHandler: createAuthHandler({ database: target }) }));
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    t.after(() => new Promise((resolve) => server.close(() => {
+      source.close();
+      target.close();
+      resolve();
+    })));
+    const origin = `http://127.0.0.1:${server.address().port}`;
+
+    const foreignMapping = await fetch(`${origin}/api/campaigns/import-backup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+      body: JSON.stringify({ backup, playerAccountMap: { [sourceSeat.account_id]: "foreign-player" } })
+    });
+    assert.equal(foreignMapping.status, 422);
+    assert.equal(target.prepare("SELECT COUNT(*) AS count FROM campaigns").get().count, 0);
+
+    const missingMapping = await fetch(`${origin}/api/campaigns/import-backup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+      body: JSON.stringify({ backup, playerAccountMap: {} })
+    });
+    assert.equal(missingMapping.status, 422);
+    assert.equal(target.prepare("SELECT COUNT(*) AS count FROM campaigns").get().count, 0);
+
+    const importedResponse = await fetch(`${origin}/api/campaigns/import-backup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+      body: JSON.stringify({ backup, playerAccountMap: { [sourceSeat.account_id]: "mapped-player" } })
+    });
+    assert.equal(importedResponse.status, 201);
+    const { campaign, import: imported } = await importedResponse.json();
+    assert.notEqual(campaign.id, sourceCampaign.campaignId);
+    assert.equal(imported.sourceCampaignId, sourceCampaign.campaignId);
+    assert.equal(campaign.name, "The Long Road");
+    const memberships = target.prepare("SELECT account_id, role FROM campaign_memberships WHERE campaign_id = ? ORDER BY role")
+      .all(campaign.id).map(({ account_id, role }) => ({ account_id, role }));
+    assert.deepEqual(memberships, [{ account_id: "target-gm", role: "gm" }, { account_id: "mapped-player", role: "player" }]);
+    assert.equal(target.prepare("SELECT COUNT(*) AS count FROM campaign_memberships WHERE campaign_id = ? AND account_id IN ('source-gm', ?)")
+      .get(campaign.id, sourceSeat.account_id).count, 0);
+    const localSeat = target.prepare("SELECT * FROM player_seats WHERE campaign_id = ?").get(campaign.id);
+    assert.equal(localSeat.account_id, "mapped-player");
+    assert.equal(localSeat.character_id, sourceSeat.character_id);
+    assert.equal(getPlayerConditions(target, "mapped-player", campaign.id).record.conditions.notes, "Mapped public condition");
+    assert.doesNotMatch(JSON.stringify(getPlayerConditions(target, "mapped-player", campaign.id)), /PRIVATE source note/);
+    assert.equal(listComms(target, "mapped-player", campaign.id, "player").messages[0].text, "Source player message");
+    assert.equal(getPlayerInventory(target, "mapped-player", campaign.id).proposals[0].kind, "add");
+    assert.equal(target.prepare("SELECT submitter_account_id FROM inventory_proposals WHERE campaign_id = ?").get(campaign.id).submitter_account_id, "mapped-player");
+    const events = listAuditEvents(target, "target-gm", campaign.id).events;
+    assert.ok(events.some((event) => event.action === "conditions.save" && event.actor.id === "target-gm"));
+    assert.ok(events.some((event) => event.action === "campaign.restore" && event.actor.id === "target-gm"));
+  } finally {
+    if (!server) {
+      source.close();
+      target.close();
+    }
   }
 });
 

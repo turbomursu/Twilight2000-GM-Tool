@@ -115,6 +115,8 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   const allowed = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
   assert.equal(allowed.status, 200);
   const { runtime } = await allowed.json();
+  assert.equal(runtime.campaign.premise, "A small column travels north through an uncertain region.");
+  assert.equal(runtime.campaign.era, "11 May 2000");
   assert.equal(runtime.dashboard.rationsDays, 6);
   assert.equal(runtime.route.length, 4);
   assert.deepEqual(runtime.route.map(({ mapPosition }) => mapPosition), [
@@ -123,6 +125,7 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
     { lat: 61.01, lng: 14.54 },
     { lat: 61.12, lng: 14.62 }
   ]);
+  assert.equal(runtime.locations.length, 4);
   assert.equal(runtime.personnel.length, 4);
   assert.equal(runtime.journal.length, 3);
 
@@ -145,6 +148,12 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
     body: JSON.stringify({ expectedRevision: runtime.campaign.revision - 1, personnel: runtime.personnel })
   });
   assert.equal(stalePersonnelUpdate.status, 409);
+  const staleMapUpdate = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: runtime.campaign.revision - 1, locations: [{ id: runtime.locations[0].id, mapPosition: { lat: 60.6, lng: 14.1 } }] })
+  });
+  assert.equal(staleMapUpdate.status, 409);
 
   const updatedPersonnel = runtime.personnel.map((person, index) => ({
     ...person,
@@ -153,10 +162,15 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
     readiness: index === 0 ? "Alert" : person.readiness
   }));
   const updatedJournal = runtime.journal.map((entry) => ({ ...entry, date: entry.entryDate }));
+  const updatedRoute = runtime.route.map(({ locationId, detail, kmFromPrevious }) => ({ locationId, detail, kmFromPrevious }));
+  [updatedRoute[1], updatedRoute[2]] = [updatedRoute[2], updatedRoute[1]];
+  const updatedLocations = [{ id: runtime.locations[0].id, mapPosition: { lat: 60.6, lng: 14.1 } }];
   const updateResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
-    body: JSON.stringify({ expectedRevision: runtime.campaign.revision, dashboard: { rationsDays: 5, weather: "Rain/Snow", weatherNote: "North road weather watch." }, personnel: updatedPersonnel, journal: updatedJournal })
+    body: JSON.stringify({ expectedRevision: runtime.campaign.revision,
+      dashboard: { rationsDays: 5, weather: "Rain/Snow", weatherNote: "North road weather watch." },
+      personnel: updatedPersonnel, journal: updatedJournal, route: updatedRoute, locations: updatedLocations })
   });
   assert.equal(updateResponse.status, 200);
   const updatedRuntime = (await updateResponse.json()).runtime;
@@ -166,7 +180,10 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(updatedRuntime.personnel[0].name, "Anja Updated");
   assert.equal(updatedRuntime.personnel[0].condition, "Recovering");
   assert.equal(updatedRuntime.personnel[0].readiness, "Alert");
-  assert.equal(updatedRuntime.campaign.revision, 4);
+  assert.equal(updatedRuntime.route[1].locationId, runtime.route[2].locationId);
+  assert.deepEqual(updatedRuntime.locations[0].mapPosition, { lat: 60.6, lng: 14.1 });
+  assert.deepEqual(updatedRuntime.route.find(({ locationId }) => locationId === runtime.locations[0].id).mapPosition, { lat: 60.6, lng: 14.1 });
+  assert.equal(updatedRuntime.campaign.revision, 6);
 
   const reloaded = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
   const reloadedRuntime = (await reloaded.json()).runtime;
@@ -174,6 +191,20 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(reloadedRuntime.dashboard.weather, "Rain/Snow");
   assert.equal(reloadedRuntime.dashboard.weatherNote, "North road weather watch.");
   assert.equal(reloadedRuntime.personnel[0].name, "Anja Updated");
+  assert.equal(reloadedRuntime.route[1].locationId, runtime.route[2].locationId);
+  assert.deepEqual(reloadedRuntime.locations[0].mapPosition, { lat: 60.6, lng: 14.1 });
+
+  const outOfBoundsMapUpdate = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: reloadedRuntime.campaign.revision, locations: [{ id: runtime.locations[0].id, mapPosition: { lat: 80, lng: 14 } }] })
+  });
+  assert.equal(outOfBoundsMapUpdate.status, 422);
+
+  const auditResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/audit`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
+  const auditedActions = (await auditResponse.json()).events.map(({ action }) => action);
+  assert.ok(auditedActions.includes("route.update"));
+  assert.ok(auditedActions.includes("map.locations.update"));
 
   const deniedWrite = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",

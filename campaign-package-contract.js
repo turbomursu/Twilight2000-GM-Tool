@@ -19,6 +19,16 @@
       || south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) {
       fail("The setup package needs valid campaign-area bounds.");
     }
+    const basemap = input.map.offlineBasemap;
+    if (basemap !== undefined && basemap !== null) {
+      if (!isRecord(basemap) || Object.keys(basemap).length !== 3
+        || !Object.hasOwn(basemap, "assetId") || !Object.hasOwn(basemap, "attribution") || !Object.hasOwn(basemap, "format")
+        || basemap.format !== "raster-pmtiles"
+        || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
+        || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) {
+        fail("The offline basemap must reference a raster PMTiles asset and include attribution.");
+      }
+    }
     const grid = input.map.grid;
     if (grid.coordinateSystem !== "axial-q-r" || grid.cellKm !== 10 || !Array.isArray(grid.terrainCells) || grid.terrainCells.length > 10000) {
       fail("The setup package contains an unsupported travel grid.");
