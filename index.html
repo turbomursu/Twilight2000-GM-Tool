@@ -166,6 +166,7 @@
     .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(290px, .85fr); gap: 18px; }
     .map-wrap { position: relative; overflow: hidden; background: #dce5d2; }
     #field-map { display: block; width: 100%; height: 335px; }
+    .runtime-route-map { width: 100%; height: 335px; background: #e2e7e0; }
     .map-key { display: flex; flex-wrap: wrap; gap: 15px; padding: 11px 15px; border-top: 1px solid var(--line); color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
     .key-item { display: inline-flex; align-items: center; gap: 6px; }
     .key-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); }
@@ -453,10 +454,12 @@
           </div>
           <div class="dashboard-grid">
             <section class="panel" aria-labelledby="map-title">
-              <div class="panel-head"><div><div class="eyebrow">Theater / Dalarna County</div><h2 id="map-title">Route sketch</h2></div><span class="inline-hint">FIELD SKETCH / NOT TO SCALE</span></div>
-              <div class="map-wrap" id="sample-route-sketch"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated sample route sketch"></canvas></div>
-              <p class="empty-state" id="runtime-route-map-notice" hidden>Runtime map rendering is not connected yet. Route stops below are loaded from this campaign.</p>
+              <div class="panel-head"><div><div class="eyebrow">Theater / Campaign locations</div><h2 id="map-title">Route sketch</h2></div><span class="inline-hint" id="route-map-caption">FIELD SKETCH / NOT TO SCALE</span></div>
+              <div class="map-wrap" id="sample-route-sketch"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated local sample route sketch"></canvas></div>
+              <div class="runtime-route-map" id="runtime-route-map" aria-label="Read-only campaign route map" hidden></div>
+              <p class="empty-state" id="runtime-route-map-notice" hidden></p>
               <div class="map-key" id="sample-route-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
+              <div class="map-key" id="runtime-route-map-key" hidden><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="inline-hint">Saved route coordinates / read only. OSM tiles require internet.</span></div>
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="situation-title-card">
@@ -758,6 +761,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let pendingRuntimeBackup = null;
       let influenceMap = null;
       let influenceHexLayer = null;
+      let runtimeRouteMap = null;
+      let runtimeRouteLayer = null;
+      let runtimeRouteSignature = "";
       let stagedInfluenceCells = new Set();
       let liveInfluenceEditing = false;
       let runtimeDataLoaded = false;
@@ -831,7 +837,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
             name: stop.name,
             detail: stop.detail,
             distance: `${distance} km`,
-            kmFromPrevious: stop.kmFromPrevious
+            kmFromPrevious: stop.kmFromPrevious,
+            mapPosition: stop.mapPosition
           };
         });
         state = {
@@ -870,9 +877,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
         document.getElementById("top-campaign-name").textContent = runtime.campaign.name;
         document.getElementById("dashboard-data-mode").textContent = "RUNTIME / SERVER";
-        document.getElementById("sample-route-sketch").hidden = true;
-        document.getElementById("sample-route-key").hidden = true;
-        document.getElementById("runtime-route-map-notice").hidden = false;
         exportRuntimeBackupButton.disabled = false;
         openRuntimeRestoreButton.disabled = false;
         render();
@@ -956,7 +960,73 @@ Military rank || optional</textarea><span class="row-description">One field per 
         renderRoute("movement-route");
         renderPeople();
         renderNotes();
-        if (!runtimeDataLoaded) drawMap();
+        if (runtimeDataLoaded) renderRuntimeRouteMap();
+        else drawMap();
+      }
+      function renderRuntimeRouteMap() {
+        const sampleSketch = document.getElementById("sample-route-sketch");
+        const sampleKey = document.getElementById("sample-route-key");
+        const runtimeMapElement = document.getElementById("runtime-route-map");
+        const runtimeKey = document.getElementById("runtime-route-map-key");
+        const notice = document.getElementById("runtime-route-map-notice");
+        const caption = document.getElementById("route-map-caption");
+        sampleSketch.hidden = true;
+        sampleKey.hidden = true;
+        runtimeKey.hidden = false;
+        caption.textContent = "SAVED ROUTE / READ ONLY";
+
+        const positionedStops = route.map((stop, index) => ({ ...stop, index }))
+          .filter((stop) => stop.mapPosition && Number.isFinite(stop.mapPosition.lat) && Number.isFinite(stop.mapPosition.lng)
+            && stop.mapPosition.lat >= -90 && stop.mapPosition.lat <= 90
+            && stop.mapPosition.lng >= -180 && stop.mapPosition.lng <= 180);
+        if (!positionedStops.length) {
+          runtimeMapElement.hidden = true;
+          notice.textContent = "This campaign route has no saved map coordinates.";
+          notice.hidden = false;
+          return;
+        }
+        if (typeof L === "undefined") {
+          runtimeMapElement.hidden = true;
+          notice.textContent = "The route map library did not load. The saved route list remains available.";
+          notice.hidden = false;
+          return;
+        }
+        runtimeMapElement.hidden = false;
+        if (!runtimeMapElement.clientWidth) {
+          runtimeMapElement.hidden = true;
+          return;
+        }
+        notice.hidden = true;
+        if (!runtimeRouteMap) {
+          runtimeRouteMap = L.map(runtimeMapElement, { minZoom: 2, maxZoom: 18, scrollWheelZoom: false });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+          }).addTo(runtimeRouteMap);
+          runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
+        }
+
+        const signature = `${state.runtimeCampaignId}:${positionedStops.map((stop) => `${stop.name}:${stop.mapPosition.lat},${stop.mapPosition.lng}`).join("|")}`;
+        const shouldFit = signature !== runtimeRouteSignature;
+        runtimeRouteLayer.clearLayers();
+        const positions = positionedStops.map((stop) => [stop.mapPosition.lat, stop.mapPosition.lng]);
+        if (positions.length > 1) L.polyline(positions, { color: "#a97832", weight: 3, opacity: .9 }).addTo(runtimeRouteLayer);
+        positionedStops.forEach((stop) => {
+          const current = stop.index === state.activeStop;
+          L.circleMarker([stop.mapPosition.lat, stop.mapPosition.lng], {
+            radius: current ? 8 : 5,
+            color: current ? "#b74435" : "#344a40",
+            weight: 2,
+            fillColor: current ? "#b74435" : "#e8ece5",
+            fillOpacity: 1
+          }).bindTooltip(escapeHtml(stop.name), { direction: "top", offset: [0, -6] }).addTo(runtimeRouteLayer);
+        });
+        if (shouldFit) {
+          if (positions.length > 1) runtimeRouteMap.fitBounds(positions, { padding: [24, 24], maxZoom: 12 });
+          else runtimeRouteMap.setView(positions[0], 10);
+          runtimeRouteSignature = signature;
+        }
+        requestAnimationFrame(() => runtimeRouteMap?.invalidateSize({ pan: false }));
       }
       function setView(view) {
         document.querySelectorAll(".view").forEach((section) => section.classList.toggle("active", section.id === `view-${view}`));
@@ -966,7 +1036,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
         });
         const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions", audit: "Campaign audit" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
-        if (view === "situation") requestAnimationFrame(drawMap);
+        if (view === "situation") requestAnimationFrame(() => {
+          drawMap();
+          if (runtimeDataLoaded) renderRuntimeRouteMap();
+        });
         if (view === "influence") {
           renderLiveInfluenceControls();
           requestAnimationFrame(() => {
@@ -2344,7 +2417,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
       document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => {
         if (event.target === dialog) dialog.close();
       }));
-      window.addEventListener("resize", () => requestAnimationFrame(drawMap));
+      window.addEventListener("resize", () => requestAnimationFrame(() => {
+        drawMap();
+        runtimeRouteMap?.invalidateSize({ pan: false });
+      }));
       syncWeatherEditor();
       render();
       refreshRuntimeCampaigns();

@@ -117,6 +117,12 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   const { runtime } = await allowed.json();
   assert.equal(runtime.dashboard.rationsDays, 6);
   assert.equal(runtime.route.length, 4);
+  assert.deepEqual(runtime.route.map(({ mapPosition }) => mapPosition), [
+    { lat: 60.79, lng: 13.15 },
+    { lat: 60.51, lng: 14.22 },
+    { lat: 61.01, lng: 14.54 },
+    { lat: 61.12, lng: 14.62 }
+  ]);
   assert.equal(runtime.personnel.length, 4);
   assert.equal(runtime.journal.length, 3);
 

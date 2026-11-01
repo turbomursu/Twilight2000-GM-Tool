@@ -410,6 +410,7 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     assert.equal(restored.dashboard.rationsDays, before.dashboard.rationsDays);
     assert.equal(restored.dashboard.weather, before.dashboard.weather);
     assert.equal(restored.dashboard.weatherNote, before.dashboard.weatherNote);
+    assert.deepEqual(restored.route.map(({ mapPosition }) => mapPosition), before.route.map(({ mapPosition }) => mapPosition));
     assert.equal(restored.personnel.length, before.personnel.length);
     assert.equal(restored.journal.length, before.journal.length);
     assert.deepEqual(restored.journal.map(({ title }) => title), before.journal.map(({ title }) => title));
