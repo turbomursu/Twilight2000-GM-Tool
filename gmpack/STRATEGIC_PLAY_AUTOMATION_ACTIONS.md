@@ -58,14 +58,13 @@ The Strategic Play Loop is the operational time scale (~6 hours per shift) where
 - [ ] Update party location (if moving multiple hexes, can update per hex or at shift end)
 
 ### 5. Roll Weather (T2K 4E Strategic Play Rules)
-- [ ] Roll 1D6 for weather change:
-  - Symbol result (≥4): Weather improves one step
-  - No symbol (1-3): Weather worsens one step
+- [ ] Roll 1D6 and record the physical result plus the matching improve/worsen symbol shown in the Strategic Play Referee Aid
+- [ ] Do not infer a numeric face threshold; the local source aid does not map its symbols to numeric results
 - [ ] Track weather state progression:
   - Fair → Cloudy → Rain/Snow → Cloudy (minimum)
 - [ ] Apply weather effects (if any):
-  - Rain/Snow: movement penalty, visibility reduction
-  - Heavy conditions: resource consumption increases
+  - Use cited visibility, ranged-attack, marching Stamina, and driving guidance for GM adjudication
+  - Do not infer general movement or resource penalties
 - [ ] Record weather condition and GM note
 
 ### 6. Check for Encounters (Procedural)

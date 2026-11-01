@@ -227,9 +227,8 @@ The game operates across three distinct time scales and scenarios:
 
 **Weather & Environment:**
 2. **Update Weather**
-   - Roll 1D6 per Strategic Play rules
-     - Symbol = weather improves one step
-     - No symbol = weather worsens one step
+    - Roll 1D6 per Strategic Play rules and identify the matching weather symbol from the Referee Aid
+    - Apply the aid's one-step improve or worsen result; do not infer a numeric face threshold when only the symbols are available
    - Conditions: Fair → Cloudy → Rain/Snow → Cloudy (min)
    - After heavy rain/snow, weather automatically reverts to Cloudy for ≥1 shift
    - Record weather condition and optional note
@@ -385,10 +384,9 @@ Used during campaign travel between major encounters
    - Temperature varies by season and location
 
 2. **Roll for Weather Change**
-   - Roll 1D6
-   - Symbol = weather improves one step
-   - No symbol = weather worsens one step
-   - Adjust visibility and terrain difficulty accordingly
+   - Roll 1D6 and apply the matching weather symbol shown in the Strategic Play Referee Aid
+   - The local aid does not encode a numeric face mapping; record the physical result and GM-confirmed symbol outcome
+   - Use cited visibility, ranged-attack, marching Stamina, and driving guidance for GM adjudication; do not infer blanket terrain modifiers
 
 ### Per-Participant Tasks
 

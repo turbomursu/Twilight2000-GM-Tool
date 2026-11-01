@@ -262,7 +262,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 16) {
+    if (version > 17) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -560,6 +560,15 @@ function openRuntimeDatabase(path = ":memory:") {
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
+  if (version < 17) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`ALTER TABLE runtime_dashboard_state ADD COLUMN weather_last_roll_shift TEXT NOT NULL DEFAULT '';
+      ALTER TABLE runtime_dashboard_state ADD COLUMN weather_cloudy_shifts_remaining INTEGER NOT NULL DEFAULT 0 CHECK (weather_cloudy_shifts_remaining IN (0, 1));
+      PRAGMA user_version = 17;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
   return database;
 }
 
@@ -680,7 +689,9 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     auditEvents: Object.hasOwn(backup.data, "auditEvents") ? backup.data.auditEvents.map((row) => ({ ...row, game_time: Object.hasOwn(row, "game_time") ? row.game_time : null })) : [],
     dailySupplyUsage: Object.hasOwn(backup.data, "dailySupplyUsage") ? backup.data.dailySupplyUsage : [],
     dashboardState: backup.data.dashboardState ? { ...backup.data.dashboardState,
-      game_time: Object.hasOwn(backup.data.dashboardState, "game_time") ? backup.data.dashboardState.game_time : "00:00" } : null };
+      game_time: Object.hasOwn(backup.data.dashboardState, "game_time") ? backup.data.dashboardState.game_time : "00:00",
+      weather_last_roll_shift: Object.hasOwn(backup.data.dashboardState, "weather_last_roll_shift") ? backup.data.dashboardState.weather_last_roll_shift : "",
+      weather_cloudy_shifts_remaining: Object.hasOwn(backup.data.dashboardState, "weather_cloudy_shifts_remaining") ? backup.data.dashboardState.weather_cloudy_shifts_remaining : 0 } : null };
   if (!data.campaign || data.campaign.runtime_id !== targetRuntimeId
     || data.campaign.schema_version !== 1 || data.campaign.revision !== backup.sourceRevision
     || !data.setupImport || data.setupImport.runtime_campaign_id !== targetRuntimeId
@@ -865,6 +876,10 @@ function validateRuntimeSave(backup, targetRuntimeId) {
       .some((value) => !Number.isSafeInteger(value) || value < 0)
     || dashboard.active_stop_index >= data.routeStops.length
     || typeof dashboard.weather !== "string" || !dashboard.weather.trim()
+    || typeof dashboard.weather_last_roll_shift !== "string"
+    || (dashboard.weather_last_roll_shift !== "" && !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(dashboard.weather_last_roll_shift))
+    || ![0, 1].includes(dashboard.weather_cloudy_shifts_remaining)
+    || (dashboard.weather_cloudy_shifts_remaining === 1 && dashboard.weather !== "Cloudy")
     || typeof dashboard.weather_note !== "string") fail("Invalid dashboard state in runtime backup.");
   return data;
 }
@@ -956,7 +971,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("faction_influence_cells", ["runtime_campaign_id", "faction_id", "q", "r"], data.factionInfluenceCells);
     insertRows("settlement_factions", ["runtime_campaign_id", "settlement_id", "faction_id", "prominence_rank"], data.settlementFactions);
     insertRows("gm_notes", ["runtime_campaign_id", "id", "title", "body", "visibility"], data.gmNotes);
-    insertRows("runtime_dashboard_state", ["campaign_id", "game_date", "game_time", "day_number", "distance_km", "rations_days", "fuel_units", "weather", "weather_note", "active_stop_index", "updated_at"], [data.dashboardState]);
+    insertRows("runtime_dashboard_state", ["campaign_id", "game_date", "game_time", "day_number", "distance_km", "rations_days", "fuel_units", "weather", "weather_note", "weather_last_roll_shift", "weather_cloudy_shifts_remaining", "active_stop_index", "updated_at"], [data.dashboardState]);
     insertRows("daily_supply_usage", ["campaign_id", "game_date", "ration_days_used", "recorded_at"], data.dailySupplyUsage);
     insertRows("route_stops", ["campaign_id", "ordinal", "location_id", "detail", "km_from_previous"], data.routeStops);
     insertRows("personnel", ["campaign_id", "id", "name", "role", "condition", "readiness", "sort_order"], data.personnel);
@@ -1390,9 +1405,11 @@ function getRuntimeDashboard(database, accountId, runtimeId) {
       AND campaign_memberships.role = 'gm' AND campaigns.active = 1`).get(runtimeId, accountId);
   if (!campaign) return null;
 
-  const dashboard = database.prepare(`SELECT game_date AS gameDate, day_number AS dayNumber, game_time AS gameTime,
+    const dashboard = database.prepare(`SELECT game_date AS gameDate, day_number AS dayNumber, game_time AS gameTime,
       distance_km AS distanceKm, rations_days AS rationsDays, fuel_units AS fuelUnits,
-      weather, weather_note AS weatherNote, active_stop_index AS activeStopIndex, updated_at AS updatedAt
+      weather, weather_note AS weatherNote, weather_last_roll_shift AS weatherLastRollShift,
+      weather_cloudy_shifts_remaining AS weatherCloudyShiftsRemaining,
+      active_stop_index AS activeStopIndex, updated_at AS updatedAt
     FROM runtime_dashboard_state WHERE campaign_id = ?`).get(runtimeId);
   if (!dashboard) return null;
 
@@ -1492,11 +1509,13 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
       if (next.activeStopIndex >= nextRouteLength) throw new Error("Active route stop is outside the campaign route.");
       if (typeof next.weather !== "string" || !next.weather.trim() || next.weather.length > 80) throw new Error("Weather label is missing or too long.");
       if (typeof next.weatherNote !== "string" || next.weatherNote.length > 1000) throw new Error("Weather note is too long.");
+      const weatherChanged = next.weather.trim() !== current.dashboard.weather;
       database.prepare(`UPDATE runtime_dashboard_state SET game_date = ?, game_time = ?, day_number = ?, distance_km = ?,
-        rations_days = ?, fuel_units = ?, weather = ?, weather_note = ?, active_stop_index = ?, updated_at = ?
+        rations_days = ?, fuel_units = ?, weather = ?, weather_note = ?, weather_cloudy_shifts_remaining = CASE WHEN ? THEN 0 ELSE weather_cloudy_shifts_remaining END,
+        active_stop_index = ?, updated_at = ?
         WHERE campaign_id = ?`)
         .run(next.gameDate, next.gameTime, next.dayNumber, next.distanceKm, next.rationsDays, next.fuelUnits,
-          next.weather.trim(), next.weatherNote, next.activeStopIndex, timestamp, runtimeId);
+          next.weather.trim(), next.weatherNote, Number(weatherChanged), next.activeStopIndex, timestamp, runtimeId);
     }
 
     if (Object.hasOwn(input, "personnel")) {
@@ -2167,6 +2186,17 @@ function advanceRuntimeTime(database, accountId, campaignId, input) {
     const clock = require("../campaign-clock.js").advanceSixHours(current.dashboard);
     const timestamp = new Date().toISOString();
     const midday = require("../campaign-clock.js").middayForAdvance(current.dashboard);
+    let weather = current.dashboard.weather;
+    let cloudyShiftsRemaining = current.dashboard.weatherCloudyShiftsRemaining;
+    let weatherDurationEvent = false;
+    if (weather === "Rain/Snow") {
+      weather = "Cloudy";
+      cloudyShiftsRemaining = 1;
+      weatherDurationEvent = true;
+    } else if (cloudyShiftsRemaining > 0) {
+      cloudyShiftsRemaining -= 1;
+      weatherDurationEvent = true;
+    }
     let rationDaysUsed = 0;
     let suppliesProcessed = false;
     if (midday && !database.prepare("SELECT 1 FROM daily_supply_usage WHERE campaign_id = ? AND game_date = ?").get(campaignId, midday)) {
@@ -2177,20 +2207,71 @@ function advanceRuntimeTime(database, accountId, campaignId, input) {
       database.prepare("UPDATE runtime_dashboard_state SET rations_days = MAX(0, rations_days - ?) WHERE campaign_id = ?").run(rationDaysUsed, campaignId);
       suppliesProcessed = true;
     }
-    database.prepare("UPDATE runtime_dashboard_state SET game_date = ?, game_time = ?, day_number = ?, updated_at = ? WHERE campaign_id = ?")
-      .run(clock.gameDate, clock.gameTime, clock.dayNumber, timestamp, campaignId);
+    database.prepare(`UPDATE runtime_dashboard_state SET game_date = ?, game_time = ?, day_number = ?, weather = ?,
+      weather_cloudy_shifts_remaining = ?, updated_at = ? WHERE campaign_id = ?`)
+      .run(clock.gameDate, clock.gameTime, clock.dayNumber, weather, cloudyShiftsRemaining, timestamp, campaignId);
+    const journalEntryId = randomUUID();
+    const weatherNote = current.dashboard.weather === "Rain/Snow" && weather === "Cloudy"
+      ? " Heavy rain/snow lasted one shift; weather returned to Cloudy for at least one full shift."
+      : current.dashboard.weatherCloudyShiftsRemaining > 0 && cloudyShiftsRemaining === 0
+        ? " The required Cloudy shift is complete; weather rolls may resume next shift."
+        : "";
     database.prepare(`INSERT INTO journal_entries (campaign_id, id, title, body, entry_date, kind, created_at)
-      VALUES (?, ?, ?, ?, ?, 'Clock', ?)`).run(campaignId, randomUUID(), `Time advanced to ${clock.gameDate} ${clock.gameTime}`,
+      VALUES (?, ?, ?, ?, ?, 'Clock', ?)`).run(campaignId, journalEntryId, `Time advanced to ${clock.gameDate} ${clock.gameTime}`,
       suppliesProcessed ? `GM advanced time by six hours. Midday ration schedule: ${rationDaysUsed ? "one ration-day consumed" : "no rations available"}. Fuel and item actions remain GM-managed.`
         : "GM advanced campaign time by six hours. No daily ration charge outside an unprocessed midday.", clock.gameDate, timestamp);
+    if (weatherNote) database.prepare("UPDATE journal_entries SET body = body || ? WHERE id = ? AND campaign_id = ?")
+      .run(weatherNote, journalEntryId, campaignId);
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?").run(timestamp, campaignId);
     require("./audit.cjs").appendAuditEvent(database, accountId, campaignId, { action: "clock.advance", targetType: "campaign",
       targetId: campaignId, beforeRevision: current.campaign.revision, afterRevision: current.campaign.revision + 1 });
     if (suppliesProcessed) require("./audit.cjs").appendAuditEvent(database, accountId, campaignId, { action: "supplies.midday", targetType: "campaign",
       targetId: campaignId });
+    if (weatherDurationEvent) require("./audit.cjs").appendAuditEvent(database, accountId, campaignId, {
+      action: "weather.duration", targetType: "dashboard", targetId: campaignId, relatedId: journalEntryId
+    });
     const runtime = getRuntimeDashboard(database, accountId, campaignId);
     database.exec("COMMIT"); return runtime;
   } catch (error) { database.exec("ROLLBACK"); throw error; }
+}
+
+function rollRuntimeWeather(database, accountId, campaignId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)
+    || Object.keys(input).some((key) => !["expectedRevision", "roll", "outcome"].includes(key))
+    || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0
+    || !Number.isSafeInteger(input.roll) || input.roll < 1 || input.roll > 6
+    || !["improves", "worsens", "holds"].includes(input.outcome)) throw new Error("Record a d6 result and its matching weather symbol outcome.");
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const current = getRuntimeDashboard(database, accountId, campaignId);
+    if (!current) throw new Error("Runtime campaign not found.");
+    if (current.campaign.revision !== input.expectedRevision) throw new Error("Campaign revision changed; reload before rolling weather.");
+    if (current.dashboard.weatherCloudyShiftsRemaining > 0) throw new Error("Weather must remain Cloudy for one full shift before rolling again.");
+    const shiftKey = `${current.dashboard.gameDate}T${current.dashboard.gameTime}`;
+    if (current.dashboard.weatherLastRollShift === shiftKey) throw new Error("Weather has already been rolled for this shift.");
+    const result = require("../weather-rules.js").resolveWeatherRoll(current.dashboard.weather, input.roll, input.outcome);
+    if (database.prepare("SELECT COUNT(*) AS count FROM journal_entries WHERE campaign_id = ?").get(campaignId).count >= 10000) {
+      throw new Error("Campaign journal limit reached.");
+    }
+    const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
+    const journalEntryId = randomUUID();
+    const outcome = result.changed ? `${result.previousWeather} to ${result.weather}` : `${result.weather} (no change)`;
+    database.prepare("UPDATE runtime_dashboard_state SET weather = ?, weather_last_roll_shift = ?, updated_at = ? WHERE campaign_id = ?")
+      .run(result.weather, shiftKey, timestamp, campaignId);
+    database.prepare(`INSERT INTO journal_entries (campaign_id, id, title, body, entry_date, kind, created_at)
+      VALUES (?, ?, ?, ?, ?, 'Weather', ?)`)
+      .run(campaignId, journalEntryId, `Weather roll / ${shiftKey}`, `D6 result ${result.roll}; recorded symbol outcome: ${result.direction}. Weather ${outcome}.`, current.dashboard.gameDate, timestamp);
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?").run(timestamp, campaignId);
+    require("./audit.cjs").appendAuditEvent(database, accountId, campaignId, {
+      action: "weather.roll", targetType: "dashboard", targetId: campaignId, relatedId: journalEntryId
+    });
+    const runtime = getRuntimeDashboard(database, accountId, campaignId);
+    database.exec("COMMIT");
+    return { runtime, roll: result, shiftKey };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 function getPartyFaction(database, accountId, runtimeId) {
@@ -2247,6 +2328,7 @@ function getPartyFaction(database, accountId, runtimeId) {
 
 module.exports = {
   advanceRuntimeTime,
+  rollRuntimeWeather,
   openRuntimeDatabase,
   importSetupPackage,
   listRuntimeCampaigns,

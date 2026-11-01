@@ -11,7 +11,7 @@ const { listComms, sendComms } = require("./comms.cjs");
 const { getGMInventory, reviewInventoryProposal, manageGMInventory } = require("./inventory.cjs");
 const { getGMConditions, updateGMConditions } = require("./conditions.cjs");
 const { listAuditEvents } = require("./audit.cjs");
-const { advanceRuntimeTime } = require("./runtime-store.cjs");
+const { advanceRuntimeTime, rollRuntimeWeather } = require("./runtime-store.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -117,6 +117,20 @@ function createCampaignHandler({ database }) {
         try { campaignId = decodeURIComponent(advanceMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
         return sendJson(response, 200, { runtime: advanceRuntimeTime(database, account.id, campaignId, await readJsonBody(request)) });
       } catch (error) { return sendJson(response, error instanceof HttpError ? error.status : /not found/.test(error.message) ? 404 : /revision changed/.test(error.message) ? 409 : 422, { error: error.message }); }
+    }
+    const weatherRollMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/weather-roll$/);
+    if (weatherRollMatch) {
+      if (request.method !== "POST") return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(weatherRollMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        return sendJson(response, 200, rollRuntimeWeather(database, account.id, campaignId, await readJsonBody(request)));
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Runtime campaign not found/.test(error.message) ? 404
+            : /revision changed|already been rolled|must remain Cloudy/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
     }
     const auditMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/audit$/);
     if (auditMatch) {

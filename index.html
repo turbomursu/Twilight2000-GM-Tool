@@ -290,6 +290,9 @@
     .weather-editor .field textarea { min-height: 70px; }
     .weather-effects { padding: 10px 11px; border-left: 3px solid var(--gold); background: #f0e9d8; }
     .weather-effects p { margin: 6px 0; font-size: 11px; line-height: 1.5; }
+    .weather-roll-control { display: grid; justify-items: start; gap: 7px; }
+    .weather-roll-control .feedback { margin: 0; }
+    .weather-roll-inputs { display: grid; grid-template-columns: minmax(72px, 0.35fr) minmax(0, 1fr); gap: 8px; width: 100%; }
     .report-workspace { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
     .report-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
     .report-fields .report-body, .report-fields .report-actions { grid-column: 1 / -1; }
@@ -585,7 +588,27 @@
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="supply-title"><div class="panel-head"><div><div class="eyebrow">Column inventory</div><h2 id="supply-title">Provisions</h2></div><span class="heading-tag">Days remaining</span></div><div class="panel-body"><div class="supply-line"><div><strong>Food</strong><small>Shared ration reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of food" title="Use one day of food">−</button><output id="food-count"></output><button class="button button-icon" data-action="add-rations" aria-label="Add one day of food" title="Add one day of food">+</button></div></div><div class="supply-line"><div><strong>Fuel</strong><small>Estimated vehicle reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="fuel-down" aria-label="Reduce fuel reserve" title="Reduce fuel reserve">−</button><output id="fuel-count"></output><button class="button button-icon" data-action="fuel-up" aria-label="Increase fuel reserve" title="Increase fuel reserve">+</button></div></div><div class="supply-line"><div><strong>Distance</strong><small>Logged since leaving the coast</small></div><div class="supply-control"><button class="button button-icon" data-action="distance-down" aria-label="Reduce logged distance" title="Reduce logged distance">−</button><output id="distance-count"></output><button class="button button-icon" data-action="distance-up" aria-label="Add ten kilometers" title="Add ten kilometers">+</button></div></div></div></section>
-              <section class="panel" aria-labelledby="weather-title"><div class="panel-head"><div><div class="eyebrow">Strategic play / GM control</div><h2 id="weather-title">Weather log</h2></div><span class="heading-tag">Editable</span></div><div class="panel-body"><form class="weather-editor" id="weather-form"><label class="field" for="weather-state"><span class="eyebrow">Weather condition</span><select id="weather-state"><option value="Fair">Fair</option><option value="Cloudy">Cloudy</option><option value="Rain/Snow">Rain/Snow</option><option value="GM-defined">GM-defined</option></select></label><label class="field" id="weather-custom-field" for="weather-custom-label" hidden><span class="eyebrow">GM-defined condition</span><input id="weather-custom-label" maxlength="80" placeholder="Describe the condition"></label><div class="weather-effects" role="note"><span class="eyebrow">Fourth Edition effects / reference</span><p id="weather-effects-copy"></p><span class="inline-hint">T2K Referee Aid, Strategic Play; refers to Player's Manual p. 139. For GM adjudication; this display does not modify rolls.</span></div><label class="field" for="weather-note"><span class="eyebrow">Optional GM note</span><textarea id="weather-note" maxlength="1000" rows="3" placeholder="Local detail or ruling"></textarea></label><button class="button button-primary" type="submit">Save weather</button></form></div></section>
+              <section class="panel" aria-labelledby="weather-title">
+                <div class="panel-head"><div><div class="eyebrow">Strategic play / GM control</div><h2 id="weather-title">Weather log</h2></div><span class="heading-tag">Editable</span></div>
+                <div class="panel-body">
+                  <form class="weather-editor" id="weather-form">
+                    <label class="field" for="weather-state"><span class="eyebrow">Weather condition</span><select id="weather-state"><option value="Fair">Fair</option><option value="Cloudy">Cloudy</option><option value="Rain/Snow">Rain/Snow</option><option value="GM-defined">GM-defined</option></select></label>
+                    <label class="field" id="weather-custom-field" for="weather-custom-label" hidden><span class="eyebrow">GM-defined condition</span><input id="weather-custom-label" maxlength="80" placeholder="Describe the condition"></label>
+                    <div class="weather-effects" role="note"><span class="eyebrow">Fourth Edition effects / reference</span><p id="weather-effects-copy"></p><span class="inline-hint">T2K Referee Aid, Strategic Play; Player's Manual p. 139. Effects remain GM-adjudicated.</span></div>
+                    <div class="weather-roll-control">
+                      <span class="inline-hint">At shift start, record the physical d6 and select the symbol shown in the Referee Aid. The aid does not map symbols to numeric faces.</span>
+                      <div class="weather-roll-inputs">
+                        <label class="field" for="weather-d6-result"><span class="eyebrow">D6 result</span><input id="weather-d6-result" type="number" min="1" max="6" step="1" inputmode="numeric" required></label>
+                        <label class="field" for="weather-roll-outcome"><span class="eyebrow">Weather symbol</span><select id="weather-roll-outcome" required><option value="">Select outcome</option><option value="improves">Weather improves</option><option value="worsens">Weather worsens</option><option value="holds">No change</option></select></label>
+                      </div>
+                      <button class="button" id="roll-weather" type="button" disabled>Record weather roll</button>
+                      <p class="feedback" id="weather-roll-status" role="status" aria-live="polite">Select a runtime campaign.</p>
+                    </div>
+                    <label class="field" for="weather-note"><span class="eyebrow">Optional GM note</span><textarea id="weather-note" maxlength="1000" rows="3" placeholder="Local detail or ruling"></textarea></label>
+                    <button class="button button-primary" type="submit">Save weather</button>
+                  </form>
+                </div>
+              </section>
             </div>
           </div>
         </section>
@@ -801,6 +824,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const weatherCustomLabel = document.getElementById("weather-custom-label");
       const weatherNoteInput = document.getElementById("weather-note");
       const weatherEffectsCopy = document.getElementById("weather-effects-copy");
+      const weatherD6Result = document.getElementById("weather-d6-result");
+      const weatherRollOutcome = document.getElementById("weather-roll-outcome");
+      const weatherRollButton = document.getElementById("roll-weather");
+      const weatherRollStatus = document.getElementById("weather-roll-status");
       const openPlayerSeedDialogButton = document.getElementById("open-player-seed-dialog");
       const openCharacterChangesButton = document.getElementById("open-character-changes");
       const exportRuntimeBackupButton = document.getElementById("export-runtime-backup");
@@ -930,6 +957,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
           fuel: dashboard.fuelUnits,
           weather: dashboard.weather,
           weatherNote: dashboard.weatherNote,
+          weatherLastRollShift: dashboard.weatherLastRollShift,
+          weatherCloudyShiftsRemaining: dashboard.weatherCloudyShiftsRemaining,
           activeStop: Math.min(dashboard.activeStopIndex, Math.max(0, route.length - 1)),
           people: runtime.personnel.map((person) => ({
             id: person.id,
@@ -947,8 +976,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
           })),
           runtimeLocations: runtime.locations
         };
-        syncWeatherEditor();
         runtimeDataLoaded = true;
+        syncWeatherEditor();
         document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
         document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
         document.getElementById("top-campaign-name").textContent = runtime.campaign.name;
@@ -1014,6 +1043,29 @@ Military rank || optional</textarea><span class="row-description">One field per 
         weatherCustomLabel.value = isOfficial ? "" : state.weather;
         weatherNoteInput.value = state.weatherNote || "";
         updateWeatherEffects();
+        updateWeatherRollAvailability();
+      }
+      function updateWeatherRollAvailability() {
+        const official = ["Fair", "Cloudy", "Rain/Snow"].includes(state.weather);
+        const hasRuntime = runtimeDataLoaded && state.runtimeCampaignId && runtimeCampaignSelect.value === state.runtimeCampaignId;
+        const shiftKey = `${state.date}T${state.time || "00:00"}`;
+        const forcedCloudy = (state.weatherCloudyShiftsRemaining || 0) > 0;
+        const alreadyRolled = state.weatherLastRollShift === shiftKey;
+        const recordedRoll = Number(weatherD6Result.value);
+        const validRollInput = Number.isSafeInteger(recordedRoll) && recordedRoll >= 1 && recordedRoll <= 6
+          && ["improves", "worsens", "holds"].includes(weatherRollOutcome.value);
+        const savedCondition = weatherStateSelect.value === "GM-defined" ? weatherCustomLabel.value.trim() : weatherStateSelect.value;
+        const conditionSaved = savedCondition === state.weather;
+        weatherRollButton.disabled = !hasRuntime || !official || !conditionSaved || forcedCloudy || alreadyRolled || !validRollInput;
+        weatherRollStatus.className = "feedback";
+        if (!runtimeCampaignSelect.value) weatherRollStatus.textContent = "Select a runtime campaign to roll.";
+        else if (!runtimeDataLoaded) weatherRollStatus.textContent = "Loading campaign weather state.";
+        else if (!official) weatherRollStatus.textContent = "GM-defined weather has no automatic Fourth Edition roll.";
+        else if (!conditionSaved) weatherRollStatus.textContent = "Save the current weather condition before recording a roll.";
+        else if (forcedCloudy) weatherRollStatus.textContent = "Cloudy is required for one full shift before the next weather roll.";
+        else if (alreadyRolled) weatherRollStatus.textContent = "Weather is already rolled for this shift.";
+        else if (!validRollInput) weatherRollStatus.textContent = "Enter the physical d6 result and select its weather symbol.";
+        else weatherRollStatus.textContent = "Ready to record this shift's weather result.";
       }
       function render() {
         const formattedDate = `${dateLabel(state.date)} / ${state.time || "00:00"}`;
@@ -1934,6 +1986,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       async function loadRuntimeCampaign(runtimeCampaignId, announce = true) {
+        runtimeDataLoaded = false;
+        weatherD6Result.value = "";
+        weatherRollOutcome.value = "";
+        updateWeatherRollAvailability();
         const { campaign } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}`);
         const { layers } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/faction-layers`);
         if (runtimeCampaignSelect.value !== runtimeCampaignId) return;
@@ -1947,6 +2003,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
         placeholder.value = "";
         placeholder.textContent = location.protocol === "http:" ? "Loading campaigns" : "LAN HTTP service required";
         runtimeCampaignSelect.replaceChildren(placeholder);
+        runtimeDataLoaded = false;
+        updateWeatherRollAvailability();
         if (location.protocol !== "http:") {
           runtimeCampaignSelect.disabled = true;
           exportRuntimeBackupButton.disabled = true;
@@ -1976,8 +2034,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
           exportRuntimeBackupButton.disabled = !selectedId;
           openRuntimeRestoreButton.disabled = !selectedId;
           if (selectedId) await loadRuntimeCampaign(selectedId, false);
-          else document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
+          else {
+            runtimeDataLoaded = false;
+            updateWeatherRollAvailability();
+            document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
+          }
         } catch (error) {
+          runtimeDataLoaded = false;
+          updateWeatherRollAvailability();
           runtimeCampaignSelect.disabled = true;
           openPlayerSeedDialogButton.disabled = true;
           openCharacterChangesButton.disabled = true;
@@ -1994,6 +2058,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
 
       runtimeCampaignSelect.addEventListener("change", () => {
         if (runtimeCampaignSelect.value) loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
+        else {
+          runtimeDataLoaded = false;
+          updateWeatherRollAvailability();
+        }
       });
       document.getElementById("reload-faction-layers").addEventListener("click", async () => {
         const campaignId = state.runtimeCampaignId;
@@ -2746,7 +2814,15 @@ Military rank || optional</textarea><span class="row-description">One field per 
             document.getElementById("note-dialog").close();
           });
       });
-      weatherStateSelect.addEventListener("change", updateWeatherEffects);
+      weatherStateSelect.addEventListener("change", () => {
+        weatherD6Result.value = "";
+        weatherRollOutcome.value = "";
+        updateWeatherEffects();
+        updateWeatherRollAvailability();
+      });
+      weatherCustomLabel.addEventListener("input", updateWeatherRollAvailability);
+      weatherD6Result.addEventListener("input", updateWeatherRollAvailability);
+      weatherRollOutcome.addEventListener("change", updateWeatherRollAvailability);
       weatherForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const weather = weatherStateSelect.value === "GM-defined" ? weatherCustomLabel.value.trim() : weatherStateSelect.value;
@@ -2756,6 +2832,35 @@ Military rank || optional</textarea><span class="row-description">One field per 
           state.weatherNote = weatherNote;
         }, "Weather record saved.");
         if (saved) syncWeatherEditor();
+      });
+      weatherRollButton.addEventListener("click", async () => {
+        const campaignId = state.runtimeCampaignId;
+        if (weatherRollButton.disabled || !campaignId) return;
+        const roll = Number(weatherD6Result.value);
+        const outcome = weatherRollOutcome.value;
+        weatherRollButton.disabled = true;
+        weatherRollStatus.className = "feedback";
+        weatherRollStatus.textContent = "Recording the d6 result and weather symbol.";
+        try {
+          const result = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/weather-roll`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expectedRevision: state.runtimeRevision, roll, outcome })
+          });
+          if (state.runtimeCampaignId !== campaignId) return;
+          weatherD6Result.value = "";
+          weatherRollOutcome.value = "";
+          applyRuntimeSnapshot(result.runtime);
+          const weatherChange = result.roll.changed ? `${result.roll.previousWeather} -> ${result.roll.weather}` : `${result.roll.weather} (no category change)`;
+          weatherRollStatus.textContent = `D6 result ${result.roll.roll}: weather ${result.roll.direction}; ${weatherChange}.`;
+        } catch (error) {
+          if (/revision changed|already been rolled|must remain Cloudy/i.test(error.message)) {
+            await loadRuntimeCampaign(campaignId, false).catch(() => {});
+          }
+          updateWeatherRollAvailability();
+          weatherRollStatus.className = "feedback error";
+          weatherRollStatus.textContent = error.message;
+        }
       });
       document.getElementById("person-form").addEventListener("submit", async (event) => {
         event.preventDefault();

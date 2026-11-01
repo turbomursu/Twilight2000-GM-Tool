@@ -62,9 +62,8 @@ T2K 4E defines gameplay through three separate time scales—**Combat Rounds** (
    - Note temperature (seasonal)
 
 2. **Roll for Weather Change**
-   - Roll 1D6
-   - Symbol result → weather improves one step
-   - No symbol → weather worsens one step
+   - Roll 1D6 and record the matching improve/worsen symbol from the Strategic Play Referee Aid
+   - Do not assume a numeric face mapping from the available local transcription
    - Track: Fair → Cloudy → Rain/Snow (with auto-revert rules)
 
 3. **Assign Tasks Per PC**

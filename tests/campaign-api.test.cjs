@@ -11,6 +11,7 @@ const { openRuntimeDatabase, createPlayerSeed } = require("../server/runtime-sto
 const { validateMapDraft } = require("../server/map-publications.cjs");
 const { emptyConditions } = require("../server/conditions.cjs");
 const { seedSampleRuntime } = require("../server/sample-data.cjs");
+const { resolveWeatherRoll } = require("../weather-rules.js");
 
 const bootstrapToken = "test-only-bootstrap-token-0123456789-abcdef";
 const password = "A-correct-horse-battery-41";
@@ -79,6 +80,31 @@ test("six-hour advance API rejects stale duplicates and charges daily rations on
   assert.equal(noon.dashboard.gameTime, "12:00"); assert.equal(noon.dashboard.rationsDays, morning.dashboard.rationsDays - 1);
   const audit = await (await fetch(`${origin}/api/campaigns/${campaignId}/audit`, { headers: { Cookie: cookie } })).json();
   assert.equal(audit.events[0].action, "supplies.midday"); assert.equal(audit.events[0].gameTime.timeOfDay, "12:00");
+});
+
+test("weather roll API is authenticated, revision-checked, and allows one roll per shift", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const gmId = database.prepare("SELECT id FROM accounts WHERE login_identifier = 'gm-user'").get().id;
+  const { campaignId } = seedSampleRuntime(database, gmId);
+  database.prepare("UPDATE runtime_dashboard_state SET weather = 'Cloudy' WHERE campaign_id = ?").run(campaignId);
+  const path = `${origin}/api/campaigns/${campaignId}/weather-roll`;
+  assert.equal((await fetch(path, { method: "POST" })).status, 401);
+  assert.equal((await fetch(path, { headers: { Cookie: cookie } })).status, 405);
+  const runtimeResponse = await fetch(`${origin}/api/campaigns/${campaignId}/runtime`, { headers: { Cookie: cookie } });
+  const initial = (await runtimeResponse.json()).runtime;
+  const send = (revision, roll, outcome, headers = {}) => fetch(path, { method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, ...headers },
+    body: JSON.stringify({ expectedRevision: revision, roll, outcome }) });
+  assert.equal((await send(initial.campaign.revision, 4, "holds", { Origin: "http://untrusted.example" })).status, 403);
+  assert.equal((await send(initial.campaign.revision, 4, "invalid")).status, 422);
+  const response = await send(initial.campaign.revision, 4, "worsens");
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.ok(Number.isSafeInteger(result.roll.roll) && result.roll.roll >= 1 && result.roll.roll <= 6);
+  assert.deepEqual(result.roll, resolveWeatherRoll("Cloudy", 4, "worsens"));
+  assert.equal(result.runtime.dashboard.weatherLastRollShift, "2000-05-11T00:00");
+  assert.equal((await send(result.runtime.campaign.revision, 2, "holds")).status, 409);
 });
 
 test("audit API is owner-only, read-only, paginated, and does not expose or forge private changes", async (t) => {

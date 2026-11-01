@@ -42,7 +42,7 @@ Use normalized SQLite tables and foreign keys for relationships, ownership, and 
 | `characters` | Character ID, campaign ID, seed/playable status, and bounded character fields. GM-authored seed fields explicitly carry a player-editable flag determined at assignment; only fields left blank by the GM are player-editable. Player ownership is derived from the seat assignment. |
 | `character_conditions` | Implemented campaign/character foreign keys, optimistic revision, active/cleared marker, bounded public condition JSON, separate private GM notes, and GM updater/timestamp. Nullable numeric/flag values are unknown, not healthy/zero. No rules effects or capacities are derived. |
 | `inventory_items` | Implemented stable item ID, campaign/character foreign keys, revision/active flag, bounded item fields, quantity, manual carry location, accepted RB/GM/UF category/reference, and GM reviewer/time. Removed rows remain inactive. RB/GM acceptance is a human GM source review, not automated book verification; UF remains unverified. |
-| `runtime_dashboard_state` | Per-campaign date/day and HH:MM, distance, ration-days, fuel, weather, route stop, and timestamp. Six-hour advances and the GM-defined midday food schedule are bookkeeping, not inferred rules outcomes. |
+| `runtime_dashboard_state` | Per-campaign date/day and HH:MM, distance, ration-days, fuel, weather, last rolled shift, remaining forced-Cloudy shifts, route stop, and timestamp. Six-hour advances and the GM-defined midday food schedule are bookkeeping, not inferred rules outcomes. |
 | `daily_supply_usage` | Campaign/date unique midday marker, ration-days actually used (0 or 1), and UTC timestamp. GM-defined food schedule; clock HH:MM, reserve, and usage recover together. |
 | `situation_reports` | Implemented per-campaign saved draft, separate current published JSON, publication time, and monotonic optimistic report revision. Only title, body, and manually entered game time are allowed in report payloads. Withdrawal keeps the draft but clears the published fields. |
 | `map_publications` | Implemented per-campaign map draft, explicit schema-v2 player snapshot, publication timestamp, and optimistic map revision. Drafts select location IDs, ordered selected-location route IDs, bounded labeled point markings, bounded GeoJSON LineString/single-ring Polygon geometries, and a GM-set position. Optional raster PMTiles asset ID/attribution comes from the immutable setup snapshot. Published data omits source notes/visibility, descriptions, terrain/factions, atlas, and raw annotations. |
@@ -66,6 +66,12 @@ GM report actions use `/api/campaigns/:id/situation-report` with a report-specif
 ## Campaign Clock Boundary
 
 The owning GM's six-hour action checks the campaign revision and computes time from authoritative state. Midnight changes date/day; crossing midday consumes one shared ration-day only if that date has no usage marker. Zero reserves record zero used. Clock, daily usage, journal, and audit are one transaction. Manual clock edits do not process prior noons. Restore recovers usage with clock/reserves; missing legacy time initializes at 00:00. New message/audit stamps capture nullable HH:MM without inventing historical times. Fuel, items, carrying, and dice rules are not inferred.
+
+## Strategic Weather Roll Boundary
+
+The owning GM records a physical d6 result and selects the matching improve/worsen symbol from the Strategic Play Referee Aid. The local aid does not expose a numeric mapping for those symbols, so no face threshold is inferred. `POST /api/campaigns/:id/weather-roll` checks GM ownership and campaign revision, permits one roll per shift, applies the chosen one-step state change, and records the d6, symbol outcome, and resulting weather in the GM journal/audit trail. GM-defined weather has no automatic roll.
+
+When a shift ends in Rain/Snow, the next six-hour clock advance returns the state to Cloudy and sets one forced Cloudy shift. Weather rolls remain blocked until that shift completes. Clock transitions and weather duration are atomic with journal/audit writes. Runtime backups preserve both the last rolled shift and the forced-Cloudy counter; older backups initialize those fields to no prior roll and no lock. These controls do not modify character or attack rolls.
 
 ## Audit Boundary
 

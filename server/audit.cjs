@@ -4,7 +4,7 @@ const actions = new Set([
   "conditions.save", "conditions.clear", "inventory.add", "inventory.update", "inventory.remove",
   "inventory.approve.add", "inventory.approve.update", "inventory.approve.remove", "inventory.reject",
   "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "campaign.restore", "clock.advance", "supplies.midday",
-  "dashboard.update", "journal.create", "journal.update", "route.update", "map.locations.update", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
+  "dashboard.update", "journal.create", "journal.update", "route.update", "map.locations.update", "weather.roll", "weather.duration", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
 ]);
 const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "map_catalog", "route", "campaign", "dashboard", "journal_entry", "faction_influence", "faction_prominence", "character_review", "player_seat"]);
 const auditColumns = ["id", "campaign_id", "actor_account_id", "actor_label", "action", "target_type", "target_id", "target_label", "character_id", "related_id",
@@ -18,6 +18,7 @@ function expectedTarget(action) {
   if (action === "map.locations.update") return "map_catalog";
   if (action.startsWith("map.")) return "map_publication";
   if (action === "dashboard.update") return "dashboard";
+  if (action.startsWith("weather.")) return "dashboard";
   if (action.startsWith("journal.")) return "journal_entry";
   if (action === "route.update") return "route";
   if (action.startsWith("faction.influence.")) return "faction_influence";

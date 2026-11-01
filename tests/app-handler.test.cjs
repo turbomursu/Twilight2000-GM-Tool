@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const { once } = require("node:events");
-const { mkdtempSync, rmSync } = require("node:fs");
+const { mkdtempSync, readFileSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const test = require("node:test");
@@ -72,6 +72,11 @@ test("serves protected pages only for an active session and gates them again aft
   const runtimeHtml = await protectedPage.text();
   assert.match(runtimeHtml, /data-auth-logout/);
   assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
+  const playerHtml = readFileSync(join(__dirname, "..", "player-interface.html"), "utf8");
+  assert.match(playerHtml, /href="\/vendor\/leaflet\.css"/);
+  assert.match(playerHtml, /src="\/vendor\/leaflet\.js"/);
+  assert.match(playerHtml, /src="\/vendor\/pmtiles\.js"/);
+  assert.doesNotMatch(playerHtml, /unpkg\.com\/leaflet/);
   for (const id of ["map-geometry-type", "map-geometry-label", "add-map-geometry", "map-geometry-coordinates", "map-geometry-entries"]) {
     assert.equal(runtimeHtml.split(`id="${id}"`).length - 1, 1, `${id} must appear once`);
   }
@@ -81,6 +86,7 @@ test("serves protected pages only for an active session and gates them again aft
   assert.equal(setupPage.status, 200);
   const setupHtml = await setupPage.text();
   assert.match(setupHtml, /id="export-package-top"/);
+  assert.equal([...setupHtml.matchAll(/\b(?:let|const)\s+baseMapLayer\s*=/g)].length, 1);
   for (const id of ["map-bound-south", "map-bound-west", "map-bound-north", "map-bound-east", "apply-map-bounds"]) {
     assert.match(setupHtml, new RegExp(`id="${id}"`));
   }

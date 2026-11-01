@@ -175,6 +175,14 @@ On reaching/crossing **12:00**, the GM-defined daily food schedule consumes **on
 
 Backups include clock HH:MM, reserves, and `dailySupplyUsage`, plus clock/midday audit entries. Restore recovers reserves and usage together; replay follows that saved state. Legacy backups missing time default to 00:00 and missing usage to empty. New COMMS/audit stamps include `timeOfDay`; historical entries remain unknown. Restart existing services for the migration. Tests/browser checks verify four six-hour steps with one noon deduction, midnight rollover, date replay, empty reserves, duplicate requests, rollback, and recovery.
 
+### Strategic Weather Rolls And Duration
+
+In **Movement → Weather log**, record the physical d6 result and select the matching improve/worsen symbol shown in the T2K 4E Referee Aid. The local aid does not map those symbols to numeric faces, so the GM confirms the outcome; the app does not infer a threshold. Only Fair, Cloudy, and Rain/Snow use the verified progression. GM-defined conditions remain manual.
+
+`POST /api/campaigns/:id/weather-roll` accepts `{ "expectedRevision": 3, "roll": 4, "outcome": "worsens" }`. Outcomes are `improves`, `worsens`, or `holds`. The owning GM's server validates the d6 and outcome, applies at most one roll per campaign shift, and records the result in the GM journal and audit history. Stale or duplicate attempts return `409`; invalid input returns `422`.
+
+After one Fieldbook shift (the runtime clock's six-hour step) in Rain/Snow, advancing time automatically returns weather to Cloudy and locks weather rolls for one complete Cloudy shift. The lock and last rolled shift are included in runtime backups; older backups default both fields to their initial state. Effects remain GM-adjudicated and are not applied to combat rolls.
+
 ### GM Campaign Audit
 
 Clock advances and midday ration checks also record `clock.advance` and `supplies.midday` events. New audit game-time metadata includes `timeOfDay`; historical null times remain date/day-only. The midday usage ledger and journal retain the actual quantity used; the audit entry is action metadata, not a rules calculation.
