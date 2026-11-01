@@ -13,6 +13,7 @@ const { createAuthHandler } = require("../server/auth.cjs");
 const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("../server/runtime-store.cjs");
 const { getGMReport, updateGMReport, getPlayerReport } = require("../server/situation-reports.cjs");
 const { getGMMap, updateGMMap, getPlayerMap } = require("../server/map-publications.cjs");
+const { listComms, sendComms } = require("../server/comms.cjs");
 
 function createGm(database, id, username) {
   const timestamp = new Date().toISOString();
@@ -20,6 +21,53 @@ function createGm(database, id, username) {
     (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role)
     VALUES (?, ?, ?, 0, ?, ?, 'gm')`).run(id, username, "test-only-hash", timestamp, timestamp);
 }
+
+test("COMMS messages persist and restore with immutable sender/time snapshots and atomic rollback", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-comms-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database = openRuntimeDatabase(path);
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const playerId = database.prepare("SELECT account_id FROM player_seats WHERE campaign_id = ?").get(campaignId).account_id;
+    sendComms(database, playerId, campaignId, "player", { text: "First report" });
+    sendComms(database, "gm-owner", campaignId, "gm", { text: "Copy" });
+    const saved = listComms(database, playerId, campaignId, "player");
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    assert.equal(backup.data.commsMessages.length, 2);
+    database.close(); database = openRuntimeDatabase(path);
+    assert.deepEqual(listComms(database, playerId, campaignId, "player"), saved);
+    sendComms(database, playerId, campaignId, "player", { text: "After backup" });
+    const current = listComms(database, playerId, campaignId, "player");
+    const revision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    database.exec(`CREATE TRIGGER fail_comms_restore BEFORE INSERT ON comms_messages
+      BEGIN SELECT RAISE(ABORT, 'comms restore failure'); END;`);
+    assert.throws(() => restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision }), /comms restore failure/);
+    assert.deepEqual(listComms(database, playerId, campaignId, "player"), current);
+    database.exec("DROP TRIGGER fail_comms_restore");
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision });
+    assert.deepEqual(listComms(database, playerId, campaignId, "player"), saved);
+    database.close(); database = openRuntimeDatabase(path);
+    assert.deepEqual(listComms(database, playerId, campaignId, "player"), saved);
+  } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("COMMS returns the latest 200 messages in send order without leaking account IDs", () => {
+  const database = openRuntimeDatabase();
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const playerId = database.prepare("SELECT account_id FROM player_seats WHERE campaign_id = ?").get(campaignId).account_id;
+    for (let index = 0; index < 201; index += 1) sendComms(database, playerId, campaignId, "player", { text: `Message ${index}` });
+    const result = listComms(database, playerId, campaignId, "player");
+    assert.equal(result.messages.length, 200); assert.equal(result.hasEarlier, true);
+    assert.equal(result.messages[0].text, "Message 1"); assert.equal(result.messages[199].text, "Message 200");
+    assert.equal(exportRuntimeSave(database, "gm-owner", campaignId).data.commsMessages.length, 201);
+    assert.doesNotMatch(JSON.stringify(result), /sender_account_id|sort_order|password/);
+  } finally { database.close(); }
+});
 
 test("map selections persist and recovery withdraws publication atomically", () => {
   const directory = mkdtempSync(join(tmpdir(), "fieldbook-map-test-"));

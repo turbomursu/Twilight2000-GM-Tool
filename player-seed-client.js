@@ -63,6 +63,10 @@
       recordTitle.textContent = "Player map";
       recordDescription.textContent = "";
     }
+    if (document.querySelector("#player-comms-tab")?.getAttribute("aria-current") === "page") {
+      recordTitle.textContent = "COMMS";
+      recordDescription.textContent = "";
+    }
     emptyState.hidden = true;
     form.hidden = false;
     finalizeButton.hidden = character.status !== "seed";

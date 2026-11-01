@@ -9,6 +9,13 @@
   <style>
     .published-map-canvas { width: 100%; height: 420px; min-width: 0; border: 1px solid #89957f; background: #d7dfca; }
     #player-map-name { min-width: 0; overflow-wrap: anywhere; }
+    .comms-list { list-style: none; margin: 16px 0; padding: 0; min-height: 220px; max-height: 340px; overflow: auto; }
+    .comms-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 12px 0; border-bottom: 1px solid #89957f; }
+    .comms-row strong, .comms-row time { overflow-wrap: anywhere; font: 11px var(--mono); }
+    .comms-row time { color: #596851; }
+    .comms-row p { grid-column: 1 / -1; margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+    .comms-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
+    .comms-compose button:disabled { opacity: .5; cursor: not-allowed; }
     :root {
       color-scheme: light;
       --ink: #202b23;
@@ -471,26 +478,11 @@
           <p class="character-review-status" id="character-review-status" role="status">Accepted values are not connected. Player changes stay pending until GM review.</p>
         </div>
       </section>
-      <section class="player-panel" data-panel="dispatches" aria-label="Published dispatches" hidden>
-        <div class="dispatch-console">
-          <aside class="dispatch-index" aria-label="Published dispatch list">
-            <div class="dispatch-index-head"><div><span class="eyebrow">Player mailbox / seat 02</span><strong>Dispatch archive</strong></div><span class="dispatch-stamp" id="dispatch-count">02</span></div>
-            <button class="dispatch-select" type="button" data-dispatch-id="bridge" aria-current="true"><span><strong>North bridge / Vansbro</strong><small>11 May 2000 / 07:55</small></span><span class="message-state new" data-message-state>NEW</span></button>
-            <button class="dispatch-select" type="button" data-dispatch-id="movement" aria-current="false"><span><strong>Column movement</strong><small>10 May 2000 / 18:20</small></span><span class="message-state" data-message-state>READ</span></button>
-          </aside>
-          <article class="dispatch-detail" aria-live="polite">
-            <header class="dispatch-detail-head"><div><span class="eyebrow" id="dispatch-sector">GM-published / Dalarna sector</span><h2 id="dispatch-title">North bridge / Vansbro</h2></div><div class="dispatch-detail-actions"><button class="dispatch-delete" type="button" data-delete-dispatch>Delete</button></div></header>
-            <div class="dispatch-meta"><div><span class="eyebrow">Date</span><strong id="dispatch-date">11 May 2000</strong></div><div><span class="eyebrow">Game time sent</span><strong id="dispatch-time">07:55</strong></div><div><span class="eyebrow">From</span><strong id="dispatch-sender">Campaign control</strong></div><div><span class="eyebrow">To</span><strong id="dispatch-recipient">Player seat 02</strong></div></div>
-            <p class="dispatch-message" id="dispatch-message">Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.</p>
-            <footer class="dispatch-detail-foot"><span id="dispatch-origin">Published by campaign control</span><span id="dispatch-visibility">Player copy / read only</span></footer>
-            <p class="dispatch-feedback" id="dispatch-feedback" role="status">Delete removes this copy from your inbox only; the GM archive is unchanged.</p>
-          </article>
-        </div>
-        <form class="dispatch-compose" id="dispatch-compose-form">
-          <label for="dispatch-compose-input"><span class="eyebrow">Broadcast / GM + all players / Lena Fors</span><input id="dispatch-compose-input" name="message" type="text" maxlength="240" required placeholder="Type a message for the group"></label>
-          <button class="dispatch-send" type="submit"><span aria-hidden="true">↗</span>Send</button>
-        </form>
-        <p class="dispatch-send-feedback" id="dispatch-send-feedback" role="status">Uses campaign game time / delivery is local preview only.</p>
+      <section class="player-panel comms-workspace" data-panel="comms" data-comms-role="player" aria-label="Campaign COMMS" hidden>
+        <div class="map-record-head"><h2>COMMS</h2><button class="player-seed-refresh" id="refresh-comms" type="button" disabled>Refresh</button></div>
+        <p id="comms-status" role="status">Select an assigned campaign.</p>
+        <ol class="comms-list" id="comms-messages" role="log" aria-label="Campaign messages" aria-live="polite" aria-relevant="additions"></ol>
+        <form id="comms-form"><fieldset class="comms-compose" disabled><div class="field"><label for="comms-message">Broadcast / GM + all players</label><input id="comms-message" type="text" maxlength="240" required autocomplete="off"></div><button class="dispatch-send" type="submit"><span aria-hidden="true">&#8599;</span> Send</button></fieldset></form>
       </section>
     </section>
     <nav class="device-controls" aria-label="Player quick access">
@@ -499,7 +491,7 @@
         <button class="action-button" id="player-sitrep-tab" type="button" title="Situation report" data-view-state="active">Sitrep</button>
         <button class="action-button tab-inactive" type="button" disabled title="Inactive / player inventory is not connected" data-view-state="inactive">Inventory</button>
         <button class="action-button" id="player-character-tab" type="button" aria-current="page" title="Assigned character" data-view-state="active">Character</button>
-        <button class="action-button tab-inactive" type="button" disabled title="Inactive / shared COMMS is not connected" data-view-state="inactive">COMMS</button>
+        <button class="action-button" id="player-comms-tab" type="button" title="Campaign COMMS" data-view-state="active">COMMS</button>
         <button class="action-button" id="player-map-tab" type="button" title="Published campaign map" data-view-state="active">Map</button>
       </div>
     </nav>
@@ -525,6 +517,7 @@
   <script src="/situation-report-client.js" defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="/map-publication-client.js" defer></script>
+  <script src="/comms-client.js" defer></script>
   <script>
     if (document.body.dataset.enableLocalPlayerPreview === "true") {
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];

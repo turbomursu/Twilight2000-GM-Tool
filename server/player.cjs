@@ -2,6 +2,7 @@ const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
 const { createCharacterChangeRequest, finalizePlayerSeed, getPlayerCharacter, listPlayerCampaigns, updatePlayerSeed } = require("./runtime-store.cjs");
 const { getPlayerReport } = require("./situation-reports.cjs");
 const { getPlayerMap } = require("./map-publications.cjs");
+const { listComms, sendComms } = require("./comms.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -68,6 +69,22 @@ function createPlayerHandler({ database }) {
     }
 
     const pathname = new URL(request.url, "http://fieldbook.invalid").pathname;
+    const commsMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/comms$/);
+    if (commsMatch) {
+      if (!["GET", "POST"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(commsMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const result = request.method === "GET" ? listComms(database, account.id, campaignId, "player")
+          : sendComms(database, account.id, campaignId, "player", await readJsonBody(request));
+        return result ? sendJson(response, request.method === "POST" ? 201 : 200, result)
+          : sendJson(response, 404, { error: "Campaign not found." });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : /Campaign not found/.test(error.message) ? 404
+          : /archive is full/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
     const mapMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map$/);
     if (mapMatch) {
       if (request.method !== "GET") return sendJson(response, 405, { error: "Read-only player map." });

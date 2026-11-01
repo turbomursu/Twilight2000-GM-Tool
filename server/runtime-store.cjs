@@ -262,7 +262,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 8) {
+    if (version > 9) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -378,6 +378,31 @@ function openRuntimeDatabase(path = ":memory:") {
       throw error;
     }
   }
+  if (version < 9) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE comms_messages (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        sender_account_id TEXT NOT NULL REFERENCES accounts(id),
+        sender_role TEXT NOT NULL CHECK (sender_role IN ('gm', 'player')),
+        sender_label TEXT NOT NULL,
+        message_text TEXT NOT NULL CHECK (length(message_text) BETWEEN 1 AND 240),
+        game_date TEXT,
+        day_number INTEGER CHECK (day_number >= 0),
+        created_at TEXT NOT NULL,
+        sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+        UNIQUE (campaign_id, sort_order),
+        CHECK ((game_date IS NULL AND day_number IS NULL) OR (game_date IS NOT NULL AND day_number IS NOT NULL))
+      ) STRICT;
+      PRAGMA user_version = 9;`);
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      database.close();
+      throw error;
+    }
+  }
   return database;
 }
 
@@ -447,6 +472,7 @@ function collectRuntimeSave(database, gmAccountId, runtimeId, options = {}) {
     dashboardState: database.prepare("SELECT * FROM runtime_dashboard_state WHERE campaign_id = ?").get(runtimeId) || null,
     situationReport: database.prepare("SELECT campaign_id, revision, draft_json FROM situation_reports WHERE campaign_id = ?").get(runtimeId) || null,
     mapPublication: database.prepare("SELECT campaign_id, revision, draft_json FROM map_publications WHERE campaign_id = ?").get(runtimeId) || null,
+    commsMessages: queryRows("SELECT * FROM comms_messages WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
     routeStops: queryRows("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal", runtimeId),
     personnel: queryRows("SELECT * FROM personnel WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
     journalEntries: queryRows("SELECT * FROM journal_entries WHERE campaign_id = ? ORDER BY id", runtimeId),
@@ -480,7 +506,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     || runtimeBackupChecksum(payload) !== checksum) {
     fail("The runtime backup checksum is invalid; no data was restored.");
   }
-  const data = backup.data;
+  const data = { ...backup.data, commsMessages: Object.hasOwn(backup.data, "commsMessages") ? backup.data.commsMessages : [] };
   if (!data.campaign || data.campaign.runtime_id !== targetRuntimeId
     || data.campaign.schema_version !== 1 || data.campaign.revision !== backup.sourceRevision
     || !data.setupImport || data.setupImport.runtime_campaign_id !== targetRuntimeId
@@ -502,7 +528,8 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     journalEntries: 10000,
     characters: 1000,
     playerSeats: 4,
-    characterChangeRequests: 10000
+    characterChangeRequests: 10000,
+    commsMessages: 10000
   };
   for (const [key, maximum] of Object.entries(limits)) {
     if (!Array.isArray(data[key]) || data[key].length > maximum) fail(`The runtime backup has an invalid ${key} list.`);
@@ -534,7 +561,8 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     journalEntries: "campaign_id",
     characters: "campaign_id",
     playerSeats: "campaign_id",
-    characterChangeRequests: "campaign_id"
+    characterChangeRequests: "campaign_id",
+    commsMessages: "campaign_id"
   };
   for (const [tableKey, campaignKey] of Object.entries(campaignKeys)) {
     if (data[tableKey].some((row) => row[campaignKey] !== targetRuntimeId)) fail(`The runtime backup contains a ${tableKey} row for another campaign.`);
@@ -590,6 +618,21 @@ function validateRuntimeSave(backup, targetRuntimeId) {
   });
   const characters = new Map(data.characters.map((character) => [character.id, character]));
   const memberships = new Map(data.campaignMemberships.map((membership) => [membership.account_id, membership.role]));
+  const messageIds = new Set();
+  const messageOrders = new Set();
+  data.commsMessages.forEach((message) => {
+    if (typeof message.id !== "string" || !message.id || message.id.length > 120 || messageIds.has(message.id)
+      || !Number.isSafeInteger(message.sort_order) || message.sort_order < 0 || messageOrders.has(message.sort_order)
+      || !["gm", "player"].includes(message.sender_role) || memberships.get(message.sender_account_id) !== message.sender_role
+      || typeof message.sender_label !== "string" || !message.sender_label.trim() || message.sender_label.length > 80
+      || typeof message.created_at !== "string" || !Number.isFinite(Date.parse(message.created_at))) fail("Invalid COMMS message metadata in runtime backup.");
+    if (require("./comms.cjs").validateMessageText(message.message_text) !== message.message_text) fail("Invalid COMMS message text in runtime backup.");
+    if (message.game_date === null ? message.day_number !== null
+      : typeof message.game_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(message.game_date)
+        || !Number.isSafeInteger(message.day_number) || message.day_number < 0
+        || new Date(`${message.game_date}T00:00:00Z`).toISOString().slice(0, 10) !== message.game_date) fail("Invalid COMMS game time in runtime backup.");
+    messageIds.add(message.id); messageOrders.add(message.sort_order);
+  });
   seats.forEach((seat) => {
     if (!characters.has(seat.character_id) || memberships.get(seat.account_id) !== "player") {
       fail("Invalid player seat ownership in runtime backup.");
@@ -650,6 +693,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     }
 
     const deleteTables = [
+      ["comms_messages", "campaign_id"],
       ["character_change_requests", "campaign_id"], ["player_seats", "campaign_id"], ["characters", "campaign_id"],
       ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
       ["runtime_dashboard_state", "campaign_id"], ["settlement_factions", "runtime_campaign_id"],
@@ -703,6 +747,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("route_stops", ["campaign_id", "ordinal", "location_id", "detail", "km_from_previous"], data.routeStops);
     insertRows("personnel", ["campaign_id", "id", "name", "role", "condition", "readiness", "sort_order"], data.personnel);
     insertRows("journal_entries", ["campaign_id", "id", "title", "body", "entry_date", "kind", "created_at"], data.journalEntries);
+    insertRows("comms_messages", ["id", "campaign_id", "sender_account_id", "sender_role", "sender_label", "message_text", "game_date", "day_number", "created_at", "sort_order"], data.commsMessages);
     insertRows("characters", ["id", "campaign_id", "status", "fields_json", "created_at", "updated_at"], data.characters);
     insertRows("player_seats", ["id", "campaign_id", "account_id", "character_id", "display_label", "active", "assigned_at"], data.playerSeats);
     insertRows("character_change_requests", ["id", "campaign_id", "seat_id", "character_id", "requested_fields_json", "status", "submitted_at", "reviewer_account_id", "reviewed_at", "review_note"], data.characterChangeRequests);

@@ -107,12 +107,15 @@ test("player activates, selects assigned campaign, fills only blank seed fields,
   assert.doesNotMatch(playerPageHtml, /id="player-sitrep-tab"[^>]*disabled/);
   assert.match(playerPageHtml, /id="player-map-tab"[^>]*data-view-state="active">Map/);
   assert.doesNotMatch(playerPageHtml, /id="player-map-tab"[^>]*disabled/);
-  for (const inactiveTab of ["Inventory", "COMMS"]) {
+  assert.match(playerPageHtml, /id="player-comms-tab"[^>]*data-view-state="active">COMMS/);
+  assert.doesNotMatch(playerPageHtml, /id="player-comms-tab"[^>]*disabled/);
+  for (const inactiveTab of ["Inventory"]) {
     assert.match(playerPageHtml, new RegExp(`disabled title="Inactive[^"]*" data-view-state="inactive">${inactiveTab}`));
   }
   assert.equal((await fetch(`${origin}/player-seed-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   assert.equal((await fetch(`${origin}/situation-report-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   assert.equal((await fetch(`${origin}/map-publication-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
+  assert.equal((await fetch(`${origin}/comms-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   const gmPage = await fetch(`${origin}/index.html`, { headers: { Cookie: playerCookie }, redirect: "manual" });
   assert.equal(gmPage.status, 302);
   assert.equal(gmPage.headers.get("location"), "/player-interface.html");

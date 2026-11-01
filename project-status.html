@@ -95,7 +95,7 @@
         <section class="summary" aria-label="Roadmap summary">
           <div class="summary-item"><span class="eyebrow">Overall</span><strong>In progress</strong><p>Phases 0-1 are partial, not complete.</p></div>
           <div class="summary-item"><span class="eyebrow">Working now</span><strong>GM-owned seed flow</strong><p>Named users, assignments, finalization, and reviewed changes.</p></div>
-          <div class="summary-item"><span class="eyebrow">Main gap</span><strong>Shared COMMS</strong><p>Reports and point-layer maps are published; Inventory, COMMS, offline maps, and broader gameplay remain planned.</p></div>
+          <div class="summary-item"><span class="eyebrow">Main gap</span><strong>Player inventory</strong><p>Reports, maps, and single-line COMMS are connected; inventory, offline maps, and broader gameplay remain planned.</p></div>
         </section>
 
         <section class="section" aria-labelledby="done-title">
@@ -115,7 +115,7 @@
           <div class="section-head"><h2 id="partial-title">In progress</h2><span>Partially checked</span></div>
           <div class="checklist">
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign setup and dashboard connection</strong><p>Setup import and map selection work; Situation, Personnel, Movement, and Journal now read/write supported SQLite runtime fields. Route/map rendering and remaining panels are still sample or local.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player character experience</strong><p>Seed completion and GM-reviewed edits are server-backed. Character, Sitrep, and Map are active; Inventory and COMMS remain inactive.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player character experience</strong><p>Seed completion and GM-reviewed edits are server-backed. Character, Sitrep, Map, and COMMS are active; Inventory remains inactive.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Runtime persistence and recovery</strong><p>Supported database edits persist. GM-only Backup/Restore recovers the same campaign atomically, retaining IDs, seats, requests, and saved revision provenance; cross-host recovery and scheduled backups remain planned.</p></span><span class="state partial">Partial</span></label>
           </div>
         </section>
@@ -127,14 +127,15 @@
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Same-campaign runtime backup and restore</strong><p>Validated private backups, explicit replacement confirmation, older-revision warning, atomic recovery, stable IDs, and campaign isolation pass focused tests. Account recovery on a new host is not included.</p></span><span class="state done">Working slice</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>GM-published text situation reports</strong><p>Draft, preview, publish, and withdraw pass API, persistence/recovery, and synthetic GM/player browser checks on 01 Nov 2026. Active assignments and explicit field allow-lists exclude drafts and GM notes. Restore withdraws publication.</p></span><span class="state done">Text slice</span></label>
             <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Published point-layer campaign map</strong><p>Explicit selected locations, point markings, route, and GM position pass four-seat privacy/ownership and recovery tests. Browser preview, loaded tiles, 200% zoom, centered reset, inert labels, and withdrawal verified on 01 Nov 2026. Offline tiles and polygon markings remain planned.</p></span><span class="state done">Point slice</span></label>
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Connect player inventory, COMMS, and condition updates</strong><p>Keep changes seat-owned and route rule-governed actions to verified procedures or GM review.</p></span><span class="state">Phase 3-4</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Single-line campaign COMMS</strong><p>GM/four-seat delivery, server sender/date/day stamps, spoof rejection, archive bounds, persistence, and recovery pass tests. Browser sends/replies, literal text, failed-input retention, and selection-race checks verified on 01 Nov 2026. Push and read receipts remain planned.</p></span><span class="state done">Single-line slice</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Player inventory and condition updates</strong><p>Keep changes seat-owned and route rule-governed actions to verified procedures or GM review.</p></span><span class="state">Phase 3-4</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Build verified character/NPC generation</strong><p>Use authoritative Fourth Edition procedures; keep unverified fields GM-managed and cite sources.</p></span><span class="state">Phase 2</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Add logistics, economy, diplomacy, conflict, and simulation</strong><p>Keep consequential outcomes inspectable, GM-controlled, and separate from rules logic.</p></span><span class="state">Phases 4-8</span></label>
           </div>
         </section>
 
-        <aside class="next-step"><strong>Recommended next milestone</strong><p>Connect campaign-scoped COMMS delivery with server-derived sender identity and game time.</p></aside>
-        <aside class="next-step"><strong>Suggested next prompt</strong><p>Implement a single-line COMMS message from each assigned player to the GM and all campaign seats. Persist sender identity and campaign game time; test campaign isolation, spoofed senders, and delivery to four players.</p></aside>
+        <aside class="next-step"><strong>Recommended next milestone</strong><p>Connect player inventories and GM-reviewed item proposals without inventing rules effects.</p></aside>
+        <aside class="next-step"><strong>Suggested next prompt</strong><p>Implement campaign-scoped player inventories with GM-approved item and quantity proposals, RB/GM/UF source claims and references, and own-character authorization. Keep rules-governed actions and carrying effects GM-managed until verified.</p></aside>
         <p class="footnote">This page is a concise snapshot. The detailed deliverables, dependencies, and exit checks remain in ROADMAP.md and FEATURES.md. Checkboxes are status indicators, not a second editable roadmap.</p>
       </div>
     </main>

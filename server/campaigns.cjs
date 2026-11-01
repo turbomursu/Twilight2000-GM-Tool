@@ -6,6 +6,7 @@ const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
 const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("./runtime-store.cjs");
 const { getGMReport, updateGMReport } = require("./situation-reports.cjs");
 const { getGMMap, updateGMMap } = require("./map-publications.cjs");
+const { listComms, sendComms } = require("./comms.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -102,6 +103,22 @@ function createCampaignHandler({ database }) {
 
     if (request.method === "GET" && url.pathname === "/api/campaigns") {
       return sendJson(response, 200, { campaigns: listRuntimeCampaigns(database, account.id) });
+    }
+    const commsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/comms$/);
+    if (commsMatch) {
+      if (!["GET", "POST"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(commsMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const result = request.method === "GET" ? listComms(database, account.id, campaignId, "gm")
+          : sendComms(database, account.id, campaignId, "gm", await readJsonBody(request));
+        return result ? sendJson(response, request.method === "POST" ? 201 : 200, result)
+          : sendJson(response, 404, { error: "Campaign not found." });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : /Campaign not found/.test(error.message) ? 404
+          : /archive is full/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
     }
     const mapMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/map-publication$/);
     if (mapMatch && ["GET", "PUT"].includes(request.method)) {

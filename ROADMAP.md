@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-The GM Tool has a local sample fallback and owner-scoped SQLite APIs for dashboard, faction, prominence, report, and map-publication records. Reports and point-layer maps have separate drafts/published snapshots with revision checks. Character, Sitrep, and Map are connected; Inventory and COMMS remain inactive. Four-seat map privacy, ownership, withdrawal, persistence, and recovery pass tests. Synthetic browser checks verify previews, public tiles, inert labels, read-only browsing, 200% zoom, and centered reset. Recovery restores drafts but withdraws both publications. Offline basemaps, broader gameplay, and publication history remain planned.
+The GM Tool has owner-scoped SQLite APIs for supported campaign records, report/map publication, and COMMS. Character, Sitrep, Map, and COMMS are connected; Inventory remains inactive. Players and GMs send single-line campaign broadcasts with server-derived identity and date/day stamps; missing clock data is explicit. Four-seat isolation, spoof rejection, archive ordering, persistence, and recovery pass tests. Browser checks verify player sends, GM replies, inert text, failure preservation, and campaign-switch races. Recovery restores message history but withdraws report/map publications. Offline maps, inventory, rules-governed gameplay, and publication history remain planned.
 
 ## Delivery Principles
 
@@ -87,6 +87,7 @@ The GM Tool has a local sample fallback and owner-scoped SQLite APIs for dashboa
 - Let the GM publish the Setup Tool map with GM-managed markings, route, and player position. Give players scroll access and zoom up to 200%, with map open/reset centered on their position, without allowing them to change campaign map state.
 - Implemented point-layer slice: GM selection of locations, labeled point markings, ordered selected-location waypoints, and bounded player position. Explicit publication can reveal selected source GM-only locations; unselected records remain excluded. Read-only assigned-player output uses a schema-v1 allow-list and no raw annotations or setup export. Map drafts participate in runtime backup, and restore always withdraws publication. Polygon markings, offline tiles, fog masking, history, and push delivery remain planned.
 - Allow players to send a single-line COMMS message to the GM and all player seats; record player identity, campaign game time, and message content.
+- Implemented single-line slice: authenticated player/GM broadcast endpoints, 240-character/control-character validation, server sender and date/day snapshots, immutable message IDs/order, and a shared latest-200 view for the GM and four seats. Full stored archives participate in backup/restore. Visible views poll every 15 seconds; push delivery, per-player receipts, moderation, and time-of-day clock support remain planned.
 - Support 1-4 authenticated player seats, each assigned one character and an independent browser session.
 - Show each player only their own character and inventory, alongside GM-published situation information.
 - From the GM Tool, let the GM add, remove, edit, preview, publish, and withdraw report information; show whether changes are drafts or published.

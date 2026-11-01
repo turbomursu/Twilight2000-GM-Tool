@@ -12,7 +12,7 @@ Run the dependency-free test suite with `node --test`. Node is only required for
 
 ## LAN Auth API
 
-The Node service enforces GM/player roles and campaign ownership. Dashboard records, factions, prominence, report drafts, and map drafts persist in SQLite. GMs explicitly publish or withdraw reports and selected map layers shown to assigned players. Inventory, COMMS, and broader gameplay remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 and does not encrypt passwords or cookies. Use only on a trusted LAN, never the internet or untrusted networks.
+The Node service enforces GM/player roles and campaign ownership. Dashboard records, factions, prominence, report/map drafts, and COMMS messages persist in SQLite. GMs explicitly publish reports/maps; active players and GMs broadcast through their campaign channel. Inventory and broader rules-governed gameplay remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 without encryption. Use only on a trusted LAN, never the internet or untrusted networks.
 
 In PowerShell, configure a one-time bootstrap token before starting the service:
 
@@ -113,6 +113,18 @@ Select a runtime campaign, then open **Player map** on the GM desk. Check the lo
 
 The handset Map opens/resets at the GM position, supports panning and zoom from 25% to 200%, and cannot edit campaign layers. It refreshes on opening, Refresh, return, and every 15 seconds while visible; unchanged publications preserve the current view. Withdrawal clears the map on the next refresh; failures and campaign switches clear stale layers. No map snapshot is stored in browser storage. Leaflet/OSM reference tiles require internet. Public geographic labels are not concealed by omitting campaign locations; fog masking, offline basemaps, polygon/line markings, and publication history remain planned. Map browsing does not resolve travel rules.
 
+### COMMS API
+
+Open **COMMS** on the GM desk or handset, choose the campaign, and send one line. Player messages go to the GM and every active campaign seat; the GM can reply to the same channel. The input is capped at 240 characters. The server rejects blank text, line breaks/control characters, and additional sender/time/recipient/campaign fields. Failed or unconfirmed sends retain the input; after a network failure, check the channel before retrying to avoid duplicates.
+
+- GM `GET`/`POST /api/campaigns/:id/comms` requires ownership. Player `GET`/`POST /api/player/campaigns/:id/comms` requires an active assigned seat. POST accepts only `{ "text": "North road clear." }` and returns `201` with `{ "message": { "id": "...", "sender": { "label": "Lena Fors", "role": "player" }, "text": "North road clear.", "gameTime": { "gameDate": "2000-05-11", "dayNumber": 14 }, "sentAt": "..." } }`.
+- Sender and game-time values are derived from the authenticated seat and authoritative campaign clock, not the browser. GM replies use label/role `GM`/`gm`. If the campaign has no clock, `gameTime` is `null` and the UI shows **Game time not set**. The current clock has date/day only; no time of day is inferred. Sent timestamps are server UTC timestamps. Stored sender/time snapshots do not change when the campaign clock or assignment later changes.
+- GET returns `{ "messages": [ ... ], "hasEarlier": false }`, ordered oldest-to-newest within the latest 200. Only GM responses additionally include `campaignRevision`; no account IDs, raw seats/characters, GM notes, or setup data enter the channel projection. POST increments the campaign revision to protect concurrent restore. Responses: `401` unauthenticated, `403` wrong role/cross-origin, `404` inaccessible campaign, `422` invalid text/fields, `409` full archive. Per-campaign storage is bounded at 10000 messages.
+
+COMMS refreshes on opening, **Refresh**, returning to the page, and every 15 seconds while visible, rather than instantaneous push. Browser storage is not used for messages. Campaign switches and failed reads clear stale displayed messages; in-flight sends cannot populate a different selected channel. Text is rendered literally, not as HTML. Read receipts, unread flags, per-player deletion, moderation, pagination, and push delivery remain planned.
+
+Runtime-v1 backups include the complete stored COMMS archive, not just the visible 200 messages. Restore validates campaign/sender references, text, time, and ordering and preserves IDs and snapshots atomically. Older backups without `commsMessages` recover an empty archive. Credentials remain excluded, and referenced accounts must exist on the host. Restart an existing Node service to load the new endpoints and migration.
+
 ## Included
 
 - Campaign situation dashboard and illustrated route sketch
@@ -122,7 +134,7 @@ The handset Map opens/resets at the GM position, supports panning and zoom from 
 - Browser-local autosave and JSON campaign export
 - Standalone [Campaign Setup Tool prototype](campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
 - Optional development fixture seeds a separate SQLite `The Long Road` runtime with clock/resources, route stops, personnel, journal, and a sample player seed for testing the runtime read API.
-- Authenticated [Player Interface](player-interface.html) with assigned Character and GM-published Sitrep and Map views. Inventory and COMMS remain inactive; legacy samples are not connected runtime data.
+- Authenticated [Player Interface](player-interface.html) with Character, published Sitrep/Map, and campaign COMMS. Inventory remains inactive; legacy samples are not connected runtime data.
 
 ## Ruleset Fidelity
 

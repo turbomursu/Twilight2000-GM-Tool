@@ -50,6 +50,86 @@ async function bootstrapGM(origin) {
   return response.headers.get("set-cookie").split(";")[0];
 }
 
+test("COMMS broadcasts single-line messages with server-owned identity and game time to GM and four seats", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const importCampaign = async (source) => (await (await fetch(`${origin}/api/campaigns/import-setup`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(source)
+  })).json()).campaign;
+  const campaign = await importCampaign(validSetupPackage());
+  const otherSource = validSetupPackage(); otherSource.campaign.id = "other-comms-campaign";
+  const otherCampaign = await importCampaign(otherSource);
+  const gm = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  const insertAccount = database.prepare(`INSERT INTO accounts
+    (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  async function login(username) {
+    const response = await fetch(`${origin}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }) });
+    assert.equal(response.status, 200); return response.headers.get("set-cookie").split(";")[0];
+  }
+  const cookies = [];
+  for (let seat = 1; seat <= 4; seat += 1) {
+    const username = `comms-player-${seat}`;
+    insertAccount.run(username, username, gm.password_hash, "player", gm.id, gm.created_at, gm.updated_at);
+    createPlayerSeed(database, gm.id, campaign.id, { username, displayLabel: `Seat ${seat}`,
+      fields: [{ key: "private", label: "Private field", value: "Private character data", required: false }] });
+    cookies.push(await login(username));
+  }
+  insertAccount.run("comms-other-gm", "comms-other-gm", gm.password_hash, "gm", null, gm.created_at, gm.updated_at);
+  const otherGMCookie = await login("comms-other-gm");
+  const gmPath = `${origin}/api/campaigns/${campaign.id}/comms`;
+  const playerPath = `${origin}/api/player/campaigns/${campaign.id}/comms`;
+  const post = (path, authCookie, body, extraHeaders = {}) => fetch(path, { method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: authCookie, ...extraHeaders }, body: JSON.stringify(body) });
+  const read = async (path, authCookie) => (await fetch(path, { headers: { Cookie: authCookie } })).json();
+  assert.equal((await fetch(playerPath)).status, 401);
+  assert.equal((await fetch(gmPath)).status, 401);
+  assert.equal((await fetch(gmPath, { headers: { Cookie: cookies[0] } })).status, 403);
+  assert.equal((await fetch(gmPath, { headers: { Cookie: otherGMCookie } })).status, 404);
+  assert.equal((await post(gmPath, otherGMCookie, { text: "Foreign message" })).status, 404);
+  const foreignPlayerPath = `${origin}/api/player/campaigns/${otherCampaign.id}/comms`;
+  assert.equal((await fetch(foreignPlayerPath, { headers: { Cookie: cookies[0] } })).status, 404);
+  assert.equal((await post(foreignPlayerPath, cookies[0], { text: "Foreign message" })).status, 404);
+  assert.equal((await post(playerPath, cookies[0], { text: "Hello" }, { Origin: "http://untrusted.example" })).status, 403);
+  for (const text of ["", "   ", "First\nSecond", "First\rSecond", "First\u2028Second", "First\tSecond", "x".repeat(241)]) {
+    assert.equal((await post(playerPath, cookies[0], { text })).status, 422);
+  }
+  for (const extra of [{ sender: "GM" }, { gameTime: "fake" }, { campaignId: otherCampaign.id }, { recipient: "another-seat" }]) {
+    assert.equal((await post(playerPath, cookies[0], { text: "Spoof", ...extra })).status, 422);
+  }
+  assert.deepEqual(await read(playerPath, cookies[0]), { messages: [], hasEarlier: false });
+  const unstamped = await post(playerPath, cookies[0], { text: "Clock not configured" });
+  assert.equal(unstamped.status, 201); assert.equal((await unstamped.json()).message.gameTime, null);
+  database.prepare(`INSERT INTO runtime_dashboard_state
+    (campaign_id, game_date, day_number, distance_km, rations_days, fuel_units, weather, weather_note, active_stop_index, updated_at)
+    VALUES (?, '2000-05-11', 14, 0, 0, 0, 'Rain', '', 0, ?)`).run(campaign.id, new Date().toISOString());
+  for (let seat = 1; seat <= 4; seat += 1) {
+    const response = await post(playerPath, cookies[seat - 1], { text: seat === 1 ? "x".repeat(240) : `Report ${seat} <img src=x>` });
+    assert.equal(response.status, 201);
+    const { message } = await response.json();
+    assert.deepEqual(message.sender, { label: `Seat ${seat}`, role: "player" });
+    assert.deepEqual(message.gameTime, { gameDate: "2000-05-11", dayNumber: 14 });
+  }
+  database.prepare("UPDATE runtime_dashboard_state SET game_date = '2000-05-12', day_number = 15 WHERE campaign_id = ?").run(campaign.id);
+  const reply = await post(gmPath, cookie, { text: "  Copy. Hold position.  " });
+  assert.equal(reply.status, 201);
+  const replyBody = await reply.json();
+  assert.deepEqual(replyBody.message.sender, { label: "GM", role: "gm" });
+  assert.equal(replyBody.message.text, "Copy. Hold position.");
+  assert.deepEqual(replyBody.message.gameTime, { gameDate: "2000-05-12", dayNumber: 15 });
+  const received = await read(playerPath, cookies[0]);
+  assert.equal(received.messages.length, 6);
+  assert.deepEqual(received.messages[1].gameTime, { gameDate: "2000-05-11", dayNumber: 14 });
+  for (const authCookie of cookies) assert.deepEqual(await read(playerPath, authCookie), received);
+  assert.deepEqual((await read(gmPath, cookie)).messages, received.messages);
+  assert.deepEqual((await read(`${origin}/api/campaigns/${otherCampaign.id}/comms`, cookie)).messages, []);
+  assert.doesNotMatch(JSON.stringify(received), /sender_account_id|Private character|gm-only|gm-user|setupPackage|login_identifier|password/);
+  database.prepare("UPDATE player_seats SET active = 0 WHERE account_id = 'comms-player-1'").run();
+  assert.equal((await fetch(playerPath, { headers: { Cookie: cookies[0] } })).status, 404);
+  assert.equal((await post(playerPath, cookies[0], { text: "Revoked" })).status, 404);
+});
+
 test("GM-selected maps exclude hidden records and publish read-only to all four assigned players", async (t) => {
   const { origin, database } = await startTestServer(t);
   const cookie = await bootstrapGM(origin);

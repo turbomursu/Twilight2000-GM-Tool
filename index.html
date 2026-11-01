@@ -291,6 +291,13 @@
     .map-marking-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); }
     .map-route-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; font-size: 12px; }
     .map-route-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .comms-list { list-style: none; margin: 16px 0; padding: 0; min-height: 220px; max-height: 340px; overflow: auto; }
+    .comms-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .comms-row strong, .comms-row time { overflow-wrap: anywhere; font: 11px var(--mono); }
+    .comms-row time { color: var(--muted); }
+    .comms-row p { grid-column: 1 / -1; margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+    .comms-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
+    .comms-compose button:disabled { opacity: .5; cursor: not-allowed; }
     .report-copy { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
     .report-preview { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
     .topbar, .top-actions { flex-wrap: wrap; }
@@ -360,6 +367,7 @@
       <nav class="nav-list" aria-label="Views">
         <button class="nav-item" data-view="situation" aria-current="page"><span class="nav-icon" aria-hidden="true">01</span>Situation</button>
         <button class="nav-item" data-view="publication"><span class="nav-icon" aria-hidden="true">06</span>Player map</button>
+        <button class="nav-item" data-view="comms"><span class="nav-icon" aria-hidden="true">07</span>COMMS</button>
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
@@ -466,6 +474,13 @@
             </fieldset>
           </form>
           <section id="gm-map-preview" hidden><p class="eyebrow" id="gm-map-preview-label">Draft preview</p><div class="published-map-canvas" id="gm-map-preview-canvas" role="region" aria-label="Player map preview"></div></section>
+        </section>
+
+        <section class="view comms-workspace" id="view-comms" data-comms-role="gm" aria-labelledby="gm-comms-title">
+          <div class="page-heading"><div><div class="heading-tag">Campaign channel</div><h1 id="gm-comms-title">COMMS</h1></div><button class="button" id="refresh-comms" type="button" disabled>Refresh</button></div>
+          <p class="feedback" id="comms-status" role="status">Select a runtime campaign.</p>
+          <ol class="comms-list" id="comms-messages" role="log" aria-label="Campaign messages" aria-live="polite" aria-relevant="additions"></ol>
+          <form id="comms-form"><fieldset class="comms-compose" disabled><div class="field"><label for="comms-message">Broadcast / all campaign players</label><input id="comms-message" type="text" maxlength="240" required autocomplete="off"></div><button class="button button-primary" type="submit"><span aria-hidden="true">&#8599;</span> Send</button></fieldset></form>
         </section>
 
         <section class="view" id="view-roster" aria-labelledby="roster-title">
@@ -610,6 +625,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/auth-client.js" defer></script>
   <script src="/situation-report-client.js" defer></script>
   <script src="/map-publication-client.js" defer></script>
+  <script src="/comms-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -857,7 +873,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
         if (view === "influence") {
@@ -1483,6 +1499,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
       });
       document.addEventListener("fieldbook:map-saved", (event) => {
+        if (state.runtimeCampaignId === event.detail.campaignId) {
+          state.runtimeRevision = event.detail.campaignRevision;
+          persist();
+        }
+      });
+      document.addEventListener("fieldbook:comms-updated", (event) => {
         if (state.runtimeCampaignId === event.detail.campaignId) {
           state.runtimeRevision = event.detail.campaignRevision;
           persist();
