@@ -1347,6 +1347,8 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
       const insert = database.prepare(`INSERT INTO personnel
         (campaign_id, id, name, role, condition, readiness, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`);
       rows.forEach((person) => insert.run(runtimeId, person.id, person.name, person.role, person.condition, person.readiness, person.sortOrder));
+      database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+        .run(timestamp, runtimeId);
     }
 
     if (Object.hasOwn(input, "journal")) {

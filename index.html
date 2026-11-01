@@ -626,12 +626,14 @@
   </dialog>
 
   <dialog id="person-dialog" aria-labelledby="person-dialog-title">
-    <div class="dialog-head"><div><div class="eyebrow">Column / personnel</div><h2 id="person-dialog-title">Add person</h2></div><button class="icon-button" data-action="close-person" aria-label="Close dialog">×</button></div>
+    <div class="dialog-head"><div><div class="eyebrow">Column / personnel</div><h2 id="person-dialog-title">Add person</h2></div><button class="icon-button" type="button" data-action="close-person" aria-label="Close dialog">×</button></div>
     <form class="dialog-form" id="person-form">
-      <div class="field"><label for="person-name">Name</label><input id="person-name" name="name" maxlength="50" required placeholder="Name"></div>
-      <div class="field"><label for="person-role">Role</label><input id="person-role" name="role" maxlength="40" required placeholder="Medic, driver, scout..."></div>
-      <div class="field"><label for="person-condition">Condition</label><select id="person-condition" name="condition"><option>Stable</option><option>Bruised</option><option>Wounded</option><option>Exhausted</option><option>Recovering</option></select></div>
-      <div class="dialog-actions"><button class="button" type="button" data-action="close-person">Cancel</button><button class="button button-primary" type="submit">Add to roster</button></div>
+      <div class="field"><label for="person-name">Name</label><input id="person-name" name="name" maxlength="100" required placeholder="Name"></div>
+      <div class="field"><label for="person-role">Role</label><input id="person-role" name="role" maxlength="80" required placeholder="Medic, driver, scout..."></div>
+      <div class="field"><label for="person-condition">Condition</label><input id="person-condition" name="condition" maxlength="80" required value="Stable"></div>
+      <div class="field"><label for="person-readiness">Readiness</label><input id="person-readiness" name="readiness" maxlength="40" required value="Ready"></div>
+      <p class="feedback" id="person-form-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions"><button class="button" type="button" data-action="close-person">Cancel</button><button class="button button-primary" id="person-submit" type="submit">Add to roster</button></div>
     </form>
   </dialog>
   <dialog id="setup-import-dialog" aria-labelledby="setup-import-title">
@@ -767,6 +769,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let stagedInfluenceCells = new Set();
       let liveInfluenceEditing = false;
       let runtimeDataLoaded = false;
+      let editingPersonId = null;
       let runtimeFactionLayers = null;
       let factionSavePending = false;
 
@@ -819,10 +822,29 @@ Military rank || optional</textarea><span class="row-description">One field per 
         return `<div class="person-row"><span class="avatar" aria-hidden="true">${escapeHtml(initials(person.name))}</span><div class="person-copy"><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.role)}</small></div><span class="status ${person.status === "Watch" ? "watch" : ""}">${escapeHtml(person.status)}</span></div>`;
       }
       function renderPeople() {
-        const html = state.people.map((person) => `<article class="person-card"><span class="avatar" aria-hidden="true">${escapeHtml(initials(person.name))}</span><div><h3>${escapeHtml(person.name)}</h3><div class="role">${escapeHtml(person.role)}</div><div class="person-meta"><span>${escapeHtml(person.condition)}</span><span>${escapeHtml(person.status)}</span></div></div><div class="person-actions"><button class="icon-button" data-action="delete-person" data-id="${person.id}" aria-label="Remove ${escapeHtml(person.name)}" title="Remove from roster">×</button></div></article>`).join("");
+        const html = state.people.map((person) => `<article class="person-card"><span class="avatar" aria-hidden="true">${escapeHtml(initials(person.name))}</span><div><h3>${escapeHtml(person.name)}</h3><div class="role">${escapeHtml(person.role)}</div><div class="person-meta"><span>${escapeHtml(person.condition)}</span><span>${escapeHtml(person.status)}</span></div></div><div class="person-actions"><button class="button" data-action="edit-person" data-id="${escapeHtml(person.id)}" aria-label="Edit ${escapeHtml(person.name)}">Edit</button><button class="icon-button" data-action="delete-person" data-id="${escapeHtml(person.id)}" aria-label="Remove ${escapeHtml(person.name)}" title="Remove from roster">×</button></div></article>`).join("");
         document.getElementById("roster-grid").innerHTML = html || `<div class="panel empty-state">No personnel recorded.</div>`;
         document.getElementById("roster-preview").innerHTML = state.people.slice(0, 4).map(personPreview).join("") || `<div class="empty-state">No personnel recorded.</div>`;
         document.getElementById("roster-count").textContent = `${state.people.length} ${state.people.length === 1 ? "person" : "people"} attached to the column`;
+      }
+      function openPersonDialog(person = null) {
+        const form = document.getElementById("person-form");
+        const title = document.getElementById("person-dialog-title");
+        const submit = document.getElementById("person-submit");
+        const status = document.getElementById("person-form-status");
+        editingPersonId = person?.id ?? null;
+        form.reset();
+        status.className = "feedback";
+        status.textContent = "";
+        title.textContent = person ? "Edit personnel" : "Add person";
+        submit.textContent = person ? "Save changes" : "Add to roster";
+        if (person) {
+          document.getElementById("person-name").value = person.name;
+          document.getElementById("person-role").value = person.role;
+          document.getElementById("person-condition").value = person.condition;
+          document.getElementById("person-readiness").value = person.status || person.readiness || "Ready";
+        }
+        document.getElementById("person-dialog").showModal();
       }
       function renderNotes() {
         document.getElementById("journal-list").innerHTML = state.notes.length ? state.notes.map(noteMarkup).join("") : `<div class="empty-state">No entries recorded.</div>`;
@@ -882,7 +904,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         render();
       }
 
-      async function commitRuntimeUpdate(updates, applyLocal, successMessage) {
+      async function commitRuntimeUpdate(updates, applyLocal, successMessage, options = {}) {
         if (!runtimeDataLoaded && runtimeCampaignSelect.value) {
           showToast("Runtime campaign data is not loaded; changes were not applied.");
           return false;
@@ -905,6 +927,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           return true;
         } catch (error) {
           showToast(`Runtime change was not saved: ${error.message}`);
+          if (/campaign revision changed/i.test(error.message) && typeof options.onConflict === "function") {
+            await options.onConflict(error);
+          }
           return false;
         }
       }
@@ -2192,8 +2217,15 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
         if (action === "open-note") document.getElementById("note-dialog").showModal();
         if (action === "close-note") document.getElementById("note-dialog").close();
-        if (action === "open-person") document.getElementById("person-dialog").showModal();
-        if (action === "close-person") document.getElementById("person-dialog").close();
+        if (action === "open-person") openPersonDialog();
+        if (action === "edit-person") {
+          const person = state.people.find((entry) => String(entry.id) === button.dataset.id);
+          if (person) openPersonDialog(person);
+        }
+        if (action === "close-person") {
+          document.getElementById("person-dialog").close();
+          editingPersonId = null;
+        }
         if (action === "export-record") {
           const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), campaign: state }, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
@@ -2395,24 +2427,64 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }, "Weather record saved.");
         if (saved) syncWeatherEditor();
       });
-      document.getElementById("person-form").addEventListener("submit", (event) => {
+      document.getElementById("person-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        const personFormStatus = document.getElementById("person-form-status");
+        const personSubmitButton = document.getElementById("person-submit");
+        const existingPerson = editingPersonId === null
+          ? null
+          : state.people.find((entry) => String(entry.id) === String(editingPersonId));
+        if (editingPersonId !== null && !existingPerson) {
+          personFormStatus.className = "feedback error";
+          personFormStatus.textContent = "This personnel record no longer exists in the latest campaign state. Your draft is still here.";
+          return;
+        }
         const person = {
-          id: runtimeDataLoaded ? runtimeRecordId("person") : nextId(state.people),
+          id: existingPerson?.id ?? (runtimeDataLoaded ? runtimeRecordId("person") : nextId(state.people)),
           name: data.get("name").trim(),
           role: data.get("role").trim(),
-          condition: data.get("condition"),
-          status: "Ready"
+          condition: data.get("condition").trim(),
+          status: data.get("readiness").trim()
         };
-        const people = [...state.people, person];
+        const people = existingPerson
+          ? state.people.map((entry) => String(entry.id) === String(existingPerson.id) ? person : entry)
+          : [...state.people, person];
         const personnel = people.map(({ status, ...entry }) => ({ ...entry, readiness: entry.readiness || status }));
-        commitRuntimeUpdate({ personnel }, () => { state.people = people; }, "Person added to the roster.")
-          .then((saved) => {
-            if (!saved) return;
-            event.currentTarget.reset();
-            document.getElementById("person-dialog").close();
-          });
+        const campaignId = state.runtimeCampaignId;
+        const wasEditing = Boolean(existingPerson);
+        personSubmitButton.disabled = true;
+        personFormStatus.className = "feedback";
+        personFormStatus.textContent = "Saving personnel…";
+        try {
+          const saved = await commitRuntimeUpdate({ personnel }, () => { state.people = people; },
+            wasEditing ? "Personnel record updated." : "Person added to the roster.", {
+              onConflict: async () => {
+                if (!campaignId || runtimeCampaignSelect.value !== campaignId) return;
+                try {
+                  await loadRuntimeCampaign(campaignId, false);
+                  personFormStatus.className = "feedback error";
+                  personFormStatus.textContent = "Campaign changed. Latest personnel loaded; your draft remains. Review it and save again.";
+                } catch (error) {
+                  personFormStatus.className = "feedback error";
+                  personFormStatus.textContent = `Could not reload the campaign. Your draft remains: ${error.message}`;
+                }
+              }
+            });
+          if (!saved) {
+            if (!personFormStatus.classList.contains("error")) {
+              personFormStatus.className = "feedback error";
+              personFormStatus.textContent = "Personnel was not saved. Your draft remains in the form.";
+            }
+            return;
+          }
+          personFormStatus.textContent = "";
+          document.getElementById("person-form").reset();
+          document.getElementById("person-dialog").close();
+          editingPersonId = null;
+        } finally {
+          personSubmitButton.disabled = false;
+        }
       });
       document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => {
         if (event.target === dialog) dialog.close();

@@ -139,9 +139,17 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
     body: JSON.stringify({ expectedRevision: runtime.campaign.revision - 1, journal: runtime.journal })
   });
   assert.equal(staleUpdate.status, 409);
+  const stalePersonnelUpdate = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: runtime.campaign.revision - 1, personnel: runtime.personnel })
+  });
+  assert.equal(stalePersonnelUpdate.status, 409);
 
   const updatedPersonnel = runtime.personnel.map((person, index) => ({
     ...person,
+    name: index === 0 ? "Anja Updated" : person.name,
+    condition: index === 0 ? "Recovering" : person.condition,
     readiness: index === 0 ? "Alert" : person.readiness
   }));
   const updatedJournal = runtime.journal.map((entry) => ({ ...entry, date: entry.entryDate }));
@@ -155,14 +163,17 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(updatedRuntime.dashboard.rationsDays, 5);
   assert.equal(updatedRuntime.dashboard.weather, "Rain/Snow");
   assert.equal(updatedRuntime.dashboard.weatherNote, "North road weather watch.");
+  assert.equal(updatedRuntime.personnel[0].name, "Anja Updated");
+  assert.equal(updatedRuntime.personnel[0].condition, "Recovering");
   assert.equal(updatedRuntime.personnel[0].readiness, "Alert");
-  assert.equal(updatedRuntime.campaign.revision, 3);
+  assert.equal(updatedRuntime.campaign.revision, 4);
 
   const reloaded = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
   const reloadedRuntime = (await reloaded.json()).runtime;
   assert.equal(reloadedRuntime.dashboard.rationsDays, 5);
   assert.equal(reloadedRuntime.dashboard.weather, "Rain/Snow");
   assert.equal(reloadedRuntime.dashboard.weatherNote, "North road weather watch.");
+  assert.equal(reloadedRuntime.personnel[0].name, "Anja Updated");
 
   const deniedWrite = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
@@ -186,9 +197,32 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
     body: JSON.stringify({ expectedRevision: reloadedRuntime.campaign.revision, dashboard: { weather: "Dense smoke", weatherNote: "GM-defined visibility condition." } })
   });
   assert.equal(customWeatherResponse.status, 200);
-  const customWeather = (await customWeatherResponse.json()).runtime.dashboard;
+  const customWeatherRuntime = (await customWeatherResponse.json()).runtime;
+  const customWeather = customWeatherRuntime.dashboard;
   assert.equal(customWeather.weather, "Dense smoke");
   assert.equal(customWeather.weatherNote, "GM-defined visibility condition.");
+
+  const personnelOnly = customWeatherRuntime.personnel.map((person, index) => ({
+    ...person,
+    readiness: index === 0 ? "Resting" : person.readiness
+  }));
+  const personnelOnlyResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: customWeatherRuntime.campaign.revision, personnel: personnelOnly })
+  });
+  assert.equal(personnelOnlyResponse.status, 200);
+  const personnelOnlyRuntime = (await personnelOnlyResponse.json()).runtime;
+  assert.equal(personnelOnlyRuntime.campaign.revision, customWeatherRuntime.campaign.revision + 1);
+  assert.equal(personnelOnlyRuntime.personnel[0].readiness, "Resting");
+
+  const stalePersonnelRetry = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: customWeatherRuntime.campaign.revision, personnel: customWeather.personnel })
+  });
+  assert.equal(stalePersonnelRetry.status, 409);
+  assert.equal(getRuntimeDashboard(database, "gm-account-1", seeded.campaignId).personnel[0].readiness, "Resting");
 
   const denied = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${otherToken}` } });
   assert.equal(denied.status, 404);

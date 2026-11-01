@@ -377,14 +377,19 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, {
       expectedRevision: before.campaign.revision,
       dashboard: { rationsDays: 2, weather: "Rain/Snow", weatherNote: "Weather shift ends after tonight." },
-      personnel: before.personnel.slice(0, 1),
+      personnel: before.personnel.map((person, index) => index === 0
+        ? { ...person, name: "Anja Updated", condition: "Recovering", readiness: "Alert" }
+        : person),
       journal: []
     }, { now: () => Date.parse("2026-11-01T10:10:00.000Z") });
     const changed = getRuntimeDashboard(database, "gm-owner", seeded.campaignId);
     assert.equal(changed.dashboard.rationsDays, 2);
     assert.equal(changed.dashboard.weather, "Rain/Snow");
     assert.equal(changed.dashboard.weatherNote, "Weather shift ends after tonight.");
-    assert.equal(changed.personnel.length, 1);
+    assert.equal(changed.personnel.length, before.personnel.length);
+    assert.equal(changed.personnel[0].name, "Anja Updated");
+    assert.equal(changed.personnel[0].condition, "Recovering");
+    assert.equal(changed.personnel[0].readiness, "Alert");
     assert.equal(changed.journal.length, 0);
 
     assert.throws(() => restoreRuntimeSave(database, "gm-owner", seeded.campaignId, backup, {
@@ -411,7 +416,7 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     assert.equal(restored.dashboard.weather, before.dashboard.weather);
     assert.equal(restored.dashboard.weatherNote, before.dashboard.weatherNote);
     assert.deepEqual(restored.route.map(({ mapPosition }) => mapPosition), before.route.map(({ mapPosition }) => mapPosition));
-    assert.equal(restored.personnel.length, before.personnel.length);
+    assert.deepEqual(restored.personnel, before.personnel);
     assert.equal(restored.journal.length, before.journal.length);
     assert.deepEqual(restored.journal.map(({ title }) => title), before.journal.map(({ title }) => title));
     assert.equal(restored.campaign.revision, changed.campaign.revision + 1);
