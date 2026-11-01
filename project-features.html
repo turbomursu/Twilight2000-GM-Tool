@@ -96,7 +96,7 @@
         <section class="summary" aria-label="Feature status summary">
           <div class="summary-item"><span class="eyebrow">Available slices</span><strong>Accounts and seeds</strong><p>GM-created users, campaign seed assignment, and GM-reviewed field edits.</p></div>
           <div class="summary-item"><span class="eyebrow">Partial surfaces</span><strong>Setup and runtime</strong><p>Dashboard, publications, COMMS, and owned inventory/GM review work; broader rules-governed gameplay remains open.</p></div>
-          <div class="summary-item"><span class="eyebrow">Not connected</span><strong>Player gameplay</strong><p>Verified item/condition effects, carrying, and full actor audit history.</p></div>
+          <div class="summary-item"><span class="eyebrow">Not connected</span><strong>Player gameplay</strong><p>Verified rules effects, carrying, broader action audit coverage, and full content history.</p></div>
         </section>
 
         <section class="section" aria-labelledby="surfaces-title">
@@ -132,7 +132,10 @@
           </div>
         </section>
 
-        <aside class="notice"><strong>Suggested next prompt</strong><p>Implement campaign audit history for GM condition/inventory changes and publication actions. Record server-derived actor, target, revisions, and timestamp; enforce owner-only access and include history in runtime backups.</p></aside>
+        <aside class="notice"><strong>Integration verified / 01 Nov 2026</strong><p>All five player views and GM character approval work over a combined restored campaign. Client regressions now cover finalized-character submissions and delayed responses after deselection. Private GM notes remain excluded; report/map restore still requires explicit republishing.</p></aside>
+        <section class="section"><h2>GM audit</h2><label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Read-only owner audit metadata</strong><p>Covered condition/inventory/publication/restore events include server actor, target, revisions, time, and live/recovered origin. Atomic failures, permissions, pagination, conflict-safe backup merging, and browser checks pass as of 01 Nov 2026. Other actions, content snapshots, and retention tooling remain planned.</p></span><span class="state done">Metadata slice</span></label></section>
+        <section class="section"><h2>Clock and supplies</h2><label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Six-hour clock and midday food</strong><p>+6h changes days only at midnight. Once-per-date noon rations, empty reserves, revision/rollback protection, HH:MM stamps, and recovery pass tests/browser checks as of 01 Nov 2026. GM-defined bookkeeping; fuel/items remain manual.</p></span><span class="state done">GM schedule</span></label></section>
+        <aside class="notice"><strong>Suggested next prompt</strong><p>Extend audit coverage to manual dashboard/journal changes, faction layers, character reviews, and seat assignment. Clock advance and midday supply processing are already audited; preserve transactional owner-only history.</p></aside>
         <aside class="notice"><strong>Rules fidelity</strong><p>Where a feature models an actual Twilight: 2000 Fourth Edition procedure, it must be source-verified. Unverified mechanics remain GM-managed; prototypes are not rules engines.</p></aside>
         <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
       </div>

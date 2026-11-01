@@ -1,4 +1,5 @@
 const { getRuntimeCampaign, getPlayerCharacter } = require("./runtime-store.cjs");
+const { appendAuditEvent } = require("./audit.cjs");
 
 const numericFields = ["damage", "stress", "temporaryRadiation", "permanentRadiation"];
 const flagFields = ["starving", "dehydrated", "sleepDeprived", "hypothermic"];
@@ -57,6 +58,9 @@ function updateGMConditions(database, accountId, campaignId, input) {
       gm_notes = excluded.gm_notes, updated_by = excluded.updated_by, updated_at = excluded.updated_at`).run(
       input.characterId, campaignId, current.revision + 1, input.clear ? 0 : 1, JSON.stringify(conditions), gmNotes, accountId, timestamp);
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?").run(timestamp, campaignId);
+    appendAuditEvent(database, accountId, campaignId, { action: input.clear ? "conditions.clear" : "conditions.save",
+      targetType: "conditions", targetId: input.characterId, characterId: input.characterId,
+      beforeRevision: current.revision, afterRevision: current.revision + 1 });
     const result = getGMConditions(database, accountId, campaignId);
     database.exec("COMMIT"); return { conditions: result };
   } catch (error) { database.exec("ROLLBACK"); throw error; }

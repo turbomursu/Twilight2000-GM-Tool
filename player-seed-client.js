@@ -16,6 +16,8 @@
   const emptyState = document.querySelector("#player-seed-empty");
   let selectedCampaignId = "";
   let currentCharacter = null;
+  let characterLoadVersion = 0;
+  let savePending = false;
 
   function showStatus(message, kind = "") {
     status.textContent = message;
@@ -42,8 +44,8 @@
     const controls = new Map([...fieldContainer.querySelectorAll("textarea")].map((input) => [input.dataset.fieldKey, input.value.trim()]));
     const missing = currentCharacter?.fields.some((field) => field.required
       && !(field.playerEditable ? controls.get(field.key) : field.value.trim()));
-    finalizeButton.disabled = currentCharacter?.status !== "seed" || Boolean(missing);
-    saveButton.disabled = currentCharacter?.status === "playable" && Boolean(currentCharacter.pendingChangeRequest);
+    finalizeButton.disabled = savePending || currentCharacter?.status !== "seed" || Boolean(missing);
+    saveButton.disabled = savePending || !currentCharacter || (currentCharacter.status === "playable" && Boolean(currentCharacter.pendingChangeRequest));
   }
 
   function renderSeed(character) {
@@ -113,7 +115,12 @@
   }
 
   async function loadCharacter(campaignId) {
+    const loadVersion = ++characterLoadVersion;
     selectedCampaignId = campaignId;
+    currentCharacter = null;
+    pendingSummary.hidden = true;
+    pendingSummary.textContent = "";
+    refreshButton.disabled = true;
     form.hidden = true;
     fieldContainer.replaceChildren();
     emptyState.hidden = false;
@@ -121,25 +128,39 @@
     showStatus("Loading assigned character…");
     try {
       const { character } = await request(`/api/player/campaigns/${encodeURIComponent(campaignId)}/character`);
+      if (loadVersion !== characterLoadVersion || selectedCampaignId !== campaignId || campaignSelect.value !== campaignId) return false;
       renderSeed(character);
       refreshButton.disabled = false;
+      return true;
     } catch (error) {
+      if (loadVersion !== characterLoadVersion || selectedCampaignId !== campaignId) return false;
       showStatus(error.message, "error");
       emptyState.textContent = error.message;
       refreshButton.disabled = true;
+      return false;
     }
   }
 
   campaignSelect.addEventListener("change", () => {
     if (campaignSelect.value) loadCharacter(campaignSelect.value);
     else {
+      characterLoadVersion += 1;
       selectedCampaignId = "";
       currentCharacter = null;
       form.hidden = true;
       fieldContainer.replaceChildren();
+      pendingSummary.hidden = true;
+      pendingSummary.textContent = "";
+      recordName.textContent = "Select a campaign";
+      recordState.textContent = "Character fields are supplied by your GM.";
+      recordEyebrow.textContent = "Player / assigned campaign";
+      recordDescription.textContent = "Choose an assigned campaign.";
+      if (document.querySelector("#player-character-tab")?.getAttribute("aria-current") === "page") recordTitle.textContent = "Character record";
+      refreshButton.disabled = true;
       emptyState.hidden = false;
       emptyState.textContent = "Choose an assigned campaign to load your character.";
       showStatus("Choose a campaign assigned by your GM.");
+      updateFinalizeButton();
     }
   });
   refreshButton.addEventListener("click", () => {
@@ -148,50 +169,59 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!selectedCampaignId || currentCharacter?.status !== "seed") return;
-    saveButton.disabled = true;
+    if (savePending || !selectedCampaignId || !currentCharacter || currentCharacter.pendingChangeRequest) return;
+    const campaignId = selectedCampaignId;
+    const loadVersion = characterLoadVersion;
+    const characterStatus = currentCharacter.status;
+    savePending = true;
+    updateFinalizeButton();
     try {
       const fields = [...fieldContainer.querySelectorAll("textarea")].map((input) => ({ key: input.dataset.fieldKey, value: input.value }));
-      const result = await request(`/api/player/campaigns/${encodeURIComponent(selectedCampaignId)}/character`, {
+      const result = await request(`/api/player/campaigns/${encodeURIComponent(campaignId)}/character`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fields })
       });
-      if (currentCharacter.status === "seed") {
+      if (selectedCampaignId !== campaignId || loadVersion !== characterLoadVersion) return;
+      if (characterStatus === "seed") {
         renderSeed(result.character);
         showStatus("Seed progress saved. Finalize when required fields are complete.", "success");
       } else {
-        await loadCharacter(selectedCampaignId);
-        showStatus("Changes sent to the GM for approval.", "success");
+        if (await loadCharacter(campaignId)) showStatus("Changes sent to the GM for approval.", "success");
       }
     } catch (error) {
-      showStatus(error.message, "error");
+      if (selectedCampaignId === campaignId && loadVersion === characterLoadVersion) showStatus(error.message, "error");
     } finally {
-      saveButton.disabled = false;
+      savePending = false;
+      updateFinalizeButton();
     }
   });
 
   finalizeButton.addEventListener("click", async () => {
-    if (!selectedCampaignId || currentCharacter?.status !== "seed") return;
-    finalizeButton.disabled = true;
+    if (savePending || !selectedCampaignId || currentCharacter?.status !== "seed") return;
+    const campaignId = selectedCampaignId;
+    const loadVersion = characterLoadVersion;
+    savePending = true;
+    updateFinalizeButton();
     try {
       const fields = [...fieldContainer.querySelectorAll("textarea")].map((input) => ({ key: input.dataset.fieldKey, value: input.value }));
       if (fields.length) {
-        const saved = await request(`/api/player/campaigns/${encodeURIComponent(selectedCampaignId)}/character`, {
+        await request(`/api/player/campaigns/${encodeURIComponent(campaignId)}/character`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fields })
         });
-        currentCharacter = saved.character;
       }
-      const { character } = await request(`/api/player/campaigns/${encodeURIComponent(selectedCampaignId)}/character/finalize`, {
+      const { character } = await request(`/api/player/campaigns/${encodeURIComponent(campaignId)}/character/finalize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}"
       });
-      renderSeed(character);
+      if (selectedCampaignId === campaignId && loadVersion === characterLoadVersion) renderSeed(character);
     } catch (error) {
-      showStatus(error.message, "error");
+      if (selectedCampaignId === campaignId && loadVersion === characterLoadVersion) showStatus(error.message, "error");
+    } finally {
+      savePending = false;
       updateFinalizeButton();
     }
   });

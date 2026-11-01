@@ -11,6 +11,10 @@
         "/^node --test$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^Select-String -Path 'C:\\\\Users\\\\hemu\\\\git\\\\Twilight2000-GM-Tool\\\\server\\\\runtime-store\\.cjs' -Pattern 'function importSetupPackage' \\| ForEach-Object \\{ \\$_\\.LineNumber \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

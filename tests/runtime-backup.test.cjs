@@ -16,6 +16,7 @@ const { getGMMap, updateGMMap, getPlayerMap } = require("../server/map-publicati
 const { listComms, sendComms } = require("../server/comms.cjs");
 const { getPlayerInventory, createInventoryProposal, reviewInventoryProposal, manageGMInventory, validateInventoryBackup } = require("../server/inventory.cjs");
 const { emptyConditions, getGMConditions, updateGMConditions, getPlayerConditions } = require("../server/conditions.cjs");
+const { updatePlayerSeed, finalizePlayerSeed, createCharacterChangeRequest, getPlayerCharacter } = require("../server/runtime-store.cjs");
 
 function createGm(database, id, username) {
   const timestamp = new Date().toISOString();
@@ -23,6 +24,56 @@ function createGm(database, id, username) {
     (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role)
     VALUES (?, ?, ?, 0, ?, ?, 'gm')`).run(id, username, "test-only-hash", timestamp, timestamp);
 }
+
+test("combined campaign recovery preserves character/inventory requests, conditions and COMMS while withdrawing publications", () => {
+  const database = openRuntimeDatabase();
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const seat = database.prepare("SELECT * FROM player_seats WHERE campaign_id = ?").get(campaignId);
+    updatePlayerSeed(database, seat.account_id, campaignId, [{ key: "nationality", value: "Swedish" }]);
+    finalizePlayerSeed(database, seat.account_id, campaignId);
+    const characterRequest = createCharacterChangeRequest(database, seat.account_id, campaignId, [{ key: "appearance", value: "Pending description" }]);
+    const item = { name: "Campaign ration", quantity: 2, carryLocation: "backpack", sourceCategory: "GM", sourceReference: "Campaign ruling", details: "Manual equipment" };
+    const added = createInventoryProposal(database, seat.account_id, campaignId, { kind: "add", item }).proposal;
+    reviewInventoryProposal(database, "gm-owner", campaignId, added.id,
+      { decision: "approve", sourceCategory: "GM", sourceReference: item.sourceReference, confirmSource: true });
+    const accepted = getPlayerInventory(database, seat.account_id, campaignId).items[0];
+    const inventoryRequest = createInventoryProposal(database, seat.account_id, campaignId,
+      { kind: "update", itemId: accepted.id, expectedItemRevision: accepted.revision, item: { ...item, quantity: 5 } }).proposal;
+    updateGMConditions(database, "gm-owner", campaignId, { characterId: seat.character_id, expectedRevision: 0,
+      conditions: { ...emptyConditions(), damage: 2, notes: "Visible medical record" }, gmNotes: "Private condition plan" });
+    sendComms(database, seat.account_id, campaignId, "player", { text: "Ready at the checkpoint" });
+    const report = { title: "Checkpoint", body: "Hold position", gameTime: "Day 14" };
+    updateGMReport(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft: report });
+    updateGMReport(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
+    const catalog = getGMMap(database, "gm-owner", campaignId).catalog;
+    const map = { locationIds: catalog.locations.slice(0, 2).map((location) => location.id), markings: [],
+      routeLocationIds: catalog.locations.slice(0, 2).map((location) => location.id), playerPosition: catalog.locations[0].position };
+    updateGMMap(database, "gm-owner", campaignId, { action: "draft", expectedRevision: 0, draft: map });
+    updateGMMap(database, "gm-owner", campaignId, { action: "publish", expectedRevision: 1 });
+    const savedMessages = listComms(database, seat.account_id, campaignId, "player");
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    const source = backup.data.setupImport.source_json;
+    sendComms(database, "gm-owner", campaignId, "gm", { text: "After backup" });
+    const revision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup, { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision });
+    const character = getPlayerCharacter(database, seat.account_id, campaignId);
+    assert.equal(character.seatId, seat.id); assert.equal(character.characterId, seat.character_id);
+    assert.equal(character.pendingChangeRequest.id, characterRequest.id);
+    const inventory = getPlayerInventory(database, seat.account_id, campaignId);
+    assert.equal(inventory.items[0].id, accepted.id); assert.equal(inventory.items[0].quantity, 2);
+    assert.equal(inventory.proposals.find((proposal) => proposal.id === inventoryRequest.id).expectedItemRevision, inventory.items[0].revision);
+    assert.equal(getPlayerConditions(database, seat.account_id, campaignId).record.conditions.damage, 2);
+    assert.doesNotMatch(JSON.stringify(getPlayerConditions(database, seat.account_id, campaignId)), /Private condition plan/);
+    assert.deepEqual(listComms(database, seat.account_id, campaignId, "player"), savedMessages);
+    assert.deepEqual(getPlayerReport(database, seat.account_id, campaignId), { report: null, publishedAt: null });
+    assert.deepEqual(getPlayerMap(database, seat.account_id, campaignId), { map: null, publishedAt: null });
+    assert.deepEqual(getGMReport(database, "gm-owner", campaignId).draft, report);
+    assert.deepEqual(getGMMap(database, "gm-owner", campaignId).draft, map);
+    assert.equal(exportRuntimeSave(database, "gm-owner", campaignId).data.setupImport.source_json, source);
+  } finally { database.close(); }
+});
 
 test("condition records recover private/public data atomically and retain revision markers for old backups", () => {
   const directory = mkdtempSync(join(tmpdir(), "fieldbook-condition-test-"));
@@ -513,9 +564,11 @@ test("file-backed recovery preserves rows and does not modify another campaign o
     database.close();
     database = openRuntimeDatabase(path);
     const recovered = exportRuntimeSave(database, "gm-owner", seeded.campaignId);
-    for (const key of Object.keys(backup.data).filter((key) => key !== "campaign")) {
+    for (const key of Object.keys(backup.data).filter((key) => !["campaign", "auditEvents"].includes(key))) {
       assert.deepEqual(recovered.data[key], backup.data[key], `${key} survived recovery`);
     }
+    assert.equal(recovered.data.auditEvents.at(-1).action, "campaign.restore");
+    backup.data.auditEvents.forEach((event) => assert.ok(recovered.data.auditEvents.some((saved) => saved.id === event.id)));
     assert.equal(recovered.sourceRevision, 2);
     assert.deepEqual(exportRuntimeSave(database, "gm-owner", second.runtimeCampaignId, {
       now: () => independent.exportedAt

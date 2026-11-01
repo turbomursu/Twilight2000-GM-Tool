@@ -3,12 +3,14 @@ const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashb
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
-const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("./runtime-store.cjs");
+const { getRuntimeFactionLayers, updateRuntimeFactionLayers, getPartyFaction } = require("./runtime-store.cjs");
 const { getGMReport, updateGMReport } = require("./situation-reports.cjs");
 const { getGMMap, updateGMMap } = require("./map-publications.cjs");
 const { listComms, sendComms } = require("./comms.cjs");
 const { getGMInventory, reviewInventoryProposal, manageGMInventory } = require("./inventory.cjs");
 const { getGMConditions, updateGMConditions } = require("./conditions.cjs");
+const { listAuditEvents } = require("./audit.cjs");
+const { advanceRuntimeTime } = require("./runtime-store.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -106,6 +108,31 @@ function createCampaignHandler({ database }) {
     if (request.method === "GET" && url.pathname === "/api/campaigns") {
       return sendJson(response, 200, { campaigns: listRuntimeCampaigns(database, account.id) });
     }
+    const advanceMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/advance-time$/);
+    if (advanceMatch) {
+      if (request.method !== "POST") return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(advanceMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        return sendJson(response, 200, { runtime: advanceRuntimeTime(database, account.id, campaignId, await readJsonBody(request)) });
+      } catch (error) { return sendJson(response, error instanceof HttpError ? error.status : /not found/.test(error.message) ? 404 : /revision changed/.test(error.message) ? 409 : 422, { error: error.message }); }
+    }
+    const auditMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/audit$/);
+    if (auditMatch) {
+      if (request.method !== "GET") return sendJson(response, 405, { error: "Audit history is read-only." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(auditMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        if ([...url.searchParams.keys()].some((key) => !["limit", "before"].includes(key))
+          || ["limit", "before"].some((key) => url.searchParams.getAll(key).length > 1
+            || (url.searchParams.has(key) && !/^[1-9]\d*$/.test(url.searchParams.get(key))))) throw new HttpError(422, "Invalid audit pagination.");
+        const audit = listAuditEvents(database, account.id, campaignId, {
+          limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : 50,
+          before: url.searchParams.has("before") ? Number(url.searchParams.get("before")) : null
+        });
+        return audit ? sendJson(response, 200, audit) : sendJson(response, 404, { error: "Runtime campaign not found." });
+      } catch (error) { return sendJson(response, error instanceof HttpError ? error.status : 422, { error: error.message }); }
+    }
     const conditionMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/conditions$/);
     if (conditionMatch) {
       if (!["GET", "PUT"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
@@ -199,6 +226,17 @@ function createCampaignHandler({ database }) {
           : /Runtime campaign not found/.test(error.message) ? 404
             : /revision changed/.test(error.message) ? 409 : 422;
         return sendJson(response, status, { error: error.message });
+      }
+    }
+    const partyMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/party$/);
+    if (partyMatch && request.method === "GET") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(partyMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const party = getPartyFaction(database, account.id, campaignId);
+        return party ? sendJson(response, 200, { party }) : sendJson(response, 404, { error: "Runtime campaign not found." });
+      } catch (error) {
+        return sendJson(response, 404, { error: error.message });
       }
     }
     const backupMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup$/);

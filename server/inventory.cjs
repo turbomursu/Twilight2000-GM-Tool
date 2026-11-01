@@ -1,5 +1,6 @@
 const { randomUUID } = require("node:crypto");
 const { getRuntimeCampaign, getPlayerCharacter } = require("./runtime-store.cjs");
+const { appendAuditEvent } = require("./audit.cjs");
 
 function validateItem(item) {
   const keys = ["name", "quantity", "carryLocation", "sourceCategory", "sourceReference", "details"];
@@ -99,6 +100,9 @@ function reviewInventoryProposal(database, accountId, campaignId, proposalId, in
     if (!proposal) throw new Error("Inventory proposal not found.");
     if (proposal.status !== "pending") throw new Error("Inventory proposal already reviewed.");
     const timestamp = new Date().toISOString();
+    const audit = { action: input.decision === "reject" ? "inventory.reject" : `inventory.approve.${proposal.kind}`,
+      targetType: input.decision === "reject" ? "inventory_proposal" : "inventory_item", targetId: proposal.id,
+      characterId: proposal.character_id, relatedId: input.decision === "approve" ? proposal.id : null };
     if (input.decision === "approve") {
       const seat = database.prepare("SELECT 1 FROM player_seats WHERE campaign_id = ? AND character_id = ? AND account_id = ? AND active = 1")
         .get(campaignId, proposal.character_id, proposal.submitter_account_id);
@@ -108,6 +112,7 @@ function reviewInventoryProposal(database, accountId, campaignId, proposalId, in
         target = database.prepare("SELECT * FROM inventory_items WHERE id = ? AND campaign_id = ? AND character_id = ? AND active = 1")
           .get(proposal.item_id, campaignId, proposal.character_id);
         if (!target || target.revision !== proposal.expected_item_revision) throw new Error("Item revision changed; reject the stale proposal.");
+        Object.assign(audit, { targetId: target.id, beforeRevision: target.revision, afterRevision: target.revision + 1 });
       }
       if (proposal.kind === "remove") {
         database.prepare("UPDATE inventory_items SET active = 0, revision = revision + 1, reviewed_by = ?, reviewed_at = ? WHERE id = ?")
@@ -125,6 +130,7 @@ function reviewInventoryProposal(database, accountId, campaignId, proposalId, in
           database.prepare("INSERT INTO inventory_items (id, campaign_id, character_id, revision, active, item_json, reviewed_by, reviewed_at) VALUES (?, ?, ?, 0, 1, ?, ?, ?)")
             .run(itemId, campaignId, proposal.character_id, JSON.stringify(item), accountId, timestamp);
           database.prepare("UPDATE inventory_proposals SET item_id = ? WHERE id = ?").run(itemId, proposal.id);
+          Object.assign(audit, { targetId: itemId, afterRevision: 0 });
         } else {
           database.prepare("UPDATE inventory_items SET item_json = ?, revision = revision + 1, reviewed_by = ?, reviewed_at = ? WHERE id = ?")
             .run(JSON.stringify(item), accountId, timestamp, target.id);
@@ -135,6 +141,7 @@ function reviewInventoryProposal(database, accountId, campaignId, proposalId, in
       .run(input.decision === "approve" ? "approved" : "rejected", accountId, timestamp, input.reviewNote || "", proposal.id);
     touchCampaign(database, campaignId, timestamp);
     const inventory = getGMInventory(database, accountId, campaignId);
+    appendAuditEvent(database, accountId, campaignId, audit);
     database.exec("COMMIT"); return { inventory };
   } catch (error) { database.exec("ROLLBACK"); throw error; }
 }
@@ -152,22 +159,28 @@ function manageGMInventory(database, accountId, campaignId, input) {
     if (!getRuntimeCampaign(database, accountId, campaignId)) throw new Error("Runtime campaign not found.");
     if (!database.prepare("SELECT 1 FROM characters WHERE id = ? AND campaign_id = ?").get(input.characterId, campaignId)) throw new Error("Inventory character not found.");
     const timestamp = new Date().toISOString();
+    const audit = { action: `inventory.${input.kind}`, targetType: "inventory_item", targetId: input.itemId ?? "",
+      characterId: input.characterId };
     if (input.kind === "add") {
       if (database.prepare("SELECT COUNT(*) AS count FROM inventory_items WHERE campaign_id = ?").get(campaignId).count >= 5000
         || database.prepare("SELECT COUNT(*) AS count FROM inventory_items WHERE campaign_id = ? AND character_id = ? AND active = 1")
           .get(campaignId, input.characterId).count >= 200) throw new Error("Inventory item limit reached.");
+      const itemId = randomUUID();
       database.prepare("INSERT INTO inventory_items (id, campaign_id, character_id, revision, active, item_json, reviewed_by, reviewed_at) VALUES (?, ?, ?, 0, 1, ?, ?, ?)")
-        .run(randomUUID(), campaignId, input.characterId, JSON.stringify(item), accountId, timestamp);
+        .run(itemId, campaignId, input.characterId, JSON.stringify(item), accountId, timestamp);
+      Object.assign(audit, { targetId: itemId, afterRevision: 0 });
     } else {
       const target = database.prepare("SELECT * FROM inventory_items WHERE id = ? AND campaign_id = ? AND character_id = ? AND active = 1")
         .get(typeof input.itemId === "string" ? input.itemId : "", campaignId, input.characterId);
       if (!target) throw new Error("Inventory item not found.");
       if (!Number.isSafeInteger(input.expectedItemRevision) || input.expectedItemRevision !== target.revision) throw new Error("Item revision changed; refresh inventory.");
+      Object.assign(audit, { targetId: target.id, beforeRevision: target.revision, afterRevision: target.revision + 1 });
       database.prepare("UPDATE inventory_items SET item_json = ?, active = ?, revision = revision + 1, reviewed_by = ?, reviewed_at = ? WHERE id = ?")
         .run(item ? JSON.stringify(item) : target.item_json, input.kind === "remove" ? 0 : 1, accountId, timestamp, target.id);
     }
     touchCampaign(database, campaignId, timestamp);
     const inventory = getGMInventory(database, accountId, campaignId);
+    appendAuditEvent(database, accountId, campaignId, audit);
     database.exec("COMMIT"); return { inventory };
   } catch (error) { database.exec("ROLLBACK"); throw error; }
 }

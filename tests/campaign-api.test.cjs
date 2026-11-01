@@ -6,6 +6,7 @@ const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { openRuntimeDatabase, createPlayerSeed } = require("../server/runtime-store.cjs");
 const { emptyConditions } = require("../server/conditions.cjs");
+const { seedSampleRuntime } = require("../server/sample-data.cjs");
 
 const bootstrapToken = "test-only-bootstrap-token-0123456789-abcdef";
 const password = "A-correct-horse-battery-41";
@@ -50,6 +51,72 @@ async function bootstrapGM(origin) {
   assert.equal(response.status, 201);
   return response.headers.get("set-cookie").split(";")[0];
 }
+
+test("six-hour advance API rejects stale duplicates and charges daily rations only at midday", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const gm = database.prepare("SELECT id FROM accounts WHERE login_identifier = 'gm-user'").get();
+  const { campaignId } = seedSampleRuntime(database, gm.id);
+  const path = `${origin}/api/campaigns/${campaignId}/advance-time`;
+  const send = (revision, headers = {}) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie, ...headers }, body: JSON.stringify({ expectedRevision: revision }) });
+  assert.equal((await fetch(path, { method: "POST" })).status, 401);
+  assert.equal((await fetch(path, { headers: { Cookie: cookie } })).status, 405);
+  assert.equal((await send(0, { Origin: "http://untrusted.example" })).status, 403);
+  const responses = await Promise.all([send(0), send(0)]);
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+  const morning = (await (await fetch(`${origin}/api/campaigns/${campaignId}/runtime`, { headers: { Cookie: cookie } })).json()).runtime;
+  assert.equal(morning.dashboard.gameTime, "06:00");
+  const noonResponse = await send(morning.campaign.revision); assert.equal(noonResponse.status, 200);
+  const noon = (await noonResponse.json()).runtime;
+  assert.equal(noon.dashboard.gameTime, "12:00"); assert.equal(noon.dashboard.rationsDays, morning.dashboard.rationsDays - 1);
+  const audit = await (await fetch(`${origin}/api/campaigns/${campaignId}/audit`, { headers: { Cookie: cookie } })).json();
+  assert.equal(audit.events[0].action, "supplies.midday"); assert.equal(audit.events[0].gameTime.timeOfDay, "12:00");
+});
+
+test("audit API is owner-only, read-only, paginated, and does not expose or forge private changes", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const imported = await fetch(`${origin}/api/campaigns/import-setup`, { method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(validSetupPackage()) });
+  const { campaign } = await imported.json();
+  const gm = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  const addAccount = database.prepare(`INSERT INTO accounts
+    (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  addAccount.run("audit-player", "audit-player", gm.password_hash, "player", gm.id, gm.created_at, gm.updated_at);
+  addAccount.run("audit-other-gm", "audit-other-gm", gm.password_hash, "gm", null, gm.created_at, gm.updated_at);
+  createPlayerSeed(database, gm.id, campaign.id, { username: "audit-player", displayLabel: "Audit player", fields: [{ key: "name", label: "Name", value: "Private character field", required: false }] });
+  const characterId = database.prepare("SELECT character_id FROM player_seats WHERE account_id = 'audit-player'").get().character_id;
+  async function login(username) {
+    const response = await fetch(`${origin}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+    assert.equal(response.status, 200); return response.headers.get("set-cookie").split(";")[0];
+  }
+  const playerCookie = await login("audit-player"); const otherCookie = await login("audit-other-gm");
+  const path = `${origin}/api/campaigns/${campaign.id}/audit`;
+  assert.equal((await fetch(`${origin}/audit-client.js`, { headers: { Cookie: cookie } })).status, 200);
+  assert.equal((await fetch(path)).status, 401);
+  assert.equal((await fetch(path, { headers: { Cookie: playerCookie } })).status, 403);
+  assert.equal((await fetch(path, { headers: { Cookie: otherCookie } })).status, 404);
+  assert.equal((await fetch(path, { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ actor: "forged" }) })).status, 405);
+  assert.equal((await fetch(`${origin}/api/player/campaigns/${campaign.id}/audit`, { headers: { Cookie: playerCookie } })).status, 404);
+  const write = (body) => fetch(`${origin}/api/campaigns/${campaign.id}/conditions`, { method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(body) });
+  const update = { characterId, expectedRevision: 0, conditions: { ...emptyConditions(), notes: "Public note" }, gmNotes: "PRIVATE GM PLAN" };
+  assert.equal((await write({ ...update, actor: "forged" })).status, 422);
+  assert.equal((await write(update)).status, 200);
+  assert.equal((await write({ characterId, expectedRevision: 1, clear: true })).status, 200);
+  const first = await (await fetch(`${path}?limit=1`, { headers: { Cookie: cookie } })).json();
+  assert.equal(first.events[0].action, "conditions.clear"); assert.equal(first.events[0].actor.label, "gm-user");
+  const next = await (await fetch(`${path}?limit=1&before=${first.nextBefore}`, { headers: { Cookie: cookie } })).json();
+  assert.equal(next.events[0].action, "conditions.save"); assert.equal(next.nextBefore, null);
+  assert.doesNotMatch(JSON.stringify([first, next]), /PRIVATE GM PLAN|Public note|Private character field|password/);
+  for (const query of ["limit=101", "limit=0", "before=-1", "limit=1&limit=2", "actor=forged"]) {
+    assert.equal((await fetch(`${path}?${query}`, { headers: { Cookie: cookie } })).status, 422);
+  }
+  database.exec("CREATE TRIGGER fail_http_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT, 'audit storage failure'); END;");
+  assert.equal((await write({ ...update, expectedRevision: 2 })).status, 422);
+  assert.equal(database.prepare("SELECT revision FROM character_conditions WHERE character_id = ?").get(characterId).revision, 2);
+  assert.equal((await (await fetch(path, { headers: { Cookie: cookie } })).json()).events.length, 2);
+});
 
 test("GM condition records project only each active player's values and exclude private GM notes", async (t) => {
   const { origin, database } = await startTestServer(t);
@@ -268,7 +335,7 @@ test("COMMS broadcasts single-line messages with server-owned identity and game 
     assert.equal(response.status, 201);
     const { message } = await response.json();
     assert.deepEqual(message.sender, { label: `Seat ${seat}`, role: "player" });
-    assert.deepEqual(message.gameTime, { gameDate: "2000-05-11", dayNumber: 14 });
+    assert.deepEqual(message.gameTime, { gameDate: "2000-05-11", dayNumber: 14, timeOfDay: "00:00" });
   }
   database.prepare("UPDATE runtime_dashboard_state SET game_date = '2000-05-12', day_number = 15 WHERE campaign_id = ?").run(campaign.id);
   const reply = await post(gmPath, cookie, { text: "  Copy. Hold position.  " });
@@ -276,10 +343,10 @@ test("COMMS broadcasts single-line messages with server-owned identity and game 
   const replyBody = await reply.json();
   assert.deepEqual(replyBody.message.sender, { label: "GM", role: "gm" });
   assert.equal(replyBody.message.text, "Copy. Hold position.");
-  assert.deepEqual(replyBody.message.gameTime, { gameDate: "2000-05-12", dayNumber: 15 });
+  assert.deepEqual(replyBody.message.gameTime, { gameDate: "2000-05-12", dayNumber: 15, timeOfDay: "00:00" });
   const received = await read(playerPath, cookies[0]);
   assert.equal(received.messages.length, 6);
-  assert.deepEqual(received.messages[1].gameTime, { gameDate: "2000-05-11", dayNumber: 14 });
+  assert.deepEqual(received.messages[1].gameTime, { gameDate: "2000-05-11", dayNumber: 14, timeOfDay: "00:00" });
   for (const authCookie of cookies) assert.deepEqual(await read(playerPath, authCookie), received);
   assert.deepEqual((await read(gmPath, cookie)).messages, received.messages);
   assert.deepEqual((await read(`${origin}/api/campaigns/${otherCampaign.id}/comms`, cookie)).messages, []);

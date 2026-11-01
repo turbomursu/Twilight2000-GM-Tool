@@ -1,4 +1,5 @@
 const { getRuntimeCampaign, getPlayerCharacter } = require("./runtime-store.cjs");
+const { appendAuditEvent } = require("./audit.cjs");
 
 function projectReport(report) {
   return { title: report.title, body: report.body, gameTime: report.gameTime };
@@ -60,6 +61,8 @@ function updateGMReport(database, accountId, campaignId, input) {
       report.published ? JSON.stringify(report.published) : null, report.publishedAt);
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(new Date().toISOString(), campaignId);
+    appendAuditEvent(database, accountId, campaignId, { action: `report.${input.action}`, targetType: "situation_report",
+      targetId: campaignId, beforeRevision: report.revision, afterRevision: report.revision + 1 });
     const result = getGMReport(database, accountId, campaignId);
     database.exec("COMMIT");
     return { report: result };

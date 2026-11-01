@@ -35,7 +35,7 @@
     row.dataset.signature = JSON.stringify(message);
     const sender = document.createElement("strong"); sender.textContent = message.sender.role === "gm" ? "GM" : `${message.sender.label} / PLAYER`;
     const time = document.createElement("time"); time.dateTime = message.sentAt; time.title = `Sent / ${message.sentAt}`;
-    time.textContent = message.gameTime ? `${message.gameTime.gameDate} / Day ${message.gameTime.dayNumber}` : "Game time not set";
+    time.textContent = message.gameTime ? `${message.gameTime.gameDate}${message.gameTime.timeOfDay ? ` ${message.gameTime.timeOfDay}` : ""} / Day ${message.gameTime.dayNumber}` : "Game time not set";
     const text = document.createElement("p"); text.textContent = message.text;
     row.append(sender, time, text); return row;
   }

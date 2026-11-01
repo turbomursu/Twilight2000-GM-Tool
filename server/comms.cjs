@@ -21,14 +21,14 @@ function access(database, accountId, campaignId, role) {
 
 function projectMessage(row) {
   return { id: row.id, sender: { label: row.sender_label, role: row.sender_role }, text: row.message_text,
-    gameTime: row.game_date === null ? null : { gameDate: row.game_date, dayNumber: row.day_number }, sentAt: row.created_at };
+    gameTime: row.game_date === null ? null : { gameDate: row.game_date, dayNumber: row.day_number, ...(row.game_time ? { timeOfDay: row.game_time } : {}) }, sentAt: row.created_at };
 }
 
 function listComms(database, accountId, campaignId, role) {
   const actor = access(database, accountId, campaignId, role);
   if (!actor) return null;
   const rows = database.prepare(`SELECT id, sender_label, sender_role, message_text, game_date, day_number, created_at
-    FROM comms_messages WHERE campaign_id = ? ORDER BY sort_order DESC LIMIT 201`).all(campaignId);
+    , game_time FROM comms_messages WHERE campaign_id = ? ORDER BY sort_order DESC LIMIT 201`).all(campaignId);
   return { messages: rows.slice(0, 200).reverse().map(projectMessage), hasEarlier: rows.length > 200,
     ...(role === "gm" ? { campaignRevision: actor.revision } : {}) };
 }
@@ -44,13 +44,13 @@ function sendComms(database, accountId, campaignId, role, input) {
     const order = database.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(sort_order), -1) + 1 AS next
       FROM comms_messages WHERE campaign_id = ?`).get(campaignId);
     if (order.count >= 10000) throw new Error("Campaign COMMS archive is full.");
-    const clock = database.prepare("SELECT game_date, day_number FROM runtime_dashboard_state WHERE campaign_id = ?").get(campaignId);
+    const clock = database.prepare("SELECT game_date, game_time, day_number FROM runtime_dashboard_state WHERE campaign_id = ?").get(campaignId);
     const row = { id: randomUUID(), sender_label: actor.label, sender_role: role, message_text: text,
-      game_date: clock?.game_date ?? null, day_number: clock?.day_number ?? null, created_at: new Date().toISOString() };
+      game_date: clock?.game_date ?? null, game_time: clock?.game_time ?? null, day_number: clock?.day_number ?? null, created_at: new Date().toISOString() };
     database.prepare(`INSERT INTO comms_messages
-      (id, campaign_id, sender_account_id, sender_role, sender_label, message_text, game_date, day_number, created_at, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.id, campaignId, accountId, role, actor.label, text,
-      row.game_date, row.day_number, row.created_at, order.next);
+      (id, campaign_id, sender_account_id, sender_role, sender_label, message_text, game_date, game_time, day_number, created_at, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.id, campaignId, accountId, role, actor.label, text,
+      row.game_date, row.game_time, row.day_number, row.created_at, order.next);
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?").run(row.created_at, campaignId);
     database.exec("COMMIT");
     return { message: projectMessage(row), ...(role === "gm" ? { campaignRevision: actor.revision + 1 } : {}) };

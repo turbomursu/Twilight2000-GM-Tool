@@ -27,7 +27,9 @@ const PROTECTED_FILES = new Map([
   ["/map-publication-client.js", ["map-publication-client.js", "text/javascript; charset=utf-8"]],
   ["/comms-client.js", ["comms-client.js", "text/javascript; charset=utf-8"]],
   ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]],
-  ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]]
+  ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]],
+  ["/audit-client.js", ["audit-client.js", "text/javascript; charset=utf-8"]],
+  ["/campaign-clock.js", ["campaign-clock.js", "text/javascript; charset=utf-8"]]
 ]);
 const AUTH_PATHS = new Set([
   "/api/auth/status",

@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-Supported campaign state, conditions, inventories/proposals, publications, and COMMS use owner-scoped SQLite APIs. All five handset views are connected. GM-managed conditions have public fields and private notes; players read only their active assigned character's public record. Four-seat privacy, query-spoof rejection, stale saves, clear markers, and atomic persistence/recovery pass tests; browser checks verify saves, unknown/present/absent values, inert notes, conflicts, and clearing. Conditions/carrying rules automation, offline maps, and full audit/history remain planned. Next priority: owner-only audit history for authoritative GM changes and publication actions.
+Supported campaign state and GM audit metadata use owner-scoped SQLite APIs. All five handset views are connected. Condition/inventory changes, inventory decisions, report/map mutation actions, and restore now have atomic append-only audit events. The owning GM can page the history; players cannot read it. Backup merge preserves later live entries, rejects conflicting IDs, marks recovered metadata, and records restore. Tests verify ownership, rollback, reopen, and recovery; browser checks verify actors/revisions, safe labels, paging, and player denial. Next priority: extend coverage to dashboard/faction changes, character reviews, and seat assignment. Full content snapshots, retention tooling, rules automation, offline maps, and cross-host recovery remain planned.
 
 ## Delivery Principles
 
@@ -77,9 +77,12 @@ Supported campaign state, conditions, inventories/proposals, publications, and C
 
 ## Phase 3: GM Runtime and Player Situation Report
 
+Integration check (01 Nov 2026): combined recovery and all five browser views verified. Fixed a seed-only browser submit guard and late character-response display. Client regressions complement API permission/recovery checks; covered GM mutations now have audit metadata. Rules automation, wider audit coverage/content snapshots, and cross-host recovery remain incomplete.
+
 **Goal:** Make the imported campaign operable and give the GM explicit control over the player-facing report.
 
 - Turn the existing dashboard, clock, journal, roster, route, and resource counters into views over imported campaign state rather than separate sample state.
+- Implemented clock slice: revision-protected +6h with date/day rollover at midnight. A GM-defined one-ration-day schedule processes each date's midday once; fuel/items remain manual. Time, daily usage, and audit/journal are atomic and recover together. New COMMS/audit stamps retain HH:MM; older stamps are not backfilled. General scheduling and verified consumption remain planned.
 - Complete runtime save/load, autosave, backup, and recovery workflows for the running campaign.
 - Implemented slice: GM-only runtime-v1 export and atomic same-campaign restore preserve supported record IDs, seats, requests, and source revision provenance, with replacement/older-backup confirmations and a monotonic active revision. Accounts must already exist; cross-host recovery and scheduled backups remain planned.
 - Add a Player Interface situation report backed only by a deliberately constructed player-visible projection.
@@ -87,15 +90,15 @@ Supported campaign state, conditions, inventories/proposals, publications, and C
 - Let the GM publish the Setup Tool map with GM-managed markings, route, and player position. Give players scroll access and zoom up to 200%, with map open/reset centered on their position, without allowing them to change campaign map state.
 - Implemented point-layer slice: GM selection of locations, labeled point markings, ordered selected-location waypoints, and bounded player position. Explicit publication can reveal selected source GM-only locations; unselected records remain excluded. Read-only assigned-player output uses a schema-v1 allow-list and no raw annotations or setup export. Map drafts participate in runtime backup, and restore always withdraws publication. Polygon markings, offline tiles, fog masking, history, and push delivery remain planned.
 - Allow players to send a single-line COMMS message to the GM and all player seats; record player identity, campaign game time, and message content.
-- Implemented single-line slice: authenticated player/GM broadcast endpoints, 240-character/control-character validation, server sender and date/day snapshots, immutable message IDs/order, and a shared latest-200 view for the GM and four seats. Full stored archives participate in backup/restore. Visible views poll every 15 seconds; push delivery, per-player receipts, moderation, and time-of-day clock support remain planned.
+- Implemented single-line slice: player/GM broadcasts retain server sender and date/day/time snapshots. Historical date-only stamps stay unchanged. Archives recover atomically; visible views poll every 15 seconds. Push delivery, receipts, and moderation remain planned.
 - Support 1-4 authenticated player seats, each assigned one character and an independent browser session.
 - Show each player only their own character and inventory, alongside GM-published situation information.
-- Implemented manual-condition slice: owning GM complete-record saves/clear, distinct public/private notes, and active own-seat GET-only projection. Null values remain unknown; no derived capacity, penalty, or recovery is calculated. Condition revisions advance during restore, including empty markers when an older backup omits them. Broader rules automation and actor audit history remain planned.
+- Implemented manual-condition slice: owning GM complete-record saves/clear, distinct public/private notes, and own-seat GET-only projection. Null values remain unknown and no rules effects are derived. Condition revisions advance during restore with empty markers for omitted older records. GM condition changes now have atomic audit metadata; rules automation and wider action coverage remain planned.
 - From the GM Tool, let the GM add, remove, edit, preview, publish, and withdraw report information; show whether changes are drafts or published.
 - Keep GM notes, hidden threats, unrevealed state, and other players' private data out of player-facing output by default.
 - Allow players to submit change requests only for their own assigned character and inventory. Keep requests pending until the GM reviews and applies them; route dice-governed actions through the rules-verified item-action workflow planned in Phase 4.
 - Implemented slice: finalized character edits and inventory add/update/remove proposals require owning-GM review. Inventory item revisions prevent stale approvals, and accepted source data is independently confirmed by the GM. Broader rules-governed character/item actions remain in progress.
-- Expand current optimistic report revision checks into publication history and actor audit records so the GM can inspect previous publications; this history is not implemented yet.
+- Implemented audit metadata slice: conditions, inventories/reviews, report/map mutations, and restores record server actor, target IDs/labels, revisions, time, and recovery origin. Broader mutation coverage and full past-publication content snapshots remain planned; no pre-upgrade actions are backfilled.
 - Add missions and a campaign event ledger as GM-managed runtime records.
 
 **Exit checks:** Verify one-player and four-player campaigns, independent browser sessions, and blocked cross-player/GM-only access. Players can scroll/zoom the full published map but cannot modify map, markings, route, or position state. Character and inventory requests never change accepted state before GM approval. COMMS messages preserve sender and game time and reach the GM and all player seats. GM changes appear in the player report only after publishing; withdrawn information disappears. Runtime recovery does not unexpectedly alter published content or player ownership.

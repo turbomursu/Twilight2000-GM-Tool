@@ -1,4 +1,5 @@
 const { getRuntimeCampaign, getPlayerCharacter } = require("./runtime-store.cjs");
+const { appendAuditEvent } = require("./audit.cjs");
 
 function record(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -109,6 +110,8 @@ function updateGMMap(database, accountId, campaignId, input) {
       published_json = excluded.published_json, published_at = excluded.published_at`).run(
       campaignId, map.revision + 1, JSON.stringify(map.draft), map.published ? JSON.stringify(map.published) : null, map.publishedAt);
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?").run(new Date().toISOString(), campaignId);
+    appendAuditEvent(database, accountId, campaignId, { action: `map.${input.action}`, targetType: "map_publication",
+      targetId: campaignId, beforeRevision: map.revision, afterRevision: map.revision + 1 });
     const result = getGMMap(database, accountId, campaignId);
     database.exec("COMMIT");
     return { map: result };

@@ -316,6 +316,17 @@
     .condition-editor input, .condition-editor select, .condition-editor textarea { width: 100%; min-width: 0; border: 1px solid var(--line); padding: 9px; color: var(--ink); background: white; }
     .condition-editor .wide { grid-column: 1 / -1; }
     .condition-editor button:disabled { opacity: .5; cursor: not-allowed; }
+    .audit-table-wrap { width: 100%; max-height: min(65vh, 650px); overflow: auto; }
+    .audit-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+    .audit-table th, .audit-table td { padding: 12px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    .audit-table th { position: sticky; top: 0; z-index: 1; color: var(--muted); background: var(--surface); font: 10px var(--mono); }
+    .audit-table th:first-child { width: 19%; }
+    .audit-table th:nth-child(4) { width: 24%; }
+    .audit-table small { display: block; margin-top: 5px; color: var(--muted); font: 9px var(--mono); }
+    .audit-table details { min-width: 0; }
+    .audit-table details p { margin: 8px 0 0; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .audit-controls { display: flex; align-items: center; gap: 8px; }
+    .audit-controls button:disabled { opacity: .5; cursor: not-allowed; }
     .report-copy { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
     .report-preview { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
     .topbar, .top-actions { flex-wrap: wrap; }
@@ -388,6 +399,7 @@
         <button class="nav-item" data-view="comms"><span class="nav-icon" aria-hidden="true">07</span>COMMS</button>
         <button class="nav-item" data-view="inventory"><span class="nav-icon" aria-hidden="true">08</span>Inventories</button>
         <button class="nav-item" data-view="conditions"><span class="nav-icon" aria-hidden="true">09</span>Conditions</button>
+        <button class="nav-item" data-view="audit"><span class="nav-icon" aria-hidden="true">10</span>Audit</button>
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
@@ -448,7 +460,7 @@
                 <div class="panel-body"><button class="button" data-action="open-note">Add a note <span aria-hidden="true">+</span></button></div>
               </section>
               <section class="panel" aria-labelledby="route-title">
-                <div class="panel-head"><div><div class="eyebrow">Northbound / Route 26</div><h2 id="route-title">Route checkpoints</h2></div><button class="button button-icon" data-action="advance-day" aria-label="Advance campaign one day" title="Advance campaign one day">+1</button></div>
+                <div class="panel-head"><div><div class="eyebrow">Northbound / Route 26</div><h2 id="route-title">Route checkpoints</h2></div><button class="button button-icon" data-action="advance-time" aria-label="Advance campaign six hours" title="Advance six hours / daily rations at midday">+6h</button></div>
                 <div class="panel-body"><div class="route-list" id="route-list"></div></div>
               </section>
             </div>
@@ -521,6 +533,12 @@
           <form id="gm-condition-form"><fieldset class="condition-editor" id="gm-condition-fields" disabled></fieldset></form>
         </section>
 
+        <section class="view" id="view-audit" aria-labelledby="audit-title">
+          <div class="page-heading"><div><div class="heading-tag">GM record</div><h1 id="audit-title">Campaign audit</h1></div><div class="audit-controls"><button class="button button-icon" id="audit-refresh" type="button" title="Refresh audit history" aria-label="Refresh audit history" disabled>&#8635;</button><button class="button button-icon" id="audit-newest" type="button" title="Newest audit entries" aria-label="Newest audit entries" disabled>&#8679;</button><button class="button button-icon" id="audit-older" type="button" title="Older audit entries" aria-label="Older audit entries" disabled>&#8592;</button></div></div>
+          <p class="feedback" id="audit-status" role="status">Select a runtime campaign.</p>
+          <div class="audit-table-wrap" role="region" tabindex="0" aria-label="Scrollable audit entries"><table class="audit-table" aria-label="GM campaign audit history"><thead><tr><th>Recorded / UTC</th><th>Actor</th><th>Action</th><th>Target</th><th>Record revision</th><th>Campaign revision</th><th>Origin</th></tr></thead><tbody id="audit-rows"></tbody></table></div>
+        </section>
+
         <section class="view" id="view-roster" aria-labelledby="roster-title">
           <div class="page-heading">
             <div><div class="heading-tag">Column / personnel record</div><h1 id="roster-title">Personnel</h1></div>
@@ -537,7 +555,7 @@
           </div>
           <div class="movement-grid">
             <section class="panel" aria-labelledby="travel-day-title">
-              <div class="travel-controls"><div><div class="eyebrow">Current travel day</div><strong id="travel-date"></strong></div><div class="stepper"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of rations" title="Use one day of rations">−</button><output id="travel-day-count"></output><button class="button button-icon" data-action="advance-day" aria-label="Advance campaign one day" title="Advance campaign one day">+</button></div></div>
+              <div class="travel-controls"><div><div class="eyebrow">Campaign clock / GM-defined rations at 12:00</div><strong id="travel-date"></strong></div><div class="stepper"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of rations" title="Use one day of rations">−</button><output id="travel-day-count"></output><button class="button button-icon" data-action="advance-time" aria-label="Advance campaign six hours" title="Advance six hours / daily rations at midday">+6h</button></div></div>
               <div class="panel-body"><div class="section-bar" style="margin:0 0 12px"><div><h2>Planned route</h2></div><div class="supply-control"><span class="inline-hint" id="movement-distance"></span><button class="button" data-action="next-stop">Mark next waypoint</button></div></div><div class="route-list" id="movement-route"></div></div>
             </section>
             <div class="side-stack">
@@ -661,11 +679,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="campaign-package-contract.js"></script>
   <script src="/auth-client.js" defer></script>
+  <script src="/campaign-clock.js"></script>
   <script src="/situation-report-client.js" defer></script>
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>
   <script src="/inventory-client.js" defer></script>
   <script src="/conditions-client.js" defer></script>
+  <script src="/audit-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -809,6 +829,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           campaignName: runtime.campaign.name,
           campaignSetting: runtime.campaign.setting,
           date: dashboard.gameDate,
+          time: dashboard.gameTime,
           day: dashboard.dayNumber,
           distance: dashboard.distanceKm,
           rations: dashboard.rationsDays,
@@ -881,7 +902,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }));
       }
       function render() {
-        const formattedDate = dateLabel(state.date);
+        const formattedDate = `${dateLabel(state.date)} / ${state.time || "00:00"}`;
         document.getElementById("active-campaign-name").textContent = state.campaignName || "The Long Road";
         document.getElementById("active-campaign-setting").textContent = state.campaignSetting || "Dalarna, Sweden / 2000";
         document.getElementById("top-campaign-name").textContent = state.campaignName || "The Long Road";
@@ -913,7 +934,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions", audit: "Campaign audit" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
         if (view === "influence") {
@@ -2096,20 +2117,28 @@ Military rank || optional</textarea><span class="row-description">One field per 
             state.notes.unshift(entry);
           }, `Waypoint reached: ${route[nextStop].name}.`);
         }
-        if (action === "advance-day") {
-          const nextDate = dateWithOffset(state.date, 1);
-          const nextDay = state.day + 1;
-          const nextRations = Math.max(0, state.rations - 1);
-          const entry = { id: runtimeDataLoaded ? runtimeRecordId("journal") : nextId(state.notes), title: `Travel day ${nextDay}`, body: "The column continued north. Update the journal with what happened on the road.", date: nextDate, kind: "Movement" };
-          await commitRuntimeUpdate({
-            dashboard: { gameDate: nextDate, dayNumber: nextDay, rationsDays: nextRations },
-            journal: runtimeDataLoaded ? runtimeJournal([entry, ...state.notes]) : []
-          }, () => {
-            state.date = nextDate;
-            state.day = nextDay;
-            state.rations = nextRations;
-            state.notes.unshift(entry);
-          }, "Campaign advanced one day; one ration day used.");
+        if (action === "advance-time") {
+          const controls = [...document.querySelectorAll('[data-action="advance-time"]')];
+          if (controls.some((control) => control.disabled)) return;
+          controls.forEach((control) => { control.disabled = true; });
+          try {
+            if (runtimeCampaignSelect.value) {
+              if (!runtimeDataLoaded) throw new Error("Runtime clock not loaded; reload the campaign.");
+              const campaignId = state.runtimeCampaignId;
+              const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/advance-time`, { method: "POST",
+                headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: state.runtimeRevision }) });
+              if (runtimeCampaignSelect.value === campaignId) { applyRuntimeSnapshot(runtime); showToast("Time advanced six hours; daily rations processed at midday."); }
+            } else {
+              const current = { gameDate: state.date, gameTime: state.time || "00:00", dayNumber: state.day };
+              const next = FieldbookClock.advanceSixHours(current); const midday = FieldbookClock.middayForAdvance(current);
+              const used = new Set(state.dailySupplyDates || []);
+              if (midday && !used.has(midday)) { state.rations = Math.max(0, state.rations - 1); used.add(midday); }
+              state.date = next.gameDate; state.time = next.gameTime; state.day = next.dayNumber; state.dailySupplyDates = [...used];
+              state.notes.unshift({ id: nextId(state.notes), title: `Time advanced to ${next.gameDate} ${next.gameTime}`, body: "GM-defined daily ration schedule at midday.", date: next.gameDate, kind: "Clock" });
+              persist(); render(); showToast("Local sample advanced six hours; daily rations at midday.");
+            }
+          } catch (error) { showToast(`Time not advanced: ${error.message}`); }
+          finally { controls.forEach((control) => { control.disabled = false; }); }
         }
         if (action === "use-rations" || action === "add-rations") {
           const rations = action === "use-rations" ? Math.max(0, state.rations - 1) : state.rations + 1;
