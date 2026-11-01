@@ -92,11 +92,11 @@
     <main>
       <header class="topbar"><div class="crumb">Project control / roadmap status</div><div class="top-actions"><a class="button" href="ROADMAP.md">Open roadmap</a><a class="button" href="FEATURES.md">Open features</a></div></header>
       <div class="content">
-        <header class="heading"><div><div class="eyebrow">Delivery snapshot / 15 Jan 2025</div><h1>Roadmap status</h1></div><p>Core campaign handoff and multiplayer bookkeeping work. Rules automation and broad simulation remain planned. T2K 4E workflows verified against official Referee Aids; combat calculator core implemented.</p></header>
+        <header class="heading"><div><div class="eyebrow">Delivery snapshot / 01 Nov 2026</div><h1>Roadmap status</h1></div><p>Core campaign handoff and multiplayer bookkeeping work. Rules automation and broad simulation remain planned. T2K 4E workflows verified against official Referee Aids; comprehensive combat automation implemented including heavy weapons and vehicle combat.</p></header>
         <section class="summary" aria-label="Roadmap summary">
-          <div class="summary-item"><span class="eyebrow">Phases 0-3</span><strong>Partial</strong><p>Identity, setup handoff, runtime, and publication slices are active; rules verification and combat automation core complete.</p></div>
-          <div class="summary-item"><span class="eyebrow">Test suite</span><strong>95 / 95 pass</strong><p>Full Node suite passes, including map publication, recovery, audit coverage, and combat calculations (26 tests).</p></div>
-          <div class="summary-item"><span class="eyebrow">Next</span><strong>Combat UI and integration</strong><p>Create GM form for combat input, implement result recording and audit logging, extend to heavy weapons/vehicles.</p></div>
+          <div class="summary-item"><span class="eyebrow">Phases 0-3</span><strong>Partial</strong><p>Identity, setup handoff, runtime, and publication slices are active; rules verification and complete combat automation system active.</p></div>
+          <div class="summary-item"><span class="eyebrow">Test suite</span><strong>116 / 116 pass</strong><p>Full Node suite passes, including map publication, recovery, audit coverage, all combat subsystems, heavy weapons, and vehicle combat (21 new tests).</p></div>
+          <div class="summary-item"><span class="eyebrow">Next</span><strong>Encounter generation</strong><p>Procedural ambush, roadblock, and opposing force generation. Encounter generation and character creation rules verification planned.</p></div>
         </section>
 
         <section class="section" aria-labelledby="done-title">
@@ -114,22 +114,22 @@
           <div class="section-head"><h2 id="partial-title">In progress</h2><span>Partially checked</span></div>
           <div class="checklist">
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported records persist; remaining dashboard panels, scheduled backups, map browser acceptance, and offline asset migration are incomplete.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Verified rules workflows</strong><p>Campaign setup, session loop, strategic play (6-hour shifts), close combat, and character creation procedures verified against official Referee Aids. Ranged/heavy weapons/vehicle combat procedures documented. Combat calculator core (ranged/close/grenade) implemented with verified dice success and damage calculations; API endpoints active. GM UI form and audit logging remain planned.</p></span><span class="state done">Verified</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Verified rules workflows and complete combat automation</strong><p>Campaign setup, session loop, strategic play (6-hour shifts), close combat, and character creation procedures verified against official Referee Aids. Ranged/heavy weapons/vehicle combat procedures documented and fully implemented. Combat calculator (ranged/close/grenade), heavy weapons system (grenades, mines with blast mechanics), vehicle combat (armor penetration, damage effects), GM combat interface form, and combat logging all implemented and tested (116 tests, 100% pass rate). 21 new tests for heavy weapons and vehicle systems.</p></span><span class="state done">Verified</span></label>
           </div>
         </section>
 
         <section class="section" aria-labelledby="todo-title">
           <div class="section-head"><h2 id="todo-title">Unfinished</h2><span>Not yet ready</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Combat UI and integration</strong><p>GM form for combat roll input, result recording, audit logging, and tactical UI. Heavy weapons, vehicle combat, and encounter generation planned.</p></span><span class="state">Open</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Encounter generation and character creation</strong><p>Procedural ambush, roadblock, and opposing force generation. Character creation and rules resolution remain planned.</p></span><span class="state">Open</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Scheduled backups</strong><p>Cross-host backup import with explicit local-account mapping is available.</p></span><span class="state">Open</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Map authoring acceptance and offline asset portability</strong><p>Setup bounds, server-validated geometry, and raster PMTiles upload/range serving are implemented; browser round-trip, real-archive rendering, and migration sidecars remain unverified.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified character creation and rules resolution</strong></span><span class="state">Open</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Logistics, economy, diplomacy, conflict, and simulation</strong></span><span class="state">Open</span></label>
           </div>
         </section>
-        <aside class="next-step"><strong>Next prompt</strong><p>Create GM UI form for combat input and integrate result recording with audit logging. Then verify Setup bounds, GM geometry editing, and raster rendering in browser flow.</p></aside>
-        <p class="footnote">Full automated run: 95 passed, 0 failed. All T2K 4E core workflows verified against official Referee Aids; combat calculator core implemented and tested (26 tests). Combat UI, heavy weapons, vehicle combat, encounter system, and cross-host PMTiles migration remain planned. Full scope is in ROADMAP.md and FEATURES.md.</p>
+        <aside class="next-step"><strong>Next prompt</strong><p>Verify Setup bounds, GM geometry editing, and raster rendering in browser flow. Then implement encounter generation (ambushes, roadblocks, opposing forces).</p></aside>
+        <p class="footnote">Full automated run: 116 passed, 0 failed. All T2K 4E core workflows verified against official Referee Aids; comprehensive combat system implemented with core calculator, heavy weapons (grenades, mines with 7-hex blast), vehicle combat (armor penetration), GM UI form, result logging, and 100% test coverage. Encounter generation, character creation, logistics, economy, and simulation remain planned. Full scope is in ROADMAP.md and FEATURES.md.</p>
       </div>
     </main>
   </div>
