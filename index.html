@@ -277,6 +277,11 @@
     .field label { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
     .field input, .field textarea, .field select { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: #fff; font-size: 12px; }
     .field textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+    .weather-editor { display: grid; gap: 12px; }
+    .weather-editor .field[hidden] { display: none; }
+    .weather-editor .field textarea { min-height: 70px; }
+    .weather-effects { padding: 10px 11px; border-left: 3px solid var(--gold); background: #f0e9d8; }
+    .weather-effects p { margin: 6px 0; font-size: 11px; line-height: 1.5; }
     .report-workspace { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
     .report-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
     .report-fields .report-body, .report-fields .report-actions { grid-column: 1 / -1; }
@@ -560,7 +565,7 @@
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="supply-title"><div class="panel-head"><div><div class="eyebrow">Column inventory</div><h2 id="supply-title">Provisions</h2></div><span class="heading-tag">Days remaining</span></div><div class="panel-body"><div class="supply-line"><div><strong>Food</strong><small>Shared ration reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of food" title="Use one day of food">−</button><output id="food-count"></output><button class="button button-icon" data-action="add-rations" aria-label="Add one day of food" title="Add one day of food">+</button></div></div><div class="supply-line"><div><strong>Fuel</strong><small>Estimated vehicle reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="fuel-down" aria-label="Reduce fuel reserve" title="Reduce fuel reserve">−</button><output id="fuel-count"></output><button class="button button-icon" data-action="fuel-up" aria-label="Increase fuel reserve" title="Increase fuel reserve">+</button></div></div><div class="supply-line"><div><strong>Distance</strong><small>Logged since leaving the coast</small></div><div class="supply-control"><button class="button button-icon" data-action="distance-down" aria-label="Reduce logged distance" title="Reduce logged distance">−</button><output id="distance-count"></output><button class="button button-icon" data-action="distance-up" aria-label="Add ten kilometers" title="Add ten kilometers">+</button></div></div></div></section>
-              <section class="panel" aria-labelledby="weather-title"><div class="panel-head"><div><div class="eyebrow">Conditions</div><h2 id="weather-title">Weather log</h2></div><button class="button" data-action="cycle-weather">Change</button></div><div class="panel-body"><div class="prompt-panel"><span class="eyebrow">Current conditions</span><p id="weather-copy"></p><span class="inline-hint">WEATHER IS A CAMPAIGN NOTE</span></div></div></section>
+              <section class="panel" aria-labelledby="weather-title"><div class="panel-head"><div><div class="eyebrow">Strategic play / GM control</div><h2 id="weather-title">Weather log</h2></div><span class="heading-tag">Editable</span></div><div class="panel-body"><form class="weather-editor" id="weather-form"><label class="field" for="weather-state"><span class="eyebrow">Weather condition</span><select id="weather-state"><option value="Fair">Fair</option><option value="Cloudy">Cloudy</option><option value="Rain/Snow">Rain/Snow</option><option value="GM-defined">GM-defined</option></select></label><label class="field" id="weather-custom-field" for="weather-custom-label" hidden><span class="eyebrow">GM-defined condition</span><input id="weather-custom-label" maxlength="80" placeholder="Describe the condition"></label><div class="weather-effects" role="note"><span class="eyebrow">Fourth Edition effects / reference</span><p id="weather-effects-copy"></p><span class="inline-hint">T2K Referee Aid, Strategic Play; refers to Player's Manual p. 139. For GM adjudication; this display does not modify rolls.</span></div><label class="field" for="weather-note"><span class="eyebrow">Optional GM note</span><textarea id="weather-note" maxlength="1000" rows="3" placeholder="Local detail or ruling"></textarea></label><button class="button button-primary" type="submit">Save weather</button></form></div></section>
             </div>
           </div>
         </section>
@@ -680,6 +685,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="campaign-package-contract.js"></script>
   <script src="/auth-client.js" defer></script>
   <script src="/campaign-clock.js"></script>
+  <script src="weather-rules.js"></script>
   <script src="/situation-report-client.js" defer></script>
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>
@@ -735,6 +741,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const setupImportSummary = document.getElementById("setup-import-summary");
       const applySetupImportButton = document.getElementById("apply-setup-import");
       const runtimeCampaignSelect = document.getElementById("runtime-campaign-select");
+      const weatherForm = document.getElementById("weather-form");
+      const weatherStateSelect = document.getElementById("weather-state");
+      const weatherCustomField = document.getElementById("weather-custom-field");
+      const weatherCustomLabel = document.getElementById("weather-custom-label");
+      const weatherNoteInput = document.getElementById("weather-note");
+      const weatherEffectsCopy = document.getElementById("weather-effects-copy");
       const openPlayerSeedDialogButton = document.getElementById("open-player-seed-dialog");
       const openCharacterChangesButton = document.getElementById("open-character-changes");
       const exportRuntimeBackupButton = document.getElementById("export-runtime-backup");
@@ -852,6 +864,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
             kind: entry.kind
           }))
         };
+        syncWeatherEditor();
         runtimeDataLoaded = true;
         document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
         document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
@@ -901,6 +914,20 @@ Military rank || optional</textarea><span class="row-description">One field per 
           kind: entry.kind
         }));
       }
+      function updateWeatherEffects() {
+        const isCustom = weatherStateSelect.value === "GM-defined";
+        weatherCustomField.hidden = !isCustom;
+        weatherCustomLabel.required = isCustom;
+        weatherEffectsCopy.textContent = FieldbookWeatherRules.describeWeatherEffects(isCustom ? "" : weatherStateSelect.value);
+      }
+      function syncWeatherEditor() {
+        const officialConditions = ["Fair", "Cloudy", "Rain/Snow"];
+        const isOfficial = officialConditions.includes(state.weather);
+        weatherStateSelect.value = isOfficial ? state.weather : "GM-defined";
+        weatherCustomLabel.value = isOfficial ? "" : state.weather;
+        weatherNoteInput.value = state.weatherNote || "";
+        updateWeatherEffects();
+      }
       function render() {
         const formattedDate = `${dateLabel(state.date)} / ${state.time || "00:00"}`;
         document.getElementById("active-campaign-name").textContent = state.campaignName || "The Long Road";
@@ -918,7 +945,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("fuel-count").textContent = state.fuel;
         document.getElementById("distance-count").textContent = `${state.distance} km`;
         document.getElementById("movement-distance").textContent = `${state.distance} KM LOGGED`;
-        document.getElementById("weather-copy").textContent = state.weatherNote;
         const latestJournalEntry = state.notes[0];
         document.getElementById("latest-journal-title").textContent = latestJournalEntry?.title || "No field notes recorded";
         document.getElementById("latest-journal-body").textContent = latestJournalEntry?.body || "Add a journal entry to record the current situation.";
@@ -2156,18 +2182,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
           const distance = action === "distance-down" ? Math.max(0, state.distance - 10) : state.distance + 10;
           await commitRuntimeUpdate({ dashboard: { distanceKm: distance } }, () => { state.distance = distance; }, "Logged distance updated.");
         }
-        if (action === "cycle-weather") {
-          const conditions = [
-            ["Clear", "Clear skies and a cool wind. Distant movement is easier to spot across the open ground."],
-            ["Overcast", "A low grey ceiling hangs over the forest. The air is still and damp."],
-            ["Cold rain", "Low cloud and steady rain. The gravel roads are softening; visibility is short in the tree line."],
-            ["Fog", "A cold fog has settled into the low ground. Sound carries, but the road disappears ahead."]
-          ];
-          const next = (conditions.findIndex((entry) => entry[0] === state.weather) + 1) % conditions.length;
-          await commitRuntimeUpdate({ dashboard: { weather: conditions[next][0], weatherNote: conditions[next][1] } }, () => {
-            [state.weather, state.weatherNote] = conditions[next];
-          }, `Conditions updated: ${conditions[next][0]}.`);
-        }
         if (action === "delete-person") {
           const people = state.people.filter((person) => String(person.id) !== button.dataset.id);
           await commitRuntimeUpdate({ personnel: people.map(({ status, ...person }) => ({ ...person, readiness: person.readiness || status })) }, () => { state.people = people; }, "Person removed from the roster.");
@@ -2297,6 +2311,17 @@ Military rank || optional</textarea><span class="row-description">One field per 
             document.getElementById("note-dialog").close();
           });
       });
+      weatherStateSelect.addEventListener("change", updateWeatherEffects);
+      weatherForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const weather = weatherStateSelect.value === "GM-defined" ? weatherCustomLabel.value.trim() : weatherStateSelect.value;
+        const weatherNote = weatherNoteInput.value.trim();
+        const saved = await commitRuntimeUpdate({ dashboard: { weather, weatherNote } }, () => {
+          state.weather = weather;
+          state.weatherNote = weatherNote;
+        }, "Weather record saved.");
+        if (saved) syncWeatherEditor();
+      });
       document.getElementById("person-form").addEventListener("submit", (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -2320,6 +2345,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (event.target === dialog) dialog.close();
       }));
       window.addEventListener("resize", () => requestAnimationFrame(drawMap));
+      syncWeatherEditor();
       render();
       refreshRuntimeCampaigns();
     })();

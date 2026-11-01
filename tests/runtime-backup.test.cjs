@@ -376,12 +376,14 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
 
     updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, {
       expectedRevision: before.campaign.revision,
-      dashboard: { rationsDays: 2, weather: "Fog" },
+      dashboard: { rationsDays: 2, weather: "Rain/Snow", weatherNote: "Weather shift ends after tonight." },
       personnel: before.personnel.slice(0, 1),
       journal: []
     }, { now: () => Date.parse("2026-11-01T10:10:00.000Z") });
     const changed = getRuntimeDashboard(database, "gm-owner", seeded.campaignId);
     assert.equal(changed.dashboard.rationsDays, 2);
+    assert.equal(changed.dashboard.weather, "Rain/Snow");
+    assert.equal(changed.dashboard.weatherNote, "Weather shift ends after tonight.");
     assert.equal(changed.personnel.length, 1);
     assert.equal(changed.journal.length, 0);
 
@@ -407,6 +409,7 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     assert.equal(result.restoredFromRevision, before.campaign.revision);
     assert.equal(restored.dashboard.rationsDays, before.dashboard.rationsDays);
     assert.equal(restored.dashboard.weather, before.dashboard.weather);
+    assert.equal(restored.dashboard.weatherNote, before.dashboard.weatherNote);
     assert.equal(restored.personnel.length, before.personnel.length);
     assert.equal(restored.journal.length, before.journal.length);
     assert.deepEqual(restored.journal.map(({ title }) => title), before.journal.map(({ title }) => title));

@@ -43,7 +43,7 @@ node server/main.cjs
 The command prints the runtime campaign ID and, when it creates the `sample-player` account, its one-time activation token. The GM dashboard snapshot is available to that campaign's owner at `GET /api/campaigns/:id/runtime`.
 
 ### Runtime Snapshot API
-Runtime `PUT` updates require `expectedRevision` from the current `runtime.campaign.revision`; stale writes return `409` and should be reloaded before retrying.
+Runtime `PUT` updates require `expectedRevision` from the current `runtime.campaign.revision`; stale writes return `409` and should be reloaded before retrying. Weather uses the existing `dashboard.weather` and `dashboard.weatherNote` fields; the UI derives cited effects for GM adjudication without applying modifiers to rolls.
 
 `GET /api/campaigns/:id/runtime` requires a signed-in GM who owns the campaign. It returns the campaign summary, dashboard counters/weather, ordered route stops, personnel, and journal; it returns `404` when the caller does not own the campaign or runtime dashboard state is absent. `PUT /api/campaigns/:id/runtime` accepts partial `dashboard` updates and replacement `personnel` or `journal` lists. Updates are validated and saved in one SQLite transaction, increment the campaign revision, and return the refreshed snapshot. Route definitions and map rendering are not editable through this endpoint.
 

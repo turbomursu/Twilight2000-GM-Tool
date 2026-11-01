@@ -142,17 +142,21 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   const updateResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
-    body: JSON.stringify({ expectedRevision: runtime.campaign.revision, dashboard: { rationsDays: 5, weather: "Fog" }, personnel: updatedPersonnel, journal: updatedJournal })
+    body: JSON.stringify({ expectedRevision: runtime.campaign.revision, dashboard: { rationsDays: 5, weather: "Rain/Snow", weatherNote: "North road weather watch." }, personnel: updatedPersonnel, journal: updatedJournal })
   });
   assert.equal(updateResponse.status, 200);
   const updatedRuntime = (await updateResponse.json()).runtime;
   assert.equal(updatedRuntime.dashboard.rationsDays, 5);
-  assert.equal(updatedRuntime.dashboard.weather, "Fog");
+  assert.equal(updatedRuntime.dashboard.weather, "Rain/Snow");
+  assert.equal(updatedRuntime.dashboard.weatherNote, "North road weather watch.");
   assert.equal(updatedRuntime.personnel[0].readiness, "Alert");
   assert.equal(updatedRuntime.campaign.revision, 3);
 
   const reloaded = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
-  assert.equal((await reloaded.json()).runtime.dashboard.rationsDays, 5);
+  const reloadedRuntime = (await reloaded.json()).runtime;
+  assert.equal(reloadedRuntime.dashboard.rationsDays, 5);
+  assert.equal(reloadedRuntime.dashboard.weather, "Rain/Snow");
+  assert.equal(reloadedRuntime.dashboard.weatherNote, "North road weather watch.");
 
   const deniedWrite = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
@@ -169,6 +173,16 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(invalidCombinedUpdate.status, 422);
   const afterRollback = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
   assert.equal((await afterRollback.json()).runtime.dashboard.rationsDays, 5);
+
+  const customWeatherResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: reloadedRuntime.campaign.revision, dashboard: { weather: "Dense smoke", weatherNote: "GM-defined visibility condition." } })
+  });
+  assert.equal(customWeatherResponse.status, 200);
+  const customWeather = (await customWeatherResponse.json()).runtime.dashboard;
+  assert.equal(customWeather.weather, "Dense smoke");
+  assert.equal(customWeather.weatherNote, "GM-defined visibility condition.");
 
   const denied = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${otherToken}` } });
   assert.equal(denied.status, 404);

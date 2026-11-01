@@ -109,6 +109,7 @@ Integration check (01 Nov 2026): combined recovery and all five browser views ve
 **Goal:** Replace fixed demonstration values with campaign-managed travel and supply records.
 
 - Add editable locations, route legs, waypoints, travel conditions, and weather state.
+- Implemented weather slice: GM-selected Fair, Cloudy, Rain/Snow, or GM-defined condition plus optional note persists in the revision-checked runtime dashboard and backup. Referee Aid weather effects are derived for adjudication; rolls are not modified, and weather-change rolls/shift-duration tracking remain planned.
 - Implement route modifiers only after Fourth Edition procedures are verified; otherwise label them as GM-entered campaign conditions.
 - Add convoy operations, cargo manifests, inventories, stockpiles, consumption, and resource distribution.
 - Add player-owned character inventories and item actions. Implement dice-governed procedures only after verification against authoritative Fourth Edition sources; record inputs, roll, and outcome, and send ambiguous cases to the GM.

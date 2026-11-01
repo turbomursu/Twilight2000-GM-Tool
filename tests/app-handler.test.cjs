@@ -45,6 +45,9 @@ test("redirects anonymous requests to login and serves only public auth assets",
   const projectFeatures = await fetch(`${origin}/project-features.html`, { redirect: "manual" });
   assert.equal(projectFeatures.status, 302);
   assert.equal(projectFeatures.headers.get("location"), "/login.html?next=%2Fproject-features.html");
+  const weatherRules = await fetch(`${origin}/weather-rules.js`, { redirect: "manual" });
+  assert.equal(weatherRules.status, 302);
+  assert.equal(weatherRules.headers.get("location"), "/login.html?next=%2Fweather-rules.js");
 
   const login = await fetch(`${origin}/login.html`);
   assert.equal(login.status, 200);
@@ -77,6 +80,10 @@ test("serves protected pages only for an active session and gates them again aft
   const featuresPage = await fetch(`${origin}/project-features.html`, { headers: { Cookie: cookie } });
   assert.equal(featuresPage.status, 200);
   assert.match(await featuresPage.text(), /Feature status/);
+  const weatherRules = await fetch(`${origin}/weather-rules.js`, { headers: { Cookie: cookie } });
+  assert.equal(weatherRules.status, 200);
+  assert.match(weatherRules.headers.get("content-type"), /text\/javascript/);
+  assert.match(await weatherRules.text(), /Rain\/Snow/);
   const roadmap = await fetch(`${origin}/ROADMAP.md`, { headers: { Cookie: cookie } });
   assert.equal(roadmap.status, 200);
   assert.match(roadmap.headers.get("content-type"), /text\/markdown/);

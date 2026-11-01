@@ -31,6 +31,7 @@ const PROTECTED_FILES = new Map([
   ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]],
   ["/audit-client.js", ["audit-client.js", "text/javascript; charset=utf-8"]],
   ["/campaign-clock.js", ["campaign-clock.js", "text/javascript; charset=utf-8"]],
+  ["/weather-rules.js", ["weather-rules.js", "text/javascript; charset=utf-8"]],
   ["/player-seeds.js", ["player-seeds.js", "text/javascript; charset=utf-8"]]
 ]);
 const AUTH_PATHS = new Set([
