@@ -375,6 +375,7 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     const backup = exportRuntimeSave(database, "gm-owner", seeded.campaignId, { now: () => "2026-11-01T10:00:00.000Z" });
 
     updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, {
+      expectedRevision: before.campaign.revision,
       dashboard: { rationsDays: 2, weather: "Fog" },
       personnel: before.personnel.slice(0, 1),
       journal: []
@@ -408,6 +409,7 @@ test("runtime backup round-trips dashboard and preserves record IDs and monotoni
     assert.equal(restored.dashboard.weather, before.dashboard.weather);
     assert.equal(restored.personnel.length, before.personnel.length);
     assert.equal(restored.journal.length, before.journal.length);
+    assert.deepEqual(restored.journal.map(({ title }) => title), before.journal.map(({ title }) => title));
     assert.equal(restored.campaign.revision, changed.campaign.revision + 1);
     assert.deepEqual(database.prepare("SELECT id FROM personnel WHERE campaign_id = ? ORDER BY sort_order").all(seeded.campaignId).map(({ id }) => id), originalPersonnelIds);
     assert.equal(database.prepare("SELECT id FROM characters WHERE campaign_id = ?").get(seeded.campaignId).id, originalCharacterId);
@@ -429,7 +431,7 @@ test("runtime restore rejects bad checksums and rolls back database failures ato
       expectedRevision: 0
     }), /checksum is invalid/);
 
-    updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, { dashboard: { rationsDays: 1 } });
+    updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, { expectedRevision: getRuntimeDashboard(database, "gm-owner", seeded.campaignId).campaign.revision, dashboard: { rationsDays: 1 } });
     const beforeFailure = getRuntimeDashboard(database, "gm-owner", seeded.campaignId);
     database.exec(`CREATE TRIGGER reject_restore_personnel BEFORE INSERT ON personnel
       BEGIN SELECT RAISE(ABORT, 'injected restore failure'); END`);
@@ -501,7 +503,7 @@ test("runtime backup HTTP routes export and restore only for the owning GM", asy
     const updateResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${ownerToken}` },
-      body: JSON.stringify({ dashboard: { rationsDays: 2 } })
+      body: JSON.stringify({ expectedRevision: currentRevision, dashboard: { rationsDays: 2 } })
     });
     assert.equal(updateResponse.status, 200);
 
@@ -555,7 +557,7 @@ test("file-backed recovery preserves rows and does not modify another campaign o
     const second = importSetupPackage(database, JSON.stringify(setup), { ownerAccountId: "gm-owner" });
     const backup = exportRuntimeSave(database, "gm-owner", seeded.campaignId);
     const independent = exportRuntimeSave(database, "gm-owner", second.runtimeCampaignId);
-    updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, { dashboard: { rationsDays: 0 } });
+    updateRuntimeDashboard(database, "gm-owner", seeded.campaignId, { expectedRevision: getRuntimeDashboard(database, "gm-owner", seeded.campaignId).campaign.revision, dashboard: { rationsDays: 0 } });
     const currentRevision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(seeded.campaignId).revision;
     assert.throws(() => restoreRuntimeSave(database, "gm-owner", second.runtimeCampaignId, backup, {
       confirmReplace: true, expectedRevision: 0

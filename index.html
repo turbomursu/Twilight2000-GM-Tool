@@ -455,8 +455,8 @@
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="situation-title-card">
-                <div class="panel-head"><div><div class="eyebrow">Command notes</div><h2 id="situation-title-card">Immediate concern</h2></div><span class="heading-tag">Priority 02</span></div>
-                <div class="alert-block"><div class="alert-mark" aria-hidden="true">!</div><div><strong>Bridge status unknown</strong><p>Locals reported damage on the north road. Confirm before committing the vehicles.</p></div></div>
+                <div class="panel-head"><div><div class="eyebrow">Command notes</div><h2 id="situation-title-card">Latest field note</h2></div><span class="heading-tag" id="latest-journal-meta"></span></div>
+                <div class="alert-block"><div class="alert-mark" aria-hidden="true">!</div><div><strong id="latest-journal-title"></strong><p id="latest-journal-body"></p></div></div>
                 <div class="panel-body"><button class="button" data-action="open-note">Add a note <span aria-hidden="true">+</span></button></div>
               </section>
               <section class="panel" aria-labelledby="route-title">
@@ -881,7 +881,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(state.runtimeCampaignId)}/runtime`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updates)
+            body: JSON.stringify({ ...updates, expectedRevision: state.runtimeRevision })
           });
           applyRuntimeSnapshot(runtime);
           showToast(successMessage);
@@ -919,6 +919,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("distance-count").textContent = `${state.distance} km`;
         document.getElementById("movement-distance").textContent = `${state.distance} KM LOGGED`;
         document.getElementById("weather-copy").textContent = state.weatherNote;
+        const latestJournalEntry = state.notes[0];
+        document.getElementById("latest-journal-title").textContent = latestJournalEntry?.title || "No field notes recorded";
+        document.getElementById("latest-journal-body").textContent = latestJournalEntry?.body || "Add a journal entry to record the current situation.";
+        document.getElementById("latest-journal-meta").textContent = latestJournalEntry ? `${latestJournalEntry.kind} / ${dateLabel(latestJournalEntry.date)}` : "No entries";
         const nextWaypoint = route[Math.min(state.activeStop + 1, route.length - 1)] || route[state.activeStop] || { name: "No waypoint" };
         document.getElementById("situation-summary").textContent = `The column is moving north through ${state.campaignSetting || "Dalarna"}. ${state.weather} conditions continue; the next waypoint is ${nextWaypoint.name}.`;
         document.getElementById("weather-title").setAttribute("data-weather", state.weather);

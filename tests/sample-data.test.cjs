@@ -120,6 +120,20 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(runtime.personnel.length, 4);
   assert.equal(runtime.journal.length, 3);
 
+  const missingRevision = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ journal: runtime.journal })
+  });
+  assert.equal(missingRevision.status, 422);
+
+  const staleUpdate = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ expectedRevision: runtime.campaign.revision - 1, journal: runtime.journal })
+  });
+  assert.equal(staleUpdate.status, 409);
+
   const updatedPersonnel = runtime.personnel.map((person, index) => ({
     ...person,
     readiness: index === 0 ? "Alert" : person.readiness
@@ -128,7 +142,7 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   const updateResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
-    body: JSON.stringify({ dashboard: { rationsDays: 5, weather: "Fog" }, personnel: updatedPersonnel, journal: updatedJournal })
+    body: JSON.stringify({ expectedRevision: runtime.campaign.revision, dashboard: { rationsDays: 5, weather: "Fog" }, personnel: updatedPersonnel, journal: updatedJournal })
   });
   assert.equal(updateResponse.status, 200);
   const updatedRuntime = (await updateResponse.json()).runtime;
@@ -143,14 +157,14 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   const deniedWrite = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${otherToken}` },
-    body: JSON.stringify({ dashboard: { rationsDays: 1 } })
+    body: JSON.stringify({ expectedRevision: updatedRuntime.campaign.revision, dashboard: { rationsDays: 1 } })
   });
   assert.equal(deniedWrite.status, 404);
 
   const invalidCombinedUpdate = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
-    body: JSON.stringify({ dashboard: { rationsDays: 2 }, journal: [{ id: "broken" }] })
+    body: JSON.stringify({ expectedRevision: updatedRuntime.campaign.revision, dashboard: { rationsDays: 2 }, journal: [{ id: "broken" }] })
   });
   assert.equal(invalidCombinedUpdate.status, 422);
   const afterRollback = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });

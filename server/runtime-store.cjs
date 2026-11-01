@@ -525,7 +525,7 @@ function openRuntimeDatabase(path = ":memory:") {
       ALTER TABLE factions ADD COLUMN current_location_id TEXT;
       ALTER TABLE factions ADD COLUMN morale_rating TEXT CHECK (morale_rating IN ('A', 'B', 'C', 'D'));
       ALTER TABLE factions ADD COLUMN resources_json TEXT;
-      CREATE UNIQUE INDEX unique_player_party_per_campaign 
+      CREATE UNIQUE INDEX unique_player_party_per_campaign
         ON factions(runtime_campaign_id) WHERE faction_type = 'player-party';
       CREATE TABLE party_members (
         runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
@@ -537,7 +537,7 @@ function openRuntimeDatabase(path = ":memory:") {
         FOREIGN KEY (runtime_campaign_id, faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE CASCADE,
         FOREIGN KEY (runtime_campaign_id, character_id) REFERENCES characters(campaign_id, id) ON DELETE CASCADE
       ) STRICT;
-      CREATE INDEX idx_party_members_faction 
+      CREATE INDEX idx_party_members_faction
         ON party_members(runtime_campaign_id, faction_id) WHERE is_active = 1;
       PRAGMA user_version = 15;`);
       database.exec("COMMIT");
@@ -1113,9 +1113,9 @@ function importSetupPackage(database, sourceJson, options = {}) {
       `SELECT id FROM locations WHERE runtime_campaign_id = ? AND is_starting_location = 1 LIMIT 1`
     ).get(runtimeId);
     const firstLocation = firstStartingLocation?.id || input.map.locations[0]?.id || null;
-    
+
     database.prepare(`INSERT INTO factions
-      (runtime_campaign_id, id, name, description, color, faction_type, is_player_controlled, 
+      (runtime_campaign_id, id, name, description, color, faction_type, is_player_controlled,
        current_location_id, morale_rating)
       VALUES (?, ?, 'Player Party', 'The player character group', '#4A90E2', 'player-party', 1, ?, 'C')`)
       .run(runtimeId, partyId, firstLocation);
@@ -1155,30 +1155,30 @@ function syncPartyFactionMembers(database, runtimeId) {
   const party = database.prepare(
     `SELECT id FROM factions WHERE runtime_campaign_id = ? AND faction_type = 'player-party'`
   ).get(runtimeId);
-  
+
   if (!party) return; // No party faction yet
-  
+
   const partyId = party.id;
   const activeSeats = database.prepare(
     `SELECT character_id FROM player_seats WHERE campaign_id = ? AND active = 1`
   ).all(runtimeId);
-  
+
   const timestamp = new Date().toISOString();
-  
+
   // Remove stale members (characters no longer in active seats)
   database.prepare(
-    `DELETE FROM party_members 
+    `DELETE FROM party_members
      WHERE runtime_campaign_id = ? AND faction_id = ? AND character_id NOT IN (
        SELECT character_id FROM player_seats WHERE campaign_id = ? AND active = 1
      )`
   ).run(runtimeId, partyId, runtimeId);
-  
+
   // Add new members
   for (const seat of activeSeats) {
     const existing = database.prepare(
       `SELECT 1 FROM party_members WHERE runtime_campaign_id = ? AND faction_id = ? AND character_id = ?`
     ).get(runtimeId, partyId, seat.character_id);
-    
+
     if (!existing) {
       database.prepare(
         `INSERT INTO party_members (runtime_campaign_id, faction_id, character_id, is_active, joined_at)
@@ -1194,10 +1194,10 @@ function getRuntimeFactionLayers(database, accountId, runtimeId) {
     WHERE campaigns.runtime_id = ? AND campaigns.active = 1
       AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`).get(runtimeId, accountId);
   if (!campaign) return null;
-  
+
   // Sync party members before reading faction layers
   syncPartyFactionMembers(database, runtimeId);
-  
+
   const factions = database.prepare("SELECT id FROM factions WHERE runtime_campaign_id = ? ORDER BY id").all(runtimeId);
   const settlements = database.prepare("SELECT id FROM settlements WHERE runtime_campaign_id = ? ORDER BY id").all(runtimeId);
   const influence = database.prepare(`SELECT faction_id, q, r FROM faction_influence_cells
@@ -1296,12 +1296,14 @@ function getRuntimeDashboard(database, accountId, runtimeId) {
 
 function updateRuntimeDashboard(database, accountId, runtimeId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Runtime changes must be an object.");
-  const allowedSections = new Set(["dashboard", "personnel", "journal"]);
+  const allowedSections = new Set(["expectedRevision", "dashboard", "personnel", "journal"]);
   if (Object.keys(input).some((key) => !allowedSections.has(key))) throw new Error("The runtime update contains an unsupported section.");
+  if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new Error("Expected campaign revision is required.");
   database.exec("BEGIN IMMEDIATE");
   try {
     const current = getRuntimeDashboard(database, accountId, runtimeId);
     if (!current) throw new Error("Runtime campaign not found.");
+    if (current.campaign.revision !== input.expectedRevision) throw new Error("Campaign revision changed; reload before saving.");
     const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
 
     if (Object.hasOwn(input, "dashboard")) {
@@ -1999,7 +2001,7 @@ function getPartyFaction(database, accountId, runtimeId) {
     WHERE campaigns.runtime_id = ? AND campaigns.active = 1
       AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`).get(runtimeId, accountId);
   if (!campaign) return null;
-  
+
   const party = database.prepare(`
     SELECT f.id, f.name, f.description, f.color, f.faction_type, f.is_player_controlled,
            f.current_location_id, f.morale_rating, f.resources_json,
@@ -2008,9 +2010,9 @@ function getPartyFaction(database, accountId, runtimeId) {
     LEFT JOIN locations l ON f.runtime_campaign_id = l.runtime_campaign_id AND f.current_location_id = l.id
     WHERE f.runtime_campaign_id = ? AND f.faction_type = 'player-party'
   `).get(runtimeId);
-  
+
   if (!party) return null;
-  
+
   const members = database.prepare(`
     SELECT pm.character_id, c.fields_json, ps.display_label
     FROM party_members pm
@@ -2019,9 +2021,9 @@ function getPartyFaction(database, accountId, runtimeId) {
     WHERE pm.runtime_campaign_id = ? AND pm.faction_id = ? AND pm.is_active = 1
     ORDER BY ps.display_label
   `).all(runtimeId, party.id);
-  
+
   const resources = party.resources_json ? JSON.parse(party.resources_json) : null;
-  
+
   return {
     id: party.id,
     name: party.name,

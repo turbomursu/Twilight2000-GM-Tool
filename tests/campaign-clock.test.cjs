@@ -38,10 +38,10 @@ test("midday consumes one ration-day once per date and recovery preserves the da
     const midnight = advance(); assert.equal(midnight.dashboard.gameTime, "00:00"); assert.equal(midnight.dashboard.dayNumber, initial.dashboard.dayNumber + 1);
     restoreRuntimeSave(database, "midday-gm", campaignId, backup, { expectedRevision: midnight.campaign.revision, confirmReplace: true, confirmOlderBackup: true });
     assert.equal(getRuntimeDashboard(database, "midday-gm", campaignId).dashboard.gameTime, "12:00");
-    updateRuntimeDashboard(database, "midday-gm", campaignId, { dashboard: { gameTime: "06:00" } });
+    updateRuntimeDashboard(database, "midday-gm", campaignId, { expectedRevision: getRuntimeDashboard(database, "midday-gm", campaignId).campaign.revision, dashboard: { gameTime: "06:00" } });
     assert.equal(advance().dashboard.rationsDays, noon.dashboard.rationsDays);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM daily_supply_usage WHERE campaign_id = ?").get(campaignId).count, 1);
-    updateRuntimeDashboard(database, "midday-gm", campaignId, { dashboard: { gameDate: "2000-05-12", gameTime: "06:00", rationsDays: 0 } });
+    updateRuntimeDashboard(database, "midday-gm", campaignId, { expectedRevision: getRuntimeDashboard(database, "midday-gm", campaignId).campaign.revision, dashboard: { gameDate: "2000-05-12", gameTime: "06:00", rationsDays: 0 } });
     const empty = advance(); assert.equal(empty.dashboard.rationsDays, 0);
     assert.equal(database.prepare("SELECT ration_days_used FROM daily_supply_usage WHERE campaign_id = ? AND game_date = '2000-05-12'").get(campaignId).ration_days_used, 0);
     assert.equal(empty.dashboard.fuelUnits, initial.dashboard.fuelUnits);

@@ -310,7 +310,8 @@ function createCampaignHandler({ database }) {
         const runtime = updateRuntimeDashboard(database, account.id, campaignId, updates);
         return sendJson(response, 200, { runtime });
       } catch (error) {
-        const status = /Runtime campaign not found/.test(error.message) ? 404 : 422;
+        const status = /Runtime campaign not found/.test(error.message) ? 404
+          : /revision changed/.test(error.message) ? 409 : 422;
         return sendJson(response, status, { error: error.message });
       }
     }
