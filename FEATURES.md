@@ -118,6 +118,8 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 
 ## Combat Foundation
 
+- **T2K 4E workflow verification** — Implemented. Campaign setup, session loop, strategic play (6-hour shifts), close combat, ranged/heavy weapons, and vehicle combat procedures verified against official Referee Aids (OCR transcriptions). Campaign setup, session-level publishing, strategic play weather/movement, and character creation fully match official rules. Combat automation and encounter generation remain planned; all procedures and weapon/vehicle data are documented in analysis files and ready for implementation.
+- **Core combat calculator** — Implemented. Ranged attack, close combat, and grenade resolution engines with verified dice success calculations, damage formulas, critical hit detection, weapon jam logic, and ammo consumption. Does not generate random rolls—GM enters pre-rolled dice values and system calculates results. API endpoints (HTTP POST) accept attack parameters and return calculated results. Comprehensive test suite (26 tests) verifies all combat scenarios. Integration with campaign handler complete. GM UI form, combat result recording, and audit logging integration remain planned.
 - **Tactical encounters** — Planned. Use verified Fourth Edition procedures when resolving actual mechanics.
 - **Ambush generation** — Planned. Keep generated situations under GM control and distinguish them from rules procedures.
 - **Raid generation** — Planned.

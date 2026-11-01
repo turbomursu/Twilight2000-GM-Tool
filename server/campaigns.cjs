@@ -1,5 +1,6 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
 const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard } = require("./runtime-store.cjs");
+const { createCombatHandler } = require("./combat-api.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
@@ -327,6 +328,11 @@ function createCampaignHandler({ database }) {
           : /revision changed/.test(error.message) ? 409 : 422;
         return sendJson(response, status, { error: error.message });
       }
+    }
+
+    const combatMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/combat\/([a-z-]+)$/);
+    if (combatMatch && ["POST"].includes(request.method)) {
+      return createCombatHandler({ database })(request, response, combatMatch[1], combatMatch[2]);
     }
 
     const changeListMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/character-changes$/);
