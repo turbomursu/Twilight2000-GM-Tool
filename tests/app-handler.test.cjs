@@ -72,10 +72,19 @@ test("serves protected pages only for an active session and gates them again aft
   const runtimeHtml = await protectedPage.text();
   assert.match(runtimeHtml, /data-auth-logout/);
   assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
+  for (const id of ["map-geometry-type", "map-geometry-label", "add-map-geometry", "map-geometry-coordinates", "map-geometry-entries"]) {
+    assert.equal(runtimeHtml.split(`id="${id}"`).length - 1, 1, `${id} must appear once`);
+  }
+  assert.match(runtimeHtml, /<option value="LineString">Line<\/option><option value="Polygon">Area<\/option>/);
 
   const setupPage = await fetch(`${origin}/campaign-setup.html`, { headers: { Cookie: cookie } });
   assert.equal(setupPage.status, 200);
-  assert.match(await setupPage.text(), /id="export-package-top"/);
+  const setupHtml = await setupPage.text();
+  assert.match(setupHtml, /id="export-package-top"/);
+  for (const id of ["map-bound-south", "map-bound-west", "map-bound-north", "map-bound-east", "apply-map-bounds"]) {
+    assert.match(setupHtml, new RegExp(`id="${id}"`));
+  }
+  assert.match(setupHtml, /Bounds must contain all campaign locations/);
 
   for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md"]) {
     assert.equal((await fetch(`${origin}${path}`, { headers: { Cookie: cookie } })).status, 404);
