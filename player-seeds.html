@@ -83,6 +83,7 @@
     .campaign-select select { width: 100%; min-height: 32px; border: 1px solid var(--line); color: var(--ink); background: #f7f8f3; font: 9px var(--mono); text-transform: none; }
     .editor-body { padding: 17px; }
     .blank-state { display: grid; min-height: 390px; place-content: center; gap: 12px; padding: 24px; color: var(--muted); text-align: center; }
+    .blank-state[hidden], .seed-form[hidden] { display: none; }
     .blank-state strong { color: var(--ink); font: 20px var(--serif); text-transform: uppercase; }
     .blank-state p { max-width: 390px; margin: 0 auto; font-size: 11px; line-height: 1.55; }
     .seed-form { display: grid; gap: 18px; }
@@ -111,6 +112,9 @@
     .skill-line output { color: var(--muted); font: 8px var(--mono); text-align: right; }
     .rule-note { padding: 11px 13px; border-left: 3px solid var(--gold); color: #4c5a51; background: #e7e6d9; font-size: 10px; line-height: 1.5; }
     .rule-note strong { display: block; margin-bottom: 4px; color: #4d583f; font: 9px var(--mono); text-transform: uppercase; }
+    .legacy-drafts { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: -7px 0 17px; padding: 11px 13px; border-left: 3px solid var(--gold); background: #e7e6d9; }
+    .legacy-drafts[hidden] { display: none; }
+    .legacy-drafts p { margin: 0; color: #4c5a51; font-size: 10px; line-height: 1.45; }
     .career-terms-list { display: grid; gap: 12px; }
     .career-term { display: grid; gap: 12px; padding: 12px; border: 1px solid #c4cec1; background: #e2e8dd; }
     .career-term-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -144,6 +148,7 @@
       .topbar { min-height: 54px; padding: 0 15px; }
       .content { padding: 20px 14px 32px; }
       .page-heading { align-items: start; flex-direction: column; gap: 9px; }
+      .legacy-drafts { align-items: start; flex-direction: column; }
       h1 { font-size: 29px; }
       .layout { grid-template-columns: minmax(0, 1fr); }
       .seed-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -174,6 +179,7 @@
           <div><div class="heading-tag">Unassigned by default / GM-only</div><h1>Player seeds</h1></div>
           <p>Prepare a GM-owned player login and T2K 4E character template outside any campaign. The player has no campaign access until you assign the template.</p>
         </header>
+        <aside class="legacy-drafts" id="legacy-drafts" hidden><p>Older browser-only seed drafts remain saved on this device and are not imported into the GM service.</p><button class="button" id="download-legacy-drafts" type="button">Download local drafts</button></aside>
         <div class="layout">
           <aside class="panel" aria-labelledby="seed-list-title">
             <div class="panel-head"><div><h2 id="seed-list-title">Seed register</h2><small id="seed-count">0 templates</small></div><button class="button button-primary" id="new-seed" type="button" aria-label="Create player seed">+ New</button></div>

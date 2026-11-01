@@ -4,11 +4,11 @@ A small, local-first game master desk for a Twilight: 2000 Fourth Edition campai
 
 ## Run
 
-The standalone prototype can still be opened directly from `index.html` for local evaluation, but direct file access bypasses server authentication. For login-gated access, use the HTTP LAN service described below.
+The standalone prototype can still be opened directly from `index.html` for local evaluation, but direct file access bypasses server authentication and is not supported for GM player-seed management. Use the HTTP LAN service described below for login-gated access.
 
 ## Tests
 
-Run the dependency-free test suite with `node --test`. Node is only required for tests; the browser tools still run directly from the HTML files.
+Run the dependency-free test suite with `node --test`. Open static prototypes directly if desired; authenticated GM and player workflows, including Player Seeds, require the Node LAN service.
 
 ## LAN Auth API
 
@@ -21,7 +21,7 @@ $env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGu
 node server/main.cjs
 ```
 
-The first successful account bootstrap removes the stored bootstrap-token hash. Authentication routes include `POST /api/auth/bootstrap`, `POST /api/auth/activate`, `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`; sessions use HttpOnly, SameSite=Strict cookies. GM user routes are `GET /api/users` and `POST /api/users`. Campaign routes include `POST /api/campaigns/import-setup`, `GET /api/campaigns`, `GET /api/campaigns/:id`, `GET /api/campaigns/:id/runtime`, `GET /api/campaigns/:id/character-changes`, and `POST /api/campaigns/:id/character-changes/:requestId/review`. Player routes are `GET /api/player/campaigns`, `GET|PUT /api/player/campaigns/:id/character`, and `POST /api/player/campaigns/:id/character/finalize`; GM seed assignment uses `POST /api/campaigns/:id/player-seeds`. Set `FIELDBOOK_HOST`, `FIELDBOOK_PORT`, and `FIELDBOOK_DB_PATH` to override the listener and SQLite location.
+The first successful account bootstrap removes the stored bootstrap-token hash. Authentication routes include `POST /api/auth/bootstrap`, `POST /api/auth/activate`, `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`; sessions use HttpOnly, SameSite=Strict cookies. GM user routes are `GET /api/users` and `POST /api/users`. GM player templates use `GET|POST /api/player-seeds` and `PUT|DELETE /api/player-seeds/:seedId`; creating a template can create a disabled player login and one-time activation token without assigning a campaign. Campaign routes include `POST /api/campaigns/import-setup`, `GET /api/campaigns`, `GET /api/campaigns/:id`, `GET /api/campaigns/:id/runtime`, `GET /api/campaigns/:id/character-changes`, and `POST /api/campaigns/:id/character-changes/:requestId/review`. GM seed assignment uses `POST /api/campaigns/:id/player-seeds` with a template ID; the server copies it into the campaign and enforces ownership and the four-seat limit. Player routes are `GET /api/player/campaigns`, `GET|PUT /api/player/campaigns/:id/character`, and `POST /api/player/campaigns/:id/character/finalize`. Set `FIELDBOOK_HOST`, `FIELDBOOK_PORT`, and `FIELDBOOK_DB_PATH` to override the listener and SQLite location.
 
 ## Runtime Sample Data
 

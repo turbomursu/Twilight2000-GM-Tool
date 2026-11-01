@@ -1368,14 +1368,14 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
   }
 }
 
-function normalizePlayerSeedFields(fields) {
+function normalizePlayerSeedFields(fields, maximumValueLength = 2000) {
   if (!Array.isArray(fields) || fields.length < 1 || fields.length > 100) throw new Error("A player seed needs between 1 and 100 fields.");
   const keys = new Set();
   return fields.map((field) => {
     if (!field || typeof field !== "object" || Array.isArray(field)
       || typeof field.key !== "string" || !/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(field.key)
       || typeof field.label !== "string" || !field.label.trim() || field.label.length > 100
-      || typeof field.value !== "string" || field.value.length > 2000
+      || typeof field.value !== "string" || field.value.length > maximumValueLength
       || typeof field.required !== "boolean") {
       throw new Error("A player seed contains an invalid field definition.");
     }
@@ -1599,13 +1599,23 @@ function updatePlayerSeedTemplate(database, gmAccountId, templateId, input, opti
 function deletePlayerSeedTemplate(database, gmAccountId, templateId) {
   const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
   if (gm?.global_role !== "gm") throw new Error("GM account required.");
-  const template = database.prepare("SELECT account_id FROM player_seed_templates WHERE id = ? AND owner_gm_id = ?").get(templateId, gmAccountId);
-  if (!template) return false;
-  if (database.prepare("SELECT 1 AS assigned FROM player_seats WHERE account_id = ? AND active = 1 LIMIT 1").get(template.account_id)) {
-    throw new Error("Remove this player from all campaigns before deleting the template.");
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const template = database.prepare("SELECT account_id FROM player_seed_templates WHERE id = ? AND owner_gm_id = ?").get(templateId, gmAccountId);
+    if (!template) {
+      database.exec("COMMIT");
+      return false;
+    }
+    if (database.prepare("SELECT 1 AS assigned FROM player_seats WHERE account_id = ? AND active = 1 LIMIT 1").get(template.account_id)) {
+      throw new Error("Remove this player from all campaigns before deleting the template.");
+    }
+    database.prepare("DELETE FROM player_seed_templates WHERE id = ? AND owner_gm_id = ?").run(templateId, gmAccountId);
+    database.exec("COMMIT");
+    return true;
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
   }
-  database.prepare("DELETE FROM player_seed_templates WHERE id = ? AND owner_gm_id = ?").run(templateId, gmAccountId);
-  return true;
 }
 
 function createAssignedUser(database, gmAccountId, username, options = {}) {
@@ -1699,7 +1709,7 @@ function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}
       username = template.username;
       displayLabel ||= template.displayLabel;
       existingAccount = { id: template.accountId, global_role: "player", created_by_account_id: gmAccountId };
-      fields = normalizePlayerSeedFields(playerFieldsFromTemplate(JSON.parse(template.characterJson)));
+      fields = normalizePlayerSeedFields(playerFieldsFromTemplate(JSON.parse(template.characterJson)), 12000);
     } else {
       existingAccount = database.prepare(`SELECT id, disabled, global_role, created_by_account_id
         FROM accounts WHERE login_identifier = ?`).get(username);

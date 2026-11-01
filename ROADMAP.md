@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-Supported campaign state and GM audit metadata use owner-scoped SQLite APIs. All five handset views are connected. Condition/inventory changes, inventory decisions, report/map mutation actions, and restore now have atomic append-only audit events. The owning GM can page the history; players cannot read it. Backup merge preserves later live entries, rejects conflicting IDs, marks recovered metadata, and records restore. Tests verify ownership, rollback, reopen, and recovery; browser checks verify actors/revisions, safe labels, paging, and player denial. Next priority: extend coverage to dashboard/faction changes, character reviews, and seat assignment. Full content snapshots, retention tooling, rules automation, offline maps, and cross-host recovery remain planned.
+Supported campaign state and GM audit metadata use owner-scoped SQLite APIs. All five handset views are connected. Condition/inventory changes, inventory decisions, report/map mutation actions, and restore now have atomic append-only audit events. The owning GM can page the history; players cannot read it. Backup merge preserves later live entries, rejects conflicting IDs, marks recovered metadata, and records restore. Tests verify ownership, rollback, reopen, and recovery; browser checks verify actors/revisions, safe labels, paging, and player denial. GM-owned player templates now exist independently of campaigns; explicit assignment creates a campaign copy, while unassigned players see no campaigns. T2K 4E character and life-path results are recorded manually, not automated or rules-validated. Next priority: extend audit coverage to dashboard/faction changes, character reviews, and seat assignment. Full content snapshots, retention tooling, rules automation, offline maps, and cross-host recovery remain planned.
 
 ## Delivery Principles
 
@@ -68,6 +68,7 @@ Supported campaign state and GM audit metadata use owner-scoped SQLite APIs. All
 **Goal:** Add verified character/NPC creation and optional AI assistance to campaign authoring.
 
 - Add player-character and NPC creation to the appropriate GM authoring/runtime workflows, using verified Fourth Edition procedures wherever applicable.
+- Build on the current manual template slice: global GM-owned player templates can record final attributes, skills, CUF, and structured life-path outcomes, but full rules-driven generation and source-checked validation remain outstanding.
 - Cite the relevant book and page or section in original, concise language; distinguish optional, house-ruled, and GM-managed fields.
 - Add AI-assisted campaign setup as a draft workflow: review, edit, accept, or discard generated material before it enters a setup package.
 - Provide a manual campaign-creation path so this workflow remains usable without an AI service.

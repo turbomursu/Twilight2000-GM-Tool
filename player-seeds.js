@@ -18,6 +18,7 @@
   const assignButton = document.getElementById("assign-seed");
   const campaignSelect = document.getElementById("assignment-campaign");
   const activationToken = document.getElementById("activation-token");
+  const legacyDrafts = document.getElementById("legacy-drafts");
   const toast = document.getElementById("toast");
   let seedStore = { seeds: [] };
   let campaigns = [];
@@ -112,6 +113,24 @@
     toast.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
+  }
+
+  function prepareLegacyDraftExport() {
+    let raw;
+    try {
+      raw = localStorage.getItem("fieldbook-player-seeds-v1");
+    } catch (error) {
+      return;
+    }
+    if (!raw) return;
+    legacyDrafts.hidden = false;
+    document.getElementById("download-legacy-drafts").addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
+      link.download = "fieldbook-local-player-seeds.json";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
   }
 
   function makeFieldLabel(text, htmlFor) {
@@ -520,7 +539,7 @@
   async function deleteSelectedSeed() {
     const seed = selectedSeed();
     if (!seed || seed.assignments?.length) return;
-    if (!window.confirm(`Delete the player template and login for ${seed.username}?`)) return;
+    if (!window.confirm(`Delete the player template for ${seed.username}? The player login will remain and can be assigned a new template later.`)) return;
     try {
       await apiRequest(`/api/player-seeds/${encodeURIComponent(seed.id)}`, { method: "DELETE" });
       seedStore.seeds = seedStore.seeds.filter((item) => item.id !== seed.id);
@@ -535,6 +554,7 @@
   }
 
   async function initialize() {
+    prepareLegacyDraftExport();
     renderRatingFields();
     renderSkillFields();
     renderCareerTerms([]);

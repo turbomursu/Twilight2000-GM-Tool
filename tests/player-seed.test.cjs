@@ -221,6 +221,16 @@ test("player activates, selects assigned campaign, fills only blank seed fields,
   const gmSeeds = await fetch(`${origin}/api/campaigns/${campaignId}/player-seeds`, { headers: { Cookie: gmCookie } });
   assert.equal((await gmSeeds.json()).seeds.length, 4);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM player_seats WHERE campaign_id = ? AND account_id = ?").get(campaignId, seed.accountId).count, 1);
+  const independentTemplate = await postJson(origin, "/api/player-seeds", {
+    username: "waiting-seed", displayLabel: "Waiting Player", character: { characterName: "Unassigned" }
+  }, gmCookie);
+  assert.equal(independentTemplate.status, 201);
+  const { seed: waitingSeed } = await independentTemplate.json();
+  assert.equal((await fetch(`${origin}/api/player-seeds/${encodeURIComponent(waitingSeed.id)}`, { method: "DELETE", headers: { Cookie: gmCookie } })).status, 200);
+  const remainingSeeds = await fetch(`${origin}/api/player-seeds`, { headers: { Cookie: gmCookie } });
+  assert.deepEqual((await remainingSeeds.json()).seeds, []);
+  const accounts = await fetch(`${origin}/api/users`, { headers: { Cookie: gmCookie } });
+  assert.ok((await accounts.json()).users.some(({ username, campaignAssignments }) => username === "waiting-seed" && campaignAssignments === 0));
 });
 
 test("GM player templates stay independent until campaign assignment", async (t) => {
@@ -237,7 +247,12 @@ test("GM player templates stay independent until campaign assignment", async (t)
       attributes: { Strength: "C", Agility: "C", Intelligence: "C", Empathy: "C" },
       skills: { "Ranged Combat": "D", "Close Combat": "F" },
       cuf: "D",
-      lifePath: { careerTerms: [{ career: "Scout", skillAdvances: ["Recon to C"], promotion: { outcome: "failure" } }] },
+      lifePath: { careerTerms: Array.from({ length: 12 }, (_, index) => ({
+        career: `Career ${index + 1}`,
+        skillAdvances: ["Recon to C"],
+        promotion: { outcome: "failure" },
+        notes: "Manual referee notes. ".repeat(10)
+      })) },
       creationSteps: { "step-nationality": true, "step-attributes": true }
     }
   }, gmCookie);
@@ -254,6 +269,9 @@ test("GM player templates stay independent until campaign assignment", async (t)
   const playerCookie = activated.headers.get("set-cookie").split(";")[0];
   assert.deepEqual((await (await fetch(`${origin}/api/player/campaigns`, { headers: { Cookie: playerCookie } })).json()).campaigns, []);
   assert.equal((await fetch(`${origin}/api/player-seeds`, { headers: { Cookie: playerCookie } })).status, 403);
+  const playerSeedPage = await fetch(`${origin}/player-seeds.html`, { headers: { Cookie: playerCookie }, redirect: "manual" });
+  assert.equal(playerSeedPage.status, 302);
+  assert.equal(playerSeedPage.headers.get("location"), "/player-interface.html");
 
   const importResponse = await fetch(`${origin}/api/campaigns/import-setup`, {
     method: "POST",
@@ -272,7 +290,9 @@ test("GM player templates stay independent until campaign assignment", async (t)
   const assignedSeed = (await assignedSeeds.json()).seeds[0];
   assert.equal(assignedSeed.displayLabel, "Maja Lind");
   assert.equal(assignedSeed.fields.find(({ key }) => key === "attributeStrength").value, "C");
-  assert.match(assignedSeed.fields.find(({ key }) => key === "careerHistory").value, /Recon to C/);
+  const careerHistory = assignedSeed.fields.find(({ key }) => key === "careerHistory").value;
+  assert.match(careerHistory, /Recon to C/);
+  assert.ok(careerHistory.length > 2000);
 
   const editedTemplate = await fetch(`${origin}/api/player-seeds/${encodeURIComponent(template.id)}`, {
     method: "PUT",
