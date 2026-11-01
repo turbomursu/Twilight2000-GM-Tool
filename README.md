@@ -44,7 +44,7 @@ The command prints the runtime campaign ID and, when it creates the `sample-play
 
 ### Runtime Snapshot API
 
-This read-only endpoint requires a signed-in GM who owns the campaign. It returns `404` when the caller does not own the campaign or when no runtime dashboard state is present. It does not modify browser-local dashboard data.
+`GET /api/campaigns/:id/runtime` requires a signed-in GM who owns the campaign. It returns the campaign summary, dashboard counters/weather, ordered route stops, personnel, and journal; it returns `404` when the caller does not own the campaign or runtime dashboard state is absent. `PUT /api/campaigns/:id/runtime` accepts partial `dashboard` updates and replacement `personnel` or `journal` lists. Updates are validated and saved in one SQLite transaction, increment the campaign revision, and return the refreshed snapshot. Route definitions and map rendering are not editable through this endpoint.
 
 ```json
 {
@@ -68,7 +68,7 @@ This read-only endpoint requires a signed-in GM who owns the campaign. It return
 }
 ```
 
-These are development/sample campaign values, not rules-derived results. Runtime write, save, and restore APIs are still planned.
+These are development/sample campaign values, not rules-derived results. General save, backup, and restore workflows are still planned.
 
 ## Included
 

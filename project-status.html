@@ -113,7 +113,7 @@
         <section class="section" aria-labelledby="partial-title">
           <div class="section-head"><h2 id="partial-title">In progress</h2><span>Partially checked</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign setup handoff</strong><p>GM can select imported campaign maps and faction data; the dashboard itself is not yet a view over the runtime database.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign setup and dashboard connection</strong><p>Setup import and map selection work; Situation, Personnel, Movement, and Journal now read/write supported SQLite runtime fields. Route/map rendering and remaining panels are still sample or local.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player character experience</strong><p>Seed completion and GM-reviewed edits are server-backed; Character is active while the visible Sitrep, Inventory, COMMS, and Map tabs are marked inactive.</p></span><span class="state partial">Partial</span></label>
             <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Runtime persistence</strong><p>Setup import persists, but regular campaign edits, save/restore, backup, and recovery are not wired to runtime state.</p></span><span class="state partial">Partial</span></label>
           </div>
@@ -122,7 +122,7 @@
         <section class="section" aria-labelledby="todo-title">
           <div class="section-head"><h2 id="todo-title">Still to do</h2><span>Next roadmap work</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Bind the GM dashboard to the selected runtime campaign</strong><p>Replace sample counters, roster, journal, and route with server-owned campaign state and persist GM edits.</p></span><span class="state">Next</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Complete runtime coverage and save/restore</strong><p>Connect remaining supported panels, then add validated backup, restore, and round-trip recovery without conflating routes/maps with unimplemented state.</p></span><span class="state">Next</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Finish runtime save, restore, and recovery</strong><p>Validate backups and imports, preserve IDs and seat assignments, and prevent partial or destructive restores.</p></span><span class="state">Phase 0-1</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Publish a deliberate player-view projection</strong><p>Show only GM-published situation/map data plus the requesting player’s own finalized character.</p></span><span class="state">Phase 3</span></label>
             <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Connect player inventory, COMMS, and condition updates</strong><p>Keep changes seat-owned and route rule-governed actions to verified procedures or GM review.</p></span><span class="state">Phase 3-4</span></label>
@@ -132,7 +132,7 @@
         </section>
 
         <aside class="next-step"><strong>Recommended next milestone</strong><p>Make the dashboard read and write the selected SQLite runtime campaign, then add a round-trip save/restore check. Until that is done, the dashboard’s sample record must stay visibly distinct from imported campaign state.</p></aside>
-        <aside class="next-step"><strong>Suggested next prompt</strong><p>Connect the GM dashboard’s Situation, Personnel, Movement, and Journal views to the selected SQLite runtime campaign using the seeded fixture and owner-scoped runtime snapshot API. Replace local sample state only for supported fields, persist edits, and test authorization, reload, and campaign isolation.</p></aside>
+        <aside class="next-step"><strong>Suggested next prompt</strong><p>Implement runtime save and restore for the selected SQLite campaign. Preserve record IDs and revisions, reject invalid imports without partial changes, and test round-trip recovery and isolation between campaigns.</p></aside>
         <p class="footnote">This page is a concise snapshot. The detailed deliverables, dependencies, and exit checks remain in ROADMAP.md and FEATURES.md. Checkboxes are status indicators, not a second editable roadmap.</p>
       </div>
     </main>

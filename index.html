@@ -336,8 +336,8 @@
       </div>
       <div class="campaign-chip">
         <span class="eyebrow">Active campaign</span>
-        <strong>The Long Road</strong>
-        <small>Dalarna, Sweden / 2000</small>
+        <strong id="active-campaign-name">The Long Road</strong>
+        <small id="active-campaign-setting">Dalarna, Sweden / 2000</small>
       </div>
       <div class="nav-label">Campaign desk</div>
       <nav class="nav-list" aria-label="Views">
@@ -360,12 +360,14 @@
 
     <main>
       <header class="topbar">
-        <div class="crumb"><span>The Long Road</span><b>/</b><span id="crumb-view">Situation</span></div>
+        <div class="crumb"><span id="top-campaign-name">The Long Road</span><b>/</b><span id="crumb-view">Situation</span><small id="dashboard-data-mode">LOCAL SAMPLE</small></div>
         <div class="top-actions">
           <div class="date-stamp"><span>Campaign date</span><strong id="top-date"></strong></div>
           <button class="button" data-action="open-setup-import">Import setup</button>
           <button class="button" type="button" id="open-users-dialog">Users</button>
           <button class="button" type="button" id="open-character-changes" disabled>Review changes</button>
+          <button class="button" type="button" id="export-runtime-backup" disabled>Backup</button>
+          <button class="button" type="button" id="open-runtime-restore" disabled>Restore</button>
           <input id="setup-package-file" type="file" accept=".json,application/json" hidden>
           <button class="button button-icon" data-action="export-record" aria-label="Export campaign record" title="Export campaign record">↓</button>
           <button class="button button-primary" data-action="open-note"><span aria-hidden="true">+</span> Log entry</button>
@@ -388,8 +390,9 @@
           <div class="dashboard-grid">
             <section class="panel" aria-labelledby="map-title">
               <div class="panel-head"><div><div class="eyebrow">Theater / Dalarna County</div><h2 id="map-title">Route sketch</h2></div><span class="inline-hint">FIELD SKETCH / NOT TO SCALE</span></div>
-              <div class="map-wrap"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated field map showing the route north from Vansbro toward Mora"></canvas></div>
-              <div class="map-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
+              <div class="map-wrap" id="sample-route-sketch"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated sample route sketch"></canvas></div>
+              <p class="empty-state" id="runtime-route-map-notice" hidden>Runtime map rendering is not connected yet. Route stops below are loaded from this campaign.</p>
+              <div class="map-key" id="sample-route-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="situation-title-card">
@@ -538,6 +541,17 @@ Military rank || optional</textarea><span class="row-description">One field per 
     <div class="dialog-head"><div><div class="eyebrow">GM-only / player proposals</div><h2 id="character-change-dialog-title">Character change requests</h2></div><button class="icon-button" id="close-character-change-dialog" type="button" aria-label="Close character change requests">×</button></div>
     <div class="dialog-form"><p class="feedback" id="character-change-status" role="status" aria-live="polite">Select a runtime campaign to review requests.</p><div class="character-change-list" id="character-change-list"></div><div class="dialog-actions"><button class="button" id="refresh-character-changes" type="button">Refresh</button><button class="button" id="done-character-changes" type="button">Done</button></div></div>
   </dialog>
+  <dialog id="runtime-restore-dialog" aria-labelledby="runtime-restore-title">
+    <div class="dialog-head"><div><div class="eyebrow">GM-only / campaign recovery</div><h2 id="runtime-restore-title">Restore runtime campaign</h2></div><button class="icon-button" id="close-runtime-restore" type="button" aria-label="Close runtime restore">×</button></div>
+    <div class="dialog-form">
+      <label class="field"><span class="eyebrow">Runtime backup JSON</span><input id="runtime-backup-file" type="file" accept=".json,application/json"></label>
+      <pre id="runtime-backup-summary" hidden></pre>
+      <label class="condition-row"><span>Replace the selected runtime campaign with the validated backup.</span><input id="confirm-runtime-replace" type="checkbox"></label>
+      <label class="condition-row" id="confirm-older-backup-row" hidden><span>This backup is older than the current revision; restore it anyway.</span><input id="confirm-older-backup" type="checkbox"></label>
+      <p class="feedback" id="runtime-restore-status" role="status" aria-live="polite">Restore runs in one transaction. Invalid files or conflicts leave campaign data unchanged.</p>
+      <div class="dialog-actions"><button class="button" type="button" id="cancel-runtime-restore">Cancel</button><button class="button button-primary" type="button" id="apply-runtime-restore" disabled>Restore campaign</button></div>
+    </div>
+  </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -572,7 +586,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           { id: 1, title: "Vansbro crossing", body: "The southern bridge held under the truck. The north approach is still unconfirmed.", date: "2000-05-09", kind: "Route" }
         ]
       };
-      const route = [
+      let route = [
         { name: "Sälen coast road", detail: "Departure point", distance: "0 km", kmFromPrevious: 0 },
         { name: "Vansbro", detail: "Current position", distance: "86 km", kmFromPrevious: 86 },
         { name: "Mora", detail: "Next waypoint", distance: "+48 km", kmFromPrevious: 48 },
@@ -594,14 +608,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const runtimeCampaignSelect = document.getElementById("runtime-campaign-select");
       const openPlayerSeedDialogButton = document.getElementById("open-player-seed-dialog");
       const openCharacterChangesButton = document.getElementById("open-character-changes");
+      const exportRuntimeBackupButton = document.getElementById("export-runtime-backup");
+      const openRuntimeRestoreButton = document.getElementById("open-runtime-restore");
       let state = loadState();
       let toastTimer;
       let pendingSetupPackage = null;
       let pendingSetupSourceJson = null;
+      let pendingRuntimeBackup = null;
       let influenceMap = null;
       let influenceHexLayer = null;
       let stagedInfluenceCells = new Set();
       let liveInfluenceEditing = false;
+      let runtimeDataLoaded = false;
 
       function loadState() {
         try {
@@ -661,8 +679,102 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("journal-list").innerHTML = state.notes.length ? state.notes.map(noteMarkup).join("") : `<div class="empty-state">No entries recorded.</div>`;
         document.getElementById("recent-log").innerHTML = state.notes.slice(0, 3).map((note) => `<article class="log-entry"><time class="log-time">${escapeHtml(dateLabel(note.date, { day: "2-digit", month: "short" }))}</time><div><strong>${escapeHtml(note.title)}</strong><p>${escapeHtml(note.body)}</p></div></article>`).join("") || `<div class="empty-state">No recent dispatches.</div>`;
       }
+      function applyRuntimeSnapshot(runtime) {
+        const dashboard = runtime.dashboard;
+        let distance = 0;
+        route = runtime.route.map((stop) => {
+          distance += stop.kmFromPrevious;
+          return {
+            name: stop.name,
+            detail: stop.detail,
+            distance: `${distance} km`,
+            kmFromPrevious: stop.kmFromPrevious
+          };
+        });
+        state = {
+          ...state,
+          runtimeCampaignId: runtime.campaign.id,
+          runtimeRevision: runtime.campaign.revision,
+          campaignName: runtime.campaign.name,
+          campaignSetting: runtime.campaign.setting,
+          date: dashboard.gameDate,
+          day: dashboard.dayNumber,
+          distance: dashboard.distanceKm,
+          rations: dashboard.rationsDays,
+          fuel: dashboard.fuelUnits,
+          weather: dashboard.weather,
+          weatherNote: dashboard.weatherNote,
+          activeStop: Math.min(dashboard.activeStopIndex, Math.max(0, route.length - 1)),
+          people: runtime.personnel.map((person) => ({
+            id: person.id,
+            name: person.name,
+            role: person.role,
+            condition: person.condition,
+            status: person.readiness
+          })),
+          notes: runtime.journal.map((entry) => ({
+            id: entry.id,
+            title: entry.title,
+            body: entry.body,
+            date: entry.entryDate,
+            kind: entry.kind
+          }))
+        };
+        runtimeDataLoaded = true;
+        document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
+        document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
+        document.getElementById("top-campaign-name").textContent = runtime.campaign.name;
+        document.getElementById("dashboard-data-mode").textContent = "RUNTIME / SERVER";
+        document.getElementById("sample-route-sketch").hidden = true;
+        document.getElementById("sample-route-key").hidden = true;
+        document.getElementById("runtime-route-map-notice").hidden = false;
+        exportRuntimeBackupButton.disabled = false;
+        openRuntimeRestoreButton.disabled = false;
+        render();
+      }
+
+      async function commitRuntimeUpdate(updates, applyLocal, successMessage) {
+        if (!runtimeDataLoaded && runtimeCampaignSelect.value) {
+          showToast("Runtime campaign data is not loaded; changes were not applied.");
+          return false;
+        }
+        if (!runtimeDataLoaded || !state.runtimeCampaignId) {
+          applyLocal();
+          persist();
+          render();
+          showToast(successMessage);
+          return true;
+        }
+        try {
+          const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(state.runtimeCampaignId)}/runtime`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updates)
+          });
+          applyRuntimeSnapshot(runtime);
+          showToast(successMessage);
+          return true;
+        } catch (error) {
+          showToast(`Runtime change was not saved: ${error.message}`);
+          return false;
+        }
+      }
+
+      function runtimeJournal(entries) {
+        return entries.map((entry) => ({
+          id: String(entry.id),
+          title: entry.title,
+          body: entry.body,
+          date: entry.date,
+          kind: entry.kind
+        }));
+      }
       function render() {
         const formattedDate = dateLabel(state.date);
+        document.getElementById("active-campaign-name").textContent = state.campaignName || "The Long Road";
+        document.getElementById("active-campaign-setting").textContent = state.campaignSetting || "Dalarna, Sweden / 2000";
+        document.getElementById("top-campaign-name").textContent = state.campaignName || "The Long Road";
+        document.getElementById("dashboard-data-mode").textContent = runtimeDataLoaded ? "RUNTIME / SERVER" : "LOCAL SAMPLE";
         document.getElementById("top-date").textContent = formattedDate;
         document.getElementById("stat-day").textContent = state.day;
         document.getElementById("stat-distance").textContent = state.distance;
@@ -675,13 +787,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("distance-count").textContent = `${state.distance} km`;
         document.getElementById("movement-distance").textContent = `${state.distance} KM LOGGED`;
         document.getElementById("weather-copy").textContent = state.weatherNote;
-        document.getElementById("situation-summary").textContent = `The column is moving north through Dalarna. ${state.weather} conditions continue; the next waypoint is ${route[Math.min(state.activeStop + 1, route.length - 1)].name}.`;
+        const nextWaypoint = route[Math.min(state.activeStop + 1, route.length - 1)] || route[state.activeStop] || { name: "No waypoint" };
+        document.getElementById("situation-summary").textContent = `The column is moving north through ${state.campaignSetting || "Dalarna"}. ${state.weather} conditions continue; the next waypoint is ${nextWaypoint.name}.`;
         document.getElementById("weather-title").setAttribute("data-weather", state.weather);
         renderRoute("route-list");
         renderRoute("movement-route");
         renderPeople();
         renderNotes();
-        drawMap();
+        if (!runtimeDataLoaded) drawMap();
       }
       function setView(view) {
         document.querySelectorAll(".view").forEach((section) => section.classList.toggle("active", section.id === `view-${view}`));
@@ -1316,6 +1429,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
       async function loadRuntimeCampaign(runtimeCampaignId, announce = true) {
         const { campaign } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}`);
         activateRuntimeCampaign(campaign, announce);
+        const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/runtime`);
+        applyRuntimeSnapshot(runtime);
       }
 
       async function refreshRuntimeCampaigns(preferredId = state.runtimeCampaignId) {
@@ -1325,6 +1440,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
         runtimeCampaignSelect.replaceChildren(placeholder);
         if (location.protocol !== "http:") {
           runtimeCampaignSelect.disabled = true;
+          exportRuntimeBackupButton.disabled = true;
+          openRuntimeRestoreButton.disabled = true;
           return;
         }
         try {
@@ -1347,12 +1464,16 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeCampaignSelect.value = selectedId;
           openPlayerSeedDialogButton.disabled = !selectedId;
           openCharacterChangesButton.disabled = !selectedId;
+          exportRuntimeBackupButton.disabled = !selectedId;
+          openRuntimeRestoreButton.disabled = !selectedId;
           if (selectedId) await loadRuntimeCampaign(selectedId, false);
           else document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
         } catch (error) {
           runtimeCampaignSelect.disabled = true;
           openPlayerSeedDialogButton.disabled = true;
           openCharacterChangesButton.disabled = true;
+          exportRuntimeBackupButton.disabled = true;
+          openRuntimeRestoreButton.disabled = true;
           runtimeCampaignSelect.replaceChildren();
           const errorOption = document.createElement("option");
           errorOption.value = "";
@@ -1364,6 +1485,122 @@ Military rank || optional</textarea><span class="row-description">One field per 
 
       runtimeCampaignSelect.addEventListener("change", () => {
         if (runtimeCampaignSelect.value) loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
+      });
+
+      exportRuntimeBackupButton.addEventListener("click", async () => {
+        const campaignId = runtimeCampaignSelect.value;
+        if (!campaignId) return;
+        exportRuntimeBackupButton.disabled = true;
+        try {
+          const { backup } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/backup`);
+          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          const fileCampaign = (backup.data.campaign.name || "campaign").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          link.href = url;
+          link.download = `fieldbook-${fileCampaign}-runtime-r${backup.sourceRevision}.json`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          showToast(`Runtime backup exported / revision ${backup.sourceRevision}.`);
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          exportRuntimeBackupButton.disabled = !runtimeCampaignSelect.value;
+        }
+      });
+
+      const runtimeRestoreDialog = document.getElementById("runtime-restore-dialog");
+      const runtimeBackupFile = document.getElementById("runtime-backup-file");
+      const runtimeBackupSummary = document.getElementById("runtime-backup-summary");
+      const runtimeRestoreStatus = document.getElementById("runtime-restore-status");
+      const confirmRuntimeReplace = document.getElementById("confirm-runtime-replace");
+      const confirmOlderBackupRow = document.getElementById("confirm-older-backup-row");
+      const confirmOlderBackup = document.getElementById("confirm-older-backup");
+      const applyRuntimeRestoreButton = document.getElementById("apply-runtime-restore");
+      function updateRuntimeRestoreAvailability() {
+        const isOlder = Boolean(pendingRuntimeBackup && Number.isSafeInteger(state.runtimeRevision)
+          && pendingRuntimeBackup.sourceRevision < state.runtimeRevision);
+        confirmOlderBackupRow.hidden = !isOlder;
+        applyRuntimeRestoreButton.disabled = !pendingRuntimeBackup || !confirmRuntimeReplace.checked || (isOlder && !confirmOlderBackup.checked);
+      }
+      openRuntimeRestoreButton.addEventListener("click", () => {
+        pendingRuntimeBackup = null;
+        runtimeBackupFile.value = "";
+        runtimeBackupSummary.hidden = true;
+        runtimeBackupSummary.textContent = "";
+        confirmRuntimeReplace.checked = false;
+        confirmOlderBackup.checked = false;
+        confirmOlderBackupRow.hidden = true;
+        applyRuntimeRestoreButton.disabled = true;
+        runtimeRestoreStatus.className = "feedback";
+        runtimeRestoreStatus.textContent = "Choose a runtime backup for the selected campaign.";
+        runtimeRestoreDialog.showModal();
+      });
+      document.getElementById("close-runtime-restore").addEventListener("click", () => runtimeRestoreDialog.close());
+      document.getElementById("cancel-runtime-restore").addEventListener("click", () => runtimeRestoreDialog.close());
+      runtimeBackupFile.addEventListener("change", async () => {
+        const file = runtimeBackupFile.files?.[0];
+        pendingRuntimeBackup = null;
+        runtimeBackupSummary.hidden = true;
+        applyRuntimeRestoreButton.disabled = true;
+        confirmOlderBackup.checked = false;
+        if (!file) return;
+        try {
+          if (file.size > 100 * 1024 * 1024) throw new Error("Runtime backups must be smaller than 100 MiB.");
+          const backup = JSON.parse(await file.text());
+          if (backup.backupType !== "fieldbook.campaign-runtime" || backup.schemaVersion !== 1
+            || backup.campaignId !== runtimeCampaignSelect.value || !Number.isSafeInteger(backup.sourceRevision)
+            || typeof backup.checksum !== "string") {
+            throw new Error("Choose a schema-v1 runtime backup for the selected campaign.");
+          }
+          pendingRuntimeBackup = backup;
+          runtimeBackupSummary.textContent = [
+            `Campaign: ${backup.data?.campaign?.name || "Unknown"}`,
+            `Backup revision: ${backup.sourceRevision}`,
+            `Current revision: ${state.runtimeRevision ?? "Unknown"}`,
+            `Exported: ${backup.exportedAt || "Unknown"}`,
+            `Checksum: ${backup.checksum}`
+          ].join("\n");
+          runtimeBackupSummary.hidden = false;
+          runtimeRestoreStatus.className = "feedback success";
+          runtimeRestoreStatus.textContent = "Backup metadata loaded. Confirm replacement after reviewing the revision warning.";
+          updateRuntimeRestoreAvailability();
+        } catch (error) {
+          runtimeRestoreStatus.className = "feedback error";
+          runtimeRestoreStatus.textContent = error.message;
+          pendingRuntimeBackup = null;
+          updateRuntimeRestoreAvailability();
+        }
+      });
+      confirmRuntimeReplace.addEventListener("change", updateRuntimeRestoreAvailability);
+      confirmOlderBackup.addEventListener("change", updateRuntimeRestoreAvailability);
+      applyRuntimeRestoreButton.addEventListener("click", async () => {
+        const campaignId = runtimeCampaignSelect.value;
+        if (!campaignId || !pendingRuntimeBackup) return;
+        applyRuntimeRestoreButton.disabled = true;
+        runtimeRestoreStatus.className = "feedback";
+        runtimeRestoreStatus.textContent = "Validating and restoring in one transaction…";
+        try {
+          const { restore } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/restore`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              backup: pendingRuntimeBackup,
+              confirmReplace: confirmRuntimeReplace.checked,
+              confirmOlderBackup: confirmOlderBackup.checked,
+              expectedRevision: state.runtimeRevision
+            })
+          });
+          runtimeRestoreDialog.close();
+          await loadRuntimeCampaign(campaignId, false);
+          showToast(`Runtime restored / revision ${restore.revision}.`);
+        } catch (error) {
+          runtimeRestoreStatus.className = "feedback error";
+          runtimeRestoreStatus.textContent = error.message;
+          updateRuntimeRestoreAvailability();
+        }
       });
 
       const characterChangeDialog = document.getElementById("character-change-dialog");
@@ -1636,8 +1873,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
       });
 
       function nextId(items) { return items.reduce((largest, item) => Math.max(largest, Number(item.id) || 0), 0) + 1; }
+      function runtimeRecordId(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+      function dateWithOffset(date, offset) {
+        const value = new Date(`${date}T12:00:00Z`);
+        value.setUTCDate(value.getUTCDate() + offset);
+        return value.toISOString().slice(0, 10);
+      }
 
-      document.addEventListener("click", (event) => {
+      document.addEventListener("click", async (event) => {
         const button = event.target.closest("button");
         if (!button) return;
         if (button.dataset.view) { setView(button.dataset.view); return; }
@@ -1666,22 +1909,44 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (action === "next-stop") {
           const nextStop = Math.min(route.length - 1, state.activeStop + 1);
           if (nextStop === state.activeStop) { showToast("No further waypoint is listed."); return; }
-          state.activeStop = nextStop;
-          state.distance += route[nextStop].kmFromPrevious;
-          state.notes.unshift({ id: nextId(state.notes), title: `Reached ${route[nextStop].name}`, body: "The column reached the next planned waypoint. Record the situation and decide the next leg.", date: state.date, kind: "Movement" });
-          persist(); render(); showToast(`Waypoint reached: ${route[nextStop].name}.`);
+          const entry = { id: runtimeDataLoaded ? runtimeRecordId("journal") : nextId(state.notes), title: `Reached ${route[nextStop].name}`, body: "The column reached the next planned waypoint. Record the situation and decide the next leg.", date: state.date, kind: "Movement" };
+          const nextDistance = state.distance + route[nextStop].kmFromPrevious;
+          await commitRuntimeUpdate({
+            dashboard: { activeStopIndex: nextStop, distanceKm: nextDistance },
+            journal: runtimeDataLoaded ? runtimeJournal([entry, ...state.notes]) : []
+          }, () => {
+            state.activeStop = nextStop;
+            state.distance = nextDistance;
+            state.notes.unshift(entry);
+          }, `Waypoint reached: ${route[nextStop].name}.`);
         }
         if (action === "advance-day") {
-          addDays(1); state.day += 1; state.rations = Math.max(0, state.rations - 1);
-          state.notes.unshift({ id: nextId(state.notes), title: `Travel day ${state.day}`, body: "The column continued north. Update the journal with what happened on the road.", date: state.date, kind: "Movement" });
-          persist(); render(); showToast("Campaign advanced one day; one ration day used.");
+          const nextDate = dateWithOffset(state.date, 1);
+          const nextDay = state.day + 1;
+          const nextRations = Math.max(0, state.rations - 1);
+          const entry = { id: runtimeDataLoaded ? runtimeRecordId("journal") : nextId(state.notes), title: `Travel day ${nextDay}`, body: "The column continued north. Update the journal with what happened on the road.", date: nextDate, kind: "Movement" };
+          await commitRuntimeUpdate({
+            dashboard: { gameDate: nextDate, dayNumber: nextDay, rationsDays: nextRations },
+            journal: runtimeDataLoaded ? runtimeJournal([entry, ...state.notes]) : []
+          }, () => {
+            state.date = nextDate;
+            state.day = nextDay;
+            state.rations = nextRations;
+            state.notes.unshift(entry);
+          }, "Campaign advanced one day; one ration day used.");
         }
-        if (action === "use-rations") { state.rations = Math.max(0, state.rations - 1); persist(); render(); showToast("Ration reserve updated."); }
-        if (action === "add-rations") { state.rations += 1; persist(); render(); showToast("Ration reserve updated."); }
-        if (action === "fuel-down") { state.fuel = Math.max(0, state.fuel - 1); persist(); render(); }
-        if (action === "fuel-up") { state.fuel += 1; persist(); render(); }
-        if (action === "distance-down") { state.distance = Math.max(0, state.distance - 10); persist(); render(); }
-        if (action === "distance-up") { state.distance += 10; persist(); render(); }
+        if (action === "use-rations" || action === "add-rations") {
+          const rations = action === "use-rations" ? Math.max(0, state.rations - 1) : state.rations + 1;
+          await commitRuntimeUpdate({ dashboard: { rationsDays: rations } }, () => { state.rations = rations; }, "Ration reserve updated.");
+        }
+        if (action === "fuel-down" || action === "fuel-up") {
+          const fuel = action === "fuel-down" ? Math.max(0, state.fuel - 1) : state.fuel + 1;
+          await commitRuntimeUpdate({ dashboard: { fuelUnits: fuel } }, () => { state.fuel = fuel; }, "Fuel reserve updated.");
+        }
+        if (action === "distance-down" || action === "distance-up") {
+          const distance = action === "distance-down" ? Math.max(0, state.distance - 10) : state.distance + 10;
+          await commitRuntimeUpdate({ dashboard: { distanceKm: distance } }, () => { state.distance = distance; }, "Logged distance updated.");
+        }
         if (action === "cycle-weather") {
           const conditions = [
             ["Clear", "Clear skies and a cool wind. Distant movement is easier to spot across the open ground."],
@@ -1690,15 +1955,17 @@ Military rank || optional</textarea><span class="row-description">One field per 
             ["Fog", "A cold fog has settled into the low ground. Sound carries, but the road disappears ahead."]
           ];
           const next = (conditions.findIndex((entry) => entry[0] === state.weather) + 1) % conditions.length;
-          [state.weather, state.weatherNote] = conditions[next]; persist(); render(); showToast(`Conditions updated: ${state.weather}.`);
+          await commitRuntimeUpdate({ dashboard: { weather: conditions[next][0], weatherNote: conditions[next][1] } }, () => {
+            [state.weather, state.weatherNote] = conditions[next];
+          }, `Conditions updated: ${conditions[next][0]}.`);
         }
         if (action === "delete-person") {
-          state.people = state.people.filter((person) => String(person.id) !== button.dataset.id);
-          persist(); render(); showToast("Person removed from the roster.");
+          const people = state.people.filter((person) => String(person.id) !== button.dataset.id);
+          await commitRuntimeUpdate({ personnel: people.map(({ status, ...person }) => ({ ...person, readiness: person.readiness || status })) }, () => { state.people = people; }, "Person removed from the roster.");
         }
         if (action === "delete-note") {
-          state.notes = state.notes.filter((note) => String(note.id) !== button.dataset.id);
-          persist(); render(); showToast("Journal entry removed.");
+          const notes = state.notes.filter((note) => String(note.id) !== button.dataset.id);
+          await commitRuntimeUpdate({ journal: runtimeJournal(notes) }, () => { state.notes = notes; }, "Journal entry removed.");
         }
       });
       setupPackageFile.addEventListener("change", async () => {
@@ -1823,14 +2090,39 @@ Military rank || optional</textarea><span class="row-description">One field per 
       document.getElementById("note-form").addEventListener("submit", (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
-        state.notes.unshift({ id: nextId(state.notes), title: data.get("title").trim(), body: data.get("body").trim(), date: state.date, kind: "Dispatch" });
-        persist(); render(); event.currentTarget.reset(); document.getElementById("note-dialog").close(); showToast("Journal entry saved.");
+        const note = {
+          id: runtimeDataLoaded ? runtimeRecordId("journal") : nextId(state.notes),
+          title: data.get("title").trim(),
+          body: data.get("body").trim(),
+          date: state.date,
+          kind: "Dispatch"
+        };
+        const notes = [note, ...state.notes];
+        commitRuntimeUpdate({ journal: runtimeJournal(notes) }, () => { state.notes = notes; }, "Journal entry saved.")
+          .then((saved) => {
+            if (!saved) return;
+            event.currentTarget.reset();
+            document.getElementById("note-dialog").close();
+          });
       });
       document.getElementById("person-form").addEventListener("submit", (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
-        state.people.push({ id: nextId(state.people), name: data.get("name").trim(), role: data.get("role").trim(), condition: data.get("condition"), status: "Ready" });
-        persist(); render(); event.currentTarget.reset(); document.getElementById("person-dialog").close(); showToast("Person added to the roster.");
+        const person = {
+          id: runtimeDataLoaded ? runtimeRecordId("person") : nextId(state.people),
+          name: data.get("name").trim(),
+          role: data.get("role").trim(),
+          condition: data.get("condition"),
+          status: "Ready"
+        };
+        const people = [...state.people, person];
+        const personnel = people.map(({ status, ...entry }) => ({ ...entry, readiness: entry.readiness || status }));
+        commitRuntimeUpdate({ personnel }, () => { state.people = people; }, "Person added to the roster.")
+          .then((saved) => {
+            if (!saved) return;
+            event.currentTarget.reset();
+            document.getElementById("person-dialog").close();
+          });
       });
       document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => {
         if (event.target === dialog) dialog.close();

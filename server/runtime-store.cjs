@@ -363,6 +363,213 @@ function parseInfluenceCell(value, factionName) {
   return [q, r];
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function runtimeBackupChecksum(payload) {
+  return createHash("sha256").update(canonicalJson(payload), "utf8").digest("hex");
+}
+
+function exportRuntimeSave(database, gmAccountId, runtimeId, options = {}) {
+  const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+    JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+    WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ?
+      AND campaign_memberships.role = 'gm' AND campaigns.active = 1`).get(runtimeId, gmAccountId);
+  if (!campaign) return null;
+
+  const queryRows = (sql, ...parameters) => database.prepare(sql).all(...parameters);
+  const data = {
+    campaign,
+    campaignMemberships: queryRows(`SELECT campaign_id, account_id, role, created_at
+      FROM campaign_memberships WHERE campaign_id = ? ORDER BY role, account_id`, runtimeId),
+    setupImport: database.prepare("SELECT * FROM setup_imports WHERE runtime_campaign_id = ?").get(runtimeId) || null,
+    maps: queryRows("SELECT * FROM maps WHERE runtime_campaign_id = ?", runtimeId),
+    terrainCells: queryRows("SELECT * FROM terrain_cells WHERE runtime_campaign_id = ? ORDER BY q, r", runtimeId),
+    locations: queryRows("SELECT * FROM locations WHERE runtime_campaign_id = ? ORDER BY id", runtimeId),
+    settlements: queryRows("SELECT * FROM settlements WHERE runtime_campaign_id = ? ORDER BY id", runtimeId),
+    factions: queryRows("SELECT * FROM factions WHERE runtime_campaign_id = ? ORDER BY id", runtimeId),
+    factionInfluenceCells: queryRows("SELECT * FROM faction_influence_cells WHERE runtime_campaign_id = ? ORDER BY faction_id, q, r", runtimeId),
+    settlementFactions: queryRows("SELECT * FROM settlement_factions WHERE runtime_campaign_id = ? ORDER BY settlement_id, prominence_rank", runtimeId),
+    gmNotes: queryRows("SELECT * FROM gm_notes WHERE runtime_campaign_id = ? ORDER BY id", runtimeId),
+    dashboardState: database.prepare("SELECT * FROM runtime_dashboard_state WHERE campaign_id = ?").get(runtimeId) || null,
+    routeStops: queryRows("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal", runtimeId),
+    personnel: queryRows("SELECT * FROM personnel WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
+    journalEntries: queryRows("SELECT * FROM journal_entries WHERE campaign_id = ? ORDER BY id", runtimeId),
+    characters: queryRows("SELECT * FROM characters WHERE campaign_id = ? ORDER BY id", runtimeId),
+    playerSeats: queryRows("SELECT * FROM player_seats WHERE campaign_id = ? ORDER BY id", runtimeId),
+    characterChangeRequests: queryRows("SELECT * FROM character_change_requests WHERE campaign_id = ? ORDER BY id", runtimeId)
+  };
+  const payload = {
+    backupType: "fieldbook.campaign-runtime",
+    schemaVersion: 1,
+    exportedAt: (options.now || (() => new Date().toISOString()))(),
+    campaignId: runtimeId,
+    sourceRevision: campaign.revision,
+    data
+  };
+  return { ...payload, checksum: runtimeBackupChecksum(payload) };
+}
+
+function validateRuntimeSave(backup, targetRuntimeId) {
+  const fail = (message) => { throw new Error(message); };
+  if (!backup || typeof backup !== "object" || Array.isArray(backup)
+    || backup.backupType !== "fieldbook.campaign-runtime" || backup.schemaVersion !== 1) {
+    fail("Choose a Fieldbook runtime backup using schema version 1.");
+  }
+  if (backup.campaignId !== targetRuntimeId || !Number.isSafeInteger(backup.sourceRevision) || backup.sourceRevision < 0
+    || typeof backup.exportedAt !== "string" || !backup.data || typeof backup.data !== "object" || Array.isArray(backup.data)) {
+    fail("The runtime backup does not match the selected campaign or has invalid metadata.");
+  }
+  const { checksum, ...payload } = backup;
+  if (typeof checksum !== "string" || !/^[a-f0-9]{64}$/.test(checksum)
+    || runtimeBackupChecksum(payload) !== checksum) {
+    fail("The runtime backup checksum is invalid; no data was restored.");
+  }
+  const data = backup.data;
+  if (!data.campaign || data.campaign.runtime_id !== targetRuntimeId
+    || data.campaign.schema_version !== 1 || data.campaign.revision !== backup.sourceRevision
+    || !data.setupImport || data.setupImport.runtime_campaign_id !== targetRuntimeId
+    || data.setupImport.schema_version !== 2 || typeof data.setupImport.source_json !== "string") {
+    fail("The runtime backup has an invalid campaign or setup snapshot.");
+  }
+  const limits = {
+    campaignMemberships: 5,
+    maps: 1,
+    terrainCells: 10000,
+    locations: 500,
+    settlements: 500,
+    factions: 200,
+    factionInfluenceCells: 2000000,
+    settlementFactions: 100000,
+    gmNotes: 500,
+    routeStops: 500,
+    personnel: 200,
+    journalEntries: 10000,
+    characters: 1000,
+    playerSeats: 4,
+    characterChangeRequests: 10000
+  };
+  for (const [key, maximum] of Object.entries(limits)) {
+    if (!Array.isArray(data[key]) || data[key].length > maximum) fail(`The runtime backup has an invalid ${key} list.`);
+    if (!data[key].every((row) => row && typeof row === "object" && !Array.isArray(row))) fail(`The runtime backup contains an invalid ${key} row.`);
+  }
+  if (data.maps.length !== 1 || !data.dashboardState || typeof data.dashboardState !== "object") {
+    fail("The runtime backup needs one map and dashboard state.");
+  }
+  if (data.campaignMemberships.filter((membership) => membership.role === "gm").length !== 1
+    || data.campaignMemberships.some((membership) => membership.campaign_id !== targetRuntimeId || !["gm", "player"].includes(membership.role))) {
+    fail("The runtime backup has invalid campaign memberships.");
+  }
+  const seats = data.playerSeats;
+  if (seats.filter((seat) => seat.active === 1).length > 4
+    || new Set(seats.map((seat) => seat.account_id)).size !== seats.length
+    || new Set(seats.map((seat) => seat.character_id)).size !== seats.length) {
+    fail("The runtime backup has invalid or duplicate player seats.");
+  }
+  const campaignKeys = {
+    terrainCells: "runtime_campaign_id",
+    locations: "runtime_campaign_id",
+    settlements: "runtime_campaign_id",
+    factions: "runtime_campaign_id",
+    factionInfluenceCells: "runtime_campaign_id",
+    settlementFactions: "runtime_campaign_id",
+    gmNotes: "runtime_campaign_id",
+    routeStops: "campaign_id",
+    personnel: "campaign_id",
+    journalEntries: "campaign_id",
+    characters: "campaign_id",
+    playerSeats: "campaign_id",
+    characterChangeRequests: "campaign_id"
+  };
+  for (const [tableKey, campaignKey] of Object.entries(campaignKeys)) {
+    if (data[tableKey].some((row) => row[campaignKey] !== targetRuntimeId)) fail(`The runtime backup contains a ${tableKey} row for another campaign.`);
+  }
+  if (data.dashboardState.campaign_id !== targetRuntimeId || data.routeStops.some((stop, index) => stop.ordinal !== index)) {
+    fail("The runtime backup has invalid dashboard or route ordering data.");
+  }
+  return data;
+}
+
+function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, options = {}) {
+  const data = validateRuntimeSave(backup, targetRuntimeId);
+  if (options.confirmReplace !== true) throw new Error("Confirm replacing the selected runtime campaign before restoring.");
+  if (!Number.isSafeInteger(options.expectedRevision) || options.expectedRevision < 0) {
+    throw new Error("The current campaign revision is required for restore.");
+  }
+
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const current = database.prepare(`SELECT campaigns.revision FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ?
+        AND campaign_memberships.role = 'gm' AND campaigns.active = 1`).get(targetRuntimeId, gmAccountId);
+    if (!current) throw new Error("Runtime campaign not found.");
+    if (current.revision !== options.expectedRevision) throw new Error("Campaign revision changed. Reload the campaign before restoring.");
+    if (backup.sourceRevision < current.revision && options.confirmOlderBackup !== true) {
+      throw new Error("This backup is older than the active campaign. Explicit confirmation is required.");
+    }
+    const ownerInBackup = data.campaignMemberships.some((membership) => membership.account_id === gmAccountId && membership.role === "gm");
+    if (!ownerInBackup) throw new Error("The runtime backup does not preserve the current GM owner.");
+    for (const membership of data.campaignMemberships) {
+      const account = database.prepare("SELECT global_role FROM accounts WHERE id = ?").get(membership.account_id);
+      if (!account || account.global_role !== membership.role) throw new Error("The runtime backup references an unavailable or mismatched account role.");
+    }
+
+    const deleteTables = [
+      ["character_change_requests", "campaign_id"], ["player_seats", "campaign_id"], ["characters", "campaign_id"],
+      ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
+      ["runtime_dashboard_state", "campaign_id"], ["settlement_factions", "runtime_campaign_id"],
+      ["faction_influence_cells", "runtime_campaign_id"], ["settlements", "runtime_campaign_id"],
+      ["factions", "runtime_campaign_id"], ["terrain_cells", "runtime_campaign_id"], ["gm_notes", "runtime_campaign_id"],
+      ["locations", "runtime_campaign_id"], ["maps", "runtime_campaign_id"], ["setup_imports", "runtime_campaign_id"],
+      ["campaign_memberships", "campaign_id"]
+    ];
+    deleteTables.forEach(([table, column]) => database.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).run(targetRuntimeId));
+
+    const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
+    const restoredRevision = Math.max(current.revision, backup.sourceRevision) + 1;
+    const campaign = { ...data.campaign, revision: restoredRevision, updated_at: timestamp };
+    database.prepare(`UPDATE campaigns SET setup_campaign_id = ?, schema_version = ?, name = ?, setting = ?, premise = ?, era = ?,
+      revision = ?, active = ?, created_at = ?, updated_at = ? WHERE runtime_id = ?`)
+      .run(campaign.setup_campaign_id, campaign.schema_version, campaign.name, campaign.setting, campaign.premise, campaign.era,
+        campaign.revision, campaign.active, campaign.created_at, campaign.updated_at, targetRuntimeId);
+
+    const insertRows = (table, columns, rows) => {
+      if (!rows.length) return;
+      const statement = database.prepare(`INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`);
+      rows.forEach((row) => statement.run(...columns.map((column) => row[column])));
+    };
+    insertRows("campaign_memberships", ["campaign_id", "account_id", "role", "created_at"], data.campaignMemberships);
+    insertRows("setup_imports", ["runtime_campaign_id", "source_campaign_id", "schema_version", "imported_at", "sha256", "source_json"], [data.setupImport]);
+    insertRows("maps", ["runtime_campaign_id", "source_map_id", "name", "bounds_json", "center_json", "zoom", "atlas_json", "annotations_json", "attribution"], data.maps);
+    insertRows("terrain_cells", ["runtime_campaign_id", "q", "r", "terrain_type"], data.terrainCells);
+    insertRows("locations", ["runtime_campaign_id", "id", "name", "kind", "description", "grid_ref", "coordinates_json", "map_position_json", "visibility_eligibility", "is_starting_location"], data.locations);
+    insertRows("settlements", ["runtime_campaign_id", "id", "source_location_id", "name", "scale", "population_estimate", "security", "attitude", "leadership", "situation"], data.settlements);
+    insertRows("factions", ["runtime_campaign_id", "id", "name", "description", "color"], data.factions);
+    insertRows("faction_influence_cells", ["runtime_campaign_id", "faction_id", "q", "r"], data.factionInfluenceCells);
+    insertRows("settlement_factions", ["runtime_campaign_id", "settlement_id", "faction_id", "prominence_rank"], data.settlementFactions);
+    insertRows("gm_notes", ["runtime_campaign_id", "id", "title", "body", "visibility"], data.gmNotes);
+    insertRows("runtime_dashboard_state", ["campaign_id", "game_date", "day_number", "distance_km", "rations_days", "fuel_units", "weather", "weather_note", "active_stop_index", "updated_at"], [data.dashboardState]);
+    insertRows("route_stops", ["campaign_id", "ordinal", "location_id", "detail", "km_from_previous"], data.routeStops);
+    insertRows("personnel", ["campaign_id", "id", "name", "role", "condition", "readiness", "sort_order"], data.personnel);
+    insertRows("journal_entries", ["campaign_id", "id", "title", "body", "entry_date", "kind", "created_at"], data.journalEntries);
+    insertRows("characters", ["id", "campaign_id", "status", "fields_json", "created_at", "updated_at"], data.characters);
+    insertRows("player_seats", ["id", "campaign_id", "account_id", "character_id", "display_label", "active", "assigned_at"], data.playerSeats);
+    insertRows("character_change_requests", ["id", "campaign_id", "seat_id", "character_id", "requested_fields_json", "status", "submitted_at", "reviewer_account_id", "reviewed_at", "review_note"], data.characterChangeRequests);
+
+    database.exec("COMMIT");
+    return { campaignId: targetRuntimeId, restoredFromRevision: backup.sourceRevision, revision: restoredRevision };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 function importSetupPackage(database, sourceJson, options = {}) {
   if (typeof sourceJson !== "string" || Buffer.byteLength(sourceJson, "utf8") > 50 * 1024 * 1024) {
     throw new Error("The setup package must be JSON text no larger than 50 MiB.");
@@ -543,6 +750,88 @@ function getRuntimeDashboard(database, accountId, runtimeId) {
   const journal = database.prepare(`SELECT id, title, body, entry_date AS entryDate, kind, created_at AS createdAt
     FROM journal_entries WHERE campaign_id = ? ORDER BY entry_date DESC, created_at DESC, id`).all(runtimeId);
   return { campaign, dashboard, route, personnel, journal };
+}
+
+function updateRuntimeDashboard(database, accountId, runtimeId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Runtime changes must be an object.");
+  const allowedSections = new Set(["dashboard", "personnel", "journal"]);
+  if (Object.keys(input).some((key) => !allowedSections.has(key))) throw new Error("The runtime update contains an unsupported section.");
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const current = getRuntimeDashboard(database, accountId, runtimeId);
+    if (!current) throw new Error("Runtime campaign not found.");
+    const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
+
+    if (Object.hasOwn(input, "dashboard")) {
+      const update = input.dashboard;
+      if (!update || typeof update !== "object" || Array.isArray(update)) throw new Error("Dashboard changes must be an object.");
+      const supported = new Set(["gameDate", "dayNumber", "distanceKm", "rationsDays", "fuelUnits", "weather", "weatherNote", "activeStopIndex"]);
+      if (Object.keys(update).some((key) => !supported.has(key))) throw new Error("The dashboard update contains an unsupported field.");
+      const next = { ...current.dashboard, ...update };
+      if (typeof next.gameDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(next.gameDate) || !Number.isFinite(Date.parse(`${next.gameDate}T00:00:00Z`))) {
+        throw new Error("Campaign game date must be a valid ISO date.");
+      }
+      for (const key of ["dayNumber", "distanceKm", "rationsDays", "fuelUnits", "activeStopIndex"]) {
+        if (!Number.isSafeInteger(next[key]) || next[key] < 0) throw new Error(`${key} must be a non-negative integer.`);
+      }
+      if (next.activeStopIndex >= current.route.length) throw new Error("Active route stop is outside the campaign route.");
+      if (typeof next.weather !== "string" || !next.weather.trim() || next.weather.length > 80) throw new Error("Weather label is missing or too long.");
+      if (typeof next.weatherNote !== "string" || next.weatherNote.length > 1000) throw new Error("Weather note is too long.");
+      database.prepare(`UPDATE runtime_dashboard_state SET game_date = ?, day_number = ?, distance_km = ?,
+        rations_days = ?, fuel_units = ?, weather = ?, weather_note = ?, active_stop_index = ?, updated_at = ?
+        WHERE campaign_id = ?`)
+        .run(next.gameDate, next.dayNumber, next.distanceKm, next.rationsDays, next.fuelUnits,
+          next.weather.trim(), next.weatherNote, next.activeStopIndex, timestamp, runtimeId);
+    }
+
+    if (Object.hasOwn(input, "personnel")) {
+      if (!Array.isArray(input.personnel) || input.personnel.length > 200) throw new Error("Personnel must be a list of at most 200 records.");
+      const rows = input.personnel.map((person, sortOrder) => {
+        if (!person || typeof person !== "object" || Array.isArray(person)
+          || typeof person.id !== "string" && typeof person.id !== "number"
+          || typeof person.name !== "string" || !person.name.trim() || person.name.length > 100
+          || typeof person.role !== "string" || !person.role.trim() || person.role.length > 80
+          || typeof person.condition !== "string" || !person.condition.trim() || person.condition.length > 80
+          || typeof person.readiness !== "string" || !person.readiness.trim() || person.readiness.length > 40) {
+          throw new Error("A personnel record is invalid.");
+        }
+        return { id: String(person.id), name: person.name.trim(), role: person.role.trim(), condition: person.condition.trim(), readiness: person.readiness.trim(), sortOrder };
+      });
+      if (new Set(rows.map((person) => person.id)).size !== rows.length) throw new Error("Personnel IDs must be unique within the campaign.");
+      database.prepare("DELETE FROM personnel WHERE campaign_id = ?").run(runtimeId);
+      const insert = database.prepare(`INSERT INTO personnel
+        (campaign_id, id, name, role, condition, readiness, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      rows.forEach((person) => insert.run(runtimeId, person.id, person.name, person.role, person.condition, person.readiness, person.sortOrder));
+    }
+
+    if (Object.hasOwn(input, "journal")) {
+      if (!Array.isArray(input.journal) || input.journal.length > 1000) throw new Error("Journal must be a list of at most 1000 entries.");
+      const rows = input.journal.map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)
+          || typeof entry.id !== "string" && typeof entry.id !== "number"
+          || typeof entry.title !== "string" || !entry.title.trim() || entry.title.length > 120
+          || typeof entry.body !== "string" || entry.body.length > 4000
+          || typeof entry.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)
+          || typeof entry.kind !== "string" || !entry.kind.trim() || entry.kind.length > 80) {
+          throw new Error("A journal entry is invalid.");
+        }
+        return { id: String(entry.id), title: entry.title.trim(), body: entry.body, date: entry.date, kind: entry.kind.trim() };
+      });
+      if (new Set(rows.map((entry) => entry.id)).size !== rows.length) throw new Error("Journal entry IDs must be unique within the campaign.");
+      database.prepare("DELETE FROM journal_entries WHERE campaign_id = ?").run(runtimeId);
+      const insert = database.prepare(`INSERT INTO journal_entries
+        (campaign_id, id, title, body, entry_date, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      rows.forEach((entry) => insert.run(runtimeId, entry.id, entry.title, entry.body, entry.date, entry.kind, timestamp));
+    }
+
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, runtimeId);
+    database.exec("COMMIT");
+    return getRuntimeDashboard(database, accountId, runtimeId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 function normalizePlayerSeedFields(fields) {
@@ -856,6 +1145,9 @@ module.exports = {
   listRuntimeCampaigns,
   getRuntimeCampaign,
   getRuntimeDashboard,
+  exportRuntimeSave,
+  restoreRuntimeSave,
+  updateRuntimeDashboard,
   createAssignedUser,
   listAssignedUsers,
   createPlayerSeed,

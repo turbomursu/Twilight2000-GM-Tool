@@ -1,7 +1,8 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, getRuntimeCampaign, getRuntimeDashboard, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, reviewCharacterChangeRequest } = require("./runtime-store.cjs");
+const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard } = require("./runtime-store.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
+const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -63,11 +64,29 @@ async function readJsonBody(request) {
   }
 }
 
+async function readRuntimeRestoreBody(request) {
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers["content-type"] || "")) throw new HttpError(415, "Content-Type must be application/json.");
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of request) {
+    bytes += chunk.length;
+    if (bytes > MAX_RUNTIME_BACKUP_BYTES) throw new HttpError(413, "Runtime restore request must be no larger than 100 MiB.");
+    chunks.push(chunk);
+  }
+  try {
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
+    return body;
+  } catch {
+    throw new HttpError(400, "Runtime restore body must be a JSON object.");
+  }
+}
+
 function createCampaignHandler({ database }) {
   return async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     const url = new URL(request.url, "http://fieldbook.invalid");
-    if (request.method === "POST") {
+    if (request.method === "POST" || request.method === "PUT") {
       try {
         enforceSameOrigin(request);
       } catch (error) {
@@ -80,6 +99,40 @@ function createCampaignHandler({ database }) {
 
     if (request.method === "GET" && url.pathname === "/api/campaigns") {
       return sendJson(response, 200, { campaigns: listRuntimeCampaigns(database, account.id) });
+    }
+    const backupMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup$/);
+    if (backupMatch && request.method === "GET") {
+      let campaignId;
+      try {
+        campaignId = decodeURIComponent(backupMatch[1]);
+      } catch {
+        return sendJson(response, 400, { error: "Invalid campaign ID." });
+      }
+      const backup = exportRuntimeSave(database, account.id, campaignId);
+      return backup ? sendJson(response, 200, { backup }) : sendJson(response, 404, { error: "Campaign not found." });
+    }
+    const restoreMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/restore$/);
+    if (restoreMatch && request.method === "POST") {
+      let campaignId;
+      try {
+        campaignId = decodeURIComponent(restoreMatch[1]);
+      } catch {
+        return sendJson(response, 400, { error: "Invalid campaign ID." });
+      }
+      try {
+        const body = await readRuntimeRestoreBody(request);
+        const result = restoreRuntimeSave(database, account.id, campaignId, body.backup, {
+          confirmReplace: body.confirmReplace,
+          confirmOlderBackup: body.confirmOlderBackup,
+          expectedRevision: body.expectedRevision
+        });
+        return sendJson(response, 200, { restore: result });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Runtime campaign not found|GM owner|does not preserve the current GM owner/.test(error.message) ? 404
+            : /revision changed/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
     }
     if (request.method === "POST" && url.pathname === "/api/campaigns/import-setup") {
       try {
@@ -105,6 +158,22 @@ function createCampaignHandler({ database }) {
       return runtime
         ? sendJson(response, 200, { runtime })
         : sendJson(response, 404, { error: "Runtime campaign data not found." });
+    }
+    if (request.method === "PUT" && runtimeMatch) {
+      let campaignId;
+      try {
+        campaignId = decodeURIComponent(runtimeMatch[1]);
+      } catch {
+        return sendJson(response, 400, { error: "Invalid campaign ID." });
+      }
+      try {
+        const updates = await readJsonBody(request);
+        const runtime = updateRuntimeDashboard(database, account.id, campaignId, updates);
+        return sendJson(response, 200, { runtime });
+      } catch (error) {
+        const status = /Runtime campaign not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
     }
 
     const changeListMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/character-changes$/);

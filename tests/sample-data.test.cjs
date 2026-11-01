@@ -120,6 +120,42 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
   assert.equal(runtime.personnel.length, 4);
   assert.equal(runtime.journal.length, 3);
 
+  const updatedPersonnel = runtime.personnel.map((person, index) => ({
+    ...person,
+    readiness: index === 0 ? "Alert" : person.readiness
+  }));
+  const updatedJournal = runtime.journal.map((entry) => ({ ...entry, date: entry.entryDate }));
+  const updateResponse = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ dashboard: { rationsDays: 5, weather: "Fog" }, personnel: updatedPersonnel, journal: updatedJournal })
+  });
+  assert.equal(updateResponse.status, 200);
+  const updatedRuntime = (await updateResponse.json()).runtime;
+  assert.equal(updatedRuntime.dashboard.rationsDays, 5);
+  assert.equal(updatedRuntime.dashboard.weather, "Fog");
+  assert.equal(updatedRuntime.personnel[0].readiness, "Alert");
+  assert.equal(updatedRuntime.campaign.revision, 1);
+
+  const reloaded = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
+  assert.equal((await reloaded.json()).runtime.dashboard.rationsDays, 5);
+
+  const deniedWrite = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${otherToken}` },
+    body: JSON.stringify({ dashboard: { rationsDays: 1 } })
+  });
+  assert.equal(deniedWrite.status, 404);
+
+  const invalidCombinedUpdate = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `fieldbook_session=${gmToken}` },
+    body: JSON.stringify({ dashboard: { rationsDays: 2 }, journal: [{ id: "broken" }] })
+  });
+  assert.equal(invalidCombinedUpdate.status, 422);
+  const afterRollback = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${gmToken}` } });
+  assert.equal((await afterRollback.json()).runtime.dashboard.rationsDays, 5);
+
   const denied = await fetch(`${origin}/api/campaigns/${seeded.campaignId}/runtime`, { headers: { Cookie: `fieldbook_session=${otherToken}` } });
   assert.equal(denied.status, 404);
 });

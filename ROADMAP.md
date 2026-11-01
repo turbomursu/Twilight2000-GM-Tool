@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-The GM Tool remains a single-file browser prototype with sample dashboard UI. The HTTP LAN service authenticates GM/player sessions and provides owner-scoped campaign, user, seed, character-review, and runtime-snapshot APIs over SQLite. Setup import creates an owner-linked runtime campaign; an explicit development-only seeder adds `The Long Road` dashboard counters, stops, personnel, journal, and a sample player seed to a separate database. The GM-only `/api/campaigns/:id/runtime` endpoint exposes the normalized snapshot. The dashboard UI and influence edits are still not views over runtime state. The Player Interface renders its assigned server-owned seed/finalized character; other visible handset tabs remain inactive prototypes. Player publication and shared gameplay are not implemented.
+The GM Tool remains a single-file browser prototype with a local sample fallback. The HTTP LAN service authenticates GM/player sessions and provides owner-scoped campaign, user, seed, character-review, and runtime APIs over SQLite. Setup import creates an owner-linked runtime campaign; a development-only fixture adds `The Long Road` dashboard state. Situation, Personnel, Movement, and Journal now read the selected runtime snapshot; supported clock/resource, personnel, and journal edits persist through `PUT /api/campaigns/:id/runtime`. Route definitions/map rendering, influence editing, general save/restore, and the rest of the runtime UI remain incomplete. The Player Interface renders its assigned server-owned seed/finalized character; other visible handset tabs remain inactive prototypes. Player publication and shared gameplay are not implemented.
 
 ## Delivery Principles
 
@@ -57,7 +57,7 @@ The GM Tool remains a single-file browser prototype with sample dashboard UI. Th
 - Keep setup-package export/import separate from runtime campaign save/load and backup.
 - Treat imported setup content as initial state only; do not auto-publish setup notes or other content to players.
 - Assign one player seed to a user per campaign. For new users, issue a single-use activation token; let the player choose an assigned campaign, complete only blank GM-designated fields, and finalize only after required fields are complete. Enforce ownership and finalization on the server.
-- In progress: the API creates owner-linked initial runtime state and the GM map selector reloads imported packages. Bind the dashboard and subsequent edits to that runtime state before treating campaign initialization as complete.
+- In progress: the API creates owner-linked initial runtime state and the GM dashboard connects supported Situation, Personnel, Movement, and Journal fields to the selected runtime snapshot. Bind remaining supported panels, distinguish route/map/faction data not yet editable at runtime, and add round-trip runtime save/restore before treating campaign initialization as complete.
 - Define explicit error handling for malformed, unsupported, or duplicate package data.
 - Make unsaved or failed persistence states visible.
 
