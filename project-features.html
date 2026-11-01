@@ -62,8 +62,11 @@
     .section-head span { color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
     .checklist { display: grid; }
     .check-row { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: start; gap: 10px; padding: 10px 8px; border-bottom: 1px solid #b9c3b8; background: #e8ece5bd; }
-    .check-row input { width: 14px; height: 14px; margin: 1px 0 0; accent-color: var(--forest); }
-    .check-row input:indeterminate { accent-color: var(--gold); }
+    .check-row input { appearance: none; position: relative; width: 14px; height: 14px; margin: 1px 0 0; border: 2px solid var(--signal); border-radius: 2px; background: #fff; }
+    .check-row input:checked { border-color: #356044; background: #356044; }
+    .check-row input:checked::after { position: absolute; top: 0; left: 3px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; content: ""; transform: rotate(45deg); }
+    .check-row input:indeterminate { border-color: var(--signal); background: var(--signal); }
+    .check-row input:indeterminate::after { position: absolute; top: 4px; left: 2px; width: 6px; border-top: 2px solid #fff; content: ""; }
     .check-copy strong { display: block; font-size: 11px; line-height: 1.4; }
     .check-copy p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
     .state { padding-top: 2px; color: var(--muted); font: 8px var(--mono); text-align: right; text-transform: uppercase; white-space: nowrap; }
@@ -78,69 +81,54 @@
 <body>
   <div class="shell">
     <aside class="rail" aria-label="Project navigation">
-      <div class="brand"><div class="brand-mark" aria-hidden="true">T2K</div><div class="brand-copy"><strong>Fieldbook</strong><small>GM project desk</small></div></div>
-      <div class="rail-label">Workspace</div>
-      <a class="rail-link" href="index.html">GM runtime</a>
-      <a class="rail-link" href="campaign-setup.html">Campaign setup</a>
-      <a class="rail-link" href="player-interface.html">Player interface</a>
+      <div class="brand"><div class="brand-mark" aria-hidden="true">T2K</div><div class="brand-copy"><strong>Fieldbook</strong><small>Standalone status</small></div></div>
+      <div class="rail-label">Status pages</div>
       <a class="rail-link" href="project-status.html">Roadmap status</a>
       <a class="rail-link" href="project-features.html" aria-current="page">Feature status</a>
       <a class="rail-link" href="ROADMAP.md">Full roadmap</a>
       <a class="rail-link" href="FEATURES.md">Feature overview</a>
-      <div class="rail-bottom">Internal reference<br>Updated 01 Nov 2026</div>
+      <div class="rail-bottom">Local status server<br>127.0.0.1</div>
     </aside>
     <main>
       <header class="topbar"><div class="crumb">Project control / feature inventory</div><div class="top-actions"><a class="button" href="FEATURES.md">Open full feature overview</a><a class="button" href="ROADMAP.md">Open roadmap</a></div></header>
       <div class="content">
-        <header class="heading"><div><div class="eyebrow">Current capability snapshot</div><h1>Feature status</h1></div><p>Implemented means the feature has a verified workflow. Partial means an important slice works but the full campaign experience is incomplete. Prototype and planned items are not complete game systems.</p></header>
+        <header class="heading"><div><div class="eyebrow">Feature snapshot / 01 Nov 2026</div><h1>Feature status</h1></div><p>Green means a verified slice is ready. Red means unfinished or partial; it is not a complete system.</p></header>
         <section class="summary" aria-label="Feature status summary">
-          <div class="summary-item"><span class="eyebrow">Available slices</span><strong>Accounts and seeds</strong><p>GM-created users, campaign seed assignment, and GM-reviewed field edits.</p></div>
-          <div class="summary-item"><span class="eyebrow">Partial surfaces</span><strong>Setup and runtime</strong><p>Dashboard, publications, COMMS, and owned inventory/GM review work; remaining runtime panels and broader rules-governed gameplay remain open.</p></div>
-          <div class="summary-item"><span class="eyebrow">Not connected</span><strong>Rules resolution</strong><p>Verified rules effects, carrying, dice-governed actions, full publication snapshots, and cross-host recovery remain planned.</p></div>
+          <div class="summary-item"><span class="eyebrow">Ready slices</span><strong>Identity and publishing</strong><p>Accounts, seats, reports, map projection, COMMS, review workflows.</p></div>
+          <div class="summary-item"><span class="eyebrow">Partial</span><strong>GM runtime</strong><p>Supported SQLite panels and same-host backup/restore.</p></div>
+          <div class="summary-item"><span class="eyebrow">Unfinished</span><strong>Rules and simulation</strong><p>Character generation, action resolution, world systems, cross-host recovery.</p></div>
         </section>
 
         <section class="section" aria-labelledby="surfaces-title">
           <div class="section-head"><h2>Product surfaces</h2><span>Current status</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign Setup Tool</strong><p>Atlas, terrain, locations, settlements, factions, and notes author a schema-v2 setup package. Offline basemaps remain planned; setup labels do not apply rules modifiers.</p></span><span class="state partial">Prototype</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported dashboard fields, conditions, inventories/proposals, publications, COMMS, faction layers, and audit metadata persist in SQLite and participate in recovery as documented. Runtime dashboard writes are campaign-revision checked; the Situation latest-field-note card and read-only route preview use persisted data. Route/map editing, remaining runtime panels, rule-governed actions, and cross-host recovery remain incomplete.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Read-only runtime route preview</strong><p>The GM Situation map draws ordered saved route stops and highlights the active stop using SQLite-backed coordinates. API/backup coordinate checks and browser rendering/attribution checks pass; route editing remains incomplete.</p></span><span class="state done">Verified slice</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player seed lifecycle</strong><p>GM-created usernames, one seed per user per campaign, player completion of open fields, finalization, and approval/rejection of later edits are server-backed in the active handset Character view.</p></span><span class="state done">Working slice</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM-published player experience</strong><p>Assigned players receive reports/maps, COMMS, accepted own inventory, and their proposals. Other inventories/submissions and GM notes are excluded. Verified rules-backed gameplay remains planned.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign Setup Tool</strong><p>Authors and imports schema-v2 packages; offline basemaps remain planned.</p></span><span class="state partial">Prototype</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported fields use owner-scoped, revision-checked SQLite; route/map editing and broader recovery remain incomplete.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player Interface</strong><p>Reports, map projection, COMMS, character/inventory bookkeeping; rules-governed actions remain planned.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player seed lifecycle and route preview</strong><p>Campaign assignment/review and the GM's read-only SQLite route preview are verified.</p></span><span class="state done">Ready slices</span></label>
           </div>
         </section>
 
         <section class="section" aria-labelledby="gm-tools-title">
           <div class="section-head"><h2>GM tools and campaign systems</h2><span>Prototype work is not full simulation</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign package handoff</strong><p>Setup import and same-campaign runtime backup/restore preserve database records and immutable source snapshots. Remaining runtime editing and cross-host recovery are open.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player seat and character assignment</strong><p>User ownership and the four-seat maximum are enforced; seat administration and full player character runtime are incomplete.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Independent GM player templates</strong><p>GM-owned templates and player logins exist outside campaigns; explicit assignment copies T2K 4E fields into a selected campaign. Life-path results are entered manually; procedures are not automated or validated.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>GM Personnel add/edit/remove</strong><p>Roster changes use the persisted, owner-scoped API. Stale edits refresh the roster while retaining the dialog draft; API revision and backup recovery tests plus browser save/reload checks pass.</p></span><span class="state done">Verified slice</span></label>
-            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Weather control</strong><p>The GM can select Fair, Cloudy, Rain/Snow, or a GM-defined condition, add a note, and save through the revision-checked runtime API. Referee Aid effects are derived for GM adjudication only; no rolls are modified, and weather-change rolls/shift-duration tracking remain planned.</p></span><span class="state partial">Partial</span></label>
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified character and NPC creation</strong><p>Still requires authoritative Fourth Edition procedures, source references, and reviewed GM workflow.</p></span><span class="state">Planned</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player report publishing</strong><p>Text-only draft, server preview, explicit publish, and withdraw are implemented. The player projection excludes GM-only notes, unrevealed state, and other players' data; structured sections and publication history remain planned.</p></span><span class="state done">Text slice</span></label>
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Logistics, economy, diplomacy, and conflict</strong><p>Full campaign dashboards and simulations remain planned. Existing clock and shared-ration behavior is GM-defined bookkeeping, not a rules engine; consequential outcomes must stay GM-reviewable.</p></span><span class="state">Planned</span></label>
-            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Persistent world simulation and tactical tools</strong><p>Scheduled events, conflict simulation, battle calculations, and dice-governed item actions need verified procedures and tests.</p></span><span class="state">Planned</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Personnel add/edit/remove</strong><p>Revision conflicts refresh authoritative records and preserve the open draft.</p></span><span class="state done">Ready</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Weather control</strong><p>GM notes and cited effects display; weather rolls and duration tracking remain unimplemented.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign package recovery</strong><p>Same-host restore works; scheduled backups and cross-host account recovery remain open.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Verified character/NPC generation and rules resolution</strong><p>Requires authoritative procedures, source references, and regression examples.</p></span><span class="state">Open</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Logistics, economy, diplomacy, conflict, simulation</strong><p>Not implemented; consequential changes must remain GM-reviewed.</p></span><span class="state">Open</span></label>
           </div>
         </section>
 
         <section class="section" aria-labelledby="player-features-title">
           <div class="section-head"><h2>Player-facing features</h2><span>Separate from the seed workflow</span></div>
           <div class="checklist">
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Published text situation report</strong><p>Sitrep shows only published title, body, and game time. Owner, assignment, hidden-note, revision, withdrawal, and recovery checks pass; browser controls and literal-text rendering verified on 01 Nov 2026.</p></span><span class="state done">Text slice</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Published point-layer campaign map</strong><p>Selected locations, point markings, route, and position use a read-only four-seat projection. API/recovery and browser tiles, zoom/reset, inert-label, and withdrawal checks pass as of 01 Nov 2026. Offline basemaps and polygons remain planned.</p></span><span class="state done">Point slice</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Owned inventory and GM review</strong><p>Inventory shows accepted RB/GM/UF items and pending proposals. GM stocking, source confirmation, quantity/removal approval, isolation, and recovery pass tests; browser flows verified on 01 Nov 2026. Verified catalogs, transfers, carrying, and dice-governed actions remain planned.</p></span><span class="state done">Bookkeeping slice</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Single-line COMMS</strong><p>Player broadcasts and GM replies persist with server sender/date/day stamps. Four-seat isolation, validation, spoofing, archive/recovery, and browser checks pass as of 01 Nov 2026. Latest 200 shown; push and read receipts remain planned.</p></span><span class="state done">Single-line slice</span></label>
-            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Own-seat GM condition records</strong><p>Read-only Character conditions exclude private GM notes and other seats. Owner/revision, unknown-value, clear, persistence/recovery, and synthetic browser checks pass as of 01 Nov 2026. Derived rules effects and capacities remain planned.</p></span><span class="state done">Manual slice</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player reports, map projection, and COMMS</strong><p>Published data is allow-listed; private GM state stays hidden.</p></span><span class="state done">Ready</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Owned inventory and manual conditions</strong><p>Player proposals require GM review; condition data is read-only to players.</p></span><span class="state done">Ready slice</span></label>
           </div>
         </section>
 
-        <aside class="notice"><strong>Integration verified / 01 Nov 2026</strong><p>All five player views and GM character approval work over a combined restored campaign. Client regressions cover finalized-character submissions and delayed responses after deselection. The read-only GM route preview also renders the persisted route and active stop. Private GM notes remain excluded; report/map restore still requires explicit republishing. Full <code>node --test</code> suite: 62 passed, 0 failed on Node <code>26.13.0</code>.</p></aside>
-        <section class="section"><h2>GM audit</h2><label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Read-only owner audit metadata</strong><p>Covered condition/inventory/publication/restore/dashboard/journal/faction/character-review/seat-assignment events include server actor, target, revisions, time, and live/recovered origin. Atomic failures, permissions, pagination, conflict-safe backup merging, and browser checks pass as of 01 Nov 2026 with audit extension tests. Other actions, content snapshots, and retention tooling remain planned.</p></span><span class="state done">Extended slice</span></label></section>
-        <section class="section"><h2>Clock and supplies</h2><label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Six-hour clock and midday food</strong><p>+6h changes days only at midnight. Once-per-date noon rations, empty reserves, revision/rollback protection, HH:MM stamps, and recovery pass tests/browser checks as of 01 Nov 2026. GM-defined bookkeeping; fuel/items remain manual.</p></span><span class="state done">GM schedule</span></label></section>
-        <aside class="notice"><strong>Audit coverage</strong><p>Metadata events cover conditions, inventory changes/reviews, report/map mutations, dashboard/journal changes, faction layers, character reviews, seat assignments, and restores. Player proposals/COMMS, account/auth events, content snapshots, and retention tooling remain outside this slice.</p></aside>
-        <aside class="notice"><strong>Rules fidelity</strong><p>Where a feature models an actual Twilight: 2000 Fourth Edition procedure, it must be source-verified. Unverified mechanics remain GM-managed; prototypes are not rules engines.</p></aside>
+        <aside class="notice"><strong>Verification</strong><p>64 automated tests pass. Restore and browser workflows verified 01 Nov 2026. Rules effects remain limited to sourced, explicitly described guidance.</p></aside>
         <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
       </div>
     </main>

@@ -10,6 +10,10 @@ The standalone prototype can still be opened directly from `index.html` for loca
 
 Run the dependency-free test suite with `node --test`. Open static prototypes directly if desired; authenticated GM and player workflows, including Player Seeds, require the Node LAN service.
 
+## Project Status Site
+
+Run the roadmap and feature pages independently from the GM app with `node server/status-pages.cjs`, then open `http://127.0.0.1:8091/`. The server binds to loopback and serves only the two status pages and their Markdown sources. Set `FIELDBOOK_STATUS_PORT` to use another local port.
+
 ## LAN Auth API
 
 The Node service enforces GM/player roles and campaign ownership. Conditions, inventories/proposals, supported campaign records, publications, and COMMS persist in SQLite. Players receive only their assigned character's public condition record; private GM notes are excluded. The GM manages condition and inventory state. Derived condition/carrying effects, verified item catalogs, and dice-governed actions remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 without encryption. Use only on a trusted LAN, never the internet or untrusted networks.

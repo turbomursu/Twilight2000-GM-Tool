@@ -39,12 +39,9 @@ test("redirects anonymous requests to login and serves only public auth assets",
   const protectedPage = await fetch(`${origin}/campaign-setup.html`, { redirect: "manual" });
   assert.equal(protectedPage.status, 302);
   assert.equal(protectedPage.headers.get("location"), "/login.html?next=%2Fcampaign-setup.html");
-  const projectStatus = await fetch(`${origin}/project-status.html`, { redirect: "manual" });
-  assert.equal(projectStatus.status, 302);
-  assert.equal(projectStatus.headers.get("location"), "/login.html?next=%2Fproject-status.html");
-  const projectFeatures = await fetch(`${origin}/project-features.html`, { redirect: "manual" });
-  assert.equal(projectFeatures.status, 302);
-  assert.equal(projectFeatures.headers.get("location"), "/login.html?next=%2Fproject-features.html");
+  for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md"]) {
+    assert.equal((await fetch(`${origin}${path}`)).status, 404);
+  }
   const weatherRules = await fetch(`${origin}/weather-rules.js`, { redirect: "manual" });
   assert.equal(weatherRules.status, 302);
   assert.equal(weatherRules.headers.get("location"), "/login.html?next=%2Fweather-rules.js");
@@ -68,26 +65,21 @@ test("serves protected pages only for an active session and gates them again aft
 
   const protectedPage = await fetch(`${origin}/index.html`, { headers: { Cookie: cookie } });
   assert.equal(protectedPage.status, 200);
-  assert.match(await protectedPage.text(), /data-auth-logout/);
+  const runtimeHtml = await protectedPage.text();
+  assert.match(runtimeHtml, /data-auth-logout/);
+  assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
 
   const setupPage = await fetch(`${origin}/campaign-setup.html`, { headers: { Cookie: cookie } });
   assert.equal(setupPage.status, 200);
   assert.match(await setupPage.text(), /id="export-package-top"/);
 
-  const statusPage = await fetch(`${origin}/project-status.html`, { headers: { Cookie: cookie } });
-  assert.equal(statusPage.status, 200);
-  assert.match(await statusPage.text(), /Roadmap status/);
-  const featuresPage = await fetch(`${origin}/project-features.html`, { headers: { Cookie: cookie } });
-  assert.equal(featuresPage.status, 200);
-  assert.match(await featuresPage.text(), /Feature status/);
+  for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md"]) {
+    assert.equal((await fetch(`${origin}${path}`, { headers: { Cookie: cookie } })).status, 404);
+  }
   const weatherRules = await fetch(`${origin}/weather-rules.js`, { headers: { Cookie: cookie } });
   assert.equal(weatherRules.status, 200);
   assert.match(weatherRules.headers.get("content-type"), /text\/javascript/);
   assert.match(await weatherRules.text(), /Rain\/Snow/);
-  const roadmap = await fetch(`${origin}/ROADMAP.md`, { headers: { Cookie: cookie } });
-  assert.equal(roadmap.status, 200);
-  assert.match(roadmap.headers.get("content-type"), /text\/markdown/);
-
   const playerPage = await fetch(`${origin}/player-interface.html`, { headers: { Cookie: cookie }, redirect: "manual" });
   assert.equal(playerPage.status, 302);
   assert.equal(playerPage.headers.get("location"), "/index.html");
