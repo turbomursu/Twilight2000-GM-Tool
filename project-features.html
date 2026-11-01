@@ -92,11 +92,11 @@
     <main>
       <header class="topbar"><div class="crumb">Project control / feature inventory</div><div class="top-actions"><a class="button" href="FEATURES.md">Open full feature overview</a><a class="button" href="ROADMAP.md">Open roadmap</a></div></header>
       <div class="content">
-        <header class="heading"><div><div class="eyebrow">Feature snapshot / 01 Nov 2026</div><h1>Feature status</h1></div><p>Green means a verified slice is ready. Red means unfinished or partial; it is not a complete system. T2K 4E workflows verified against official Referee Aids. Comprehensive combat automation implemented.</p></header>
+        <header class="heading"><div><div class="eyebrow">Feature snapshot / 01 Nov 2026 · 20:35 UTC</div><h1>Feature status</h1></div><p>Green means a verified slice is ready. Red means unfinished or partial; it is not a complete system. T2K 4E workflows verified against official Referee Aids. Comprehensive combat automation implemented and integrated.</p></header>
         <section class="summary" aria-label="Feature status summary">
-          <div class="summary-item"><span class="eyebrow">Ready slices</span><strong>Identity and publishing</strong><p>Accounts, seats, reports, map projection, COMMS, review workflows, rules verification.</p></div>
-          <div class="summary-item"><span class="eyebrow">Partial</span><strong>GM runtime</strong><p>Supported SQLite panels, same-host restore, cross-host mapped import, combat automation planned.</p></div>
-          <div class="summary-item"><span class="eyebrow">Unfinished</span><strong>Advanced systems</strong><p>Encounter generation, world systems, scheduled backups, simulation.</p></div>
+          <div class="summary-item"><span class="eyebrow">Ready slices</span><strong>Identity, publishing, and combat</strong><p>Accounts, seats, reports, map projection, COMMS, review workflows, rules verification, complete combat automation.</p></div>
+          <div class="summary-item"><span class="eyebrow">Partial</span><strong>GM runtime and setup</strong><p>Supported SQLite panels, same-host restore, cross-host mapped import. Setup authoring works; offline archive rendering and cross-host asset migration not yet verified.</p></div>
+          <div class="summary-item"><span class="eyebrow">Unfinished</span><strong>Advanced systems</strong><p>Encounter generation, world systems, scheduled backups, simulation, character creation automation.</p></div>
         </section>
 
         <section class="section" aria-labelledby="surfaces-title">
@@ -130,7 +130,7 @@
           </div>
         </section>
 
-        <aside class="notice"><strong>Verification</strong><p>Full automated run: 116 passed, 0 failed. T2K 4E workflows verified against official Referee Aids (OCR transcriptions of Strategic Play, Close Combat, Ranged Combat, Heavy Weapons, Vehicle Combat, and Life Path aids). Combat system complete: core calculator (26 tests), heavy weapons (grenades/mines with 7-hex blast, 7 tests), vehicle combat (armor/penetration, 7 tests), combat logging (4 tests). All systems pass with zero regressions. GM combat interface form implemented with 5 combat type tabs. API endpoints for all combat types integrated with campaign handler. PMTiles upload/range handling and geometry validation have synthetic API coverage; real licensed archive rendering, authenticated map browser round-trip, and cross-host asset migration are not yet verified. Encounter generation and tactical/ambush systems remain planned.</p></aside>
+        <aside class="notice"><strong>Verification</strong><p>Full automated run: 116 passed, 0 failed (as of 01 Nov 2026, 20:35 UTC). T2K 4E workflows verified against official Referee Aids (OCR transcriptions of Strategic Play, Close Combat, Ranged Combat, Heavy Weapons, Vehicle Combat, and Life Path aids). Combat system complete and production-ready: core calculator (26 tests), heavy weapons grenades/mines with 7-hex blast (7 tests), vehicle combat armor/penetration (7 tests), combat logging to audit trail (4 tests), GM UI form (3 tests). All 21 new combat tests passing with zero regressions. Combat interface registered in protected files routing (GET /combat.html, /combat-client.js). API endpoints for all combat types integrated with campaign handler. PMTiles upload/range handling and geometry validation have synthetic API coverage; real licensed archive rendering, authenticated map browser round-trip, and cross-host asset migration are not yet verified. Encounter generation, tactical map, and world simulation systems remain planned.</p></aside>
         <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
       </div>
     </main>
