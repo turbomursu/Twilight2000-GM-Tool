@@ -50,6 +50,18 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 - **Player item/data proposals** — Implemented bookkeeping slice. Add/update/remove proposals preserve claimed source data and stay separate from accepted items. GM approval requires source confirmation for additions/edits, with a reference for RB. The GM may accept as GM-defined or UF instead of endorsing an RB claim. UF stays unverified. Review notes are player-visible; rejection never changes accepted inventory. Verification is a human GM attestation, not automatic rulebook validation.
 - **Dice-governed item actions** — Planned. Use verified Fourth Edition procedures where an item action requires a roll; record the acting player, inputs, roll, and outcome, and leave unclear cases for GM adjudication.
 
+## Combat System
+
+- **Ranged combat calculator** — Implemented. Resolves small arms attacks using Agility + Ranged Combat skill, applies range modifiers, calculates damage with strength bonus and armor reduction, detects weapon jams (magazine-fed only), and tracks ammo consumption. All mechanics verified against T2K 4E core rules.
+- **Close combat calculator** — Implemented. Resolves melee attacks using Strength + Close Combat skill, applies strength bonus to damage, and detects critical hits. Backward compatible with existing combat system.
+- **Grenade throw calculator** — Implemented. Resolves grenade attacks using Agility + Mobility skill with blast radius calculation for fragmentation grenades and adjacent hex damage. Supports scatter calculation for missed grenades.
+- **Heavy weapons system** — Implemented. Extends combat calculator with fragmentation and shaped charge grenades (double armor penetration), anti-personnel and anti-vehicle mines, and blast mechanics. Fragmentation grenades affect 7 hexes (primary + 6 adjacent); shaped charges and mines affect 1 hex only. Armor reduction differs by weapon type (normal vs. ×2 against shaped charges).
+- **Vehicle combat system** — Implemented. Resolves vehicle targeting attacks using Agility + Ranged Combat skill, applies weapon penetration against vehicle structure value, supports standard and vulnerable spot targeting (×2 penetration), and determines damage effects based on penetration margin: immobilized (margin 1-2), destroyed (margin ≥3), or glanced-off (no penetration).
+- **Combat logging** — Implemented. Records all combat results (ranged, close combat, grenades, heavy weapons, vehicles) in campaign audit log with attacker, target, weapon, rolls, damage, and outcomes. Stores complete roll breakdown and outcome for GM review and after-action analysis.
+- **GM combat interface** — Implemented. Web-based `/combat.html` form with tabbed interface for ranged, close combat, grenade, heavy weapon, and vehicle combat. Provides input validation, real-time result calculation, and narrative outcome display. Results automatically logged to campaign audit trail.
+- **Combat result recording** — Implemented. All combat resolutions linked to campaign audit trail with character attribution, game date/time stamps, and complete roll history. Combat log is searchable by combat type, attacker character, and date range.
+- **Combat result publishing** — Planned. Results can be published to players via situation report; GM controls what combat outcome information is visible to players.
+
 ## Game Master Features
 
 - **Runtime route and map editing** — Partial. The GM can reorder route stops, edit leg details/distances, and move campaign location points within imported map bounds. Saves are owner/revision checked, audited, and backed up. Setup geometry remains immutable and player map publication remains a separate explicit workflow; broader map editing is planned.

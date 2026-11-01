@@ -453,6 +453,370 @@ function resolveCloseCombat(input, strengthRoll, ccRoll, weapon, targetArmorLeve
   };
 }
 
+/**
+ * Validates heavy weapon input
+ * @param {Object} input
+ * @returns {string[]} Array of validation errors (empty if valid)
+ */
+function validateHeavyWeaponInput(input) {
+  const errors = [];
+  
+  if (!input.weaponName) errors.push('Weapon name required');
+  if (typeof input.baseDamage !== 'number' || input.baseDamage < 0) {
+    errors.push('Base damage must be a non-negative number');
+  }
+  if (typeof input.threshold !== 'number' || input.threshold < 1) {
+    errors.push('Threshold must be a positive number');
+  }
+  if (!['grenade-frag', 'grenade-shaped', 'mine-anti-personnel', 'mine-anti-vehicle'].includes(input.weaponType)) {
+    errors.push('Weapon type must be grenade-frag, grenade-shaped, mine-anti-personnel, or mine-anti-vehicle');
+  }
+  
+  return errors;
+}
+
+/**
+ * Resolves heavy weapon attack with blast mechanics
+ * Grenades: Agility + Mobility, blast affects primary + adjacent hexes
+ * Mines: Direct hit check, larger blast radius
+ * 
+ * @param {Object} input
+ * @param {string} input.weaponName - Grenade or mine name
+ * @param {number} input.baseDamage - Base blast damage
+ * @param {number} input.threshold - Damage threshold for criticals
+ * @param {string} input.weaponType - 'grenade-frag', 'grenade-shaped', 'mine-anti-personnel', 'mine-anti-vehicle'
+ * @param {number} input.shooterAgilityDie - D6-D12
+ * @param {number} input.shooterMobilityDie - D6-D12
+ * @param {number} input.targetArmorLevel - 0-4
+ * @param {number} agilityRoll - Roll result 1-12
+ * @param {number} mobilityRoll - Roll result 1-12
+ * @param {number} scatterRoll - Roll result 1-6 for missed grenades (if needed)
+ * @returns {Object} Heavy weapon resolution
+ */
+function resolveHeavyWeapon(input, agilityRoll, mobilityRoll, scatterRoll = null) {
+  const validationErrors = validateHeavyWeaponInput(input);
+  if (validationErrors.length > 0) {
+    throw new Error(`Invalid heavy weapon input: ${validationErrors.join('; ')}`);
+  }
+  
+  if (!Number.isInteger(agilityRoll) || agilityRoll < 1 || agilityRoll > 12) {
+    throw new Error(`Invalid agility roll: ${agilityRoll}`);
+  }
+  if (!Number.isInteger(mobilityRoll) || mobilityRoll < 1 || mobilityRoll > 12) {
+    throw new Error(`Invalid mobility roll: ${mobilityRoll}`);
+  }
+  
+  const agilityResult = calculateSuccesses(agilityRoll);
+  const mobilityResult = calculateSuccesses(mobilityRoll);
+  
+  const isHit = agilityResult.successes > 0 || mobilityResult.successes > 0;
+  const isGrenade = input.weaponType.startsWith('grenade-');
+  const isMine = input.weaponType.startsWith('mine-');
+  const isShaped = input.weaponType === 'grenade-shaped' || input.weaponType === 'mine-anti-vehicle';
+  
+  // Blast mechanics calculation
+  let blastResult = {
+    primaryHexDamage: 0,
+    adjacentHexDamage: 0,
+    affectedHexes: 0,
+    damageType: isShaped ? 'shaped-charge' : 'fragments',
+    scatterDistance: null,
+    scatterDirection: null
+  };
+  
+  if (isHit) {
+    // Primary target always takes damage
+    const baseDamage = input.baseDamage;
+    const armorReduction = isShaped ? input.targetArmorLevel * 2 : input.targetArmorLevel;
+    const primaryDamage = Math.max(0, baseDamage - armorReduction);
+    
+    blastResult.primaryHexDamage = primaryDamage;
+    blastResult.affectedHexes = 1;
+    
+    // Adjacent hexes take reduced damage (grenades only, not mines or shaped charges)
+    if (isGrenade && !isShaped) {
+      const adjacentDamage = Math.max(0, Math.floor(primaryDamage / 2));
+      blastResult.adjacentHexDamage = adjacentDamage;
+      blastResult.affectedHexes = 7; // Primary + 6 adjacent hexes
+    }
+    
+    const isCritical = primaryDamage >= input.threshold;
+    
+    return {
+      weapon: {
+        name: input.weaponName,
+        type: input.weaponType,
+        baseDamage: input.baseDamage,
+        threshold: input.threshold,
+        damageType: isShaped ? 'shaped-charge' : 'fragments'
+      },
+      rolls: {
+        agility: {
+          rolled: agilityRoll,
+          successes: agilityResult.successes,
+          isSymbol: agilityResult.isSymbol,
+          isSuccess: agilityResult.successes > 0
+        },
+        mobility: {
+          rolled: mobilityRoll,
+          successes: mobilityResult.successes,
+          isSymbol: mobilityResult.isSymbol,
+          isSuccess: mobilityResult.successes > 0
+        }
+      },
+      hit: {
+        isHit: true,
+        location: 'Direct hit on target hex'
+      },
+      blast: blastResult,
+      damage: {
+        primaryHex: {
+          base: input.baseDamage,
+          armor: isShaped ? input.targetArmorLevel * 2 : input.targetArmorLevel,
+          total: primaryDamage
+        },
+        adjacentHex: isShaped ? null : {
+          base: Math.floor(input.baseDamage / 2),
+          armor: input.targetArmorLevel,
+          total: blastResult.adjacentHexDamage
+        }
+      },
+      critical: isCritical ? {
+        threshold: input.threshold,
+        damageDealt: primaryDamage,
+        description: 'Detonation critical: maximum effect'
+      } : null,
+      summary: {
+        outcome: 'HIT',
+        primaryDamage,
+        adjacentDamage: isShaped ? 0 : blastResult.adjacentHexDamage,
+        hexesAffected: blastResult.affectedHexes,
+        isCritical,
+        damageType: isShaped ? 'shaped-charge (armor×2)' : 'fragments'
+      }
+    };
+  } else {
+    // Missed - calculate scatter for grenades
+    let scatterInfo = null;
+    if (isGrenade && scatterRoll !== null) {
+      if (!Number.isInteger(scatterRoll) || scatterRoll < 1 || scatterRoll > 6) {
+        throw new Error(`Invalid scatter roll: ${scatterRoll}`);
+      }
+      scatterInfo = {
+        roll: scatterRoll,
+        direction: ['North', 'Northeast', 'Southeast', 'South', 'Southwest', 'Northwest'][scatterRoll - 1],
+        hexesDeviated: Math.floor(Math.random() * 3) + 1 // GM determines actual deviation
+      };
+    }
+    
+    return {
+      weapon: {
+        name: input.weaponName,
+        type: input.weaponType,
+        baseDamage: input.baseDamage,
+        threshold: input.threshold,
+        damageType: isShaped ? 'shaped-charge' : 'fragments'
+      },
+      rolls: {
+        agility: {
+          rolled: agilityRoll,
+          successes: agilityResult.successes,
+          isSymbol: agilityResult.isSymbol,
+          isSuccess: agilityResult.successes > 0
+        },
+        mobility: {
+          rolled: mobilityRoll,
+          successes: mobilityResult.successes,
+          isSymbol: mobilityResult.isSymbol,
+          isSuccess: mobilityResult.successes > 0
+        }
+      },
+      hit: {
+        isHit: false,
+        location: isGrenade ? 'Missed - see scatter' : 'Missed trigger or proximity'
+      },
+      scatter: scatterInfo,
+      blast: {
+        primaryHexDamage: 0,
+        adjacentHexDamage: 0,
+        affectedHexes: 0,
+        scatterDistance: scatterInfo ? 'GM determines' : null,
+        scatterDirection: scatterInfo ? scatterInfo.direction : null
+      },
+      summary: {
+        outcome: 'MISS',
+        scatterNeeded: isGrenade,
+        description: isGrenade 
+          ? 'Grenade missed target - roll scatter to determine impact location' 
+          : 'Mine trigger not activated or proximity failure'
+      }
+    };
+  }
+}
+
+/**
+ * Validates vehicle combat input
+ * @param {Object} input
+ * @returns {string[]} Array of validation errors (empty if valid)
+ */
+function validateVehicleCombatInput(input) {
+  const errors = [];
+  
+  if (!input.vehicleName) errors.push('Vehicle name required');
+  if (!['standard', 'vulnerable'].includes(input.targetingType)) {
+    errors.push('Targeting type must be standard or vulnerable');
+  }
+  if (typeof input.vehicleStructureValue !== 'number' || input.vehicleStructureValue < 1) {
+    errors.push('Vehicle structure value must be a positive number');
+  }
+  if (typeof input.weaponPenetration !== 'number' || input.weaponPenetration < 0) {
+    errors.push('Weapon penetration must be a non-negative number');
+  }
+  if (typeof input.shooterAgilityDie !== 'number' && typeof input.shooterAgilityDie !== 'string') {
+    errors.push('Shooter agility die required');
+  }
+  if (typeof input.shooterRangedCombatDie !== 'number' && typeof input.shooterRangedCombatDie !== 'string') {
+    errors.push('Shooter ranged combat die required');
+  }
+  
+  return errors;
+}
+
+/**
+ * Resolves vehicle combat attack with armor and damage effects
+ * 
+ * @param {Object} input
+ * @param {string} input.vehicleName - Target vehicle name
+ * @param {string} input.targetingType - 'standard' or 'vulnerable' spot
+ * @param {number} input.vehicleStructureValue - Vehicle armor rating
+ * @param {number} input.weaponPenetration - Weapon armor penetration rating
+ * @param {string} input.shooterAgilityDie - D6-D12
+ * @param {string} input.shooterRangedCombatDie - D6-D12
+ * @param {string} input.range - 'short', 'medium', 'long', 'extreme'
+ * @param {number[]} input.modifierDeltas - Array of modifier adjustments
+ * @param {number} agilityRoll - Roll result 1-12
+ * @param {number} rangedCombatRoll - Roll result 1-12
+ * @returns {Object} Vehicle combat resolution
+ */
+function resolveVehicleCombat(input, agilityRoll, rangedCombatRoll) {
+  const validationErrors = validateVehicleCombatInput(input);
+  if (validationErrors.length > 0) {
+    throw new Error(`Invalid vehicle combat input: ${validationErrors.join('; ')}`);
+  }
+  
+  if (!Number.isInteger(agilityRoll) || agilityRoll < 1 || agilityRoll > 12) {
+    throw new Error(`Invalid agility roll: ${agilityRoll}`);
+  }
+  if (!Number.isInteger(rangedCombatRoll) || rangedCombatRoll < 1 || rangedCombatRoll > 12) {
+    throw new Error(`Invalid ranged combat roll: ${rangedCombatRoll}`);
+  }
+  
+  const agilityResult = calculateSuccesses(agilityRoll);
+  const rcResult = calculateSuccesses(rangedCombatRoll);
+  
+  // Calculate to-hit modifier
+  const { modifier, breakdown } = calculateToHitModifier({
+    range: input.range,
+    modifierDeltas: input.modifierDeltas || []
+  });
+  
+  const totalAgilityResult = agilityRoll + modifier;
+  const totalRCResult = rangedCombatRoll + modifier;
+  
+  const isAgilitySuccess = totalAgilityResult >= 6;
+  const isRCSuccess = totalRCResult >= 6;
+  const isHit = isAgilitySuccess || isRCSuccess;
+  
+  let damageResult = null;
+  let armorPenetration = false;
+  let vehicleEffect = null;
+  
+  if (isHit) {
+    // Vehicle armor calculation
+    // Vulnerable spots: -1 difficulty, weapon penetration counts double
+    const effectivePenetration = input.targetingType === 'vulnerable' 
+      ? input.weaponPenetration * 2 
+      : input.weaponPenetration;
+    
+    armorPenetration = effectivePenetration > input.vehicleStructureValue;
+    
+    // Determine damage effect based on penetration
+    if (armorPenetration) {
+      const penetrationMargin = effectivePenetration - input.vehicleStructureValue;
+      
+      if (penetrationMargin >= 3) {
+        vehicleEffect = 'destroyed';
+      } else if (penetrationMargin >= 1) {
+        vehicleEffect = 'immobilized';
+      } else {
+        vehicleEffect = 'damaged';
+      }
+    } else {
+      vehicleEffect = 'glanced-off';
+    }
+    
+    damageResult = {
+      weaponPenetration: input.weaponPenetration,
+      vehicleStructure: input.vehicleStructureValue,
+      effectivePenetration: effectivePenetration,
+      armorPenetrated: armorPenetration,
+      penetrationMargin: armorPenetration ? effectivePenetration - input.vehicleStructureValue : 0
+    };
+  }
+  
+  return {
+    vehicle: {
+      name: input.vehicleName,
+      structureValue: input.vehicleStructureValue,
+      targetingType: input.targetingType
+    },
+    attack: {
+      range: input.range,
+      modifierBreakdown: breakdown,
+      totalModifier: modifier
+    },
+    rolls: {
+      agility: {
+        rolled: agilityRoll,
+        successes: agilityResult.successes,
+        isSymbol: agilityResult.isSymbol,
+        modifiedTotal: totalAgilityResult,
+        isSuccess: isAgilitySuccess
+      },
+      rangedCombat: {
+        rolled: rangedCombatRoll,
+        successes: rcResult.successes,
+        isSymbol: rcResult.isSymbol,
+        modifiedTotal: totalRCResult,
+        isSuccess: isRCSuccess
+      }
+    },
+    hit: {
+      isHit,
+      targetType: input.targetingType
+    },
+    damage: damageResult,
+    effect: vehicleEffect ? {
+      outcome: vehicleEffect,
+      description: vehicleEffect === 'destroyed' 
+        ? 'Vehicle is destroyed - non-functional'
+        : vehicleEffect === 'immobilized'
+        ? 'Vehicle is immobilized - cannot move'
+        : vehicleEffect === 'damaged'
+        ? 'Vehicle suffers damage - operational but degraded'
+        : 'Armor withstands impact - vehicle operational'
+    } : null,
+    summary: {
+      outcome: isHit ? 'HIT' : 'MISS',
+      vehicleEffect: vehicleEffect || 'no-effect',
+      armorPenetrated: armorPenetration,
+      description: isHit 
+        ? `Hit on ${input.targetingType} spot - vehicle ${vehicleEffect}`
+        : 'Missed vehicle target'
+    }
+  };
+}
+
 module.exports = {
   parseDie,
   calculateSuccesses,
@@ -461,5 +825,9 @@ module.exports = {
   calculateToHitModifier,
   resolveRangedAttack,
   resolveGrenade,
-  resolveCloseCombat
+  resolveCloseCombat,
+  validateHeavyWeaponInput,
+  resolveHeavyWeapon,
+  validateVehicleCombatInput,
+  resolveVehicleCombat
 };
