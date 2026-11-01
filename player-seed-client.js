@@ -67,6 +67,10 @@
       recordTitle.textContent = "COMMS";
       recordDescription.textContent = "";
     }
+    if (document.querySelector("#player-inventory-tab")?.getAttribute("aria-current") === "page") {
+      recordTitle.textContent = "Inventory";
+      recordDescription.textContent = "";
+    }
     emptyState.hidden = true;
     form.hidden = false;
     finalizeButton.hidden = character.status !== "seed";

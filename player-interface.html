@@ -16,6 +16,20 @@
     .comms-row p { grid-column: 1 / -1; margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
     .comms-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
     .comms-compose button:disabled { opacity: .5; cursor: not-allowed; }
+    .inventory-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid #89957f; overflow-wrap: anywhere; }
+    .inventory-row p { grid-column: 1 / -1; margin: 0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inventory-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; border: 0; min-width: 0; }
+    .inventory-editor .wide { grid-column: 1 / -1; }
+    .inventory-editor label { display: grid; gap: 5px; min-width: 0; font-size: 11px; }
+    .inventory-editor input, .inventory-editor select, .inventory-editor textarea { width: 100%; min-width: 0; padding: 9px; border: 1px solid #89957f; color: #202b23; background: #edf0e7; }
+    .inventory-editor input[type="checkbox"] { width: auto; justify-self: start; }
+    .inventory-editor button:disabled { opacity: .5; cursor: not-allowed; }
+    .inventory-proposal { padding: 16px 0; border-bottom: 1px solid #89957f; overflow-wrap: anywhere; }
+    .inventory-proposal p { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inventory-band { margin-top: 20px; padding-top: 16px; border-top: 1px solid #89957f; }
+    .inventory-row .report-actions, .inventory-editor .report-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .inventory-row output { min-width: 96px; }
+    #inventory-accepted { max-height: 320px; overflow: auto; }
     :root {
       color-scheme: light;
       --ink: #202b23;
@@ -357,7 +371,15 @@
           </div>
         </div>
       </section>
-      <section class="player-panel" data-panel="inventory" aria-label="Personal inventory" hidden>
+      <section class="player-panel inventory-workspace" data-panel="inventory" data-inventory-role="player" aria-label="Personal inventory" hidden>
+        <div class="map-record-head"><h2 id="player-inventory-name">Inventory</h2><button class="player-seed-refresh" id="refresh-inventory" type="button" disabled>Refresh</button></div>
+        <p id="inventory-status" role="status">Select an assigned campaign.</p>
+        <p class="inventory-source-note">Source claims: RB / rule book, GM / GM-defined, UF / unverified. Carrying effects and dice-governed actions remain GM-managed.</p>
+        <section class="inventory-band"><h2>Accepted inventory</h2><div id="inventory-accepted"></div></section>
+        <section class="inventory-band"><h2 id="inventory-editor-title">New item proposal</h2><form id="inventory-item-form"><fieldset class="inventory-editor" id="inventory-editor" disabled></fieldset></form></section>
+        <section class="inventory-band"><h2>Proposals and review history</h2><div id="inventory-proposals"></div></section>
+      </section>
+      <section class="player-panel prototype-sample" data-panel="inventory-preview" aria-label="Inventory visual prototype" hidden>
         <div class="inventory-layout">
           <div class="inventory-content">
             <div class="list-heading">
@@ -486,10 +508,10 @@
       </section>
     </section>
     <nav class="device-controls" aria-label="Player quick access">
-      <div class="control-label"><span>Player views</span><span>Inactive views are not connected</span></div>
+      <div class="control-label"><span>Player views</span><span>Assigned campaign</span></div>
       <div class="action-bar">
         <button class="action-button" id="player-sitrep-tab" type="button" title="Situation report" data-view-state="active">Sitrep</button>
-        <button class="action-button tab-inactive" type="button" disabled title="Inactive / player inventory is not connected" data-view-state="inactive">Inventory</button>
+        <button class="action-button" id="player-inventory-tab" type="button" title="Assigned inventory" data-view-state="active">Inventory</button>
         <button class="action-button" id="player-character-tab" type="button" aria-current="page" title="Assigned character" data-view-state="active">Character</button>
         <button class="action-button" id="player-comms-tab" type="button" title="Campaign COMMS" data-view-state="active">COMMS</button>
         <button class="action-button" id="player-map-tab" type="button" title="Published campaign map" data-view-state="active">Map</button>
@@ -518,6 +540,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>
+  <script src="/inventory-client.js" defer></script>
   <script>
     if (document.body.dataset.enableLocalPlayerPreview === "true") {
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];

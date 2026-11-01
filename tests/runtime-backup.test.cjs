@@ -14,6 +14,7 @@ const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("../serv
 const { getGMReport, updateGMReport, getPlayerReport } = require("../server/situation-reports.cjs");
 const { getGMMap, updateGMMap, getPlayerMap } = require("../server/map-publications.cjs");
 const { listComms, sendComms } = require("../server/comms.cjs");
+const { getPlayerInventory, createInventoryProposal, reviewInventoryProposal, manageGMInventory, validateInventoryBackup } = require("../server/inventory.cjs");
 
 function createGm(database, id, username) {
   const timestamp = new Date().toISOString();
@@ -21,6 +22,56 @@ function createGm(database, id, username) {
     (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role)
     VALUES (?, ?, ?, 0, ?, ?, 'gm')`).run(id, username, "test-only-hash", timestamp, timestamp);
 }
+
+test("inventories and pending proposals recover atomically without reviving stale item editors", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-inventory-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database = openRuntimeDatabase(path);
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const playerId = database.prepare("SELECT account_id FROM player_seats WHERE campaign_id = ?").get(campaignId).account_id;
+    const item = { name: "GM-defined ration", quantity: 2, carryLocation: "backpack", sourceCategory: "UF", sourceReference: "", details: "No automated rules" };
+    const { proposal } = createInventoryProposal(database, playerId, campaignId, { kind: "add", item });
+    reviewInventoryProposal(database, "gm-owner", campaignId, proposal.id,
+      { decision: "approve", sourceCategory: "GM", sourceReference: "Campaign ruling", confirmSource: true });
+    const accepted = getPlayerInventory(database, playerId, campaignId).items[0];
+    const pending = createInventoryProposal(database, playerId, campaignId,
+      { kind: "update", itemId: accepted.id, expectedItemRevision: 0, item: { ...item, quantity: 5 } }).proposal;
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    assert.equal(backup.data.inventoryItems.length, 1); assert.equal(backup.data.inventoryProposals.length, 2);
+    assert.equal(backup.data.inventoryProposals.find((row) => row.id === proposal.id).item_id, accepted.id);
+    const invalid = structuredClone(backup.data); invalid.inventoryItems[0].character_id = "foreign-character";
+    assert.throws(() => validateInventoryBackup(invalid), /Invalid inventory/);
+    database.close(); database = openRuntimeDatabase(path);
+    assert.equal(getPlayerInventory(database, playerId, campaignId).items[0].quantity, 2);
+    manageGMInventory(database, "gm-owner", campaignId, { kind: "update", characterId: getPlayerInventory(database, playerId, campaignId).characterId,
+      itemId: accepted.id, expectedItemRevision: 0, item: { ...item, quantity: 9, sourceCategory: "GM" }, confirmSource: true });
+    assert.throws(() => reviewInventoryProposal(database, "gm-owner", campaignId, pending.id,
+      { decision: "approve", sourceCategory: "GM", sourceReference: "Campaign", confirmSource: true }), /revision changed/);
+    const revision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    database.exec(`CREATE TRIGGER fail_inventory_restore BEFORE INSERT ON inventory_items
+      BEGIN SELECT RAISE(ABORT, 'inventory restore failure'); END;`);
+    assert.throws(() => restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision }), /inventory restore failure/);
+    assert.equal(getPlayerInventory(database, playerId, campaignId).items[0].quantity, 9);
+    database.exec("DROP TRIGGER fail_inventory_restore");
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision });
+    let restored = getPlayerInventory(database, playerId, campaignId);
+    assert.equal(restored.items[0].id, accepted.id); assert.equal(restored.items[0].quantity, 2);
+    assert.equal(restored.items[0].revision, 2);
+    assert.equal(restored.proposals.find((row) => row.id === pending.id).expectedItemRevision, 2);
+    assert.throws(() => manageGMInventory(database, "gm-owner", campaignId, { kind: "update", characterId: restored.characterId,
+      itemId: accepted.id, expectedItemRevision: 0, item, confirmSource: true }), /revision changed/);
+    reviewInventoryProposal(database, "gm-owner", campaignId, pending.id,
+      { decision: "approve", sourceCategory: "GM", sourceReference: "Restored campaign ruling", confirmSource: true });
+    database.close(); database = openRuntimeDatabase(path);
+    restored = getPlayerInventory(database, playerId, campaignId);
+    assert.equal(restored.items[0].quantity, 5); assert.equal(restored.items[0].revision, 3);
+    assert.equal(restored.proposals.find((row) => row.id === pending.id).status, "approved");
+  } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
+});
 
 test("COMMS messages persist and restore with immutable sender/time snapshots and atomic rollback", () => {
   const directory = mkdtempSync(join(tmpdir(), "fieldbook-comms-test-"));

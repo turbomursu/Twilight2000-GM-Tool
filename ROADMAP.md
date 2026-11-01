@@ -14,7 +14,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Current Baseline
 
-The GM Tool has owner-scoped SQLite APIs for supported campaign records, report/map publication, and COMMS. Character, Sitrep, Map, and COMMS are connected; Inventory remains inactive. Players and GMs send single-line campaign broadcasts with server-derived identity and date/day stamps; missing clock data is explicit. Four-seat isolation, spoof rejection, archive ordering, persistence, and recovery pass tests. Browser checks verify player sends, GM replies, inert text, failure preservation, and campaign-switch races. Recovery restores message history but withdraws report/map publications. Offline maps, inventory, rules-governed gameplay, and publication history remain planned.
+Supported campaign records, publications, COMMS, inventories, and proposals use owner-scoped SQLite APIs. All five handset views are connected. Player inventory additions, edits, quantities, and removals stay pending until GM approval; the GM can also stock/correct inventories. Source classification is explicitly GM-reviewed and UF stays unverified. Four-seat isolation, stale reviews, source checks, persistence, and recovery pass tests; synthetic browser checks verify proposal/approval/quantity workflows and safe text. Rules-governed item actions, condition publishing, offline maps, and full audit/history remain planned. Next priority: GM-managed condition records and own-seat projection without unverified rules effects.
 
 ## Delivery Principles
 
@@ -93,7 +93,7 @@ The GM Tool has owner-scoped SQLite APIs for supported campaign records, report/
 - From the GM Tool, let the GM add, remove, edit, preview, publish, and withdraw report information; show whether changes are drafts or published.
 - Keep GM notes, hidden threats, unrevealed state, and other players' private data out of player-facing output by default.
 - Allow players to submit change requests only for their own assigned character and inventory. Keep requests pending until the GM reviews and applies them; route dice-governed actions through the rules-verified item-action workflow planned in Phase 4.
-- Implemented slice: finalized character-field edits are submitted by the assigned player as one pending request per character; the GM can approve or reject it. Broader character/inventory changes and shared player runtime remain in progress.
+- Implemented slice: finalized character edits and inventory add/update/remove proposals require owning-GM review. Inventory item revisions prevent stale approvals, and accepted source data is independently confirmed by the GM. Broader rules-governed character/item actions remain in progress.
 - Expand current optimistic report revision checks into publication history and actor audit records so the GM can inspect previous publications; this history is not implemented yet.
 - Add missions and a campaign event ledger as GM-managed runtime records.
 
@@ -107,6 +107,7 @@ The GM Tool has owner-scoped SQLite APIs for supported campaign records, report/
 - Implement route modifiers only after Fourth Edition procedures are verified; otherwise label them as GM-entered campaign conditions.
 - Add convoy operations, cargo manifests, inventories, stockpiles, consumption, and resource distribution.
 - Add player-owned character inventories and item actions. Implement dice-governed procedures only after verification against authoritative Fourth Edition sources; record inputs, roll, and outcome, and send ambiguous cases to the GM.
+- Implemented bookkeeping slice: owned accepted items, manual carry locations/quantities, RB/GM/UF claims and citations, direct GM stocking/corrections, and pending player changes. Inventories/proposals participate in atomic backups; item revisions advance during restore and valid saved pending proposals are rebased. No weights, carrying penalties, weapon statistics, transfer rules, or dice-governed actions are computed. These remain separate source-verified work.
 - Allow players to adjust quantities in their assigned inventories. Compute carrying load and apply any rules penalties only after the Fourth Edition procedure, relevant character inputs, and item weights are verified; otherwise display missing data and leave the effect GM-managed.
 - Use source-referenced Fourth Edition item data wherever applicable. Categorize sources as RB (rule book), GM (GM-defined), or UF (unverified). Let players submit new items and item-data edits as pending proposals; treat the player's category as a claim until GM verification and acceptance.
 - Add resource contracts and automated resupply as configurable, previewable GM actions.

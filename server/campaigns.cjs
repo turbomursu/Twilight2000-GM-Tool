@@ -7,6 +7,7 @@ const { getRuntimeFactionLayers, updateRuntimeFactionLayers } = require("./runti
 const { getGMReport, updateGMReport } = require("./situation-reports.cjs");
 const { getGMMap, updateGMMap } = require("./map-publications.cjs");
 const { listComms, sendComms } = require("./comms.cjs");
+const { getGMInventory, reviewInventoryProposal, manageGMInventory } = require("./inventory.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -103,6 +104,23 @@ function createCampaignHandler({ database }) {
 
     if (request.method === "GET" && url.pathname === "/api/campaigns") {
       return sendJson(response, 200, { campaigns: listRuntimeCampaigns(database, account.id) });
+    }
+    const inventoryMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/inventory(?:\/proposals\/([^/]+)\/review)?$/);
+    if (inventoryMatch) {
+      if (!(request.method === "GET" && !inventoryMatch[2]) && request.method !== "POST") return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId; let proposalId;
+        try { campaignId = decodeURIComponent(inventoryMatch[1]); proposalId = inventoryMatch[2] ? decodeURIComponent(inventoryMatch[2]) : null; }
+        catch { throw new HttpError(400, "Invalid inventory ID."); }
+        const result = request.method === "GET" ? { inventory: getGMInventory(database, account.id, campaignId) }
+          : proposalId ? reviewInventoryProposal(database, account.id, campaignId, proposalId, await readJsonBody(request))
+            : manageGMInventory(database, account.id, campaignId, await readJsonBody(request));
+        return result.inventory ? sendJson(response, 200, result) : sendJson(response, 404, { error: "Runtime campaign not found." });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : /not found/.test(error.message) ? 404
+          : /revision changed|already reviewed|assignment changed|limit reached/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
     }
     const commsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/comms$/);
     if (commsMatch) {

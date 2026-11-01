@@ -262,7 +262,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 9) {
+    if (version > 10) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -403,6 +403,46 @@ function openRuntimeDatabase(path = ":memory:") {
       throw error;
     }
   }
+  if (version < 10) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE inventory_items (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        character_id TEXT NOT NULL,
+        revision INTEGER NOT NULL CHECK (revision >= 0),
+        active INTEGER NOT NULL CHECK (active IN (0, 1)),
+        item_json TEXT NOT NULL,
+        reviewed_by TEXT NOT NULL REFERENCES accounts(id),
+        reviewed_at TEXT NOT NULL,
+        FOREIGN KEY (campaign_id, character_id) REFERENCES characters(campaign_id, id),
+        UNIQUE (campaign_id, character_id, id)
+      ) STRICT;
+      CREATE TABLE inventory_proposals (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        character_id TEXT NOT NULL,
+        submitter_account_id TEXT NOT NULL REFERENCES accounts(id),
+        kind TEXT NOT NULL CHECK (kind IN ('add', 'update', 'remove')),
+        item_id TEXT,
+        expected_item_revision INTEGER,
+        proposed_json TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+        submitted_at TEXT NOT NULL,
+        reviewed_by TEXT REFERENCES accounts(id),
+        reviewed_at TEXT,
+        review_note TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY (campaign_id, character_id) REFERENCES characters(campaign_id, id),
+        FOREIGN KEY (campaign_id, character_id, item_id) REFERENCES inventory_items(campaign_id, character_id, id)
+      ) STRICT;
+      CREATE UNIQUE INDEX one_pending_inventory_target ON inventory_proposals(item_id)
+        WHERE status = 'pending' AND item_id IS NOT NULL;
+      CREATE INDEX inventory_by_character ON inventory_items(campaign_id, character_id, active);
+      CREATE INDEX inventory_proposals_by_campaign ON inventory_proposals(campaign_id, status, submitted_at);
+      PRAGMA user_version = 10;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
   return database;
 }
 
@@ -473,6 +513,8 @@ function collectRuntimeSave(database, gmAccountId, runtimeId, options = {}) {
     situationReport: database.prepare("SELECT campaign_id, revision, draft_json FROM situation_reports WHERE campaign_id = ?").get(runtimeId) || null,
     mapPublication: database.prepare("SELECT campaign_id, revision, draft_json FROM map_publications WHERE campaign_id = ?").get(runtimeId) || null,
     commsMessages: queryRows("SELECT * FROM comms_messages WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
+    inventoryItems: queryRows("SELECT * FROM inventory_items WHERE campaign_id = ? ORDER BY id", runtimeId),
+    inventoryProposals: queryRows("SELECT * FROM inventory_proposals WHERE campaign_id = ? ORDER BY id", runtimeId),
     routeStops: queryRows("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal", runtimeId),
     personnel: queryRows("SELECT * FROM personnel WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
     journalEntries: queryRows("SELECT * FROM journal_entries WHERE campaign_id = ? ORDER BY id", runtimeId),
@@ -506,7 +548,10 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     || runtimeBackupChecksum(payload) !== checksum) {
     fail("The runtime backup checksum is invalid; no data was restored.");
   }
-  const data = { ...backup.data, commsMessages: Object.hasOwn(backup.data, "commsMessages") ? backup.data.commsMessages : [] };
+  const data = { ...backup.data,
+    commsMessages: Object.hasOwn(backup.data, "commsMessages") ? backup.data.commsMessages : [],
+    inventoryItems: Object.hasOwn(backup.data, "inventoryItems") ? backup.data.inventoryItems : [],
+    inventoryProposals: Object.hasOwn(backup.data, "inventoryProposals") ? backup.data.inventoryProposals : [] };
   if (!data.campaign || data.campaign.runtime_id !== targetRuntimeId
     || data.campaign.schema_version !== 1 || data.campaign.revision !== backup.sourceRevision
     || !data.setupImport || data.setupImport.runtime_campaign_id !== targetRuntimeId
@@ -529,7 +574,9 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     characters: 1000,
     playerSeats: 4,
     characterChangeRequests: 10000,
-    commsMessages: 10000
+    commsMessages: 10000,
+    inventoryItems: 5000,
+    inventoryProposals: 10000
   };
   for (const [key, maximum] of Object.entries(limits)) {
     if (!Array.isArray(data[key]) || data[key].length > maximum) fail(`The runtime backup has an invalid ${key} list.`);
@@ -562,7 +609,9 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     characters: "campaign_id",
     playerSeats: "campaign_id",
     characterChangeRequests: "campaign_id",
-    commsMessages: "campaign_id"
+    commsMessages: "campaign_id",
+    inventoryItems: "campaign_id",
+    inventoryProposals: "campaign_id"
   };
   for (const [tableKey, campaignKey] of Object.entries(campaignKeys)) {
     if (data[tableKey].some((row) => row[campaignKey] !== targetRuntimeId)) fail(`The runtime backup contains a ${tableKey} row for another campaign.`);
@@ -618,6 +667,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
   });
   const characters = new Map(data.characters.map((character) => [character.id, character]));
   const memberships = new Map(data.campaignMemberships.map((membership) => [membership.account_id, membership.role]));
+  require("./inventory.cjs").validateInventoryBackup(data);
   const messageIds = new Set();
   const messageOrders = new Set();
   data.commsMessages.forEach((message) => {
@@ -693,6 +743,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     }
 
     const deleteTables = [
+      ["inventory_proposals", "campaign_id"], ["inventory_items", "campaign_id"],
       ["comms_messages", "campaign_id"],
       ["character_change_requests", "campaign_id"], ["player_seats", "campaign_id"], ["characters", "campaign_id"],
       ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
@@ -702,6 +753,8 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
       ["locations", "runtime_campaign_id"], ["maps", "runtime_campaign_id"], ["setup_imports", "runtime_campaign_id"],
       ["campaign_memberships", "campaign_id"]
     ];
+    const inventoryRevisions = new Map(database.prepare("SELECT id, revision FROM inventory_items WHERE campaign_id = ?")
+      .all(targetRuntimeId).map((item) => [item.id, item.revision]));
     deleteTables.forEach(([table, column]) => database.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).run(targetRuntimeId));
 
     const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
@@ -749,6 +802,15 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("journal_entries", ["campaign_id", "id", "title", "body", "entry_date", "kind", "created_at"], data.journalEntries);
     insertRows("comms_messages", ["id", "campaign_id", "sender_account_id", "sender_role", "sender_label", "message_text", "game_date", "day_number", "created_at", "sort_order"], data.commsMessages);
     insertRows("characters", ["id", "campaign_id", "status", "fields_json", "created_at", "updated_at"], data.characters);
+    const restoredItems = data.inventoryItems.map((item) => ({ ...item, revision: Math.max(item.revision, inventoryRevisions.get(item.id) ?? 0) + 1 }));
+    const restoredItemRevisions = new Map(restoredItems.map((item) => [item.id, item.revision]));
+    const savedItemRevisions = new Map(data.inventoryItems.map((item) => [item.id, item.revision]));
+    const restoredProposals = data.inventoryProposals.map((proposal) => ({ ...proposal,
+      expected_item_revision: proposal.status === "pending" && proposal.kind !== "add"
+        && proposal.expected_item_revision === savedItemRevisions.get(proposal.item_id)
+        ? restoredItemRevisions.get(proposal.item_id) : proposal.expected_item_revision }));
+    insertRows("inventory_items", ["id", "campaign_id", "character_id", "revision", "active", "item_json", "reviewed_by", "reviewed_at"], restoredItems);
+    insertRows("inventory_proposals", ["id", "campaign_id", "character_id", "submitter_account_id", "kind", "item_id", "expected_item_revision", "proposed_json", "status", "submitted_at", "reviewed_by", "reviewed_at", "review_note"], restoredProposals);
     insertRows("player_seats", ["id", "campaign_id", "account_id", "character_id", "display_label", "active", "assigned_at"], data.playerSeats);
     insertRows("character_change_requests", ["id", "campaign_id", "seat_id", "character_id", "requested_fields_json", "status", "submitted_at", "reviewer_account_id", "reviewed_at", "review_note"], data.characterChangeRequests);
 

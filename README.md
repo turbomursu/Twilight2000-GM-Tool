@@ -12,7 +12,7 @@ Run the dependency-free test suite with `node --test`. Node is only required for
 
 ## LAN Auth API
 
-The Node service enforces GM/player roles and campaign ownership. Dashboard records, factions, prominence, report/map drafts, and COMMS messages persist in SQLite. GMs explicitly publish reports/maps; active players and GMs broadcast through their campaign channel. Inventory and broader rules-governed gameplay remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 without encryption. Use only on a trusted LAN, never the internet or untrusted networks.
+The Node service enforces GM/player roles and campaign ownership. Supported campaign records, report/map drafts, COMMS, inventories, and proposals persist in SQLite. Players propose inventory changes for GM review; the GM can also stock and correct campaign character inventories directly. Carrying effects, verified item catalogs, and dice-governed actions remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 without encryption. Use only on a trusted LAN, never the internet or untrusted networks.
 
 In PowerShell, configure a one-time bootstrap token before starting the service:
 
@@ -125,6 +125,23 @@ COMMS refreshes on opening, **Refresh**, returning to the page, and every 15 sec
 
 Runtime-v1 backups include the complete stored COMMS archive, not just the visible 200 messages. Restore validates campaign/sender references, text, time, and ordering and preserves IDs and snapshots atomically. Older backups without `commsMessages` recover an empty archive. Credentials remain excluded, and referenced accounts must exist on the host. Restart an existing Node service to load the new endpoints and migration.
 
+### Inventory API
+
+Open **Inventory** on the handset to see accepted items, submit a new item, edit an item/quantity, or propose removal. Nothing changes accepted inventory until the GM approves. Open **Inventories** on the GM desk and choose a character to stock/correct/remove items or approve/reject proposals. Accepted rows display RB/GM/UF source labels. Item details and review notes are visible to the assigned player, not private GM notes.
+
+An item has exactly `{ "name": "Field ration", "quantity": 2, "carryLocation": "backpack", "sourceCategory": "UF", "sourceReference": "", "details": "GM-managed campaign equipment" }`. Limits: name 100 characters, reference 240, details 2000, integer quantity 0-1000000. Carry locations are `combat-gear`, `backpack`, `tiny-items`, or `unassigned`. These are bookkeeping fields, not verified rules calculations. No weight, capacity, or weapon-stat calculations are accepted or inferred.
+
+- Player `GET /api/player/campaigns/:id/inventory` returns `{ "inventory": { "characterId": "...", "displayLabel": "...", "items": [ ... ], "proposals": [ ... ] } }` for their active assigned character only. Items include stable ID, item revision, accepted fields, and review timestamp; proposal history is limited to the submitting account.
+- Player `POST /api/player/campaigns/:id/inventory/proposals` accepts `{ "kind": "add", "item": { ... } }`, `{ "kind": "update", "itemId": "...", "expectedItemRevision": 0, "item": { ... } }`, or `{ "kind": "remove", "itemId": "...", "expectedItemRevision": 0 }`. It returns `202` with a pending proposal. Character IDs, acceptance decisions, source verification, or other unknown payload fields are rejected. Existing-item targets must belong to the player's assigned character.
+- GM `GET /api/campaigns/:id/inventory` returns campaign revision and each campaign character's accepted items/proposals. GM `POST` on the same route directly adds/updates/removes using the above shapes plus `characterId`; additions/edits also require `confirmSource: true`. The source category/reference are inside `item`. Existing-item changes require a current item revision.
+- GM `POST /api/campaigns/:id/inventory/proposals/:proposalId/review` accepts `{ "decision": "approve", "sourceCategory": "GM", "sourceReference": "Campaign ruling", "confirmSource": true, "reviewNote": "Player-visible feedback" }`, or `{ "decision": "reject", "reviewNote": "..." }`. Removal approval needs no new source data. Add/edit approval requires explicit source review; RB requires a reference. The GM can override the claimed category/reference. UF remains unverified after acceptance; source confirmation is a GM attestation, not automatic verification against a book.
+
+Writes are transactional, same-origin, and GM/seat-scoped. Stale revisions, already-reviewed proposals, changed assignments, duplicate pending targets, or limits return `409`; inaccessible records return `404`; invalid fields/source confirmation return `422`; unauthenticated/wrong-role requests return `401`/`403`. Limits are 200 active items per character, 5000 retained item rows per campaign, 20 pending proposals per character, one pending proposal per existing item, and 10000 proposal records per campaign. Views show pending requests first plus recent history, up to 100 records; full stored records are backed up.
+
+Visible inventory views refresh on opening, Refresh, return, and every 15 seconds. Edited GM review fields pause automatic refresh; explicit refresh asks before discarding them. Unsaved item fields survive failed saves. Refresh before retrying an unconfirmed request to avoid duplicates. Removed items are retained inactive for history. Legacy browser-local sample inventory is not automatically migrated. Rules-backed item actions, transfers, catalogs, and encumbrance remain planned; the UI labels unclear effects GM-managed.
+
+Runtime-v1 backups add optional `inventoryItems`/`inventoryProposals` arrays. Restore validates fields, source/reference requirements, campaign/character/submitter/reviewer relationships, and limits. It preserves IDs but advances item revisions to `max(current, saved) + 1`; matching saved pending proposals are rebased to the restored revision, while already-stale proposals remain stale. Failed restores roll back all changes. Older backups without these arrays recover empty inventories/proposals. Restart an existing Node service to load the migration and endpoints.
+
 ## Included
 
 - Campaign situation dashboard and illustrated route sketch
@@ -134,13 +151,13 @@ Runtime-v1 backups include the complete stored COMMS archive, not just the visib
 - Browser-local autosave and JSON campaign export
 - Standalone [Campaign Setup Tool prototype](campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
 - Optional development fixture seeds a separate SQLite `The Long Road` runtime with clock/resources, route stops, personnel, journal, and a sample player seed for testing the runtime read API.
-- Authenticated [Player Interface](player-interface.html) with Character, published Sitrep/Map, and campaign COMMS. Inventory remains inactive; legacy samples are not connected runtime data.
+- Authenticated [Player Interface](player-interface.html) with Character, Inventory, published Sitrep/Map, and COMMS. Accepted inventory and own proposals are server-backed; legacy samples remain hidden prototype data.
 
 ## Ruleset Fidelity
 
 When a feature models a game mechanic, use the Twilight: 2000 Fourth Edition core rules and applicable official supplements. Keep campaign rulings and homebrew distinct, and do not silently substitute guessed procedures. The current dashboard is a campaign bookkeeping aid, not a complete rules engine; consult the rulebooks for procedures it does not explicitly implement.
 
-Campaign data is stored in this browser using local storage. Export a JSON record before clearing browser data or moving to another browser. The sample campaign can be removed or edited in the page's script.
+Standalone setup drafts and local sample records use browser storage. Server campaign records, inventories, and proposals use SQLite and private runtime backups; browser sample exports are not substitutes for database recovery.
 
 ## Product Direction
 

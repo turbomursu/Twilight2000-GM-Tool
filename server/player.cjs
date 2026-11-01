@@ -3,6 +3,7 @@ const { createCharacterChangeRequest, finalizePlayerSeed, getPlayerCharacter, li
 const { getPlayerReport } = require("./situation-reports.cjs");
 const { getPlayerMap } = require("./map-publications.cjs");
 const { listComms, sendComms } = require("./comms.cjs");
+const { getPlayerInventory, createInventoryProposal } = require("./inventory.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -69,6 +70,22 @@ function createPlayerHandler({ database }) {
     }
 
     const pathname = new URL(request.url, "http://fieldbook.invalid").pathname;
+    const inventoryMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/inventory(?:\/(proposals))?$/);
+    if (inventoryMatch) {
+      if (!(request.method === "GET" && !inventoryMatch[2]) && !(request.method === "POST" && inventoryMatch[2])) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(inventoryMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const result = request.method === "GET" ? { inventory: getPlayerInventory(database, account.id, campaignId) }
+          : createInventoryProposal(database, account.id, campaignId, await readJsonBody(request));
+        return result.inventory === null ? sendJson(response, 404, { error: "Assigned campaign not found." })
+          : sendJson(response, request.method === "POST" ? 202 : 200, result);
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : /not found/.test(error.message) ? 404
+          : /revision changed|pending proposal|limit reached/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
     const commsMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/comms$/);
     if (commsMatch) {
       if (!["GET", "POST"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });

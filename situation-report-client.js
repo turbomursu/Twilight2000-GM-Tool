@@ -166,9 +166,11 @@
     function view(target) {
       const mapTab = document.querySelector("#player-map-tab");
       const commsTab = document.querySelector("#player-comms-tab");
+      const inventoryTab = document.querySelector("#player-inventory-tab");
       document.querySelector("#player-seed-title").textContent = target === "situation" ? "Situation report"
         : target === "map" ? "Player map"
         : target === "comms" ? "COMMS"
+        : target === "inventory" ? "Inventory"
         : document.querySelector("#player-record-state").textContent.startsWith("Playable") ? "Playable character" : "Character seed";
       document.querySelector("#player-record-description").textContent = target !== "character" ? ""
         : document.querySelector("#player-record-state").textContent;
@@ -176,8 +178,8 @@
         item.hidden = item.dataset.panel !== target;
         item.classList.toggle("active", !item.hidden);
       });
-      [sitrepTab, characterTab, mapTab, commsTab].filter(Boolean).forEach((button) => button.removeAttribute("aria-current"));
-      (target === "situation" ? sitrepTab : target === "map" ? mapTab : target === "comms" ? commsTab : characterTab).setAttribute("aria-current", "page");
+      [sitrepTab, characterTab, mapTab, commsTab, inventoryTab].filter(Boolean).forEach((button) => button.removeAttribute("aria-current"));
+      (target === "situation" ? sitrepTab : target === "map" ? mapTab : target === "comms" ? commsTab : target === "inventory" ? inventoryTab : characterTab).setAttribute("aria-current", "page");
       if (target === "situation") { clear(); status.textContent = "Refreshing report..."; load(); }
     }
     sitrepTab.addEventListener("click", () => view("situation"));

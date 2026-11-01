@@ -50,6 +50,95 @@ async function bootstrapGM(origin) {
   return response.headers.get("set-cookie").split(";")[0];
 }
 
+test("player inventories isolate four seats and apply item/source/quantity changes only after owning GM approval", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const imported = await fetch(`${origin}/api/campaigns/import-setup`, { method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(validSetupPackage()) });
+  const { campaign } = await imported.json();
+  const gm = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  const addAccount = database.prepare(`INSERT INTO accounts
+    (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const cookies = [];
+  async function login(username) {
+    const response = await fetch(`${origin}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }) });
+    assert.equal(response.status, 200); return response.headers.get("set-cookie").split(";")[0];
+  }
+  for (let seat = 1; seat <= 4; seat += 1) {
+    const username = `inventory-player-${seat}`;
+    addAccount.run(username, username, gm.password_hash, "player", gm.id, gm.created_at, gm.updated_at);
+    createPlayerSeed(database, gm.id, campaign.id, { username, displayLabel: `Player ${seat}`,
+      fields: [{ key: "private", label: "Private", value: "Other private character fields", required: false }] });
+    cookies.push(await login(username));
+  }
+  addAccount.run("inventory-other-gm", "inventory-other-gm", gm.password_hash, "gm", null, gm.created_at, gm.updated_at);
+  const otherGMCookie = await login("inventory-other-gm");
+  const playerPath = `${origin}/api/player/campaigns/${campaign.id}/inventory`;
+  const gmPath = `${origin}/api/campaigns/${campaign.id}/inventory`;
+  const read = async (authCookie = cookies[0]) => (await (await fetch(playerPath, { headers: { Cookie: authCookie } })).json()).inventory;
+  const post = (path, authCookie, body, headers = {}) => fetch(path, { method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: authCookie, ...headers }, body: JSON.stringify(body) });
+  const propose = (body, authCookie = cookies[0], headers = {}) => post(`${playerPath}/proposals`, authCookie, body, headers);
+  const review = (id, body, authCookie = cookie) => post(`${gmPath}/proposals/${id}/review`, authCookie, body);
+  const item = { name: "Field ration <img src=x>", quantity: 2, carryLocation: "backpack", sourceCategory: "RB", sourceReference: "Claimed reference", details: "Manual inventory record" };
+  assert.equal((await fetch(playerPath)).status, 401);
+  assert.equal((await fetch(gmPath, { headers: { Cookie: cookies[0] } })).status, 403);
+  assert.equal((await fetch(gmPath, { headers: { Cookie: otherGMCookie } })).status, 404);
+  assert.equal((await propose({ kind: "add", item }, cookies[0], { Origin: "http://untrusted.example" })).status, 403);
+  assert.equal((await propose({ kind: "add", item })).status, 202);
+  const first = (await read()).proposals[0];
+  assert.equal((await post(`${playerPath}/proposals`, cookies[1], { kind: "add", item }, { Origin: "http://untrusted.example" })).status, 403);
+  assert.equal((await review(first.id, { decision: "approve" }, cookies[0])).status, 403);
+  assert.equal((await review(first.id, { decision: "reject" }, otherGMCookie)).status, 404);
+  assert.equal((await read()).items.length, 0);
+  assert.equal((await review(first.id, { decision: "approve", sourceCategory: "RB", sourceReference: "", confirmSource: true })).status, 422);
+  assert.equal((await review(first.id, { decision: "approve", sourceCategory: "UF", sourceReference: "", confirmSource: false })).status, 422);
+  assert.equal((await review(first.id, { decision: "approve", sourceCategory: "GM", sourceReference: "GM campaign item", confirmSource: true })).status, 200);
+  assert.equal((await review(first.id, { decision: "reject" })).status, 409);
+  let inventory = await read(); let accepted = inventory.items[0];
+  assert.equal(accepted.quantity, 2); assert.equal(accepted.sourceCategory, "GM");
+  assert.equal(accepted.sourceReference, "GM campaign item");
+  for (const authCookie of cookies.slice(1)) { const other = await read(authCookie); assert.equal(other.items.length, 0); assert.equal(other.proposals.length, 0); }
+  assert.equal((await propose({ kind: "update", itemId: accepted.id, expectedItemRevision: 0, item }, cookies[1])).status, 404);
+  assert.equal((await propose({ kind: "add", item, characterId: inventory.characterId })).status, 422);
+  assert.equal((await propose({ kind: "add", item: { ...item, quantity: -1 } })).status, 422);
+  assert.equal((await propose({ kind: "add", item: { ...item, quantity: 1.5 } })).status, 422);
+  assert.equal((await propose({ kind: "add", item: { ...item, weight: 5 } })).status, 422);
+  const update = await propose({ kind: "update", itemId: accepted.id, expectedItemRevision: accepted.revision, item: { ...item, quantity: 5 } });
+  assert.equal(update.status, 202); const updateId = (await update.json()).proposal.id;
+  assert.equal((await read()).items[0].quantity, 2);
+  assert.equal((await propose({ kind: "remove", itemId: accepted.id, expectedItemRevision: 0 })).status, 409);
+  assert.equal((await review(updateId, { decision: "approve", sourceCategory: "UF", sourceReference: "Unverified campaign claim", confirmSource: true })).status, 200);
+  accepted = (await read()).items[0]; assert.equal(accepted.quantity, 5); assert.equal(accepted.revision, 1); assert.equal(accepted.sourceCategory, "UF");
+  assert.equal((await propose({ kind: "remove", itemId: accepted.id, expectedItemRevision: 0 })).status, 409);
+  const removal = await propose({ kind: "remove", itemId: accepted.id, expectedItemRevision: 1 });
+  const removalId = (await removal.json()).proposal.id;
+  assert.equal((await read()).items.length, 1);
+  assert.equal((await post(gmPath, cookie, { kind: "update", characterId: inventory.characterId, itemId: accepted.id,
+    expectedItemRevision: 1, item: { ...item, quantity: 6, sourceCategory: "UF" }, confirmSource: true })).status, 200);
+  assert.equal((await review(removalId, { decision: "approve" })).status, 409);
+  assert.equal((await review(removalId, { decision: "reject", reviewNote: "Stale after GM correction" })).status, 200);
+  const freshRemoval = await propose({ kind: "remove", itemId: accepted.id, expectedItemRevision: 2 });
+  const freshRemovalId = (await freshRemoval.json()).proposal.id;
+  assert.equal((await review(freshRemovalId, { decision: "approve", reviewNote: "Removed by GM" })).status, 200);
+  assert.equal((await read()).items.length, 0);
+  const fourth = await read(cookies[3]);
+  assert.equal((await post(gmPath, cookie, { kind: "add", characterId: fourth.characterId,
+    item: { ...item, sourceReference: "Test-only GM-attested Fourth Edition reference" }, confirmSource: true })).status, 200);
+  assert.equal((await read(cookies[3])).items[0].sourceCategory, "RB");
+  assert.equal((await read()).items.length, 0);
+  assert.equal((await post(gmPath, cookies[0], { kind: "add", characterId: fourth.characterId, item, confirmSource: true })).status, 403);
+  assert.equal((await post(gmPath, cookie, { kind: "add", characterId: "foreign-character", item, confirmSource: true })).status, 404);
+  const rejected = await propose({ kind: "add", item }); const rejectedId = (await rejected.json()).proposal.id;
+  assert.equal((await review(rejectedId, { decision: "reject", reviewNote: "Source not accepted" })).status, 200);
+  assert.equal((await read()).items.length, 0);
+  assert.doesNotMatch(JSON.stringify(await read()), /reviewed_by|submitter_account_id|Other private character|gm-only|password|setupPackage/);
+  database.prepare("UPDATE player_seats SET active = 0 WHERE account_id = 'inventory-player-1'").run();
+  assert.equal((await fetch(playerPath, { headers: { Cookie: cookies[0] } })).status, 404);
+  assert.equal((await propose({ kind: "add", item })).status, 404);
+});
+
 test("COMMS broadcasts single-line messages with server-owned identity and game time to GM and four seats", async (t) => {
   const { origin, database } = await startTestServer(t);
   const cookie = await bootstrapGM(origin);

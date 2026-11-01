@@ -298,6 +298,19 @@
     .comms-row p { grid-column: 1 / -1; margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
     .comms-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
     .comms-compose button:disabled { opacity: .5; cursor: not-allowed; }
+    .inventory-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+    .inventory-row p { grid-column: 1 / -1; margin: 0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inventory-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; border: 0; min-width: 0; }
+    .inventory-editor .wide { grid-column: 1 / -1; }
+    .inventory-editor label { display: grid; gap: 5px; min-width: 0; font-size: 11px; }
+    .inventory-editor input, .inventory-editor select, .inventory-editor textarea { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--line); background: white; color: var(--ink); }
+    .inventory-editor input[type="checkbox"] { width: auto; justify-self: start; }
+    .inventory-editor button:disabled { opacity: .5; cursor: not-allowed; }
+    .inventory-proposal { padding: 16px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+    .inventory-proposal p { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inventory-band { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .inventory-row output { min-width: 96px; }
+    #inventory-accepted { max-height: 320px; overflow: auto; }
     .report-copy { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
     .report-preview { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
     .topbar, .top-actions { flex-wrap: wrap; }
@@ -368,6 +381,7 @@
         <button class="nav-item" data-view="situation" aria-current="page"><span class="nav-icon" aria-hidden="true">01</span>Situation</button>
         <button class="nav-item" data-view="publication"><span class="nav-icon" aria-hidden="true">06</span>Player map</button>
         <button class="nav-item" data-view="comms"><span class="nav-icon" aria-hidden="true">07</span>COMMS</button>
+        <button class="nav-item" data-view="inventory"><span class="nav-icon" aria-hidden="true">08</span>Inventories</button>
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
@@ -481,6 +495,16 @@
           <p class="feedback" id="comms-status" role="status">Select a runtime campaign.</p>
           <ol class="comms-list" id="comms-messages" role="log" aria-label="Campaign messages" aria-live="polite" aria-relevant="additions"></ol>
           <form id="comms-form"><fieldset class="comms-compose" disabled><div class="field"><label for="comms-message">Broadcast / all campaign players</label><input id="comms-message" type="text" maxlength="240" required autocomplete="off"></div><button class="button button-primary" type="submit"><span aria-hidden="true">&#8599;</span> Send</button></fieldset></form>
+        </section>
+
+        <section class="view inventory-workspace" id="view-inventory" data-inventory-role="gm" aria-labelledby="gm-inventory-title">
+          <div class="page-heading"><div><div class="heading-tag">Assigned equipment</div><h1 id="gm-inventory-title">Player inventories</h1></div><button class="button" id="refresh-inventory" type="button" disabled>Refresh</button></div>
+          <label class="field">Character<select id="inventory-character" disabled></select></label>
+          <p class="feedback" id="inventory-status" role="status">Select a runtime campaign.</p>
+          <p class="feedback">Carrying effects and dice-governed actions: GM-managed / verified rules and weights not connected.</p>
+          <section class="inventory-band"><h2>Accepted inventory</h2><div id="inventory-accepted"></div></section>
+          <section class="inventory-band"><h2 id="inventory-editor-title">Stock item</h2><form id="inventory-item-form"><fieldset class="inventory-editor" id="inventory-editor" disabled></fieldset></form></section>
+          <section class="inventory-band"><h2>Proposals and review history</h2><div id="inventory-proposals"></div></section>
         </section>
 
         <section class="view" id="view-roster" aria-labelledby="roster-title">
@@ -626,6 +650,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/situation-report-client.js" defer></script>
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>
+  <script src="/inventory-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -873,7 +898,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
         if (view === "influence") {
@@ -1505,6 +1530,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
       });
       document.addEventListener("fieldbook:comms-updated", (event) => {
+        if (state.runtimeCampaignId === event.detail.campaignId) {
+          state.runtimeRevision = event.detail.campaignRevision;
+          persist();
+        }
+      });
+      document.addEventListener("fieldbook:inventory-updated", (event) => {
         if (state.runtimeCampaignId === event.detail.campaignId) {
           state.runtimeRevision = event.detail.campaignRevision;
           persist();
