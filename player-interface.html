@@ -30,6 +30,12 @@
     .inventory-row .report-actions, .inventory-editor .report-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .inventory-row output { min-width: 96px; }
     #inventory-accepted { max-height: 320px; overflow: auto; }
+    .player-condition-record { margin: 14px 0; padding: 12px 0; border-bottom: 1px solid #89957f; }
+    .player-condition-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .player-condition-values div { min-width: 0; }
+    .player-condition-values dt { color: #596851; font: 10px var(--mono); }
+    .player-condition-values dd { margin: 4px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .player-condition-values .wide { grid-column: 1 / -1; }
     :root {
       color-scheme: light;
       --ink: #202b23;
@@ -405,6 +411,12 @@
         </div>
       </section>
       <section class="player-panel active" data-panel="character" aria-label="Character record">
+        <section class="player-condition-record" aria-labelledby="player-condition-title">
+          <div class="map-record-head"><h2 id="player-condition-title">GM condition record</h2><button class="player-seed-refresh" id="refresh-character-conditions" type="button" disabled>Refresh conditions</button></div>
+          <p id="player-condition-status" role="status">Select an assigned campaign.</p>
+          <p class="character-placeholder">Condition effects and carrying remain GM-managed.</p>
+          <dl class="player-condition-values" id="player-condition-values" hidden></dl>
+        </section>
         <p class="player-seed-status" id="player-seed-status" role="status" aria-live="polite">Loading assigned campaigns.</p>
         <div class="character-record">
           <header class="character-identity"><div><span class="eyebrow">Assigned seed / server record</span><h2 id="player-record-name">Select a campaign</h2><span class="character-role" id="player-record-state">Character fields are supplied by your GM.</span></div></header>
@@ -541,6 +553,7 @@
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>
   <script src="/inventory-client.js" defer></script>
+  <script src="/conditions-client.js" defer></script>
   <script>
     if (document.body.dataset.enableLocalPlayerPreview === "true") {
     const buttons = [...document.querySelectorAll(".action-button[data-target]")];

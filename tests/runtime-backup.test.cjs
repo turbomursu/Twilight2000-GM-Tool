@@ -15,6 +15,7 @@ const { getGMReport, updateGMReport, getPlayerReport } = require("../server/situ
 const { getGMMap, updateGMMap, getPlayerMap } = require("../server/map-publications.cjs");
 const { listComms, sendComms } = require("../server/comms.cjs");
 const { getPlayerInventory, createInventoryProposal, reviewInventoryProposal, manageGMInventory, validateInventoryBackup } = require("../server/inventory.cjs");
+const { emptyConditions, getGMConditions, updateGMConditions, getPlayerConditions } = require("../server/conditions.cjs");
 
 function createGm(database, id, username) {
   const timestamp = new Date().toISOString();
@@ -22,6 +23,49 @@ function createGm(database, id, username) {
     (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role)
     VALUES (?, ?, ?, 0, ?, ?, 'gm')`).run(id, username, "test-only-hash", timestamp, timestamp);
 }
+
+test("condition records recover private/public data atomically and retain revision markers for old backups", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-condition-test-"));
+  const path = join(directory, "runtime.sqlite");
+  let database = openRuntimeDatabase(path);
+  try {
+    createGm(database, "gm-owner", "gm-owner");
+    const { campaignId } = seedSampleRuntime(database, "gm-owner");
+    const seat = database.prepare("SELECT account_id, character_id FROM player_seats WHERE campaign_id = ?").get(campaignId);
+    const olderBackup = exportRuntimeSave(database, "gm-owner", campaignId);
+    const value = { ...emptyConditions(), damage: 2, starving: false, notes: "Visible condition note" };
+    const update = { characterId: seat.character_id, expectedRevision: 0, conditions: value, gmNotes: "PRIVATE CONDITION PLAN" };
+    updateGMConditions(database, "gm-owner", campaignId, update);
+    const backup = exportRuntimeSave(database, "gm-owner", campaignId);
+    assert.equal(backup.data.characterConditions[0].gm_notes, "PRIVATE CONDITION PLAN");
+    database.close(); database = openRuntimeDatabase(path);
+    assert.deepEqual(getPlayerConditions(database, seat.account_id, campaignId).record.conditions, value);
+    assert.equal(getGMConditions(database, "gm-owner", campaignId).characters[0].gmNotes, "PRIVATE CONDITION PLAN");
+    updateGMConditions(database, "gm-owner", campaignId, { ...update, expectedRevision: 1, conditions: { ...value, damage: 9 } });
+    const revision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    database.exec(`CREATE TRIGGER fail_condition_restore BEFORE INSERT ON character_conditions
+      BEGIN SELECT RAISE(ABORT, 'condition restore failure'); END;`);
+    assert.throws(() => restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision }), /condition restore failure/);
+    assert.equal(getPlayerConditions(database, seat.account_id, campaignId).record.conditions.damage, 9);
+    database.exec("DROP TRIGGER fail_condition_restore");
+    restoreRuntimeSave(database, "gm-owner", campaignId, backup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: revision });
+    assert.equal(getPlayerConditions(database, seat.account_id, campaignId).record.conditions.damage, 2);
+    assert.equal(getPlayerConditions(database, seat.account_id, campaignId).record.revision, 3);
+    assert.throws(() => updateGMConditions(database, "gm-owner", campaignId, { ...update, expectedRevision: 1 }), /revision changed/);
+    const currentRevision = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+    restoreRuntimeSave(database, "gm-owner", campaignId, olderBackup,
+      { confirmReplace: true, confirmOlderBackup: true, expectedRevision: currentRevision });
+    assert.deepEqual(getPlayerConditions(database, seat.account_id, campaignId), { record: null });
+    const cleared = getGMConditions(database, "gm-owner", campaignId).characters[0];
+    assert.equal(cleared.revision, 4); assert.equal(cleared.recorded, false); assert.equal(cleared.gmNotes, "");
+    assert.throws(() => updateGMConditions(database, "gm-owner", campaignId, update), /revision changed/);
+    database.close(); database = openRuntimeDatabase(path);
+    assert.deepEqual(getPlayerConditions(database, seat.account_id, campaignId), { record: null });
+    assert.equal(getGMConditions(database, "gm-owner", campaignId).characters[0].revision, 4);
+  } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
+});
 
 test("inventories and pending proposals recover atomically without reviving stale item editors", () => {
   const directory = mkdtempSync(join(tmpdir(), "fieldbook-inventory-test-"));

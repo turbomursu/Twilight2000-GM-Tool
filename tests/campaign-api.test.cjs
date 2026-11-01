@@ -5,6 +5,7 @@ const test = require("node:test");
 const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { openRuntimeDatabase, createPlayerSeed } = require("../server/runtime-store.cjs");
+const { emptyConditions } = require("../server/conditions.cjs");
 
 const bootstrapToken = "test-only-bootstrap-token-0123456789-abcdef";
 const password = "A-correct-horse-battery-41";
@@ -49,6 +50,73 @@ async function bootstrapGM(origin) {
   assert.equal(response.status, 201);
   return response.headers.get("set-cookie").split(";")[0];
 }
+
+test("GM condition records project only each active player's values and exclude private GM notes", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const imported = await fetch(`${origin}/api/campaigns/import-setup`, { method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(validSetupPackage()) });
+  const { campaign } = await imported.json();
+  const gm = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  const addAccount = database.prepare(`INSERT INTO accounts
+    (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  async function login(username) {
+    const response = await fetch(`${origin}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }) });
+    assert.equal(response.status, 200); return response.headers.get("set-cookie").split(";")[0];
+  }
+  const cookies = []; const characterIds = [];
+  for (let seat = 1; seat <= 4; seat += 1) {
+    const username = `condition-player-${seat}`;
+    addAccount.run(username, username, gm.password_hash, "player", gm.id, gm.created_at, gm.updated_at);
+    createPlayerSeed(database, gm.id, campaign.id, { username, displayLabel: `Seat ${seat}`,
+      fields: [{ key: "private", label: "Private", value: `PRIVATE CHARACTER ${seat}`, required: false }] });
+    cookies.push(await login(username));
+    characterIds.push(database.prepare("SELECT character_id FROM player_seats WHERE account_id = ?").get(username).character_id);
+  }
+  addAccount.run("condition-other-gm", "condition-other-gm", gm.password_hash, "gm", null, gm.created_at, gm.updated_at);
+  const otherGMCookie = await login("condition-other-gm");
+  const gmPath = `${origin}/api/campaigns/${campaign.id}/conditions`;
+  const playerPath = `${origin}/api/player/campaigns/${campaign.id}/conditions`;
+  const write = (body, authCookie = cookie, headers = {}) => fetch(gmPath, { method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: authCookie, ...headers }, body: JSON.stringify(body) });
+  const read = async (authCookie) => (await fetch(playerPath, { headers: { Cookie: authCookie } })).json();
+  const value = { ...emptyConditions(), damage: 2, stress: 1, dehydrated: true, notes: "Public note <img src=x>" };
+  const update = { characterId: characterIds[0], expectedRevision: 0, conditions: value, gmNotes: "SECRET GM PLAN" };
+  assert.equal((await fetch(playerPath)).status, 401);
+  assert.equal((await fetch(gmPath, { headers: { Cookie: cookies[0] } })).status, 403);
+  assert.equal((await fetch(gmPath, { headers: { Cookie: otherGMCookie } })).status, 404);
+  assert.equal((await write(update, otherGMCookie)).status, 404);
+  assert.equal((await write(update, cookies[0])).status, 403);
+  assert.equal((await fetch(playerPath, { method: "PUT", headers: { Cookie: cookies[0], "Content-Type": "application/json" }, body: JSON.stringify(update) })).status, 405);
+  assert.equal((await write(update, cookie, { Origin: "http://untrusted.example" })).status, 403);
+  assert.deepEqual(await read(cookies[0]), { record: null });
+  for (const conditions of [{ ...value, hitCapacity: 99 }, { ...value, damage: -1 }, { ...value, stress: 1.5 },
+    { ...value, starving: "healthy" }, { ...value, notes: "x".repeat(2001) }]) {
+    assert.equal((await write({ ...update, conditions })).status, 422);
+  }
+  assert.equal((await write({ ...update, characterId: "foreign-character" })).status, 404);
+  for (let seat = 0; seat < 4; seat += 1) {
+    assert.equal((await write({ ...update, characterId: characterIds[seat], conditions: { ...value, damage: seat + 1, notes: `Own-seat note ${seat}` } })).status, 200);
+  }
+  for (let seat = 0; seat < 4; seat += 1) {
+    const response = await read(cookies[seat]);
+    assert.equal(response.record.conditions.damage, seat + 1);
+    assert.equal(response.record.conditions.notes, `Own-seat note ${seat}`);
+    assert.equal(response.record.conditions.starving, null);
+    assert.deepEqual(Object.keys(response.record).sort(), ["conditions", "revision", "schemaVersion", "updatedAt"]);
+    assert.doesNotMatch(JSON.stringify(response), /SECRET GM|gmNotes|gm_notes|PRIVATE CHARACTER|updated_by|characterId|setupPackage|factions/);
+  }
+  const gmResult = await (await fetch(gmPath, { headers: { Cookie: cookie } })).json();
+  assert.equal(gmResult.conditions.characters[0].gmNotes, "SECRET GM PLAN");
+  assert.equal((await write(update)).status, 409);
+  assert.equal((await write({ characterId: characterIds[0], expectedRevision: 1, clear: true })).status, 200);
+  assert.deepEqual(await read(cookies[0]), { record: null });
+  assert.equal((await write(update)).status, 409);
+  assert.equal((await read(cookies[1])).record.conditions.damage, 2);
+  database.prepare("UPDATE player_seats SET active = 0 WHERE account_id = 'condition-player-2'").run();
+  assert.equal((await fetch(playerPath, { headers: { Cookie: cookies[1] } })).status, 404);
+});
 
 test("player inventories isolate four seats and apply item/source/quantity changes only after owning GM approval", async (t) => {
   const { origin, database } = await startTestServer(t);

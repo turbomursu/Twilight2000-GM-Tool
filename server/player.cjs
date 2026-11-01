@@ -4,6 +4,7 @@ const { getPlayerReport } = require("./situation-reports.cjs");
 const { getPlayerMap } = require("./map-publications.cjs");
 const { listComms, sendComms } = require("./comms.cjs");
 const { getPlayerInventory, createInventoryProposal } = require("./inventory.cjs");
+const { getPlayerConditions } = require("./conditions.cjs");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -70,6 +71,14 @@ function createPlayerHandler({ database }) {
     }
 
     const pathname = new URL(request.url, "http://fieldbook.invalid").pathname;
+    const conditionMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/conditions$/);
+    if (conditionMatch) {
+      if (request.method !== "GET") return sendJson(response, 405, { error: "Read-only player conditions." });
+      let campaignId;
+      try { campaignId = decodeURIComponent(conditionMatch[1]); } catch { return sendJson(response, 400, { error: "Invalid campaign ID." }); }
+      const result = getPlayerConditions(database, account.id, campaignId);
+      return result ? sendJson(response, 200, result) : sendJson(response, 404, { error: "Assigned campaign not found." });
+    }
     const inventoryMatch = pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/inventory(?:\/(proposals))?$/);
     if (inventoryMatch) {
       if (!(request.method === "GET" && !inventoryMatch[2]) && !(request.method === "POST" && inventoryMatch[2])) return sendJson(response, 405, { error: "Method not allowed." });

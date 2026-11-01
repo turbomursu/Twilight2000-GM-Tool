@@ -311,6 +311,11 @@
     .inventory-band { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
     .inventory-row output { min-width: 96px; }
     #inventory-accepted { max-height: 320px; overflow: auto; }
+    .condition-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border: 0; padding: 0; min-width: 0; }
+    .condition-editor label { display: grid; gap: 5px; min-width: 0; font-size: 11px; }
+    .condition-editor input, .condition-editor select, .condition-editor textarea { width: 100%; min-width: 0; border: 1px solid var(--line); padding: 9px; color: var(--ink); background: white; }
+    .condition-editor .wide { grid-column: 1 / -1; }
+    .condition-editor button:disabled { opacity: .5; cursor: not-allowed; }
     .report-copy { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
     .report-preview { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
     .topbar, .top-actions { flex-wrap: wrap; }
@@ -382,6 +387,7 @@
         <button class="nav-item" data-view="publication"><span class="nav-icon" aria-hidden="true">06</span>Player map</button>
         <button class="nav-item" data-view="comms"><span class="nav-icon" aria-hidden="true">07</span>COMMS</button>
         <button class="nav-item" data-view="inventory"><span class="nav-icon" aria-hidden="true">08</span>Inventories</button>
+        <button class="nav-item" data-view="conditions"><span class="nav-icon" aria-hidden="true">09</span>Conditions</button>
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
@@ -505,6 +511,14 @@
           <section class="inventory-band"><h2>Accepted inventory</h2><div id="inventory-accepted"></div></section>
           <section class="inventory-band"><h2 id="inventory-editor-title">Stock item</h2><form id="inventory-item-form"><fieldset class="inventory-editor" id="inventory-editor" disabled></fieldset></form></section>
           <section class="inventory-band"><h2>Proposals and review history</h2><div id="inventory-proposals"></div></section>
+        </section>
+
+        <section class="view" id="view-conditions" aria-labelledby="gm-conditions-title">
+          <div class="page-heading"><div><div class="heading-tag">GM-managed record</div><h1 id="gm-conditions-title">Character conditions</h1></div><button class="button" id="reload-character-conditions" type="button" disabled>Reload</button></div>
+          <label class="field">Character<select id="condition-character" disabled></select></label>
+          <p class="feedback" id="gm-condition-status" role="status">Select a runtime campaign.</p>
+          <p class="feedback">Condition, capacity, carrying, and recovery effects remain GM-managed; no automatic rules effects are applied.</p>
+          <form id="gm-condition-form"><fieldset class="condition-editor" id="gm-condition-fields" disabled></fieldset></form>
         </section>
 
         <section class="view" id="view-roster" aria-labelledby="roster-title">
@@ -651,6 +665,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>
   <script src="/inventory-client.js" defer></script>
+  <script src="/conditions-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -898,7 +913,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(drawMap);
         if (view === "influence") {
@@ -1536,6 +1551,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
       });
       document.addEventListener("fieldbook:inventory-updated", (event) => {
+        if (state.runtimeCampaignId === event.detail.campaignId) {
+          state.runtimeRevision = event.detail.campaignRevision;
+          persist();
+        }
+      });
+      document.addEventListener("fieldbook:conditions-updated", (event) => {
         if (state.runtimeCampaignId === event.detail.campaignId) {
           state.runtimeRevision = event.detail.campaignRevision;
           persist();

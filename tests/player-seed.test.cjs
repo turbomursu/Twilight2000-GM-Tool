@@ -116,6 +116,8 @@ test("player activates, selects assigned campaign, fills only blank seed fields,
   assert.equal((await fetch(`${origin}/map-publication-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   assert.equal((await fetch(`${origin}/comms-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   assert.equal((await fetch(`${origin}/inventory-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
+  assert.match(playerPageHtml, /id="player-condition-values"/);
+  assert.equal((await fetch(`${origin}/conditions-client.js`, { headers: { Cookie: playerCookie } })).status, 200);
   const gmPage = await fetch(`${origin}/index.html`, { headers: { Cookie: playerCookie }, redirect: "manual" });
   assert.equal(gmPage.status, 302);
   assert.equal(gmPage.headers.get("location"), "/player-interface.html");

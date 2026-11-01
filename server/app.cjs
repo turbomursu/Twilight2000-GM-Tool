@@ -26,7 +26,8 @@ const PROTECTED_FILES = new Map([
   ["/situation-report-client.js", ["situation-report-client.js", "text/javascript; charset=utf-8"]],
   ["/map-publication-client.js", ["map-publication-client.js", "text/javascript; charset=utf-8"]],
   ["/comms-client.js", ["comms-client.js", "text/javascript; charset=utf-8"]],
-  ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]]
+  ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]],
+  ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]]
 ]);
 const AUTH_PATHS = new Set([
   "/api/auth/status",
