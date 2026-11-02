@@ -299,7 +299,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 19) {
+    if (version > 20) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -651,6 +651,76 @@ function openRuntimeDatabase(path = ":memory:") {
       ALTER TABLE personnel ADD COLUMN specialty TEXT;
       ALTER TABLE personnel ADD COLUMN notes TEXT DEFAULT '';
       PRAGMA user_version = 19;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 20) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE faction_relationships (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        from_faction_id TEXT NOT NULL,
+        to_faction_id TEXT NOT NULL,
+        attitude TEXT NOT NULL CHECK (attitude IN ('allied', 'neutral', 'hostile', 'unknown')),
+        notes TEXT DEFAULT '',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, from_faction_id, to_faction_id),
+        FOREIGN KEY (runtime_campaign_id, from_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (runtime_campaign_id, to_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE CASCADE
+      ) STRICT;
+      CREATE INDEX faction_relationships_from ON faction_relationships(runtime_campaign_id, from_faction_id);
+      CREATE TABLE settlement_resources (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        settlement_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('food', 'water', 'fuel', 'ammunition', 'medical', 'shelter', 'intel', 'other')),
+        status TEXT NOT NULL CHECK (status IN ('available', 'scarce', 'needed', 'unknown')),
+        notes TEXT DEFAULT '',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, settlement_id, resource_type),
+        FOREIGN KEY (runtime_campaign_id, settlement_id) REFERENCES settlements(runtime_campaign_id, id) ON DELETE CASCADE
+      ) STRICT;
+      CREATE INDEX settlement_resources_by_settlement ON settlement_resources(runtime_campaign_id, settlement_id);
+      CREATE TABLE campaign_events (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        event_type TEXT NOT NULL CHECK (event_type IN ('rumor', 'event', 'discovery', 'faction-action', 'settlement-change', 'threat', 'other')),
+        event_date TEXT NOT NULL,
+        linked_faction_id TEXT,
+        linked_settlement_id TEXT,
+        is_public INTEGER NOT NULL DEFAULT 0 CHECK (is_public IN (0, 1)),
+        gm_notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, id),
+        FOREIGN KEY (runtime_campaign_id, linked_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE SET NULL,
+        FOREIGN KEY (runtime_campaign_id, linked_settlement_id) REFERENCES settlements(runtime_campaign_id, id) ON DELETE SET NULL
+      ) STRICT;
+      CREATE INDEX campaign_events_by_date ON campaign_events(runtime_campaign_id, event_date);
+      CREATE INDEX campaign_events_by_type ON campaign_events(runtime_campaign_id, event_type);
+      CREATE TABLE threat_entries (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        threat_level TEXT NOT NULL CHECK (threat_level IN ('low', 'medium', 'high', 'critical')),
+        status TEXT NOT NULL CHECK (status IN ('emerging', 'active', 'contained', 'resolved')),
+        antagonist_type TEXT NOT NULL CHECK (antagonist_type IN ('faction', 'individual', 'force', 'event', 'other')),
+        linked_faction_id TEXT,
+        linked_settlement_id TEXT,
+        goal TEXT DEFAULT '',
+        resources_json TEXT DEFAULT '[]',
+        gm_notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, id),
+        FOREIGN KEY (runtime_campaign_id, linked_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE SET NULL,
+        FOREIGN KEY (runtime_campaign_id, linked_settlement_id) REFERENCES settlements(runtime_campaign_id, id) ON DELETE SET NULL
+      ) STRICT;
+      CREATE INDEX threat_entries_by_status ON threat_entries(runtime_campaign_id, status);
+      CREATE INDEX threat_entries_by_level ON threat_entries(runtime_campaign_id, threat_level);
+      PRAGMA user_version = 20;`);
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
