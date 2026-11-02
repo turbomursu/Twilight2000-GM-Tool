@@ -1,19 +1,20 @@
 # Twilight: 2000 Fourth Edition GM Tool - Installation Package
 
-**Version:** 1.0.0  
-**Release Date:** 2026-11-03  
+**Version:** 1.1.0
+**Release Date:** 2026-11-03
 **Status:** Production Ready ✅
 
 ---
 
 ## Package Contents
 
-### File: `t2k-gm-tool-v1.0.0.zip`
+### File: `t2k-gm-tool-v1.1.0.zip`
 
-**Size:** 2.94 MB (compressed)  
-**Uncompressed:** ~8.3 MB  
-**Files:** 207  
-**Directories:** 31  
+**Size:** 1.82 MB (compressed)
+**Uncompressed:** 2.93 MB
+**Files:** 70
+**Directories:** 2
+**SHA-256:** `E51886A3E0F7FCF7F1022775830DD938AA1909D1D695B85DBB1D278DC3688305`
 
 ### What's Inside
 
@@ -99,7 +100,7 @@
 
 1. **Extract the ZIP file**
    ```
-   Extract t2k-gm-tool-v1.0.0.zip to your desired location
+   Extract t2k-gm-tool-v1.1.0.zip to your desired location
    (e.g., C:\Games\T2K-GM-Tool)
    ```
 
@@ -114,7 +115,7 @@
    ```powershell
    .\INSTALL_SERVER.ps1
    ```
-   
+
    The script will:
    - Check Node.js installation
    - Install npm dependencies
@@ -126,7 +127,7 @@
    ```powershell
    npm start
    ```
-   
+
    You'll see:
    ```
    Fieldbook LAN API listening on http://0.0.0.0:8080
@@ -137,7 +138,7 @@
    - Network play: `http://[your-computer-ip]:8080`
 
 6. **Create GM account**
-   - Use the one-time setup token (shown in console or docs)
+   - Use the one-time setup token saved in `token.txt` in the install directory
    - Enter GM username and password
    - Click "Create GM account"
 
@@ -254,45 +255,45 @@ If problem persists, delete `data/fieldbook.sqlite` to start fresh.
 ## Features
 
 ### Campaign Management
-✅ Create and manage multiple campaigns  
-✅ Save/load campaigns from local storage  
-✅ Import/export campaign packages  
-✅ Campaign-specific settings and data  
+✅ Create and manage multiple campaigns
+✅ Save/load campaigns from local storage
+✅ Import/export campaign packages
+✅ Campaign-specific settings and data
 
 ### Combat System
-✅ Initiative tracking  
-✅ Turn management  
-✅ Automatic hit calculation  
-✅ Damage application  
-✅ Combat log recording  
+✅ Initiative tracking
+✅ Turn management
+✅ Automatic hit calculation
+✅ Damage application
+✅ Combat log recording
 
 ### Player Interface
-✅ Separate character sheets per player  
-✅ Inventory management  
-✅ Condition tracking  
-✅ Situation reporting  
-✅ Player-to-GM communication (COMMS)  
+✅ Separate character sheets per player
+✅ Inventory management
+✅ Condition tracking
+✅ Situation reporting
+✅ Player-to-GM communication (COMMS)
 
 ### Game Master Tools
-✅ Campaign clock management  
-✅ Weather and travel tracking  
-✅ NPC management  
-✅ Faction & settlement tracking  
-✅ Map visualization  
-✅ Basemap support (PMTiles)  
+✅ Campaign clock management
+✅ Weather and travel tracking
+✅ NPC management
+✅ Faction & settlement tracking
+✅ Map visualization
+✅ Basemap support (PMTiles)
 
 ### Data Management
-✅ Automatic backups  
-✅ Local data persistence (SQLite)  
-✅ Campaign data export/import  
-✅ Configurable backup intervals  
+✅ Automatic backups
+✅ Local data persistence (SQLite)
+✅ Campaign data export/import
+✅ Configurable backup intervals
 
 ### Technical Features
-✅ Rules-based combat automation  
-✅ Verified Fourth Edition mechanics  
-✅ Player seat assignment  
-✅ Session-locked HTTP (local network)  
-✅ Zero external dependencies  
+✅ Rules-based combat automation
+✅ Verified Fourth Edition mechanics
+✅ Player seat assignment
+✅ Session-locked HTTP (local network)
+✅ Zero external dependencies
 
 ---
 
@@ -425,6 +426,12 @@ This software is licensed under the **GNU General Public License v3.0 (GPL-3.0-o
 
 ## Version History
 
+### v1.1.0 (2026-11-03) — First-login account security
+- Installers generate a cryptographically random GM bootstrap token and save it to `token.txt`.
+- Player accounts use GM-issued temporary passwords and must change them before accessing protected pages or APIs.
+- Added migration and GM password reset support for existing player accounts.
+- Updated package metadata and excluded generated databases and dependencies from the installation archive.
+
 ### v1.0.0 (2026-11-03) — Production Release
 - Complete GM Tool with all features
 - Combat automation system
@@ -451,15 +458,16 @@ This tool is created to enhance gameplay experience for Twilight: 2000 campaigns
 
 ## Release Notes
 
-### Installation Package v1.0.0
+### Installation Package v1.1.0
 
-**Date:** November 3, 2026  
-**Status:** Production Ready ✅  
+**Date:** November 3, 2026
+**Status:** Production Ready ✅
 
 **What's Included:**
 - Complete standalone deployment package
-- 207 files, optimized for distribution
-- 2.94 MB compressed size
+- 70 files, optimized for distribution
+- 1.82 MB compressed size
+- Runtime database, dependencies, and token.txt excluded
 - All documentation and guides
 - Installation scripts for Windows, macOS, Linux
 - Full source code (GPL v3)

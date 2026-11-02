@@ -19,7 +19,7 @@ if (-not $isAdmin) {
 }
 
 # Step 1: Check Node.js installation
-Write-Host "[1/5] Checking Node.js installation..."
+Write-Host "[1/6] Checking Node.js installation..."
 $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
 
 if (-not $nodeInstalled) {
@@ -47,7 +47,7 @@ if ($majorVersion -lt 18) {
 
 # Step 2: Install dependencies
 Write-Host ""
-Write-Host "[2/5] Installing Node.js dependencies..."
+Write-Host "[2/6] Installing Node.js dependencies..."
 npm install
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
@@ -60,7 +60,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 3: Check server files
 Write-Host ""
-Write-Host "[3/5] Verifying server files..."
+Write-Host "[3/6] Verifying server files..."
 $serverFound = Test-Path "server\main.cjs"
 if (-not $serverFound) {
     Write-Host "ERROR: server\main.cjs not found"
@@ -74,7 +74,7 @@ Write-Host "       ✓ API handlers found"
 
 # Step 4: Verify database schema
 Write-Host ""
-Write-Host "[4/5] Verifying database configuration..."
+Write-Host "[4/6] Verifying database configuration..."
 $runtimeStoreFound = Test-Path "server\runtime-store.cjs"
 if (-not $runtimeStoreFound) {
     Write-Host "ERROR: server\runtime-store.cjs not found"
@@ -87,7 +87,7 @@ Write-Host "       ✓ Campaign data persistence configured"
 
 # Step 5: Create data directories
 Write-Host ""
-Write-Host "[5/5] Setting up data directories..."
+Write-Host "[5/6] Setting up data directories..."
 if (-not (Test-Path "data")) {
     New-Item -ItemType Directory -Path "data" | Out-Null
 }
@@ -97,6 +97,30 @@ if (-not (Test-Path "data\maps")) {
 Write-Host "       ✓ Created /data directory for campaigns"
 Write-Host "       ✓ Created /data/maps for PMTiles basemaps"
 
+# Step 6: Create the first-run GM bootstrap token
+Write-Host ""
+Write-Host "[6/6] Creating the first-run GM bootstrap token..."
+$tokenBytes = New-Object byte[] 32
+$randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $randomGenerator.GetBytes($tokenBytes)
+} finally {
+    $randomGenerator.Dispose()
+}
+$bootstrapToken = [Convert]::ToBase64String($tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+$tokenPath = Join-Path $PSScriptRoot "token.txt"
+try {
+    [System.IO.File]::WriteAllText($tokenPath, $bootstrapToken, [System.Text.Encoding]::ASCII)
+    [Environment]::SetEnvironmentVariable("FIELDBOOK_BOOTSTRAP_TOKEN", $bootstrapToken, "User")
+    $env:FIELDBOOK_BOOTSTRAP_TOKEN = $bootstrapToken
+} catch {
+    Write-Host "ERROR: Could not save the bootstrap token or configure the user environment."
+    Write-Host $_.Exception.Message
+    exit 1
+}
+Write-Host "       ✓ Saved bootstrap token to $tokenPath"
+Write-Host "       ✓ Configured FIELDBOOK_BOOTSTRAP_TOKEN for this and future sessions"
+
 Write-Host ""
 Write-Host "========================================"
 Write-Host "  INSTALLATION COMPLETE"
@@ -104,9 +128,9 @@ Write-Host "========================================"
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Run: npm start"
-Write-Host "     (Server starts on http://localhost:3000)"
-Write-Host "  2. Open browser to http://localhost:3000"
-Write-Host "  3. Use default credentials: admin/admin"
+Write-Host "     (Open a new terminal first if this installer was run from an existing terminal)"
+Write-Host "  2. Open browser to http://localhost:8080"
+Write-Host "  3. Enter the token saved in token.txt and create the GM account"
 Write-Host ""
 Write-Host "For detailed setup instructions, see:"
 Write-Host "  - INSTALLATION.md"

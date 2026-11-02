@@ -1,6 +1,6 @@
 # START HERE 👋
 ## Twilight: 2000 Fourth Edition GM Tool
-### v1.0.0 — Complete Deployment Package
+### v1.1.0 — Complete Deployment Package
 
 Welcome! You have everything needed to run a T2K 4E campaign.
 
@@ -12,12 +12,12 @@ Welcome! You have everything needed to run a T2K 4E campaign.
 1. **Read:** [QUICKSTART.md](QUICKSTART.md)
 2. **Run:** `INSTALL_SERVER.bat`
 3. **Start:** `npm start`
-4. **Play:** http://localhost:3000
+4. **Open:** http://localhost:8080, enter the token from `token.txt`, and create the GM account
 
 ### 📖 I Need Detailed Instructions (5 minutes)
 1. **Read:** [INSTALLATION.md](INSTALLATION.md) (complete step-by-step guide)
 2. Follow all steps carefully
-3. Open http://localhost:3000
+3. Open http://localhost:8080 and complete first-run setup with the token in `token.txt`
 4. Create your campaign
 
 ### 📚 I Need to Understand Everything (15 minutes)
@@ -40,7 +40,7 @@ Welcome! You have everything needed to run a T2K 4E campaign.
 |------|-------|---------|
 | **Installation** | `INSTALL_SERVER.bat` | Run this first (Windows) |
 | **Installation** | `INSTALL_SERVER.ps1` | Alternative for PowerShell |
-| **Start Server** | `run.cmd` or `npm start` | Start the game daily |
+| **Start Server** | `npm start` | Start the server |
 | **Quick Guide** | [QUICKSTART.md](QUICKSTART.md) | 30-second setup |
 | **Full Guide** | [INSTALLATION.md](INSTALLATION.md) | Complete instructions |
 | **Overview** | [README_DEPLOYMENT.md](README_DEPLOYMENT.md) | Deployment details |
@@ -72,15 +72,13 @@ Wait: 2-5 minutes for completion
 
 ### Step 2: Start Server
 ```
-Double-click: run.cmd
-Or type: npm start
+Open a terminal in this folder and run: npm start
 ```
 
 ### Step 3: Open Browser
 ```
-Go to: http://localhost:3000
-Login: admin / admin
-⚠️ Change password in Settings immediately!
+Go to: http://localhost:8080
+Enter the bootstrap token from token.txt and create the GM account.
 ```
 
 **Done!** You're ready to create campaigns.
@@ -94,7 +92,7 @@ Login: admin / admin
 | Problem | Solution |
 |---------|----------|
 | **"Node.js not found"** | Install Node.js 24+ from nodejs.org then restart |
-| **"Port 3000 in use"** | Close other apps or see INSTALLATION.md |
+| **"Port 8080 in use"** | Close other apps or see INSTALLATION.md |
 | **"npm install fails"** | Run as Administrator, check internet connection |
 | **"Can't connect to server"** | Verify server is running (see console) |
 | **"Database errors"** | Delete data/campaigns.db to reset |
@@ -123,7 +121,7 @@ For File Inventory → DEPLOYMENT_MANIFEST.txt
 
 After installation:
 
-- [ ] Log in to http://localhost:3000
+- [ ] Log in to http://localhost:8080
 - [ ] Change admin password in Settings
 - [ ] Create a new campaign (Campaigns > + New)
 - [ ] Name it (your campaign title)
@@ -151,14 +149,7 @@ Your campaign data is automatically backed up:
 
 ## 🔐 Security First!
 
-⚠️ **IMPORTANT:** After first login:
-
-1. Click Settings ⚙️
-2. Click User Settings
-3. Change your password to something strong
-4. Write it down somewhere safe (not in a file!)
-
-Default password (admin/admin) is for setup only!
+GM-created player accounts must change their temporary password at first sign-in. Keep the bootstrap token and temporary passwords private.
 
 ---
 
@@ -190,7 +181,7 @@ Or just run `INSTALL_SERVER.bat` now!
 1. **Read:** One of the guides above (2-15 minutes)
 2. **Install:** Run INSTALL_SERVER.bat (5 minutes)
 3. **Start:** Run npm start (immediately)
-4. **Play:** Open http://localhost:3000 (now!)
+4. **Play:** Open http://localhost:8080 (now!)
 5. **Create:** Your first campaign (5 minutes)
 6. **Enjoy:** Run amazing T2K 4E sessions!
 
@@ -230,7 +221,7 @@ Your campaign awaits. Let's make it legendary!
 
 ---
 
-**Version:** 1.0.0  
-**Status:** ✅ Ready to Deploy  
-**Support:** See INSTALLATION.md for detailed help  
+**Version:** 1.1.0
+**Status:** ✅ Ready to Deploy
+**Support:** See INSTALLATION.md for detailed help
 **Last Updated:** November 2, 2026

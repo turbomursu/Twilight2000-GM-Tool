@@ -20,6 +20,10 @@ function sha256(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
+function generateTemporaryPassword() {
+  return randomBytes(24).toString("base64url");
+}
+
 function safeHexEqual(left, right) {
   if (typeof left !== "string" || typeof right !== "string" || !/^[a-f0-9]{64}$/.test(left) || !/^[a-f0-9]{64}$/.test(right)) return false;
   return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
@@ -72,11 +76,12 @@ function parseCookies(header = "") {
 function getAuthenticatedAccount(database, token) {
   if (typeof token !== "string" || !/^[A-Za-z0-9_-]{40,50}$/.test(token)) return null;
   const tokenHash = sha256(token);
-  const row = database.prepare(`SELECT accounts.id, accounts.login_identifier, accounts.global_role, sessions.expires_at
+  const row = database.prepare(`SELECT accounts.id, accounts.login_identifier, accounts.global_role,
+      accounts.must_change_password, sessions.expires_at
     FROM sessions JOIN accounts ON accounts.id = sessions.account_id
     WHERE sessions.token_hash = ? AND accounts.disabled = 0`).get(tokenHash);
   if (row && row.expires_at > new Date().toISOString()) {
-    return { id: row.id, username: row.login_identifier, role: row.global_role };
+    return { id: row.id, username: row.login_identifier, role: row.global_role, mustChangePassword: Boolean(row.must_change_password) };
   }
   database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
   return null;
@@ -239,43 +244,6 @@ function createAuthHandler({ database, bootstrapToken }) {
         }
       }
 
-      if (route === "POST /api/auth/activate") {
-        const body = await readJsonBody(request);
-        if (typeof body.token !== "string" || !/^[A-Za-z0-9_-]{40,50}$/.test(body.token)) {
-          throw new HttpError(400, "A valid player activation token is required.");
-        }
-        const password = validatePassword(body.password);
-        const tokenHash = createHash("sha256").update(body.token).digest("hex");
-        const invite = database.prepare(`SELECT accounts.id, accounts.login_identifier, accounts.disabled, account_invites.expires_at
-          FROM account_invites JOIN accounts ON accounts.id = account_invites.account_id
-          WHERE account_invites.token_hash = ?`).get(tokenHash);
-        if (!invite || !invite.disabled || invite.expires_at <= new Date().toISOString()) {
-          throw new HttpError(401, "Activation token is invalid or expired.");
-        }
-        const passwordHash = await hashPassword(password);
-        database.exec("BEGIN IMMEDIATE");
-        try {
-          const currentInvite = database.prepare(`SELECT account_id FROM account_invites
-            WHERE token_hash = ? AND expires_at > ?`).get(tokenHash, new Date().toISOString());
-          if (!currentInvite || currentInvite.account_id !== invite.id) throw new HttpError(401, "Activation token is invalid or expired.");
-          const now = new Date().toISOString();
-          database.prepare("UPDATE accounts SET password_hash = ?, disabled = 0, updated_at = ? WHERE id = ? AND disabled = 1")
-            .run(passwordHash, now, invite.id);
-          database.prepare("DELETE FROM account_invites WHERE account_id = ?").run(invite.id);
-          const session = createSession(database, invite.id);
-          database.exec("COMMIT");
-          setSessionCookie(response, session.token);
-          return sendJson(response, 201, {
-            authenticated: true,
-            homePath: getAccountHomePath(database, invite.id),
-            account: { id: invite.id, username: invite.login_identifier, role: "player" }
-          });
-        } catch (error) {
-          database.exec("ROLLBACK");
-          throw error;
-        }
-      }
-
       if (route === "POST /api/auth/login") {
         const ip = request.socket.remoteAddress || "unknown";
         const now = Date.now();
@@ -283,7 +251,7 @@ function createAuthHandler({ database, bootstrapToken }) {
         const body = await readJsonBody(request);
         if (typeof body.username !== "string" || typeof body.password !== "string") throw new HttpError(401, "Invalid username or password.");
         const username = body.username.toLowerCase();
-        const account = database.prepare(`SELECT id, login_identifier, password_hash, disabled
+        const account = database.prepare(`SELECT id, login_identifier, password_hash, disabled, global_role, must_change_password
           FROM accounts WHERE login_identifier = ?`).get(username);
         if (!dummyPasswordHash) dummyPasswordHash = hashPassword(randomBytes(32).toString("hex"));
         const passwordHash = account?.password_hash || await dummyPasswordHash;
@@ -299,14 +267,48 @@ function createAuthHandler({ database, bootstrapToken }) {
         return sendJson(response, 200, {
           authenticated: true,
           homePath: getAccountHomePath(database, account.id),
-          account: { id: account.id, username: account.login_identifier, role: account.global_role }
+          mustChangePassword: Boolean(account.must_change_password),
+          account: { id: account.id, username: account.login_identifier, role: account.global_role, mustChangePassword: Boolean(account.must_change_password) }
         });
+      }
+
+      if (route === "POST /api/auth/change-password") {
+        const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
+        const account = getAuthenticatedAccount(database, token);
+        if (!account) throw new HttpError(401, "Sign in before changing your password.");
+        const body = await readJsonBody(request);
+        const currentPassword = validatePassword(body.currentPassword);
+        const newPassword = validatePassword(body.newPassword);
+        const stored = database.prepare("SELECT password_hash FROM accounts WHERE id = ? AND disabled = 0").get(account.id);
+        if (!stored || !(await verifyPassword(currentPassword, stored.password_hash))) {
+          throw new HttpError(401, "Current password is incorrect.");
+        }
+        if (currentPassword === newPassword) throw new HttpError(400, "Choose a password different from the temporary password.");
+        const passwordHash = await hashPassword(newPassword);
+        database.exec("BEGIN IMMEDIATE");
+        try {
+          const now = new Date().toISOString();
+          database.prepare(`UPDATE accounts SET password_hash = ?, must_change_password = 0, updated_at = ?
+            WHERE id = ? AND disabled = 0`).run(passwordHash, now, account.id);
+          database.prepare("DELETE FROM sessions WHERE account_id = ?").run(account.id);
+          const session = createSession(database, account.id);
+          database.exec("COMMIT");
+          setSessionCookie(response, session.token);
+          return sendJson(response, 200, {
+            authenticated: true,
+            homePath: getAccountHomePath(database, account.id),
+            account: { id: account.id, username: account.username, role: account.role, mustChangePassword: false }
+          });
+        } catch (error) {
+          database.exec("ROLLBACK");
+          throw error;
+        }
       }
 
       if (route === "GET /api/auth/session") {
         const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
         const account = getAuthenticatedAccount(database, token);
-        if (account) return sendJson(response, 200, { authenticated: true, homePath: getAccountHomePath(database, account.id), account });
+        if (account) return sendJson(response, 200, { authenticated: true, homePath: getAccountHomePath(database, account.id), mustChangePassword: account.mustChangePassword, account });
         clearSessionCookie(response);
         return sendJson(response, 401, { authenticated: false });
       }
@@ -327,4 +329,4 @@ function createAuthHandler({ database, bootstrapToken }) {
   };
 }
 
-module.exports = { createAuthHandler, getAuthenticatedAccount, getAccountHomePath, parseCookies };
+module.exports = { createAuthHandler, getAuthenticatedAccount, getAccountHomePath, parseCookies, hashPassword, generateTemporaryPassword };

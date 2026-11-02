@@ -1,7 +1,7 @@
 # Installation Package Distribution Summary
 
-**Date Created:** 2026-11-03 00:32:03 UTC+2  
-**Package Version:** 1.0.0  
+**Date Created:** 2026-11-03
+**Package Version:** 1.1.0
 **Status:** ✅ **READY FOR DISTRIBUTION**
 
 ---
@@ -12,21 +12,21 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Filename** | `t2k-gm-tool-v1.0.0.zip` |
-| **Location** | `/deploy/t2k-gm-tool-v1.0.0.zip` |
+| **Filename** | `t2k-gm-tool-v1.1.0.zip` |
+| **Location** | `/deploy/t2k-gm-tool-v1.1.0.zip` |
 | **File Format** | ZIP (compressed) |
-| **Compressed Size** | 2.94 MB |
-| **Uncompressed Size** | ~8.3 MB |
-| **Compression Ratio** | 64.6% |
-| **Files Included** | 207 |
-| **Directories Included** | 31 |
+| **Compressed Size** | 1.82 MB (1,817,023 bytes) |
+| **Uncompressed Size** | 2.93 MB (2,928,122 bytes) |
+| **Compression Ratio** | 62.1% |
+| **Files Included** | 70 |
+| **Directories Included** | 2 |
+| **SHA-256** | `E51886A3E0F7FCF7F1022775830DD938AA1909D1D695B85DBB1D278DC3688305` |
 
 ### Creation Method
 
 ```powershell
-Compress-Archive -Path C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool `
-                 -DestinationPath C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool-v1.0.0.zip `
-                 -Force
+The archive was created from a temporary staging copy of `deploy/t2k-gm-tool`.
+The staging copy excluded `data/`, `node_modules/`, and `token.txt`.
 ```
 
 ---
@@ -172,9 +172,9 @@ t2k-gm-tool/
 - ✅ Testing completed
 
 ### For Download Hosting
-- ✅ File size documented (2.94 MB)
+- ✅ File size documented (1.82 MB)
 - ✅ SHA checksum available (optional)
-- ✅ Version clearly labeled (1.0.0)
+- ✅ Version clearly labeled (1.1.0)
 - ✅ Release date specified
 - ✅ License documented (GPL v3)
 - ✅ Installation instructions clear
@@ -202,7 +202,7 @@ t2k-gm-tool/
 **GitHub Release:**
 ```
 Upload to: https://github.com/turbomursu/Twilight2000-GM-Tool/releases
-File: t2k-gm-tool-v1.0.0.zip
+File: t2k-gm-tool-v1.1.0.zip
 Release Notes: See deployment summary
 Assets: Include DISTRIBUTION_README.md
 ```
@@ -210,8 +210,8 @@ Assets: Include DISTRIBUTION_README.md
 **Website Distribution:**
 ```
 Host file on project website
-Download link: https://example.com/downloads/t2k-gm-tool-v1.0.0.zip
-Size: 2.94 MB
+Download link: https://example.com/downloads/t2k-gm-tool-v1.1.0.zip
+Size: 1.82 MB
 Recommended: Add MD5/SHA256 checksum for verification
 ```
 
@@ -229,7 +229,7 @@ Recommended: Add MD5/SHA256 checksum for verification
 
 ### For Users
 
-1. **Download:** `t2k-gm-tool-v1.0.0.zip` (2.94 MB)
+1. **Download:** `t2k-gm-tool-v1.1.0.zip` (1.82 MB)
 2. **Extract:** Unzip to desired location
 3. **Install:** Run `INSTALL_SERVER.ps1` (or `.bat`)
 4. **Start:** Execute `npm start`
@@ -276,11 +276,11 @@ Recommended: Add MD5/SHA256 checksum for verification
 
 ## Version Information
 
-### Current Release: v1.0.0
+### Current Release: v1.1.0
 
-**Release Date:** November 3, 2026  
-**Build Date:** 2026-11-03T00:32:03+02:00  
-**Status:** Production Ready ✅  
+**Release Date:** November 3, 2026
+**Build Date:** 2026-11-03T00:32:03+02:00
+**Status:** Production Ready ✅
 
 **Major Features:**
 - Complete GM Tool functionality
@@ -310,7 +310,7 @@ Recommended: Add MD5/SHA256 checksum for verification
 ## Next Steps
 
 ### For Users
-1. Download `t2k-gm-tool-v1.0.0.zip`
+1. Download `t2k-gm-tool-v1.1.0.zip`
 2. Read `DISTRIBUTION_README.md` for setup
 3. Extract and run `INSTALL_SERVER.ps1`
 4. Follow on-screen instructions
@@ -337,18 +337,18 @@ Recommended: Add MD5/SHA256 checksum for verification
 ### SHA256 Checksum
 To verify package integrity, compute SHA256:
 ```powershell
-(Get-FileHash "t2k-gm-tool-v1.0.0.zip" -Algorithm SHA256).Hash
+(Get-FileHash "t2k-gm-tool-v1.1.0.zip" -Algorithm SHA256).Hash
 ```
 
 ### ZIP File Test
 To verify ZIP integrity:
 ```powershell
-Test-Path "t2k-gm-tool-v1.0.0.zip"
+Test-Path "t2k-gm-tool-v1.1.0.zip"
 ```
 
 ### Extract Test
 ```powershell
-Expand-Archive -Path "t2k-gm-tool-v1.0.0.zip" -DestinationPath "test-extract" -Force
+Expand-Archive -Path "t2k-gm-tool-v1.1.0.zip" -DestinationPath "test-extract" -Force
 ```
 
 ---
@@ -405,7 +405,7 @@ The package can be safely shared with end users, uploaded to hosting platforms, 
 
 ---
 
-**Package Created:** 2026-11-03  
-**Created By:** Copilot AI Agent  
-**Status:** ✅ Production Ready  
+**Package Created:** 2026-11-03
+**Created By:** Copilot AI Agent
+**Status:** ✅ Production Ready
 **Recommendation:** Proceed with distribution

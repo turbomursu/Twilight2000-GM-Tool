@@ -17,7 +17,7 @@
   const assignmentNote = document.getElementById("assignment-note");
   const assignButton = document.getElementById("assign-seed");
   const campaignSelect = document.getElementById("assignment-campaign");
-  const activationToken = document.getElementById("activation-token");
+  const temporaryPasswordOutput = document.getElementById("temporary-password");
   const legacyDrafts = document.getElementById("legacy-drafts");
   const toast = document.getElementById("toast");
   let seedStore = { seeds: [] };
@@ -315,8 +315,8 @@
     });
     document.getElementById("editor-title").textContent = seed.character.characterName || seed.displayLabel;
     document.getElementById("editor-subtitle").textContent = `SEED ${seed.id.slice(-8).toUpperCase()} / GM-ONLY TEMPLATE`;
-    activationToken.hidden = true;
-    activationToken.textContent = "";
+    temporaryPasswordOutput.hidden = true;
+    temporaryPasswordOutput.textContent = "";
     setFormVisible(true);
     updateDiceDisplays();
     updateAssignmentControls();
@@ -327,8 +327,8 @@
     selectedSeedId = null;
     clearForm();
     form.elements.username.disabled = false;
-    activationToken.hidden = true;
-    activationToken.textContent = "";
+    temporaryPasswordOutput.hidden = true;
+    temporaryPasswordOutput.textContent = "";
     document.getElementById("editor-title").textContent = "New player seed";
     document.getElementById("editor-subtitle").textContent = "UNASSIGNED / GM-ONLY TEMPLATE";
     setFormVisible(true);
@@ -485,7 +485,7 @@
         character: characterFromForm()
       };
       const path = existing ? `/api/player-seeds/${encodeURIComponent(existing.id)}` : "/api/player-seeds";
-      const { seed } = await apiRequest(path, {
+      const { seed, temporaryPassword } = await apiRequest(path, {
         method: existing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -496,9 +496,9 @@
       selectedSeedId = seed.id;
       document.getElementById("editor-title").textContent = seed.character.characterName || seed.displayLabel;
       document.getElementById("editor-subtitle").textContent = `SEED ${seed.id.slice(-8).toUpperCase()} / GM-ONLY TEMPLATE`;
-      if (seed.activationToken) {
-        activationToken.textContent = `Activation page: ${location.origin}/login.html?activate=1\nUsername: ${seed.username}\nOne-time activation token: ${seed.activationToken}\nExpires in 7 days. Share this token with the player through a secure channel.`;
-        activationToken.hidden = false;
+      if (temporaryPassword) {
+        temporaryPasswordOutput.textContent = `Username: ${seed.username}\nTemporary password: ${temporaryPassword}\nShare through a secure channel. The player must change it at first login.`;
+        temporaryPasswordOutput.hidden = false;
       }
       form.elements.username.disabled = true;
       storageState.textContent = "GM service saved";

@@ -34,8 +34,8 @@ Use normalized SQLite tables and foreign keys for relationships, ownership, and 
 | --- | --- |
 | `campaigns` | Runtime ID, name, setting, premise, era, game date/time, runtime schema version, revision, created/updated timestamps, active state. |
 | `setup_imports` | Campaign ID, source package ID/version, import time, checksum, immutable source JSON. One campaign has one initial setup import. |
-| `accounts` | Account ID, GM-assigned login identifier, global role (`gm` or `player`), creating GM, password hash, disabled state, timestamps. New player accounts start disabled and are activated with a short-lived, single-use token; there is no public account registration. Never store plaintext passwords or expose password hashes to clients. |
-| `account_invites` | Account ID, one-time token hash, expiry, creation time. Store only a hash; delete the invite when activated or expired. |
+| `accounts` | Account ID, GM-assigned login identifier, global role (`gm` or `player`), creating GM, password hash, disabled state, forced-password-change flag, timestamps. GM-created player accounts receive a temporary password and must change it before accessing campaign pages or APIs; there is no public account registration. Never store plaintext passwords or expose password hashes to clients. |
+| `account_invites` | Legacy compatibility table; the schema upgrade clears existing invite hashes and new accounts do not use activation tokens. GM password resets also remove any legacy invite row. |
 | `player_seed_templates` | GM owner, player account, display label, bounded T2K 4E character-template JSON, and timestamps. Global to the owning GM, not attached to any campaign; each player account has one template. Assignment copies template fields into a campaign character and does not mutate the source template. |
 | `campaign_memberships` | Campaign ID, account ID, role (`gm` or `player`); the initial model allows one GM owner. A player membership must map to exactly one seat. |
 | `player_seats` | Seat ID, campaign ID, account ID, assigned character ID, display label, active state, assignment time. This is the single ownership link; enforce unique `(campaign_id, account_id)` and `(campaign_id, character_id)` pairs and at most four active player seats per campaign. |
@@ -178,7 +178,7 @@ Before treating this contract as implemented:
 - Round-trip a setup-v2 package into a new runtime campaign without modifying the source package; reject malformed/unsupported packages atomically.
 - Export and restore a runtime save while preserving IDs, revisions, assignments, and GM-only visibility.
 - Exercise one-player and four-player campaigns with separate sessions.
-- Verify GM-created usernames only, unique user-to-seed assignment per campaign, account activation expiry and single use, blank-only seed completion, required-field finalization, pending post-finalization edits, GM approval/rejection, and denied cross-seat access.
+- Verify GM-created usernames only, temporary-password delivery and forced first-login change, GM password reset, unique user-to-seed assignment per campaign, blank-only seed completion, required-field finalization, pending post-finalization edits, GM approval/rejection, and denied cross-seat access.
 - Verify server-side denial for unauthenticated access, cross-campaign access, cross-seat character/inventory access, GM-only records, unpublished content, and player attempts to mutate accepted state.
 - Verify that player proposals remain pending until GM approval and that approval/roll/publication records are auditable.
 - Verify that a withdrawn publication disappears from player responses and that an older backup cannot silently overwrite a newer active campaign.

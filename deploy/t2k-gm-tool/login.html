@@ -25,6 +25,15 @@
         <input id="login-password" name="password" type="password" autocomplete="current-password" minlength="14" maxlength="128" required>
         <button class="submit-button" type="submit">Sign in <span aria-hidden="true">→</span></button>
       </form>
+      <form id="password-change-form" autocomplete="on" hidden>
+        <label for="current-password">Temporary password</label>
+        <input id="current-password" name="currentPassword" type="password" autocomplete="current-password" minlength="14" maxlength="128" required>
+        <label for="new-password">New password</label>
+        <input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
+        <label for="confirm-password">Confirm new password</label>
+        <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
+        <button class="submit-button" type="submit">Change password <span aria-hidden="true">→</span></button>
+      </form>
       <form id="bootstrap-form" autocomplete="on" hidden>
         <label for="bootstrap-token">One-time setup token</label>
         <input id="bootstrap-token" name="bootstrapToken" type="password" autocomplete="off" required>
@@ -33,13 +42,6 @@
         <label for="bootstrap-password">GM password</label>
         <input id="bootstrap-password" name="password" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
         <button class="submit-button" type="submit">Create GM account <span aria-hidden="true">→</span></button>
-      </form>
-      <form id="activation-form" autocomplete="on" hidden>
-        <label for="activation-token">Player activation token</label>
-        <input id="activation-token" name="token" type="password" autocomplete="off" required>
-        <label for="activation-password">Choose password</label>
-        <input id="activation-password" name="password" type="password" autocomplete="new-password" minlength="14" maxlength="128" required>
-        <button class="submit-button" type="submit">Activate player account <span aria-hidden="true">→</span></button>
       </form>
       <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
       <div class="auth-footer"><span>PRIVATE LAN WORKSPACE</span><span>HTTP / SESSION LOCKED</span></div>

@@ -1,8 +1,8 @@
 # Deployment Package Complete
-## Twilight: 2000 Fourth Edition GM Tool v1.0.0
+## Twilight: 2000 Fourth Edition GM Tool v1.1.0
 
-**Package Created:** November 2, 2026  
-**Status:** ✅ Ready for Distribution  
+**Package Created:** November 2, 2026
+**Status:** ✅ Ready for Distribution
 **Location:** `deploy/t2k-gm-tool/`
 
 ---
@@ -122,10 +122,10 @@ t2k-gm-tool/
 # Windows
 # Use Windows Explorer → Select all files → Right-click → Send to → Compressed (zipped) folder
 # Or use PowerShell:
-Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.0.0.zip
+Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.1.0.zip
 
 # macOS/Linux
-zip -r t2k-gm-tool-v1.0.0.zip .
+zip -r t2k-gm-tool-v1.1.0.zip .
 
 # For GitHub Release (do not compress)
 # Upload entire folder or individual files
@@ -159,7 +159,7 @@ Before sending to users, verify:
 - [ ] INSTALL_SERVER.bat checks Node.js version
 - [ ] INSTALL_SERVER.bat creates data directories
 - [ ] INSTALL_SERVER.ps1 has same functionality
-- [ ] run.cmd starts server on port 3000
+- [ ] run.cmd starts server on port 8080
 - [ ] Scripts show clear success/error messages
 
 ### Documentation
@@ -182,7 +182,7 @@ Before sending to users, verify:
 - [ ] 267/267 tests passing
 - [ ] No console errors in browser
 - [ ] No Node.js warnings
-- [ ] Database schema version 20 ready
+- [ ] Database schema version 21 ready
 - [ ] All features accessible from UI
 
 ---
@@ -198,7 +198,7 @@ Before sending to users, verify:
 | **Web Interfaces** | 4 |
 | **Client Scripts** | 13 |
 | **Package Size (uncompressed)** | ~650 KB |
-| **Package Size (compressed .zip)** | ~200 KB |
+| **Package Size (compressed .zip)** | 1.82 MB |
 | **Installed Size** | ~250 MB (includes node_modules) |
 | **Test Coverage** | 267/267 tests |
 | **Setup Time** | 5-10 minutes |
@@ -214,9 +214,9 @@ Before sending to users, verify:
 1. Read: QUICKSTART.md (1 minute)
 2. Run: INSTALL_SERVER.bat (5 minutes)
 3. Run: npm start
-4. Open: http://localhost:3000
-5. Login: admin/admin
-6. Change password in Settings
+4. Open: http://localhost:8080
+5. Enter the bootstrap token from token.txt and create the GM account
+6. Player accounts must change their temporary password at first sign-in
 7. Create first campaign
 8. Start playing!
 ```
@@ -284,7 +284,7 @@ Based on testing:
 
 **Most Common Issues:**
 1. Node.js not in PATH (50% of errors) → Solved by restart or reinstall
-2. Port 3000 in use (30% of errors) → Solved by closing conflicts
+2. Port 8080 in use (30% of errors) → Solved by closing conflicts
 3. npm install timeout (15% of errors) → Solved by retry or admin mode
 4. Firewall blocking (5% of errors) → Solved by allowing Node.js through firewall
 
@@ -313,7 +313,7 @@ Based on testing:
 ### For Email/Announcement
 
 ```
-Subject: Twilight: 2000 Fourth Edition GM Tool v1.0.0 — Now Available
+Subject: Twilight: 2000 Fourth Edition GM Tool v1.1.0 — Now Available
 
 Dear Game Masters,
 
@@ -331,8 +331,8 @@ QUICK START:
 1. Download package
 2. Run INSTALL_SERVER.bat
 3. Double-click run.cmd
-4. Open http://localhost:3000
-5. Login: admin/admin
+4. Open http://localhost:8080
+5. Enter the bootstrap token from token.txt and create the GM account
 
 SYSTEM REQUIREMENTS:
 • Windows 10+, macOS 10.15+, or Linux
@@ -360,7 +360,7 @@ Happy gaming!
 ### For GitHub Release
 
 ```markdown
-# Twilight: 2000 Fourth Edition GM Tool v1.0.0
+# Twilight: 2000 Fourth Edition GM Tool v1.1.0
 
 Complete game master's tool for running T2K 4E campaigns.
 
@@ -382,10 +382,10 @@ Complete game master's tool for running T2K 4E campaigns.
 1. Extract package
 2. Run INSTALL_SERVER.bat (or npm install)
 3. Run npm start
-4. Open http://localhost:3000
-5. Login: admin/admin
+4. Open http://localhost:8080
+5. Enter the bootstrap token from token.txt and create the GM account
 
-See [QUICKSTART.md](QUICKSTART.md) for 30-second setup  
+See [QUICKSTART.md](QUICKSTART.md) for 30-second setup
 See [INSTALLATION.md](INSTALLATION.md) for complete guide
 
 ## Features
@@ -409,7 +409,7 @@ See [INSTALLATION.md](INSTALLATION.md) for complete guide
 See INSTALLATION.md → Troubleshooting for common issues
 
 ## Download
-Includes: t2k-gm-tool-v1.0.0.zip (200 KB)
+Includes: t2k-gm-tool-v1.1.0.zip (1.82 MB)
 Installs to: ~250 MB after npm install
 ```
 
@@ -443,7 +443,7 @@ Before making available to users:
 - [ ] INSTALLATION.md reviewed for accuracy
 - [ ] QUICKSTART.md reviewed for clarity
 - [ ] All code examples tested
-- [ ] All URLs verified (localhost:3000)
+- [ ] All URLs verified (localhost:8080)
 - [ ] 267/267 tests passing
 - [ ] No credentials exposed
 - [ ] Package compressed (.zip)
@@ -461,7 +461,7 @@ Before making available to users:
 - ✅ Installation completes in 5-10 minutes
 - ✅ Server starts immediately
 - ✅ Browser access works first try
-- ✅ Login succeeds with default credentials
+- ✅ GM account setup succeeds with token.txt
 - ✅ Can create campaign in < 2 minutes
 - ✅ No error messages
 - ✅ Data saves automatically
@@ -488,6 +488,6 @@ Users are 5-10 minutes away from running their campaigns!
 
 ---
 
-**Package Created:** November 2, 2026  
-**Version:** 1.0.0  
+**Package Created:** November 2, 2026
+**Version:** 1.1.0
 **Status:** ✅ **READY FOR DISTRIBUTION**

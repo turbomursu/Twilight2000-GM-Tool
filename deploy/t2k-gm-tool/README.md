@@ -1,5 +1,5 @@
 # 📦 TWILIGHT: 2000 FOURTH EDITION GM TOOL
-## Complete Deployment Package v1.0.0
+## Complete Deployment Package v1.1.0
 
 ---
 
@@ -83,10 +83,7 @@ INSTALL_CLIENT.bat         ← Client setup (1.9 KB)
                              • Configures browser access
                              • Verifies server is running
 
-run.cmd, run.ps1           ← Quick start scripts
-                             • Double-click to start server
-                             • Use daily to run the tool
-                             • Automatic on restart
+Server start              ← Run `npm start` from this folder
 ```
 
 ### ✅ Verification & Deployment
@@ -119,8 +116,9 @@ DEPLOYMENT_MANIFEST.txt    ← File inventory (7.5 KB)
 1. Read: QUICKSTART.md
 2. Run: INSTALL_SERVER.bat
 3. Run: npm start
-4. Open: http://localhost:3000
-5. Play!
+4. Open: http://localhost:8080
+5. Enter the token from `token.txt` and create the GM account
+6. Play!
 ```
 
 ### 📖 Path 2: Need Full Instructions (5 min read + 10 min setup)
@@ -172,7 +170,7 @@ DEPLOYMENT_MANIFEST.txt    ← File inventory (7.5 KB)
 
 ### ✅ Production Ready
 - All 267 tests passing
-- Database schema version 20 ready
+- Database schema version 21 ready
 - No hardcoded secrets or credentials
 - Security best practices included
 
@@ -199,7 +197,7 @@ package-lock.json
 ### Step 2: Create Archive
 ```
 Windows: Right-click folder → Send to → Compressed (zipped)
-Or: Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.0.0.zip
+Or: Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.1.0.zip
 ```
 
 ### Step 3: Publish
@@ -230,7 +228,7 @@ Email distribution → Attach .zip
 | **Technical Docs** | 4 |
 | **Setup Scripts** | 2 |
 | **Total Package** | ~650 KB (with application) |
-| **Compressed Size** | ~200 KB (with application) |
+| **Compressed Size** | 1.82 MB |
 | **Installation Time** | 5-10 minutes |
 | **First Launch Time** | < 5 seconds |
 | **Startup Time** | < 3 seconds |
@@ -247,7 +245,7 @@ Before using this package:
 - [x] All guides are comprehensive
 - [x] Troubleshooting section covers major issues
 - [x] Examples are accurate and tested
-- [x] URLs are correct (localhost:3000)
+- [x] URLs are correct (localhost:8080)
 - [x] System requirements documented
 - [x] User paths are clear
 - [x] Support resources included
@@ -271,11 +269,9 @@ Run INSTALL_SERVER.bat (5 minutes)
     ↓
 Run npm start (< 5 seconds)
     ↓
-Open http://localhost:3000 (instant)
+Open http://localhost:8080 (instant)
     ↓
-Login: admin/admin (20 seconds)
-    ↓
-Change password (1 minute)
+Enter the bootstrap token from token.txt and create the GM account
     ↓
 Create first campaign (5 minutes)
     ↓
@@ -289,31 +285,31 @@ Create first campaign (5 minutes)
 ## 🎯 KEY FEATURES OF THIS DEPLOYMENT
 
 ### For Users
-✅ Simple installation (one script to run)  
-✅ Automatic setup (no manual config)  
-✅ Clear documentation (7 comprehensive guides)  
-✅ Quick reference (30-second guide)  
-✅ Complete guide (15+ sections)  
-✅ Troubleshooting (15+ common issues)  
-✅ Ready to play (5-10 minutes)  
+✅ Simple installation (one script to run)
+✅ Automatic setup (no manual config)
+✅ Clear documentation (7 comprehensive guides)
+✅ Quick reference (30-second guide)
+✅ Complete guide (15+ sections)
+✅ Troubleshooting (15+ common issues)
+✅ Ready to play (5-10 minutes)
 
 ### For Deployers
-✅ Complete package (everything included)  
-✅ Multiple distribution options  
-✅ Pre-deployment checklist (100+ items)  
-✅ Deployment guide (step-by-step)  
-✅ Distribution templates (ready to use)  
-✅ Support resources (comprehensive)  
-✅ Success metrics (clear indicators)  
+✅ Complete package (everything included)
+✅ Multiple distribution options
+✅ Pre-deployment checklist (100+ items)
+✅ Deployment guide (step-by-step)
+✅ Distribution templates (ready to use)
+✅ Support resources (comprehensive)
+✅ Success metrics (clear indicators)
 
 ### For GMs
-✅ Campaign management (full CRUD)  
-✅ Combat system (automated, rule-verified)  
-✅ NPC tracking (relationships, connections)  
-✅ Faction management (attitudes, resources)  
-✅ Player interface (1-4 player seats)  
-✅ Automatic backups (every 5 minutes)  
-✅ Campaign audit trail (complete history)  
+✅ Campaign management (full CRUD)
+✅ Combat system (automated, rule-verified)
+✅ NPC tracking (relationships, connections)
+✅ Faction management (attitudes, resources)
+✅ Player interface (1-4 player seats)
+✅ Automatic backups (every 5 minutes)
+✅ Campaign audit trail (complete history)
 
 ---
 
@@ -330,12 +326,12 @@ Create first campaign (5 minutes)
 
 ### Expected Results:
 
-✅ Users can install in 5-10 minutes  
-✅ Server starts without configuration  
-✅ Fully functional game manager's tool  
-✅ Ready for first campaign immediately  
-✅ Automatic backups protect their data  
-✅ Support documentation answers questions  
+✅ Users can install in 5-10 minutes
+✅ Server starts without configuration
+✅ Fully functional game manager's tool
+✅ Ready for first campaign immediately
+✅ Automatic backups protect their data
+✅ Support documentation answers questions
 
 ---
 
@@ -371,14 +367,14 @@ This deployment package includes:
 
 Users know it worked when:
 
-✅ INSTALL_SERVER.bat completes with "SUCCESS"  
-✅ Server shows "listening on http://localhost:3000"  
-✅ Browser loads login page without error  
-✅ Can log in with admin/admin  
-✅ Can create campaigns  
-✅ Can access all interfaces  
-✅ Server restarts without data loss  
-✅ Automatic backups are created  
+✅ INSTALL_SERVER.bat completes with "SUCCESS"
+✅ Server shows "listening on http://localhost:8080"
+✅ Browser loads login page without error
+✅ GM account setup succeeds with token.txt
+✅ Can create campaigns
+✅ Can access all interfaces
+✅ Server restarts without data loss
+✅ Automatic backups are created
 
 ---
 
@@ -427,17 +423,17 @@ C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool\
 
 Users are ready to create their first T2K 4E campaign.
 
-The tool is production-ready.  
-The documentation is comprehensive.  
-The installation is fully automated.  
+The tool is production-ready.
+The documentation is comprehensive.
+The installation is fully automated.
 
 **Let's make this legendary!** 🚀
 
 ---
 
-**Created:** November 2, 2026  
-**Version:** 1.0.0  
-**Status:** ✅ PRODUCTION READY  
+**Created:** November 2, 2026
+**Version:** 1.1.0
+**Status:** ✅ PRODUCTION READY
 **Distribution:** Ready for GitHub Release, Download Link, or Package Manager
 
 ---

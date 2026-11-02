@@ -107,10 +107,8 @@ function seedSampleRuntime(database, gmAccountId, options = {}) {
   const username = options.playerUsername || SAMPLE_PLAYER_USERNAME;
   let user = database.prepare(`SELECT id, global_role, created_by_account_id, disabled
     FROM accounts WHERE login_identifier = ?`).get(username);
-  let activationToken = null;
   if (!user) {
     user = createAssignedUser(database, gmAccountId, username, { now: () => new Date(timestamp).getTime() });
-    activationToken = user.activationToken;
   } else if (user.global_role !== "player" || user.created_by_account_id !== gmAccountId) {
     throw new Error(`The sample username '${username}' is not a player user created by this GM.`);
   }
@@ -145,8 +143,7 @@ function seedSampleRuntime(database, gmAccountId, options = {}) {
     createdCampaign,
     username: username.toLowerCase(),
     characterId: seed.characterId,
-    seedStatus: seed.status,
-    activationToken
+    seedStatus: seed.status
   };
 }
 
