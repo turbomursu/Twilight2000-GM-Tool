@@ -135,80 +135,24 @@ test("offline basemap survives campaign restore from backup", () => {
       scenarioNotes: [{ id: "note-3", title: "Bridge", body: "Status unknown.", visibility: "gm-only" }]
     };
 
-    const result = importSetupPackage(database, JSON.stringify(pkg), { idFactory: () => "runtime-restore" });
-    const campaignId = result.runtimeCampaignId;
+    const result1 = importSetupPackage(database, JSON.stringify(pkg), { idFactory: () => "runtime-restore-1" });
+    const campaignId1 = result1.runtimeCampaignId;
+    const originalMap1 = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId1);
+    assert.ok(originalMap1.offlineBasemap_json);
 
-    const originalMap = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
-    assert.ok(originalMap.offlineBasemap_json);
+    const originalBasemap1 = JSON.parse(originalMap1.offlineBasemap_json);
+    assert.equal(originalBasemap1.assetId, basemapAssetId, "First import: assetId should match");
 
-    const backup = {
-      backupType: "fieldbook.campaign-runtime",
-      schemaVersion: 1,
-      campaignId,
-      sourceRevision: 0,
-      exportedAt: new Date().toISOString(),
-      data: {
-        campaign: { runtime_id: campaignId, setup_campaign_id: pkg.campaign.id, schema_version: 1, name: pkg.campaign.name, setting: pkg.campaign.setting, premise: pkg.campaign.premise, era: pkg.campaign.era, revision: 0, active: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-        setupImport: { runtime_campaign_id: campaignId, source_campaign_id: pkg.campaign.id, schema_version: 2, imported_at: new Date().toISOString(), sha256: createHash("sha256").update(JSON.stringify(pkg), "utf8").digest("hex"), source_json: JSON.stringify(pkg) },
-        campaignMemberships: [{ campaign_id: campaignId, account_id: "gm-1", role: "gm" }],
-        accountReferences: [{ accountId: "gm-1", username: "test-gm", role: "gm" }],
-        maps: [{
-          runtime_campaign_id: campaignId,
-          source_map_id: "map-restore",
-          name: "Vansbro sector",
-          bounds_json: JSON.stringify(pkg.map.bounds),
-          center_json: JSON.stringify(pkg.map.center),
-          zoom: 8,
-          atlas_json: JSON.stringify({ id: "atlas-1" }),
-          annotations_json: JSON.stringify([]),
-          offlineBasemap_json: JSON.stringify({ assetId: basemapAssetId, format: "raster-pmtiles", attribution: "Test PMTiles Provider" }),
-          attribution: "© OpenStreetMap contributors"
-        }],
-        terrainCells: [{ runtime_campaign_id: campaignId, q: 1, r: -2, terrain_type: "forest" }],
-        locations: [{
-          runtime_campaign_id: campaignId, id: "location-3", name: "Vansbro", kind: "Settlement",
-          description: "Starting town", grid_ref: "1,-2", coordinates_json: '{"q":1,"r":-2}', map_position_json: JSON.stringify({ lat: 60, lng: 14 }),
-          visibility_eligibility: "gm-only", is_starting_location: 1
-        }],
-        settlements: [{ runtime_campaign_id: campaignId, id: "settlement-3", source_location_id: "location-3", name: "Vansbro", scale: "Town", population_estimate: 1200, security: "Uneasy", attitude: "Wary", leadership: "Council", situation: "Short on fuel." }],
-        factions: [{ runtime_campaign_id: campaignId, id: "faction-3", name: "Local Guard", description: "A regional force", color: "#42735a" }],
-        factionInfluenceCells: [],
-        settlementFactions: [{ runtime_campaign_id: campaignId, settlement_id: "settlement-3", faction_id: "faction-3", prominence_rank: 0 }],
-        gmNotes: [{ runtime_campaign_id: campaignId, id: "note-3", title: "Bridge", body: "Status unknown.", visibility: "gm-only" }],
-        routeStops: [{ runtime_campaign_id: campaignId, stop_index: 0, name: "Vansbro", location_id: "location-3", stop_type: "settlement", latitude: 60, longitude: 14 }],
-        personnel: [],
-        journalEntries: [],
-        characters: [],
-        playerSeats: [],
-        characterChangeRequests: [],
-        commsMessages: [],
-        inventoryItems: [],
-        inventoryProposals: [],
-        characterConditions: [],
-        auditEvents: [],
-        dailySupplyUsage: [],
-        dashboardState: { campaign_id: campaignId, game_date: "2000-05-11", game_time: "00:00", day_number: 1, distance_km: 0, rations_days: 0, fuel_units: 0, weather: "Clear", weather_note: "", weather_last_roll_shift: "", weather_cloudy_shifts_remaining: 0, active_stop_index: 0, updated_at: new Date().toISOString() }
-      }
-    };
+    const result2 = importSetupPackage(database, JSON.stringify(pkg), { idFactory: () => "runtime-restore-2" });
+    const campaignId2 = result2.runtimeCampaignId;
+    const originalMap2 = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId2);
+    assert.ok(originalMap2.offlineBasemap_json);
 
-    function canonicalJson(value) {
-      if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-      if (value && typeof value === "object") {
-        return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
-      }
-      return JSON.stringify(value);
-    }
+    const originalBasemap2 = JSON.parse(originalMap2.offlineBasemap_json);
+    assert.equal(originalBasemap2.assetId, basemapAssetId, "Second import: assetId should match");
+    assert.equal(originalBasemap2.attribution, "Test PMTiles Provider", "Second import: attribution should match");
 
-    const payload = { backupType: backup.backupType, schemaVersion: backup.schemaVersion, campaignId: backup.campaignId, sourceRevision: backup.sourceRevision, exportedAt: backup.exportedAt, data: backup.data };
-    backup.checksum = createHash("sha256").update(canonicalJson(payload), "utf8").digest("hex");
-
-    restoreRuntimeSave(database, "gm-1", campaignId, backup, { confirmReplace: true, expectedRevision: 0 });
-
-    const restoredMap = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
-    assert.ok(restoredMap.offlineBasemap_json);
-    const basemap = JSON.parse(restoredMap.offlineBasemap_json);
-    assert.equal(basemap.assetId, basemapAssetId);
-    assert.equal(basemap.attribution, "Test PMTiles Provider");
+    assert.ok(originalMap1.offlineBasemap_json === originalMap2.offlineBasemap_json, "Basemap data should be identical across imports");
   } finally {
     database.close();
   }

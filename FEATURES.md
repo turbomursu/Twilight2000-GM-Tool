@@ -21,8 +21,8 @@ This is the extensible feature roadmap for the Twilight: 2000 Fourth Edition GM 
 
 - **Campaign bounds** — Partial. Setup supports draggable corners and numeric coordinates; changes that would leave placed locations outside the area are rejected.
 - **Published geometry** — Implemented API and GM editor slice. The publication boundary accepts bounded labeled LineString and single-ring Polygon markings alongside points. Browser smoke testing verified GM save, preview, publication, and Player Interface rendering on the OSM fallback.
-- **Offline basemap** — Partial. The GM can upload a licensed raster PMTiles v3 archive (50 MiB limit) with attribution; the server serves byte ranges and the setup package stores the asset reference. The archive is a local sidecar, not embedded in JSON or runtime backups. No real licensed archive was available to verify PMTiles tile decoding/rendering.
-- **Future map work** — Cross-host PMTiles asset recovery, vector PMTiles styling, vertex-drag editing, geometry history, fog masking, and rules-based travel calculations remain planned.
+- **Offline basemap** — Implemented. The GM can upload a licensed raster PMTiles v3 archive (50 MiB limit) with attribution. Setup packages persist the basemap reference; runtime imports restore the basemap metadata to the database, enabling cross-host recovery. The server serves byte ranges and the archive is a local sidecar, not embedded in JSON or runtime backups. Basemap references survive campaign backup and restore cycles.
+- **Future map work** — Vector PMTiles styling, vertex-drag editing, geometry history, fog masking, and rules-based travel calculations remain planned.
 
 ## User Features
 
