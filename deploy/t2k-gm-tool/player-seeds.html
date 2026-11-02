@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Player Seeds | Fieldbook GM Desk</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --fern: #687e68;
+      --signal: #b74435;
+      --gold: #a97832;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; min-height: 100vh; margin: 0; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid #82a9ad; outline-offset: 2px; }
+    .shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+    .rail { display: flex; flex-direction: column; min-height: 100vh; padding: 25px 16px 18px; color: #e8eee7; background: var(--forest-deep); border-right: 1px solid #526158; box-shadow: inset -4px 0 #111b17; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 9px 28px; color: inherit; text-decoration: none; }
+    .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid #839783; border-radius: 3px; color: #d4dfcb; background: linear-gradient(145deg, #293d33, #1d2b24); font: 700 11px var(--mono); }
+    .brand-copy { display: grid; gap: 2px; }
+    .brand-copy strong { font: 700 15px var(--serif); }
+    .brand-copy small { color: #a7b5a8; font: 9px var(--mono); text-transform: uppercase; }
+    .rail-label { padding: 0 11px 9px; color: #899a8d; font: 9px var(--mono); text-transform: uppercase; }
+    .rail-nav { display: grid; gap: 4px; }
+    .rail-nav a { display: flex; align-items: center; gap: 11px; min-height: 40px; padding: 9px 12px; border: 1px solid transparent; border-radius: 2px; color: #c5d0c4; font-size: 13px; text-decoration: none; }
+    .rail-nav a:hover, .rail-nav a[aria-current="page"] { border-color: #506354; color: #fff; background: linear-gradient(90deg, #344b3d, #293d32); }
+    .nav-index { width: 18px; color: #a7b99f; font: 12px var(--mono); }
+    .rail-note { margin-top: auto; padding: 18px 9px 2px; color: #9baa9c; font: 9px/1.6 var(--mono); text-transform: uppercase; }
+    main { min-width: 0; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 68px; gap: 16px; padding: 0 34px; border-bottom: 1px solid var(--line); background: #e2e7df; box-shadow: 0 2px 0 #aeb8ac; }
+    .crumb { color: var(--muted); font: 10px var(--mono); text-transform: uppercase; }
+    .storage-state { display: flex; align-items: center; gap: 8px; color: #536b53; font: 9px var(--mono); text-transform: uppercase; }
+    .storage-state::before { width: 7px; height: 7px; border-radius: 50%; background: #76946d; content: ""; }
+    .storage-state.error { color: var(--signal); }
+    .storage-state.error::before { background: var(--signal); }
+    .content { width: min(1480px, 100%); margin: 0 auto; padding: 31px 34px 50px; background-image: linear-gradient(90deg, #344a4008 1px, transparent 1px), linear-gradient(#344a4008 1px, transparent 1px); background-size: 24px 24px; }
+    .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+    .heading-tag, .eyebrow { color: var(--signal); font: 10px var(--mono); text-transform: uppercase; }
+    h1 { margin: 6px 0 0; font: 700 34px/1.05 var(--serif); text-transform: uppercase; }
+    .page-heading p { max-width: 530px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: linear-gradient(180deg, #f0f2ec, #dfe5dc); font-size: 10px; font-weight: 700; text-transform: uppercase; box-shadow: inset 0 1px #ffffffb8, 0 1px 0 #aab4aa; }
+    .button:hover:not(:disabled) { border-color: #758579; background: #f5f6f1; }
+    .button-primary { border-color: #263a30; color: white; background: linear-gradient(180deg, #40594b, #2d4338); }
+    .button-danger { color: var(--signal); }
+    .button:disabled { cursor: not-allowed; opacity: .48; }
+    .layout { display: grid; grid-template-columns: minmax(230px, 290px) minmax(0, 1fr); gap: 16px; align-items: start; }
+    .panel { min-width: 0; border: 1px solid #a3aea3; border-radius: 2px; background: var(--surface); box-shadow: inset 0 1px #ffffffb8, 0 2px 0 #b5beb4; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #eff1eb, #e1e7df); }
+    .panel-head h2 { margin: 0; font: 700 17px var(--serif); }
+    .panel-head small { display: block; margin-top: 3px; color: var(--muted); font: 9px var(--mono); }
+    .seed-list { display: grid; }
+    .seed-row { display: grid; width: 100%; gap: 5px; padding: 12px 14px; border: 0; border-bottom: 1px solid #d5ddd3; color: var(--ink); background: transparent; text-align: left; }
+    .seed-row:hover, .seed-row[aria-current="true"] { background: #dfe6dc; }
+    .seed-row strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .seed-row span { color: var(--muted); font: 9px var(--mono); }
+    .seed-row .assigned { color: #526f58; }
+    .empty-list { padding: 24px 16px; color: var(--muted); font: 10px/1.5 var(--mono); text-align: center; }
+    .editor { min-height: 470px; }
+    .editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    .editor-head h2 { margin: 0; font: 700 18px var(--serif); }
+    .editor-head p { margin: 4px 0 0; color: var(--muted); font: 9px var(--mono); }
+    .editor-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
+    .campaign-select { display: grid; min-width: 175px; gap: 3px; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .campaign-select select { width: 100%; min-height: 32px; border: 1px solid var(--line); color: var(--ink); background: #f7f8f3; font: 9px var(--mono); text-transform: none; }
+    .editor-body { padding: 17px; }
+    .blank-state { display: grid; min-height: 390px; place-content: center; gap: 12px; padding: 24px; color: var(--muted); text-align: center; }
+    .blank-state[hidden], .seed-form[hidden] { display: none; }
+    .blank-state strong { color: var(--ink); font: 20px var(--serif); text-transform: uppercase; }
+    .blank-state p { max-width: 390px; margin: 0 auto; font-size: 11px; line-height: 1.55; }
+    .seed-form { display: grid; gap: 18px; }
+    .form-section { display: grid; gap: 11px; padding-bottom: 17px; border-bottom: 1px solid #cbd4c8; }
+    .form-section:last-of-type { padding-bottom: 0; border-bottom: 0; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .section-heading h3 { margin: 0; font: 700 14px var(--serif); text-transform: uppercase; }
+    .section-heading span { color: var(--muted); font: 9px var(--mono); }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+    .field { display: grid; align-content: start; gap: 5px; min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    .field label, .field-label { color: #52604d; font: 9px var(--mono); text-transform: uppercase; }
+    .field input, .field select, .field textarea { width: 100%; min-height: 35px; padding: 7px 9px; border: 1px solid #aab5aa; border-radius: 2px; color: var(--ink); background: #f7f8f3; font-size: 11px; }
+    .field textarea { min-height: 78px; resize: vertical; line-height: 1.45; }
+    .field output { min-height: 12px; color: var(--muted); font: 9px var(--mono); }
+    .ratings-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .rating-field { display: grid; gap: 5px; min-width: 0; padding: 9px; border: 1px solid #c4cec1; background: #e2e8dd; }
+    .rating-field label { color: #52604d; font: 9px var(--mono); text-transform: uppercase; }
+    .rating-field select { width: 100%; min-height: 32px; border: 1px solid #aab5aa; border-radius: 2px; color: var(--ink); background: #f7f8f3; font: 11px var(--mono); }
+    .rating-field output { color: var(--muted); font: 8px var(--mono); }
+    .skills-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+    .skill-group { display: grid; gap: 5px; }
+    .skill-group h4 { margin: 0 0 2px; color: #52604d; font: 9px var(--mono); text-transform: uppercase; }
+    .skill-line { display: grid; grid-template-columns: minmax(0, 1fr) 92px 100px; align-items: center; gap: 8px; min-height: 33px; border-bottom: 1px solid #d5ddd3; font-size: 10px; }
+    .skill-line select { min-height: 27px; padding: 3px 6px; border: 1px solid #aab5aa; color: var(--ink); background: #f7f8f3; font: 10px var(--mono); }
+    .skill-line output { color: var(--muted); font: 8px var(--mono); text-align: right; }
+    .rule-note { padding: 11px 13px; border-left: 3px solid var(--gold); color: #4c5a51; background: #e7e6d9; font-size: 10px; line-height: 1.5; }
+    .rule-note strong { display: block; margin-bottom: 4px; color: #4d583f; font: 9px var(--mono); text-transform: uppercase; }
+    .legacy-drafts { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: -7px 0 17px; padding: 11px 13px; border-left: 3px solid var(--gold); background: #e7e6d9; }
+    .legacy-drafts[hidden] { display: none; }
+    .legacy-drafts p { margin: 0; color: #4c5a51; font-size: 10px; line-height: 1.45; }
+    .career-terms-list { display: grid; gap: 12px; }
+    .career-term { display: grid; gap: 12px; padding: 12px; border: 1px solid #c4cec1; background: #e2e8dd; }
+    .career-term-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .career-term-head h4 { margin: 0; font: 700 12px var(--serif); text-transform: uppercase; }
+    .career-term .field textarea { min-height: 58px; }
+    .checklist { display: grid; gap: 7px; }
+    .check-row { display: flex; align-items: start; gap: 8px; color: #47554d; font-size: 10px; line-height: 1.4; }
+    .check-row input { margin: 1px 0 0; accent-color: var(--forest); }
+    .assignment-note { min-height: 18px; margin: 0; color: var(--muted); font: 9px/1.5 var(--mono); }
+    .assignment-note.error { color: var(--signal); }
+    .activation-token { overflow-wrap: anywhere; margin: 0; padding: 11px 13px; border: 1px solid #9aaf82; color: #344a40; background: #e4eadc; font: 9px/1.5 var(--mono); white-space: pre-wrap; }
+    .activation-token[hidden] { display: none; }
+    .toast { position: fixed; right: 20px; bottom: 20px; z-index: 3; max-width: calc(100vw - 40px); padding: 12px 15px; border: 1px solid #718c73; color: #f4f6ef; background: var(--forest); font: 10px var(--mono); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); color: #758178; font: 9px var(--mono); text-transform: uppercase; }
+    @media (max-width: 1000px) {
+      .shell { grid-template-columns: 194px minmax(0, 1fr); }
+      .content { padding: 24px; }
+      .layout { grid-template-columns: minmax(210px, 250px) minmax(0, 1fr); }
+      .editor-head { align-items: start; flex-direction: column; }
+      .editor-actions { justify-content: start; }
+      .ratings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .shell { display: block; }
+      .rail { min-height: 0; padding: 12px 14px; }
+      .brand { padding: 0 2px 12px; }
+      .rail-label, .rail-note { display: none; }
+      .rail-nav { display: flex; overflow-x: auto; gap: 4px; }
+      .rail-nav a { flex: 0 0 auto; padding: 8px 10px; font-size: 11px; }
+      .topbar { min-height: 54px; padding: 0 15px; }
+      .content { padding: 20px 14px 32px; }
+      .page-heading { align-items: start; flex-direction: column; gap: 9px; }
+      .legacy-drafts { align-items: start; flex-direction: column; }
+      h1 { font-size: 29px; }
+      .layout { grid-template-columns: minmax(0, 1fr); }
+      .seed-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .seed-row { border-right: 1px solid #d5ddd3; }
+      .fields, .skills-grid { grid-template-columns: minmax(0, 1fr); }
+      .skill-line { grid-template-columns: minmax(0, 1fr) 82px 95px; }
+      footer { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="GM navigation">
+      <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">T2K</span><span class="brand-copy"><strong>Fieldbook</strong><small>Game master desk</small></span></a>
+      <div class="rail-label">GM desk</div>
+      <nav class="rail-nav" aria-label="GM tools">
+        <a href="index.html"><span class="nav-index" aria-hidden="true">01</span>Campaign runtime</a>
+        <a href="campaign-setup.html"><span class="nav-index" aria-hidden="true">02</span>Campaign setup</a>
+        <a href="player-seeds.html" aria-current="page"><span class="nav-index" aria-hidden="true">03</span>Player seeds</a>
+      </nav>
+      <div class="rail-note">GM-owned player templates<br>Campaign access starts on assignment</div>
+    </aside>
+    <main>
+      <header class="topbar"><div class="crumb">Fieldbook / GM authoring / Player seeds</div><div class="storage-state" id="storage-state" role="status">Connecting to GM service</div></header>
+      <div class="content">
+        <header class="page-heading">
+          <div><div class="heading-tag">Unassigned by default / GM-only</div><h1>Player seeds</h1></div>
+          <p>Prepare a GM-owned player login and T2K 4E character template outside any campaign. The player has no campaign access until you assign the template.</p>
+        </header>
+        <aside class="legacy-drafts" id="legacy-drafts" hidden><p>Older browser-only seed drafts remain saved on this device and are not imported into the GM service.</p><button class="button" id="download-legacy-drafts" type="button">Download local drafts</button></aside>
+        <div class="layout">
+          <aside class="panel" aria-labelledby="seed-list-title">
+            <div class="panel-head"><div><h2 id="seed-list-title">Seed register</h2><small id="seed-count">0 templates</small></div><button class="button button-primary" id="new-seed" type="button" aria-label="Create player seed">+ New</button></div>
+            <div class="seed-list" id="seed-list" aria-live="polite"></div>
+          </aside>
+          <section class="panel editor" aria-label="Player seed editor">
+            <div class="blank-state" id="blank-state"><strong>No seed selected</strong><p>Create a GM-held player seed. It remains separate from campaign records until you choose Add to campaign.</p><button class="button button-primary" id="empty-new-seed" type="button">Create player seed</button></div>
+            <form class="seed-form" id="seed-form" hidden>
+              <header class="editor-head">
+                <div><h2 id="editor-title">New player seed</h2><p id="editor-subtitle">UNASSIGNED / GM-ONLY TEMPLATE</p></div>
+                <div class="editor-actions">
+                  <button class="button button-danger" id="delete-seed" type="button" aria-label="Delete player seed" title="Delete player seed">×</button>
+                  <label class="campaign-select"><span>Campaign</span><select id="assignment-campaign" aria-label="Campaign for player assignment" disabled><option value="">Load a campaign first</option></select></label>
+                  <button class="button" id="assign-seed" type="button" disabled>Add to campaign</button>
+                  <button class="button button-primary" type="submit">Save seed</button>
+                </div>
+              </header>
+              <div class="editor-body">
+                <p class="assignment-note" id="assignment-note" role="status"></p>
+                <pre class="activation-token" id="activation-token" hidden></pre>
+                <div class="form-section">
+                  <div class="section-heading"><h3>Player and character</h3><span>Identity / service</span></div>
+                  <div class="fields">
+                    <div class="field"><label for="player-username">Player login name</label><input id="player-username" name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" autocomplete="off" required></div>
+                    <div class="field"><label for="player-display-label">Player display name</label><input id="player-display-label" name="displayLabel" maxlength="80" autocomplete="off" required></div>
+                    <div class="field"><label for="character-name">Character name</label><input id="character-name" name="characterName" maxlength="80" autocomplete="off" required></div>
+                    <div class="field"><label for="nationality">Nationality</label><input id="nationality" name="nationality" maxlength="80" autocomplete="off"></div>
+                    <div class="field"><label for="character-age">Character age</label><input id="character-age" name="age" type="number" min="18" max="99" step="1" inputmode="numeric"></div>
+                    <div class="field"><label for="branch">Branch or service</label><input id="branch" name="branch" maxlength="100"></div>
+                    <div class="field"><label for="military-rank">Military rank</label><input id="military-rank" name="militaryRank" maxlength="60"></div>
+                  </div>
+                </div>
+                <div class="form-section">
+                  <div class="section-heading"><h3>Attributes</h3><span>Final ratings / Players' Manual pp. 15-16</span></div>
+                  <div class="ratings-grid" id="attribute-fields"></div>
+                </div>
+                <div class="form-section">
+                  <div class="section-heading"><h3>Skills</h3><span>Final ratings / F = untrained</span></div>
+                  <div class="skills-grid" id="skill-fields"></div>
+                  <div class="field"><label for="specialties">Specialties</label><textarea id="specialties" name="specialties" maxlength="1200" placeholder="Record selected specialties and their linked skills."></textarea></div>
+                </div>
+                <div class="form-section">
+                  <div class="section-heading"><h3>Life path record</h3><span>Manual results / no automatic rolls</span></div>
+                  <div class="rule-note"><strong>Rules checkpoint</strong>The life-path aid starts an 18-year-old with attributes at C and CUF at D. Record final values only after resolving the character's choices and rolls against the Players' Manual (character creation, pp. 31-40). This template does not calculate career results, aging, injuries, promotion, or equipment.</div>
+                  <div class="fields">
+                    <div class="field full"><label for="childhood">Childhood / background and outcomes</label><textarea id="childhood" name="childhood" maxlength="1600"></textarea></div>
+                    <div class="field full">
+                      <span class="field-label">Career terms / manual record</span>
+                      <div class="career-terms-list" id="career-terms-list" aria-live="polite"></div>
+                      <button class="button" id="add-career-term" type="button">+ Add career term</button>
+                    </div>
+                    <div class="field full" id="legacy-career-notes-field" hidden><label for="legacy-career-notes">Earlier career notes / preserved from previous version</label><textarea id="legacy-career-notes" name="legacyCareerNotes" maxlength="3000"></textarea></div>
+                    <div class="field full"><label for="at-war-term">At-war term / outcomes and starting gear</label><textarea id="at-war-term" name="atWarTerm" maxlength="1600"></textarea></div>
+                    <div class="field"><label for="cuf">Coolness Under Fire (CUF)</label><select id="cuf" name="cuf"><option value="">Not recorded</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output id="cuf-die">Not recorded</output></div>
+                    <div class="field"><label for="starting-gear">Gear reference / manual entry</label><input id="starting-gear" name="startingGear" maxlength="500" placeholder="Verify against the final career term"></div>
+                  </div>
+                  <div class="checklist" aria-label="Character creation progress">
+                    <label class="check-row"><input type="checkbox" name="step-nationality"> Nationality and childhood recorded</label>
+                    <label class="check-row"><input type="checkbox" name="step-attributes"> Attributes and childhood skills checked</label>
+                    <label class="check-row"><input type="checkbox" name="step-careers"> Career terms and rolls recorded</label>
+                    <label class="check-row"><input type="checkbox" name="step-war"> At-war term and gear checked, if applicable</label>
+                    <label class="check-row"><input type="checkbox" name="step-personal"> Personal details and group links recorded</label>
+                  </div>
+                </div>
+                <div class="form-section">
+                  <div class="section-heading"><h3>Personal record</h3><span>Character creation / p. 18</span></div>
+                  <div class="fields">
+                    <div class="field full"><label for="appearance">Appearance</label><textarea id="appearance" name="appearance" maxlength="1000"></textarea></div>
+                    <div class="field"><label for="moral-code">Moral code</label><textarea id="moral-code" name="moralCode" maxlength="700"></textarea></div>
+                    <div class="field"><label for="big-dream">Big dream</label><textarea id="big-dream" name="bigDream" maxlength="700"></textarea></div>
+                    <div class="field"><label for="buddy">Buddy</label><input id="buddy" name="buddy" maxlength="100"></div>
+                    <div class="field"><label for="how-met">How the character met the group</label><textarea id="how-met" name="howMetGroup" maxlength="700"></textarea></div>
+                    <div class="field full"><label for="gm-notes">GM notes</label><textarea id="gm-notes" name="gmNotes" maxlength="1200"></textarea></div>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </section>
+        </div>
+        <footer><span>Fieldbook / Player seeds</span><span>GM-owned server records / unassigned until campaign placement</span></footer>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="player-seeds.js"></script>
+</body>
+</html>

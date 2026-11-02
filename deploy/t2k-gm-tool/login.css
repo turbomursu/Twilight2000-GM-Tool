@@ -1,0 +1,47 @@
+:root {
+  color-scheme: light;
+  --ink: #202b27;
+  --muted: #59665f;
+  --paper: #cbd2c9;
+  --surface: #e8ece5;
+  --line: #aab5aa;
+  --forest: #344a40;
+  --forest-deep: #17231f;
+  font-family: "Bahnschrift", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background-color: var(--paper);
+  background-image: linear-gradient(90deg, #344a4008 1px, transparent 1px), linear-gradient(#344a4008 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+button, input { font: inherit; }
+button:focus-visible, input:focus-visible { outline: 3px solid #82a9ad; outline-offset: 2px; }
+.auth-shell { display: grid; align-content: center; width: min(440px, 100%); min-height: 100vh; margin: 0 auto; padding: 28px 20px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; margin: 0 0 18px 4px; }
+.brand-mark { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid #839783; border-radius: 3px; color: #d4dfcb; background: linear-gradient(145deg, #293d33, #1d2b24); box-shadow: inset 0 1px #ffffff18, 0 2px 0 #0e1713; font: 700 11px "Cascadia Mono", "Courier New", monospace; }
+.auth-brand strong { display: block; font: 700 18px "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif; }
+.auth-brand small { display: block; margin-top: 3px; color: var(--muted); font: 9px "Cascadia Mono", "Courier New", monospace; text-transform: uppercase; }
+.auth-panel { padding: 26px; border: 1px solid #a3aea3; border-top: 3px solid var(--forest); border-radius: 2px; background: var(--surface); box-shadow: inset 0 1px #ffffffb8, 0 3px 0 #b5beb4; }
+.panel-kicker { display: flex; align-items: center; gap: 8px; color: var(--muted); font: 9px "Cascadia Mono", "Courier New", monospace; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #74966c; box-shadow: 0 0 0 3px #d4e0ce; }
+h1 { margin: 18px 0 5px; font: 700 28px/1.1 "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif; text-transform: uppercase; }
+.auth-description { margin: 0 0 22px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+form { display: grid; gap: 8px; }
+form[hidden] { display: none; }
+label { margin-top: 5px; color: var(--muted); font: 9px "Cascadia Mono", "Courier New", monospace; text-transform: uppercase; }
+input { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: #f6f7f2; font-size: 13px; }
+.submit-button { display: flex; align-items: center; justify-content: space-between; min-height: 42px; margin-top: 12px; padding: 0 13px; border: 1px solid #263a30; border-radius: 2px; color: #fff; background: linear-gradient(180deg, #40594b, #2d4338); font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+.submit-button:hover { background: linear-gradient(180deg, #4a6654, #344c3e); }
+.submit-button:disabled { cursor: wait; opacity: .7; }
+.auth-feedback { min-height: 18px; margin: 12px 0 0; color: #9b4136; font-size: 11px; line-height: 1.45; }
+.auth-feedback.success { color: #356044; }
+.auth-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px 14px; margin-top: 20px; padding-top: 12px; border-top: 1px solid #c5cec4; color: var(--muted); font: 8px "Cascadia Mono", "Courier New", monospace; }

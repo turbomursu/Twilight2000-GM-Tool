@@ -1,0 +1,1280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#252b29">
+  <title>Player Terminal | Fieldbook</title>
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <style>
+    .published-map-canvas { width: 100%; height: 420px; min-width: 0; border: 1px solid #89957f; background: #d7dfca; }
+    #player-map-name { min-width: 0; overflow-wrap: anywhere; }
+    .comms-list { list-style: none; margin: 16px 0; padding: 0; min-height: 220px; max-height: 340px; overflow: auto; }
+    .comms-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 12px 0; border-bottom: 1px solid #89957f; }
+    .comms-row strong, .comms-row time { overflow-wrap: anywhere; font: 11px var(--mono); }
+    .comms-row time { color: #596851; }
+    .comms-row p { grid-column: 1 / -1; margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+    .comms-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
+    .comms-compose button:disabled { opacity: .5; cursor: not-allowed; }
+    .inventory-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid #89957f; overflow-wrap: anywhere; }
+    .inventory-row p { grid-column: 1 / -1; margin: 0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inventory-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; border: 0; min-width: 0; }
+    .inventory-editor .wide { grid-column: 1 / -1; }
+    .inventory-editor label { display: grid; gap: 5px; min-width: 0; font-size: 11px; }
+    .inventory-editor input, .inventory-editor select, .inventory-editor textarea { width: 100%; min-width: 0; padding: 9px; border: 1px solid #89957f; color: #202b23; background: #edf0e7; }
+    .inventory-editor input[type="checkbox"] { width: auto; justify-self: start; }
+    .inventory-editor button:disabled { opacity: .5; cursor: not-allowed; }
+    .inventory-proposal { padding: 16px 0; border-bottom: 1px solid #89957f; overflow-wrap: anywhere; }
+    .inventory-proposal p { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inventory-band { margin-top: 20px; padding-top: 16px; border-top: 1px solid #89957f; }
+    .inventory-row .report-actions, .inventory-editor .report-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .inventory-row output { min-width: 96px; }
+    #inventory-accepted { max-height: 320px; overflow: auto; }
+    .player-condition-record { margin: 14px 0; padding: 12px 0; border-bottom: 1px solid #89957f; }
+    .player-condition-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .player-condition-values div { min-width: 0; }
+    .player-condition-values dt { color: #596851; font: 10px var(--mono); }
+    .player-condition-values dd { margin: 4px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .player-condition-values .wide { grid-column: 1 / -1; }
+    :root {
+      color-scheme: light;
+      --ink: #202b23;
+      --lcd: #c7d0b4;
+      --lcd-bright: #d7dfc7;
+      --line: #7d8973;
+      --muted: #596851;
+      --dark: #252b29;
+      --case: #39423d;
+      --case-edge: #69716b;
+      --amber: #d6a64a;
+      --red: #a94135;
+      --green: #526946;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --sans: "Bahnschrift", "Arial Narrow", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--dark);
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 760px; min-height: 100vh; margin: 0; padding: 28px 30px 34px; background: radial-gradient(ellipse at 50% 0%, #46504a, #252b29 70%); }
+    button { font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 3px solid #d5b86b; outline-offset: 3px; }
+    .masthead { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto 14px; color: #e2e8de; }
+    .masthead-actions { display: flex; align-items: center; gap: 14px; }
+    .masthead strong { display: block; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; }
+    .masthead small { display: block; margin-top: 4px; color: #aeb8ac; font: 9px var(--mono); text-transform: uppercase; }
+    .preview-link { color: #c9d4c2; font: 9px var(--mono); text-transform: uppercase; }
+    button.preview-link { padding: 0; border: 0; background: transparent; cursor: pointer; }
+    .device-campaign-picker { display: flex; align-items: center; gap: 7px; }
+    .device-campaign-picker label { display: grid; gap: 3px; color: #cbd4c8; font: 7px var(--mono); }
+    .device-campaign-picker select { min-width: 190px; min-height: 28px; padding: 4px 7px; border: 1px solid #879283; border-radius: 2px; color: #202b23; background: #d7dfc7; font: 9px var(--mono); }
+    .player-seed-refresh { min-height: 28px; padding: 0 8px; border: 1px solid #879283; border-radius: 2px; color: #e3e7dd; background: #3a453e; font: 8px var(--mono); text-transform: uppercase; cursor: pointer; }
+    .player-seed-refresh:disabled { cursor: not-allowed; opacity: .5; }
+    .player-seed-body { display: grid; gap: 12px; padding: 4px 2px; }
+    .player-seed-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+    .player-seed-field { display: grid; align-content: start; gap: 5px; min-width: 0; padding: 9px 10px; border: 1px solid #96a087; background: var(--lcd-bright); }
+    .player-seed-field-label { color: #596851; font: 8px var(--mono); text-transform: uppercase; }
+    .player-seed-field textarea { width: 100%; min-height: 55px; padding: 7px 8px; border: 1px solid #9da88f; border-radius: 2px; color: #202b23; background: #e9eedf; font: 11px/1.4 var(--sans); }
+    .player-seed-field textarea:disabled { color: #424d41; background: #d3ddc5; }
+    .player-seed-field output { min-height: 32px; padding: 7px 8px; border: 1px solid #c3ccc1; background: #e0e7d4; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .player-seed-status { min-height: 16px; margin: 0; color: #596851; font: 9px/1.45 var(--mono); }
+    .player-seed-status.error { color: #8d392f; }
+    .player-seed-status.success { color: #3f5d3c; }
+    .player-seed-actions { display: flex; justify-content: end; gap: 7px; padding-top: 8px; border-top: 1px solid #9ca68f; }
+    .player-seed-actions button { min-height: 31px; padding: 0 10px; border: 1px solid #677660; border-radius: 2px; color: #26342a; background: linear-gradient(#e0e8d5,#c3d0b4); font: 8px var(--mono); text-transform: uppercase; cursor: pointer; }
+    .player-seed-actions button.primary { border-color: #394b3b; color: white; background: #405642; }
+    .player-seed-actions button:disabled { cursor: not-allowed; opacity: .5; }
+    .player-change-pending { padding: 9px; border-left: 3px solid #a97832; color: #65502f; background: #e5dfc7; font: 9px/1.45 var(--mono); white-space: pre-wrap; }
+    .player-change-pending[hidden] { display: none; }
+    .player-seed-body [hidden] { display: none; }
+    .device { position: relative; max-width: 1120px; min-height: 720px; margin: 0 auto; padding: 20px; border: 2px solid var(--case-edge); border-radius: 8px; background: linear-gradient(145deg, #56615b, #333b37 20%, #414b45 80%, #29312d); box-shadow: inset 0 1px #ffffff45, inset 0 -4px #151b18, 0 12px 30px #11171480; }
+    .screw { position: absolute; top: 10px; width: 9px; height: 9px; border: 1px solid #202723; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #c1c7bd, #657067 65%, #303934 66%); }
+    .screw.left { left: 10px; }.screw.right { right: 10px; }
+    .device-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 0 7px 12px; color: #e3e7dd; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .device-campaign-picker { display: flex; align-items: center; gap: 7px; }
+    .device-campaign-picker label { display: grid; gap: 3px; color: #cbd4c8; font: 7px var(--mono); }
+    .device-campaign-picker select { min-width: 190px; min-height: 28px; padding: 4px 7px; border: 1px solid #879283; border-radius: 2px; color: #202b23; background: #d7dfc7; font: 9px var(--mono); }
+    .link-state { display: inline-flex; align-items: center; gap: 8px; color: #d6be82; }
+    .link-dot { width: 7px; height: 7px; border-radius: 50%; background: #8faa7e; box-shadow: 0 0 0 3px #8faa7e24; }
+    .lcd { min-height: 545px; padding: 20px 24px; border: 3px solid #171d19; color: var(--ink); background: var(--lcd); box-shadow: inset 0 0 24px #35452c33; }
+    .lcd-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 15px; border-bottom: 2px solid #586650; }
+    .lcd-header h1 { margin: 5px 0 0; font: 700 24px/1.05 var(--mono); letter-spacing: .02em; text-transform: uppercase; }
+    .eyebrow { color: var(--muted); font: 9px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+    .header-meta { display: flex; align-items: center; gap: 20px; text-align: right; }
+    .header-meta strong { display: block; margin-top: 4px; font: 11px var(--mono); }
+    .signal-bars { display: flex; align-items: end; gap: 3px; height: 25px; padding-left: 12px; border-left: 1px solid #89957f; }
+    .signal-bars i { width: 5px; border: 1px solid #485b43; background: #526946; }
+    .signal-bars i:nth-child(1) { height: 7px; }.signal-bars i:nth-child(2) { height: 12px; }.signal-bars i:nth-child(3) { height: 18px; }.signal-bars i:nth-child(4) { height: 24px; }
+    .player-panel { display: none; min-height: 445px; padding-top: 18px; }
+    .player-panel.active { display: block; }
+    .sitrep-grid { display: grid; grid-template-columns: minmax(0, 1fr) 205px; gap: 20px; }
+    .dispatch { min-height: 166px; padding: 16px 18px; border-left: 4px solid #75866a; background: var(--lcd-bright); }
+    .dispatch-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .dispatch-title strong { font: 10px var(--mono); text-transform: uppercase; }
+    .dispatch-stamp { padding: 4px 7px; border: 1px solid #62765c; color: #42583e; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch p { max-width: 680px; margin: 15px 0 0; font: 19px/1.45 var(--sans); }
+    .status-stack { display: grid; gap: 9px; }
+    .status-readout { padding: 12px 13px; border: 1px solid #89957f; background: #cdd6bd; }
+    .status-readout strong { display: block; margin-top: 6px; font: 13px var(--mono); text-transform: uppercase; }
+    .status-readout.alert { border-color: #aa6857; background: #e5d7c6; }
+    .status-readout.alert strong { color: #923d31; }
+    .route-heading { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0 8px; }
+    .route-strip { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; align-items: center; padding: 13px 15px; border: 1px solid #89957f; background: #d0d8c3; }
+    .route-point strong { display: block; font: 11px var(--mono); text-transform: uppercase; }
+    .route-point small { display: block; margin-top: 4px; color: #58664f; font: 8px var(--mono); text-transform: uppercase; }
+    .route-point.current strong { color: var(--red); }
+    .route-track { border-top: 2px dashed #7c896d; }
+    .info-ribbon { display: flex; justify-content: space-between; gap: 18px; margin-top: 15px; padding-top: 10px; border-top: 1px solid #929c87; color: #4c5c4d; font: 9px var(--mono); text-transform: uppercase; }
+    .inventory-layout { display: grid; grid-template-columns: minmax(0, 1fr) 225px; gap: 20px; }
+    .list-heading { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 8px; }
+    .list-heading h2 { margin: 4px 0 0; font: 700 16px var(--mono); text-transform: uppercase; }
+    .inventory-content { display: grid; gap: 12px; min-width: 0; }
+    .inventory-section { min-width: 0; }
+    .inventory-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 7px; }
+    .inventory-section-head strong { font: 10px var(--mono); text-transform: uppercase; }
+    .inventory-section-head span { color: #596850; font: 8px var(--mono); text-align: right; text-transform: uppercase; }
+    .inventory-categories { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+    .inventory-category { min-width: 0; padding: 9px 10px; border-top: 2px solid #69765f; background: #d7dfca; }
+    .inventory-category strong { display: block; font: 9px var(--mono); text-transform: uppercase; }
+    .inventory-category output { display: block; margin-top: 5px; color: #596850; font: 8px var(--mono); text-transform: uppercase; }
+    .inventory-category p { margin: 6px 0 0; color: #596850; font-size: 9px; line-height: 1.35; }
+    .item-table { border-top: 2px solid #596650; }
+    .item-row { display: grid; grid-template-columns: minmax(0,1fr) 100px 105px 105px; align-items: center; gap: 8px; min-height: 56px; padding: 0 8px; border-bottom: 1px solid #9aa38f; }
+    .item-row.selected { background: #dce4d0; }
+    .item-select { display: block; width: 100%; min-width: 0; padding: 0 0 0 7px; border: 0; border-left: 2px solid transparent; color: inherit; background: transparent; text-align: left; }
+    .item-select[aria-pressed="true"] { border-left-color: #526946; }
+    .item-select:focus-visible { outline-offset: 1px; }
+    .item-name { font-size: 12px; font-weight: 700; }
+    .item-name small { display: block; margin-top: 4px; color: #5e6a56; font: 8px var(--mono); text-transform: uppercase; }
+    .quantity-control { display: grid; grid-template-columns: 25px minmax(22px,1fr) 25px; align-items: center; gap: 3px; }
+    .quantity-control button { width: 25px; height: 27px; padding: 0; border: 1px solid #89947f; border-radius: 2px; color: #2b382d; background: #dce3d0; font: 14px var(--mono); }
+    .quantity-control button:disabled { cursor: not-allowed; opacity: .48; }
+    .item-qty { display: block; min-width: 22px; text-align: center; font: 12px var(--mono); }
+    .item-button { min-height: 29px; padding: 0 9px; border: 1px solid #738069; border-radius: 2px; color: #26342a; background: linear-gradient(#dce3d0, #bdc9ad); font: 9px var(--mono); text-transform: uppercase; box-shadow: inset 0 1px #ffffff98; }
+    .item-button:hover { background: #e4e9db; }
+    .weapon-table-wrap { overflow-x: auto; border-top: 2px solid #596650; }
+    .weapon-table { width: 100%; min-width: 760px; border-collapse: collapse; color: #29362c; font: 8px var(--mono); text-transform: uppercase; }
+    .weapon-table th, .weapon-table td { padding: 8px 7px; border-bottom: 1px solid #9aa38f; text-align: left; white-space: nowrap; }
+    .weapon-table th { color: #52604d; font-weight: 400; }
+    .weapon-table td.empty-state { padding: 18px 8px; color: #596850; text-align: center; white-space: normal; }
+    .ledger-note { min-height: 100%; padding: 14px; border: 1px solid #87937c; background: #d2dac5; }
+    .ledger-note strong { display: block; margin: 8px 0; font: 11px var(--mono); text-transform: uppercase; }
+    .ledger-note p { margin: 0; color: #4e5e4d; font-size: 11px; line-height: 1.5; }
+    .item-record { display: grid; gap: 0; margin: 11px 0; border-top: 1px solid #aeb8a5; }
+    .item-record div { padding: 8px 0; border-bottom: 1px solid #aeb8a5; }
+    .item-record strong { margin: 4px 0 0; font: 9px/1.4 var(--mono); }
+    .record-note { margin-top: 10px !important; }
+    .inventory-source-note { display: flex; align-items: start; gap: 9px; margin: 0 0 11px; padding: 9px 11px; border: 1px solid #a68a50; color: #524a34; background: #e5dfc7; font-size: 10px; line-height: 1.4; }
+    .inventory-source-note strong { flex: 0 0 auto; font: 9px var(--mono); text-transform: uppercase; }
+    .proposal-list { display: grid; gap: 7px; margin-top: 12px; }
+    .proposal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 14px; padding: 10px; border: 1px dashed #98794a; background: #e8e0ca; }
+    .proposal-card strong { display: block; font-size: 11px; }
+    .proposal-card p { margin: 4px 0 0; color: #58614e; font-size: 10px; line-height: 1.4; }
+    .proposal-card small { color: #66583b; font: 8px var(--mono); text-transform: uppercase; }
+    .proposal-status { grid-column: 1 / -1; color: #8d5c22; font: 8px var(--mono); text-transform: uppercase; }
+    dialog { width: min(580px, calc(100vw - 36px)); padding: 0; border: 2px solid #48564b; border-radius: 4px; color: var(--ink); background: var(--lcd); box-shadow: 0 18px 55px #111714a8; }
+    dialog::backdrop { background: #111714c7; }
+    .dialog-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; padding: 17px 19px; border-bottom: 1px solid var(--line); background: #d7dfc7; }
+    .dialog-head h2 { margin: 5px 0 0; font: 700 17px var(--mono); text-transform: uppercase; }
+    .dialog-form { display: grid; gap: 12px; padding: 17px 19px 19px; }
+    .dialog-notice { margin: 0; color: #5a5b45; font-size: 10px; line-height: 1.45; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: #52604d; font: 9px var(--mono); text-transform: uppercase; }
+    .field input, .field textarea, .field select { width: 100%; min-height: 36px; padding: 8px 9px; border: 1px solid #929c87; border-radius: 2px; color: #202b23; background: #edf0e7; font: 11px var(--sans); }
+    .field textarea { min-height: 75px; resize: vertical; line-height: 1.4; }
+    .dialog-actions { display: flex; justify-content: end; gap: 8px; padding-top: 3px; }
+    .dialog-button { min-height: 34px; padding: 0 12px; border: 1px solid #6f7b69; border-radius: 2px; color: #27342a; background: #d8dfce; font: 9px var(--mono); text-transform: uppercase; }
+    .dialog-button.primary { border-color: #394b3b; color: #f0f3e8; background: #405642; }
+    .dialog-feedback { min-height: 15px; margin: 8px 0 0; color: #73531f; font: 9px var(--mono); }
+    .character-record { display: grid; gap: 10px; }
+    .character-record.prototype-sample { display: none; }
+    .character-identity { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 15px; border: 1px solid #89957f; background: #d1d9c4; }
+    .character-identity h2 { margin: 4px 0 3px; font: 700 20px var(--mono); text-transform: uppercase; }
+    .character-role { color: #53614c; font: 9px var(--mono); text-transform: uppercase; }
+    .character-actions { display: flex; align-items: center; justify-content: end; gap: 7px; }
+    .character-actions .item-button { min-width: 103px; }
+    .character-tabs { display: flex; gap: 4px; border-bottom: 2px solid #69765f; }
+    .character-tab { min-width: 110px; min-height: 34px; padding: 0 12px; border: 1px solid #89957f; border-bottom: 0; color: #485745; background: #cbd4bf; font: 9px var(--mono); text-transform: uppercase; }
+    .character-tab[aria-selected="true"] { color: #26342a; background: #e0e6d6; box-shadow: inset 0 3px #526946; }
+    .character-tab:focus-visible { outline-offset: -3px; }
+    .character-pane { display: none; gap: 10px; }
+    .character-pane.active { display: grid; }
+    .character-pane[hidden] { display: none; }
+    .character-overview-grid, .condition-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(280px,.85fr); gap: 10px; align-items: start; }
+    .character-column { display: grid; gap: 10px; min-width: 0; }
+    .character-block { min-width: 0; padding: 11px 13px; border: 1px solid #89957f; background: #d7dfca; }
+    .character-block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid #aeb8a5; }
+    .character-block-head strong { font: 10px var(--mono); text-transform: uppercase; }
+    .character-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px 10px; padding-top: 10px; }
+    .character-field { display: grid; align-content: start; gap: 4px; min-width: 0; }
+    .character-field.full { grid-column: 1 / -1; }
+    .character-field label, .character-field > span { color: #52604d; font: 8px var(--mono); text-transform: uppercase; }
+    .character-field-input { width: 100%; min-height: 29px; padding: 5px 7px; border: 1px solid transparent; color: #53614c; background: transparent; font: 10px var(--sans); }
+    .character-field-input:not(:disabled) { border-color: #839077; color: #26342a; background: #f0f2e9; }
+    .character-field-input:disabled { opacity: 1; }
+    .character-field textarea.character-field-input { min-height: 45px; resize: vertical; line-height: 1.35; }
+    .character-attributes { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; padding-top: 9px; }
+    .character-attribute { min-width: 0; padding: 8px; border: 1px solid #b2bbaa; background: #e3e8da; }
+    .character-attribute > span { display: block; color: #52604d; font: 8px var(--mono); text-transform: uppercase; }
+    .character-attribute select { width: 100%; min-height: 27px; margin-top: 6px; border: 1px solid #839077; color: #26342a; background: #f0f2e9; font: 11px var(--mono); }
+    .character-attribute select:disabled { border-color: transparent; color: #53614c; background: transparent; opacity: 1; }
+    .character-die { display: block; margin-top: 5px; color: #626f5e; font: 9px var(--mono); }
+    .character-summary-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #aeb8a5; }
+    .character-summary-footer .character-placeholder { margin: 0; }
+    .character-placeholder { margin: 8px 0 0; color: #5b6855; font: 8px/1.45 var(--mono); }
+    .capacity-list { display: grid; gap: 0; }
+    .capacity-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 35px; border-bottom: 1px solid #aeb8a5; }
+    .capacity-row:last-child { border-bottom: 0; }
+    .capacity-row span { font-size: 10px; }
+    .capacity-row output, .capacity-row strong { color: #596850; font: 10px var(--mono); text-align: right; text-transform: uppercase; }
+    .character-link-button { min-height: 28px; padding: 0 9px; border: 1px solid #738069; border-radius: 2px; color: #26342a; background: #dce3d0; font: 8px var(--mono); text-transform: uppercase; }
+    .character-link-button:hover { background: #e4e9db; }
+    .skill-groups { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+    .skill-group { min-width: 0; padding: 10px 12px; border: 1px solid #89957f; background: #d7dfca; }
+    .skill-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 7px; border-bottom: 1px solid #aeb8a5; }
+    .skill-group-head strong { font: 10px var(--mono); text-transform: uppercase; }
+    .skill-group-head small { color: #596850; font: 8px var(--mono); text-transform: uppercase; }
+    .skill-row { display: grid; grid-template-columns: minmax(100px,1fr) 86px 45px; align-items: center; gap: 8px; min-height: 32px; border-bottom: 1px solid #aeb8a5; }
+    .skill-row:last-child { border-bottom: 0; }
+    .skill-row > span:first-child { font-size: 10px; }
+    .skill-rating { width: 100%; min-height: 24px; border: 1px solid #839077; color: #26342a; background: #f0f2e9; font: 9px var(--mono); }
+    .skill-rating:disabled { border-color: transparent; color: #53614c; background: transparent; opacity: 1; }
+    .skill-die { color: #626f5e; font: 8px var(--mono); text-align: right; }
+    .character-experience { display: grid; grid-template-columns: minmax(0,1fr) 100px 100px; align-items: center; gap: 8px; padding-top: 9px; }
+    .specialty-input { margin-top: 8px; }
+    .track-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+    .track-panel { padding: 10px 12px; border: 1px solid #aeb8a5; background: #e3e8da; }
+    .track-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .track-head strong { font: 9px var(--mono); text-transform: uppercase; }
+    .track-head output { color: #596850; font: 9px var(--mono); }
+    .track-boxes { display: flex; gap: 5px; margin-top: 9px; }
+    .track-boxes input { appearance: none; width: 16px; height: 16px; margin: 0; border: 1px solid #718069; background: #eef0e7; }
+    .track-boxes input:checked { background: #526946; box-shadow: inset 0 0 0 3px #eef0e7; }
+    .condition-list, .armor-list { display: grid; gap: 0; padding-top: 4px; }
+    .condition-row, .armor-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; border-bottom: 1px solid #aeb8a5; font-size: 9px; }
+    .condition-row:last-child, .armor-row:last-child { border-bottom: 0; }
+    .condition-row input { width: 14px; height: 14px; accent-color: #526946; }
+    .armor-row output { color: #596850; font: 9px var(--mono); text-transform: uppercase; }
+    .radiation-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding-top: 9px; }
+    .radiation-readout { padding: 9px; border-top: 2px solid #69765f; background: #e3e8da; }
+    .radiation-readout span { display: block; color: #52604d; font: 8px var(--mono); text-transform: uppercase; }
+    .radiation-readout strong { display: block; margin-top: 5px; color: #596850; font: 10px var(--mono); text-transform: uppercase; }
+    .character-group-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border-left: 3px solid #9a753d; background: #e5dfc7; }
+    .character-group-status strong { color: #4f5848; font: 9px var(--mono); text-transform: uppercase; }
+    .character-group-status output { color: #725b2f; font: 9px var(--mono); text-transform: uppercase; }
+    .character-proposal-list { display: grid; gap: 7px; }
+    .character-proposal-list:empty { display: none; }
+    .character-review-status { margin: 0; color: #745a27; font: 9px/1.45 var(--mono); }
+    .read-only-stamp { padding: 6px 8px; border: 1px solid #69775f; color: #475841; font: 8px var(--mono); text-align: center; text-transform: uppercase; }
+    .map-record { display: grid; gap: 10px; }
+    .map-record-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .map-record-head h2 { margin: 4px 0 0; font: 700 16px var(--mono); text-transform: uppercase; }
+    .map-legend { display: flex; align-items: center; gap: 15px; color: #4e5e4d; font: 8px var(--mono); text-transform: uppercase; }
+    .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .map-key-dot { width: 8px; height: 8px; border: 1px solid #66765e; border-radius: 50%; background: #d7dfca; }
+    .map-key-dot.current { border-color: #a94135; background: #b84939; }
+    .map-key-line { width: 18px; border-top: 2px dashed #9a753d; }
+    .map-controls { display: flex; align-items: center; gap: 6px; }
+    .map-controls button { min-width: 32px; min-height: 30px; border: 1px solid #78846e; border-radius: 2px; color: #304033; background: #dce3d0; font: 12px var(--mono); }
+    .map-controls button:hover { background: #edf0e7; }
+    .map-controls button:disabled { cursor: not-allowed; opacity: .48; }
+    .map-zoom-level { min-width: 43px; color: #52604d; font: 8px var(--mono); text-align: center; }
+    .map-browse-hint { margin-left: 7px; color: #5b6855; font: 8px var(--mono); text-transform: uppercase; }
+    .map-viewport { height: 410px; overflow: auto; overscroll-behavior: contain; border: 1px solid #89957f; background: #cbd6c3; scrollbar-color: #72816d #dce3d5; }
+    .map-surface { position: relative; width: 1350px; height: 825px; }
+    .map-art { position: absolute; top: 0; left: 0; width: 1800px; height: 1100px; overflow: hidden; transform: scale(.75); transform-origin: top left; background-color: #d8e1d0; background-image: linear-gradient(#87977e31 1px, transparent 1px), linear-gradient(90deg, #87977e31 1px, transparent 1px), radial-gradient(ellipse at 38% 42%, #9eae8d 0 2%, transparent 36%), radial-gradient(ellipse at 79% 76%, #a9b48f 0 2%, transparent 34%); background-size: 30px 30px, 30px 30px, 100% 100%, 100% 100%; }
+    .map-art::before, .map-art::after { position: absolute; width: 420px; height: 250px; border: 1px solid #74886f55; border-radius: 50%; content: ""; transform: rotate(-18deg); }
+    .map-art::before { left: 23%; top: 17%; }
+    .map-art::after { right: 7%; bottom: 8%; width: 500px; height: 330px; }
+    .map-water { position: absolute; top: -25%; right: 17%; width: 18%; height: 145%; border-left: 12px solid #6b9b9d88; border-radius: 50%; transform: rotate(20deg); }
+    .map-route-segment { position: absolute; height: 0; border-top: 3px dashed #9a753d; transform-origin: left center; }
+    .map-route-segment.first { left: 16%; top: 64%; width: 35%; transform: rotate(-15deg); }
+    .map-route-segment.second { left: 50%; top: 59%; width: 28%; transform: rotate(-28deg); }
+    .map-marker { position: absolute; z-index: 1; display: grid; grid-template-columns: 12px auto; align-items: start; gap: 6px; color: #27382d; }
+    .map-marker i { width: 10px; height: 10px; margin-top: 2px; border: 1.5px solid #687c64; border-radius: 50%; background: #edf0e7; }
+    .map-marker.current i { border: 2px solid #f3eadc; outline: 2px solid #a94135; background: #b84939; }
+    .map-marker strong { display: block; padding: 3px 5px; border: 1px solid #9aa692; background: #e6ebdfed; font: 9px var(--mono); text-transform: uppercase; }
+    .map-marker small { display: block; margin-top: 4px; padding-left: 5px; color: #596851; font: 7px var(--mono); text-transform: uppercase; }
+    .map-marker.salen { left: 12%; top: 62%; }
+    .map-marker.vansbro { left: 47%; top: 57%; }
+    .map-marker.mora { right: 14%; top: 31%; }
+    .map-north { position: absolute; top: 14px; right: 18px; color: #405344; font: 9px var(--mono); text-align: center; }
+    .map-north strong { display: block; font-size: 18px; }
+    .map-grid-label { position: absolute; left: 12px; top: 12px; padding: 5px 7px; border: 1px solid #a3ad9c; color: #4e5b4f; background: #edf0e5df; font: 8px var(--mono); text-transform: uppercase; }
+    .map-record-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid #aab49f; color: #596851; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-console { display: grid; grid-template-columns: 255px minmax(0,1fr); gap: 12px; min-height: 390px; }
+    .dispatch-index { border: 1px solid #89957f; background: #d7dfca; }
+    .dispatch-index-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 12px; border-bottom: 1px solid #aeb8a5; }
+    .dispatch-index-head strong { display: block; margin-top: 4px; font: 10px var(--mono); text-transform: uppercase; }
+    .dispatch-select { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; width: 100%; gap: 8px; padding: 12px; border: 0; border-bottom: 1px solid #aeb8a5; color: var(--ink); background: transparent; text-align: left; }
+    .dispatch-select:hover { background: #e4e9dc; }
+    .dispatch-select[aria-current="true"] { box-shadow: inset 3px 0 #53694c; background: #e1e7d8; }
+    .dispatch-select strong { display: block; font: 700 10px/1.35 var(--mono); text-transform: uppercase; }
+    .dispatch-select small { display: block; margin-top: 6px; color: #5d6955; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-select .dispatch-stamp { white-space: nowrap; }
+    .message-state { align-self: start; padding: 4px 6px; border: 1px solid #78846e; color: #53614c; background: #e4e9dc; font: 8px var(--mono); white-space: nowrap; text-transform: uppercase; }
+    .message-state.new { border-color: #a47737; color: #775425; background: #eee3c9; }
+    .dispatch-detail { display: flex; flex-direction: column; min-width: 0; padding: 15px 17px; border: 1px solid #89957f; background: #d2dac5; }
+    .dispatch-detail-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding-bottom: 11px; border-bottom: 1px solid #aab49f; }
+    .dispatch-detail-actions { display: flex; align-items: center; gap: 8px; }
+    .dispatch-delete { min-height: 28px; padding: 0 8px; border: 1px solid #a0776a; border-radius: 2px; color: #8d4035; background: #e5d7c6; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-delete:hover { background: #f0dfd0; }
+    .dispatch-detail h2 { margin: 4px 0 0; font: 700 16px var(--mono); text-transform: uppercase; }
+    .dispatch-meta { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 11px 0; border-bottom: 1px solid #aab49f; }
+    .dispatch-meta strong { display: block; margin-top: 4px; font: 9px var(--mono); text-transform: uppercase; }
+    .dispatch-message { max-width: 670px; margin: 19px 0; font: 18px/1.55 var(--sans); }
+    .dispatch-detail-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 10px; border-top: 1px solid #aab49f; color: #566450; font: 8px var(--mono); text-transform: uppercase; }
+    .dispatch-feedback { min-height: 14px; margin: 8px 0 0; color: #73531f; font: 8px var(--mono); }
+    .dispatch-compose { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 9px; margin-top: 11px; padding: 10px 12px; border: 1px solid #89957f; background: #d7dfca; }
+    .dispatch-compose label { display: grid; gap: 5px; }
+    .dispatch-compose input { width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid #929c87; border-radius: 2px; color: #202b23; background: #edf0e7; font: 11px var(--sans); }
+    .dispatch-send { display: inline-flex; align-items: center; justify-content: center; min-width: 90px; min-height: 36px; gap: 7px; padding: 0 11px; border: 1px solid #394b3b; border-radius: 2px; color: #f0f3e8; background: #405642; font: 9px var(--mono); text-transform: uppercase; }
+    .dispatch-send:hover { background: #4c674e; }
+    .dispatch-send-feedback { margin: 5px 2px 0; color: #65715e; font: 8px var(--mono); }
+    .device-controls { margin-top: 14px; padding: 0 1px; color: #dbe1d8; }
+    .control-label { display: flex; align-items: center; justify-content: space-between; margin: 0 3px 7px; font: 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .action-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .action-button { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 53px; padding: 0 8px; border: 1px solid #171e1a; border-radius: 3px; color: #e8eee6; background: linear-gradient(180deg, #505b54, #303a34); font: 700 14px var(--mono); letter-spacing: .06em; text-transform: uppercase; box-shadow: inset 0 1px #ffffff35, 0 2px 0 #161c18; }
+    .action-button:hover:not(:disabled) { background: linear-gradient(180deg, #647066, #3c493f); }
+    .action-button[aria-current="page"] { border-color: #c8d39e; color: #fff; background: linear-gradient(180deg, #586c54, #344a39); box-shadow: inset 0 0 0 1px #d0dba254, 0 2px 0 #161c18; }
+    .action-button.tab-inactive:disabled { border-style: dashed; color: #9da69b; background: linear-gradient(180deg, #3e4741, #2b332e); opacity: .68; }
+    .action-button.menu { color: #adb6ac; border-style: dashed; background: #303733; box-shadow: inset 0 1px #ffffff12; }
+    .action-button:disabled { cursor: not-allowed; opacity: .78; }
+    .hardware-foot { display: flex; justify-content: space-between; gap: 14px; margin-top: 11px; color: #abb5aa; font: 8px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+    .disclaimer { max-width: 1120px; margin: 15px auto 0; color: #bac3b8; font: 10px/1.5 var(--mono); }
+    .disclaimer a { color: #d4dfca; }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div><strong>Fieldbook / Player interface</strong><small>Assigned campaign / character record</small></div>
+    <div class="masthead-actions"><a class="preview-link" href="/player-interface-concepts.html">Open four-concept comparison</a><button class="preview-link" type="button" data-auth-logout>Sign out</button></div>
+  </header>
+  <main class="device">
+    <span class="screw left" aria-hidden="true"></span><span class="screw right" aria-hidden="true"></span>
+    <div class="device-top"><span>Player handset / assigned account</span><div class="device-campaign-picker"><label for="player-campaign-select">Campaign<select id="player-campaign-select"><option value="">Loading assignments</option></select></label><button class="player-seed-refresh" id="refresh-player-character" type="button" disabled>Refresh</button></div></div>
+    <section class="lcd" aria-live="polite">
+      <header class="lcd-header">
+        <div><span class="eyebrow" id="player-record-eyebrow">Player / assigned campaign</span><h1 id="player-seed-title">Character record</h1></div>
+        <div class="header-meta"><div><span class="eyebrow" id="player-record-description">Select an assigned campaign to open your GM-provided character seed.</span></div><div class="signal-bars" aria-label="Signal level"><i></i><i></i><i></i><i></i></div></div>
+      </header>
+      <section class="player-panel" data-panel="situation" aria-label="Situation report" hidden>
+        <h2>Situation report</h2>
+        <p id="player-report-status" role="status">Select an assigned campaign.</p>
+        <article class="dispatch" id="player-published-report" hidden><div class="dispatch-title" style="flex-wrap:wrap"><strong id="player-report-title" style="min-width:0;overflow-wrap:anywhere"></strong><span class="dispatch-stamp" id="player-report-time" style="max-width:100%;white-space:normal;overflow-wrap:anywhere"></span></div><p id="player-report-body" style="white-space:pre-wrap;overflow-wrap:anywhere"></p></article>
+        <p class="info-ribbon" id="player-report-published-at"></p>
+      </section>
+      <section class="player-panel" data-panel="map" aria-label="Published campaign map" hidden>
+        <div class="map-record">
+          <div class="map-record-head"><h2 id="player-map-name">Player map</h2><span class="eyebrow">GM publication</span></div>
+          <p id="player-map-status" role="status">Select an assigned campaign.</p>
+          <div id="player-map-content" hidden>
+            <div class="map-controls" aria-label="Map zoom controls"><button type="button" id="player-map-minus" aria-label="Zoom out" title="Zoom out">&#8722;</button><output class="map-zoom-level" id="player-map-percent">100%</output><button type="button" id="player-map-plus" aria-label="Zoom in" title="Zoom in">+</button><button type="button" id="player-map-reset" title="Center on player position">Reset view</button></div>
+            <div class="published-map-canvas" id="published-player-map" role="region" tabindex="0" aria-label="Published campaign map"></div>
+            <div class="map-record-foot"><span id="published-player-position"></span><span id="player-map-published-at"></span></div>
+          </div>
+        </div>
+      </section>
+      <section class="player-panel inventory-workspace" data-panel="inventory" data-inventory-role="player" aria-label="Personal inventory" hidden>
+        <div class="map-record-head"><h2 id="player-inventory-name">Inventory</h2><button class="player-seed-refresh" id="refresh-inventory" type="button" disabled>Refresh</button></div>
+        <p id="inventory-status" role="status">Select an assigned campaign.</p>
+        <p class="inventory-source-note">Source claims: RB / rule book, GM / GM-defined, UF / unverified. Carrying effects and dice-governed actions remain GM-managed.</p>
+        <section class="inventory-band"><h2>Accepted inventory</h2><div id="inventory-accepted"></div></section>
+        <section class="inventory-band"><h2 id="inventory-editor-title">New item proposal</h2><form id="inventory-item-form"><fieldset class="inventory-editor" id="inventory-editor" disabled></fieldset></form></section>
+        <section class="inventory-band"><h2>Proposals and review history</h2><div id="inventory-proposals"></div></section>
+      </section>
+      <section class="player-panel prototype-sample" data-panel="inventory-preview" aria-label="Inventory visual prototype" hidden>
+        <div class="inventory-layout">
+          <div class="inventory-content">
+            <div class="list-heading">
+              <div><span class="eyebrow">Assigned inventory / Lena Fors</span><h2>Personal inventory</h2><span class="eyebrow">Select an item to inspect its record</span></div>
+              <button class="item-button" type="button" data-open-proposal>Propose item or data</button>
+            </div>
+            <div class="inventory-source-note"><strong>Source categories</strong><span>RB / rule book &nbsp; GM / GM-defined &nbsp; UF / unverified. Player-selected categories are claims only; the GM must verify them. Sample entries below are UF. Carrying effects are not calculated without verified item weights and capacity rules.</span></div>
+            <section class="inventory-section" aria-label="Character sheet gear locations"><div class="inventory-section-head"><strong>Carry locations</strong><span>Players' Manual / p. 19</span></div><div class="inventory-categories">
+              <div class="inventory-category"><strong>Combat gear</strong><output>Not assigned</output><p>Items carried for quick access.</p></div>
+              <div class="inventory-category"><strong>Backpack</strong><output>Not assigned</output><p>Carried items / location not linked.</p></div>
+              <div class="inventory-category"><strong>Tiny items</strong><output>Not assigned</output><p>Items with no recorded carry location.</p></div>
+            </div></section>
+            <section class="inventory-section"><div class="inventory-section-head"><strong>Items / carry location not recorded</strong><span>Local preview / UF samples</span></div><div class="item-table" aria-label="Illustrative personal inventory">
+              <div class="item-row selected" data-item-id="ration"><button class="item-select" type="button" data-item-select="ration" aria-pressed="true"><span class="item-name">Field ration<small>UF / Unverified</small></span></button><div class="quantity-control" role="group" aria-label="Field ration quantity"><button type="button" data-quantity-step="-1" aria-label="Remove one field ration" disabled>−</button><output class="item-qty" aria-label="Field ration quantity">02</output><button type="button" data-quantity-step="1" aria-label="Add one field ration">+</button></div><button class="item-button" type="button">Use item</button><button class="item-button" type="button">Transfer</button></div>
+              <div class="item-row" data-item-id="bandage"><button class="item-select" type="button" data-item-select="bandage" aria-pressed="false"><span class="item-name">Bandage pack<small>UF / Unverified</small></span></button><div class="quantity-control" role="group" aria-label="Bandage pack quantity"><button type="button" data-quantity-step="-1" aria-label="Remove one bandage pack">−</button><output class="item-qty" aria-label="Bandage pack quantity">01</output><button type="button" data-quantity-step="1" aria-label="Add one bandage pack">+</button></div><button class="item-button" type="button">Use item</button><button class="item-button" type="button">Transfer</button></div>
+              <div class="item-row" data-item-id="flashlight"><button class="item-select" type="button" data-item-select="flashlight" aria-pressed="false"><span class="item-name">Flashlight<small>UF / Unverified</small></span></button><div class="quantity-control" role="group" aria-label="Flashlight quantity"><button type="button" data-quantity-step="-1" aria-label="Remove one flashlight">−</button><output class="item-qty" aria-label="Flashlight quantity">01</output><button type="button" data-quantity-step="1" aria-label="Add one flashlight">+</button></div><button class="item-button" type="button" data-inspect-item="flashlight">Inspect</button><button class="item-button" type="button">Transfer</button></div>
+            </div></section>
+            <section class="inventory-section"><div class="inventory-section-head"><strong>Weapons</strong><span>GM-assigned / not linked</span></div><div class="weapon-table-wrap"><table class="weapon-table"><thead><tr><th>Weapon</th><th>Rel</th><th>RoF</th><th>Damage</th><th>Crit</th><th>Blast</th><th>Range</th><th>Mag</th><th>Armor</th><th>Weight</th><th>Spent ammo</th></tr></thead><tbody><tr><td class="empty-state" colspan="11">No weapon records connected / statistics remain unassigned</td></tr></tbody></table></div></section>
+            <div class="proposal-list" id="proposal-list" aria-live="polite"></div>
+            <p class="dialog-feedback" id="proposal-feedback" role="status">Player-submitted items and data stay pending until GM verification and acceptance.</p>
+          </div>
+          <aside class="ledger-note" aria-live="polite"><span class="eyebrow">Personal record / selected item</span><strong id="record-item-name">Field ration</strong><div class="item-record"><div><span class="eyebrow">Item class</span><strong id="record-item-class">Consumable / sample record</strong></div><div><span class="eyebrow">Quantity</span><strong id="record-item-quantity">02</strong></div><div><span class="eyebrow">Source category</span><strong id="record-item-category">UF / Unverified</strong></div><div><span class="eyebrow">Fourth Edition source</span><strong id="record-item-source">No verified citation</strong></div><div><span class="eyebrow">Carrying effects</span><strong id="record-carry-status">Not calculated / rule data missing</strong></div></div><p class="record-note" id="record-item-note">No Fourth Edition mechanics or verified weight are recorded for this illustrative entry.</p></aside>
+        </div>
+      </section>
+      <section class="player-panel active" data-panel="character" aria-label="Character record">
+        <section class="player-condition-record" aria-labelledby="player-condition-title">
+          <div class="map-record-head"><h2 id="player-condition-title">GM condition record</h2><button class="player-seed-refresh" id="refresh-character-conditions" type="button" disabled>Refresh conditions</button></div>
+          <p id="player-condition-status" role="status">Select an assigned campaign.</p>
+          <p class="character-placeholder">Condition effects and carrying remain GM-managed.</p>
+          <dl class="player-condition-values" id="player-condition-values" hidden></dl>
+        </section>
+        <p class="player-seed-status" id="player-seed-status" role="status" aria-live="polite">Loading assigned campaigns.</p>
+        <div class="character-record">
+          <header class="character-identity"><div><span class="eyebrow">Assigned seed / server record</span><h2 id="player-record-name">Select a campaign</h2><span class="character-role" id="player-record-state">Character fields are supplied by your GM.</span></div></header>
+          <div class="player-seed-body">
+            <form id="player-seed-form" hidden>
+              <section class="character-block"><div class="character-block-head"><strong>Character fields</strong><span class="eyebrow">GM-controlled seed</span></div><div class="player-seed-fields" id="player-seed-fields"></div></section>
+              <p class="character-placeholder" id="player-seed-form-note">Complete fields the GM left blank. Finalize when required fields are complete.</p>
+              <section class="player-change-pending" id="player-change-request-summary" hidden></section>
+              <div class="player-seed-actions"><button type="submit" id="save-player-seed">Save progress</button><button class="primary" type="button" id="finalize-player-seed" disabled>Finalize character</button></div>
+            </form>
+            <p class="player-seed-status" id="player-seed-empty" role="status">Choose an assigned campaign to continue.</p>
+          </div>
+        </div>
+        <div class="character-record prototype-sample" hidden>
+        <div class="character-record">
+          <header class="character-identity"><div><span class="eyebrow">Assigned character / player seat 02</span><h2>Lena Fors</h2><span class="character-role">Scout / The Long Road</span></div><div class="character-actions"><button class="item-button" type="button" data-edit-character>Edit values</button><button class="item-button" type="button" data-send-character disabled>Send to GM</button></div></header>
+          <nav class="character-tabs" role="tablist" aria-label="Character record sections">
+            <button class="character-tab" type="button" role="tab" id="character-tab-condition" aria-controls="character-pane-condition" aria-selected="true" data-character-tab="condition">Condition</button>
+            <button class="character-tab" type="button" role="tab" id="character-tab-skills" aria-controls="character-pane-skills" aria-selected="false" data-character-tab="skills">Skills</button>
+            <button class="character-tab" type="button" role="tab" id="character-tab-record" aria-controls="character-pane-record" aria-selected="false" data-character-tab="record">Record</button>
+          </nav>
+          <section class="character-pane" id="character-pane-record" role="tabpanel" aria-labelledby="character-tab-record" data-character-pane="record" tabindex="0" hidden>
+            <div class="character-overview-grid">
+              <div class="character-column">
+                <section class="character-block"><div class="character-block-head"><strong>Identity and service</strong><span class="eyebrow">Assigned record</span></div><div class="character-form-grid">
+                  <label class="character-field"><span>Character name</span><input class="character-field-input" type="text" name="Character name" value="Lena Fors" data-character-input disabled></label>
+                  <label class="character-field"><span>Nationality</span><input class="character-field-input" type="text" name="Nationality" placeholder="Not assigned" data-character-input disabled></label>
+                  <label class="character-field"><span>Branch</span><input class="character-field-input" type="text" name="Branch" placeholder="Not assigned" data-character-input disabled></label>
+                  <label class="character-field"><span>Military rank</span><input class="character-field-input" type="text" name="Military rank" placeholder="Not assigned" data-character-input disabled></label>
+                  <label class="character-field full"><span>Appearance</span><textarea class="character-field-input" name="Appearance" placeholder="No description assigned" data-character-input disabled></textarea></label>
+                  <label class="character-field"><span>Moral code</span><textarea class="character-field-input" name="Moral code" placeholder="Not assigned" data-character-input disabled></textarea></label>
+                  <label class="character-field"><span>Big dream</span><textarea class="character-field-input" name="Big dream" placeholder="Not assigned" data-character-input disabled></textarea></label>
+                  <label class="character-field"><span>Buddy</span><input class="character-field-input" type="text" name="Buddy" placeholder="Not assigned" data-character-input disabled></label>
+                  <label class="character-field"><span>How you met the group</span><textarea class="character-field-input" name="How you met the group" placeholder="Not recorded" data-character-input disabled></textarea></label>
+                </div></section>
+              </div>
+              <div class="character-column">
+                <section class="character-block"><div class="character-block-head"><strong>Attributes</strong><span class="eyebrow">Rating / base die</span></div><div class="character-attributes">
+                  <label class="character-attribute"><span>Strength</span><select name="Strength" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output class="character-die" data-die-for="Strength">Not set</output></label>
+                  <label class="character-attribute"><span>Agility</span><select name="Agility" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output class="character-die" data-die-for="Agility">Not set</output></label>
+                  <label class="character-attribute"><span>Intelligence</span><select name="Intelligence" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output class="character-die" data-die-for="Intelligence">Not set</output></label>
+                  <label class="character-attribute"><span>Empathy</span><select name="Empathy" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option></select><output class="character-die" data-die-for="Empathy">Not set</output></label>
+                </div><div class="character-summary-footer"><p class="character-placeholder">Players' Manual / pp. 15-16 / draft changes remain unapproved.</p><button class="character-link-button" type="button" data-open-inventory>Open inventory</button></div></section>
+                <section class="character-block"><div class="character-block-head"><strong>Group status</strong><span class="eyebrow">Shared campaign value</span></div><div class="character-group-status"><strong>Unit morale</strong><output id="condition-unit-morale">Not linked</output></div><p class="character-placeholder">One shared rating for the group, supplied by the GM.</p></section>
+              </div>
+            </div>
+          </section>
+          <section class="character-pane" id="character-pane-skills" role="tabpanel" aria-labelledby="character-tab-skills" data-character-pane="skills" tabindex="0" hidden>
+            <div class="skill-groups">
+              <section class="skill-group"><div class="skill-group-head"><strong>Strength</strong><small>Attribute / STR</small></div>
+                <label class="skill-row"><span>Close Combat</span><select class="skill-rating" name="Close Combat" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Close Combat">Not set</output></label>
+                <label class="skill-row"><span>Heavy Weapons</span><select class="skill-rating" name="Heavy Weapons" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Heavy Weapons">Not set</output></label>
+                <label class="skill-row"><span>Stamina</span><select class="skill-rating" name="Stamina" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Stamina">Not set</output></label>
+              </section>
+              <section class="skill-group"><div class="skill-group-head"><strong>Agility</strong><small>Attribute / AGL</small></div>
+                <label class="skill-row"><span>Driving</span><select class="skill-rating" name="Driving" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Driving">Not set</output></label>
+                <label class="skill-row"><span>Ranged Combat</span><select class="skill-rating" name="Ranged Combat" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Ranged Combat">Not set</output></label>
+                <label class="skill-row"><span>Mobility</span><select class="skill-rating" name="Mobility" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Mobility">Not set</output></label>
+              </section>
+              <section class="skill-group"><div class="skill-group-head"><strong>Intelligence</strong><small>Attribute / INT</small></div>
+                <label class="skill-row"><span>Recon</span><select class="skill-rating" name="Recon" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Recon">Not set</output></label>
+                <label class="skill-row"><span>Survival</span><select class="skill-rating" name="Survival" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Survival">Not set</output></label>
+                <label class="skill-row"><span>Tech</span><select class="skill-rating" name="Tech" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Tech">Not set</output></label>
+              </section>
+              <section class="skill-group"><div class="skill-group-head"><strong>Empathy</strong><small>Attribute / EMP</small></div>
+                <label class="skill-row"><span>Command</span><select class="skill-rating" name="Command" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Command">Not set</output></label>
+                <label class="skill-row"><span>Medical Aid</span><select class="skill-rating" name="Medical Aid" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Medical Aid">Not set</output></label>
+                <label class="skill-row"><span>Persuasion</span><select class="skill-rating" name="Persuasion" data-character-input data-rating-input disabled><option value="">Not set</option><option>A</option><option>B</option><option>C</option><option>D</option><option>F</option></select><output class="skill-die" data-die-for="Persuasion">Not set</output></label>
+              </section>
+            </div>
+            <div class="character-overview-grid">
+              <section class="character-block"><div class="character-block-head"><strong>Specialties</strong><span class="eyebrow">Linked to relevant skills</span></div><label class="character-field"><textarea class="character-field-input specialty-input" name="Specialties" placeholder="No specialties assigned" data-character-input disabled></textarea></label></section>
+              <section class="character-block"><div class="character-block-head"><strong>Experience</strong><span class="eyebrow">Current / total</span></div><div class="character-experience"><span class="eyebrow">Recorded experience</span><label class="character-field"><span>Current</span><input class="character-field-input" type="number" min="0" step="1" name="Current experience" placeholder="Not set" data-character-input disabled></label><label class="character-field"><span>Total</span><input class="character-field-input" type="number" min="0" step="1" name="Total experience" placeholder="Not set" data-character-input disabled></label></div></section>
+            </div>
+          </section>
+          <section class="character-pane active" id="character-pane-condition" role="tabpanel" aria-labelledby="character-tab-condition" data-character-pane="condition" tabindex="0">
+            <div class="condition-grid">
+              <div class="character-column">
+                <section class="character-block"><div class="character-block-head"><strong>Damage and stress</strong><span class="eyebrow" id="condition-sync-state">Awaiting GM push</span></div><div class="track-grid">
+                  <div class="track-panel"><div class="track-head"><strong>Damage</strong><output id="condition-damage-count">Not linked</output></div><div class="track-boxes" role="group" aria-label="Damage track"><input type="checkbox" data-condition-track="damage" data-track-mark="1" disabled aria-label="Damage mark 1"><input type="checkbox" data-condition-track="damage" data-track-mark="2" disabled aria-label="Damage mark 2"><input type="checkbox" data-condition-track="damage" data-track-mark="3" disabled aria-label="Damage mark 3"><input type="checkbox" data-condition-track="damage" data-track-mark="4" disabled aria-label="Damage mark 4"><input type="checkbox" data-condition-track="damage" data-track-mark="5" disabled aria-label="Damage mark 5"><input type="checkbox" data-condition-track="damage" data-track-mark="6" disabled aria-label="Damage mark 6"></div></div>
+                  <div class="track-panel"><div class="track-head"><strong>Stress</strong><output id="condition-stress-count">Not linked</output></div><div class="track-boxes" role="group" aria-label="Stress track"><input type="checkbox" data-condition-track="stress" data-track-mark="1" disabled aria-label="Stress mark 1"><input type="checkbox" data-condition-track="stress" data-track-mark="2" disabled aria-label="Stress mark 2"><input type="checkbox" data-condition-track="stress" data-track-mark="3" disabled aria-label="Stress mark 3"><input type="checkbox" data-condition-track="stress" data-track-mark="4" disabled aria-label="Stress mark 4"><input type="checkbox" data-condition-track="stress" data-track-mark="5" disabled aria-label="Stress mark 5"><input type="checkbox" data-condition-track="stress" data-track-mark="6" disabled aria-label="Stress mark 6"></div></div>
+                </div><div class="capacity-list"><div class="capacity-row"><span>Hit capacity</span><output id="hit-capacity">Not set</output></div><div class="capacity-row"><span>Stress capacity</span><output id="stress-capacity">Not set</output></div><div class="capacity-row"><span>Coolness under fire</span><output id="condition-cuf">Not linked</output></div></div><p class="character-placeholder">Players' Manual / p. 16 / capacities preview from character attributes. Damage, stress, and CUF show the latest GM condition push.</p></section>
+                <section class="character-block"><div class="character-block-head"><strong>Armor</strong><span class="eyebrow">Latest GM record</span></div><div class="armor-list"><div class="armor-row"><span>Head</span><output data-armor-slot="head">Not linked</output></div><div class="armor-row"><span>Arms</span><output data-armor-slot="arms">Not linked</output></div><div class="armor-row"><span>Torso</span><output data-armor-slot="torso">Not linked</output></div><div class="armor-row"><span>Legs</span><output data-armor-slot="legs">Not linked</output></div></div></section>
+              </div>
+              <div class="character-column">
+                <section class="character-block"><div class="character-block-head"><strong>Conditions</strong><span class="eyebrow">Latest GM record</span></div><div class="condition-list"><label class="condition-row"><span>Starving</span><input type="checkbox" data-condition-flag="starving" disabled aria-label="Starving condition"></label><label class="condition-row"><span>Dehydrated</span><input type="checkbox" data-condition-flag="dehydrated" disabled aria-label="Dehydrated condition"></label><label class="condition-row"><span>Sleep deprived</span><input type="checkbox" data-condition-flag="sleepDeprived" disabled aria-label="Sleep deprived condition"></label><label class="condition-row"><span>Hypothermic</span><input type="checkbox" data-condition-flag="hypothermic" disabled aria-label="Hypothermic condition"></label></div></section>
+                <section class="character-block"><div class="character-block-head"><strong>Critical injuries and diseases</strong><span class="eyebrow">Latest GM record</span></div><div class="capacity-list"><div class="capacity-row"><span>Critical injuries</span><strong id="condition-critical-injuries">Not linked</strong></div><div class="capacity-row"><span>Diseases</span><strong id="condition-diseases">Not linked</strong></div></div></section>
+                <section class="character-block"><div class="character-block-head"><strong>Radiation</strong><span class="eyebrow">Latest GM record</span></div><div class="radiation-grid"><div class="radiation-readout"><span>Temporary</span><strong id="condition-radiation-temporary">Not linked</strong></div><div class="radiation-readout"><span>Permanent</span><strong id="condition-radiation-permanent">Not linked</strong></div></div></section>
+              </div>
+            </div>
+          </section>
+          <div class="character-proposal-list" id="character-proposal-list" aria-live="polite"></div>
+          <p class="character-review-status" id="character-review-status" role="status">Accepted values are not connected. Player changes stay pending until GM review.</p>
+        </div>
+      </section>
+      <section class="player-panel comms-workspace" data-panel="comms" data-comms-role="player" aria-label="Campaign COMMS" hidden>
+        <div class="map-record-head"><h2>COMMS</h2><button class="player-seed-refresh" id="refresh-comms" type="button" disabled>Refresh</button></div>
+        <p id="comms-status" role="status">Select an assigned campaign.</p>
+        <ol class="comms-list" id="comms-messages" role="log" aria-label="Campaign messages" aria-live="polite" aria-relevant="additions"></ol>
+        <form id="comms-form"><fieldset class="comms-compose" disabled><div class="field"><label for="comms-message">Broadcast / GM + all players</label><input id="comms-message" type="text" maxlength="240" required autocomplete="off"></div><button class="dispatch-send" type="submit"><span aria-hidden="true">&#8599;</span> Send</button></fieldset></form>
+      </section>
+    </section>
+    <nav class="device-controls" aria-label="Player quick access">
+      <div class="control-label"><span>Player views</span><span>Assigned campaign</span></div>
+      <div class="action-bar">
+        <button class="action-button" id="player-sitrep-tab" type="button" title="Situation report" data-view-state="active">Sitrep</button>
+        <button class="action-button" id="player-inventory-tab" type="button" title="Assigned inventory" data-view-state="active">Inventory</button>
+        <button class="action-button" id="player-character-tab" type="button" aria-current="page" title="Assigned character" data-view-state="active">Character</button>
+        <button class="action-button" id="player-comms-tab" type="button" title="Campaign COMMS" data-view-state="active">COMMS</button>
+        <button class="action-button" id="player-map-tab" type="button" title="Published campaign map" data-view-state="active">Map</button>
+      </div>
+    </nav>
+    <div class="hardware-foot"><span>Player terminal / campaign information controlled by GM</span><span>Fourth Edition rules actions require source verification</span></div>
+  </main>
+  <dialog id="item-proposal-dialog" aria-labelledby="proposal-title">
+    <div class="dialog-head"><div><span class="eyebrow">Player inventory / pending review</span><h2 id="proposal-title">Propose item or item data</h2></div><button class="dialog-button" type="button" data-close-proposal>Close</button></div>
+    <form class="dialog-form" id="item-proposal-form">
+      <p class="dialog-notice">This submits a proposal only. The item will not enter your inventory until the GM verifies the data and accepts it.</p>
+      <div class="form-grid">
+        <div class="field"><label for="proposal-kind">Proposal type</label><select id="proposal-kind" name="kind"><option>New item</option><option>Update item data</option></select></div>
+        <div class="field"><label for="proposal-name">Item name</label><input id="proposal-name" name="name" maxlength="70" required></div>
+        <div class="field full"><label for="proposal-data">Proposed item data</label><textarea id="proposal-data" name="data" maxlength="800" required placeholder="Describe the item or the data change you are suggesting."></textarea></div>
+        <div class="field"><label for="proposal-source-category">Source category</label><select id="proposal-source-category" name="sourceCategory"><option value="UF">UF / Unverified</option><option value="RB">RB / Rule book</option><option value="GM">GM / GM-defined</option></select></div>
+        <div class="field"><label for="proposal-source">Source reference, if known</label><input id="proposal-source" name="source" maxlength="120" placeholder="Book and page or GM note"></div>
+      </div>
+      <div class="dialog-actions"><button class="dialog-button" type="button" data-close-proposal>Cancel</button><button class="dialog-button primary" type="submit">Submit for GM review</button></div>
+    </form>
+  </dialog>
+  <p class="disclaimer" hidden>Character values, inventory quantities, and proposals autosave locally. GM-pushed condition snapshots are read-only and cached until the next push. Authenticated GM publishing, cross-device delivery, rule-based encumbrance, and dice resolution are not connected. <a href="https://www.bing.com/images/search?q=military+communications+equipment+field+radio+handset+display" target="_blank" rel="noreferrer">Visual reference: field handsets and radio displays</a></p>
+  <script src="/auth-client.js" defer></script>
+  <script src="/player-seed-client.js" defer></script>
+  <script src="/situation-report-client.js" defer></script>
+  <script src="/vendor/leaflet.js" defer></script>
+  <script src="/vendor/pmtiles.js" defer></script>
+  <script src="/map-publication-client.js" defer></script>
+  <script src="/comms-client.js" defer></script>
+  <script src="/inventory-client.js" defer></script>
+  <script src="/conditions-client.js" defer></script>
+  <script>
+    if (document.body.dataset.enableLocalPlayerPreview === "true") {
+    const buttons = [...document.querySelectorAll(".action-button[data-target]")];
+    const panels = [...document.querySelectorAll(".player-panel")];
+    const title = document.querySelector("#screen-title");
+    const proposalDialog = document.querySelector("#item-proposal-dialog");
+    const proposalForm = document.querySelector("#item-proposal-form");
+    const proposalList = document.querySelector("#proposal-list");
+    const proposalFeedback = document.querySelector("#proposal-feedback");
+    const itemSelectButtons = [...document.querySelectorAll("[data-item-select]")];
+    const quantityButtons = [...document.querySelectorAll("[data-quantity-step]")];
+    const characterInputs = [...document.querySelectorAll("[data-character-input]")];
+    const editCharacterButton = document.querySelector("[data-edit-character]");
+    const sendCharacterButton = document.querySelector("[data-send-character]");
+    const characterTabButtons = [...document.querySelectorAll("[data-character-tab]")];
+    const characterPanes = [...document.querySelectorAll("[data-character-pane]")];
+    const openInventoryButton = document.querySelector("[data-open-inventory]");
+    const characterProposalList = document.querySelector("#character-proposal-list");
+    const characterReviewStatus = document.querySelector("#character-review-status");
+    const storageStatus = document.querySelector("#local-storage-status");
+    const dispatchButtons = [...document.querySelectorAll("[data-dispatch-id]")];
+    const deleteDispatchButton = document.querySelector("[data-delete-dispatch]");
+    const dispatchFeedback = document.querySelector("#dispatch-feedback");
+    const dispatchComposeForm = document.querySelector("#dispatch-compose-form");
+    const dispatchMessageInput = document.querySelector("#dispatch-compose-input");
+    const dispatchSendFeedback = document.querySelector("#dispatch-send-feedback");
+    const mapViewport = document.querySelector("#map-viewport");
+    const mapSurface = document.querySelector("#map-surface");
+    const mapArt = document.querySelector("#map-art");
+    const mapZoomLevel = document.querySelector("#map-zoom-level");
+    const mapZoomButtons = [...document.querySelectorAll("[data-map-zoom]")];
+    const mapResetButton = document.querySelector("[data-map-reset]");
+    const mapWidth = 1800;
+    const mapHeight = 1100;
+    const minMapZoom = 0.5;
+    const maxMapZoom = 2;
+    let mapZoom = 0.75;
+    const playerName = "Lena Fors";
+    const playerSeat = "Player seat 02";
+    const gameClock = { date: "11 May 2000", time: "08:40", day: 14 };
+    const dispatchRecords = {
+      bridge: { sector: "GM-published / Dalarna sector", title: "North bridge / Vansbro", date: "11 May 2000", time: "07:55", sender: "Campaign control", recipient: playerSeat, origin: "Published by campaign control", visibility: "Player copy / read only", message: "Bridge condition remains unconfirmed. Keep below the ridge; a light was seen near the approach after dusk.", isNew: true, isRead: false, receivedOrder: 1 },
+      movement: { sector: "GM-published / Dalarna sector", title: "Column movement", date: "10 May 2000", time: "18:20", sender: "Campaign control", recipient: playerSeat, origin: "Published by campaign control", visibility: "Player copy / read only", message: "Vehicles reached the southern approach before nightfall. Road remains passable through the next waypoint.", isNew: false, isRead: false }
+    };
+    let selectedDispatchId = "bridge";
+    let outgoingMessageNumber = 0;
+    const itemRecords = {
+      ration: { name: "Field ration", itemClass: "Consumable / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." },
+      bandage: { name: "Bandage pack", itemClass: "Medical supply / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." },
+      flashlight: { name: "Flashlight", itemClass: "Equipment / sample record", sourceCategory: "UF / Unverified", source: "No verified citation", note: "No Fourth Edition mechanics are recorded for this illustrative entry." }
+    };
+    const PLAYER_STORAGE_KEY = "fieldbook-player-terminal-v1";
+    const GM_CONDITION_PUSH_KEY = "fieldbook-gm-condition-push-v1";
+    const GM_CONDITION_CHANNEL = "fieldbook-gm-condition-push-v1";
+    const PLAYER_SEAT_ID = "seat-02";
+    const PLAYER_DATA_VERSION = 1;
+    const PLAYER_RULES_REFERENCE = Object.freeze({
+      source: "Twilight: 2000 Players' Manual / Fourth Edition",
+      tables: {
+        attributeRatings: [
+          { rating: "A", dieType: "D12", dieSize: 12 },
+          { rating: "B", dieType: "D10", dieSize: 10 },
+          { rating: "C", dieType: "D8", dieSize: 8 },
+          { rating: "D", dieType: "D6", dieSize: 6 }
+        ],
+        skillRatings: [
+          { rating: "A", dieType: "D12" },
+          { rating: "B", dieType: "D10" },
+          { rating: "C", dieType: "D8" },
+          { rating: "D", dieType: "D6" },
+          { rating: "F", dieType: null }
+        ],
+        skillsByAttribute: [
+          { attribute: "Strength", code: "STR", skills: ["Close Combat", "Heavy Weapons", "Stamina"] },
+          { attribute: "Agility", code: "AGL", skills: ["Driving", "Ranged Combat", "Mobility"] },
+          { attribute: "Intelligence", code: "INT", skills: ["Recon", "Survival", "Tech"] },
+          { attribute: "Empathy", code: "EMP", skills: ["Command", "Medical Aid", "Persuasion"] }
+        ],
+        capacities: {
+          hit: { attributes: ["Strength", "Agility"], divisor: 4, page: 16 },
+          stress: { attributes: ["Intelligence", "Empathy"], divisor: 4, page: 16 }
+        },
+        gearCategories: ["Combat gear", "Backpack", "Tiny items"],
+        weaponFields: ["Weapon", "Rel", "RoF", "Damage", "Crit", "Blast", "Range", "Mag", "Armor", "Weight", "Spent ammo"],
+        references: {
+          attributes: "Players' Manual, pp. 15-16",
+          skills: "Players' Manual, pp. 16, 42",
+          gear: "Players' Manual, p. 19",
+          characterSheet: "Players' Manual character sheet"
+        }
+      }
+    });
+    const ratingDice = Object.fromEntries(PLAYER_RULES_REFERENCE.tables.skillRatings.map(({ rating, dieType }) => [rating, dieType || "No die / untrained"]));
+    const ratingDieSizes = Object.fromEntries(PLAYER_RULES_REFERENCE.tables.attributeRatings.map(({ rating, dieSize }) => [rating, dieSize]));
+    let playerStorageWritable = true;
+
+    function isRecord(value) {
+      return value !== null && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function normalizeConditionSnapshot(snapshot) {
+      if (!isRecord(snapshot)) return null;
+      const readCount = (value, maximum = Number.MAX_SAFE_INTEGER) => Number.isSafeInteger(value) && value >= 0 && value <= maximum ? value : null;
+      const readText = (value) => {
+        if (typeof value === "string") return value.trim() ? value.trim().slice(0, 160) : null;
+        return typeof value === "number" && Number.isFinite(value) ? String(value) : null;
+      };
+      const requiredKeys = ["damage", "stress", "coolnessUnderFire", "unitMorale", "armor", "conditions", "criticalInjuries", "diseases", "radiation"];
+      if (!requiredKeys.every((key) => Object.prototype.hasOwnProperty.call(snapshot, key))
+        || !isRecord(snapshot.armor)
+        || !isRecord(snapshot.conditions)
+        || !isRecord(snapshot.radiation)
+        || !["head", "arms", "torso", "legs"].every((key) => Object.prototype.hasOwnProperty.call(snapshot.armor, key))
+        || !["starving", "dehydrated", "sleepDeprived", "hypothermic"].every((key) => typeof snapshot.conditions[key] === "boolean")
+        || !["temporary", "permanent"].every((key) => Number.isSafeInteger(snapshot.radiation[key]) && snapshot.radiation[key] >= 0)
+        || !Array.isArray(snapshot.criticalInjuries)
+        || !snapshot.criticalInjuries.every((item) => typeof item === "string")
+        || !Array.isArray(snapshot.diseases)
+        || !snapshot.diseases.every((item) => typeof item === "string")) return null;
+
+      const damage = readCount(snapshot.damage, 6);
+      const stress = readCount(snapshot.stress, 6);
+      const validCuf = snapshot.coolnessUnderFire === null || ["A", "B", "C", "D"].includes(snapshot.coolnessUnderFire);
+      const validMorale = snapshot.unitMorale === null || ["A", "B", "C", "D", "E", "F"].includes(snapshot.unitMorale);
+      if (damage === null || stress === null || !validCuf || !validMorale) return null;
+
+      return {
+        damage,
+        stress,
+        coolnessUnderFire: snapshot.coolnessUnderFire,
+        unitMorale: snapshot.unitMorale,
+        armor: {
+          head: readText(snapshot.armor.head),
+          arms: readText(snapshot.armor.arms),
+          torso: readText(snapshot.armor.torso),
+          legs: readText(snapshot.armor.legs)
+        },
+        conditions: {
+          starving: snapshot.conditions.starving,
+          dehydrated: snapshot.conditions.dehydrated,
+          sleepDeprived: snapshot.conditions.sleepDeprived,
+          hypothermic: snapshot.conditions.hypothermic
+        },
+        criticalInjuries: snapshot.criticalInjuries.slice(0, 20).map((item) => item.trim().slice(0, 160)).filter(Boolean),
+        diseases: snapshot.diseases.slice(0, 20).map((item) => item.trim().slice(0, 160)).filter(Boolean),
+        radiation: {
+          temporary: snapshot.radiation.temporary,
+          permanent: snapshot.radiation.permanent
+        }
+      };
+    }
+
+    function createDefaultPlayerData() {
+      return {
+        schemaVersion: PLAYER_DATA_VERSION,
+        rulesReference: PLAYER_RULES_REFERENCE,
+        conditionSnapshot: null,
+        conditionSequence: 0,
+        conditionPushedAt: null,
+        character: {
+          record: Object.fromEntries(characterInputs.map((input) => [input.name, input.value])),
+          changeRequests: []
+        },
+        inventory: {
+          quantities: Object.fromEntries([...document.querySelectorAll(".item-row")].map((row) => [row.dataset.itemId, Number(row.querySelector(".item-qty").textContent)])),
+          selectedItemId: itemSelectButtons.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.itemSelect || "ration",
+          itemProposals: []
+        }
+      };
+    }
+
+    function loadPlayerData() {
+      const defaults = createDefaultPlayerData();
+      try {
+        const serialized = localStorage.getItem(PLAYER_STORAGE_KEY);
+        if (!serialized) return defaults;
+        const saved = JSON.parse(serialized);
+        if (!isRecord(saved) || saved.schemaVersion !== PLAYER_DATA_VERSION) {
+          playerStorageWritable = false;
+          storageStatus.textContent = "Browser store / version mismatch";
+          return defaults;
+        }
+
+        const savedCharacter = isRecord(saved.character) ? saved.character : {};
+        const savedRecord = isRecord(savedCharacter.record) ? savedCharacter.record : {};
+        const savedInventory = isRecord(saved.inventory) ? saved.inventory : {};
+        const savedQuantities = isRecord(savedInventory.quantities) ? savedInventory.quantities : {};
+        const conditionSnapshot = normalizeConditionSnapshot(saved.conditionSnapshot);
+        const conditionSequence = conditionSnapshot && Number.isSafeInteger(saved.conditionSequence) && saved.conditionSequence >= 0
+          ? saved.conditionSequence
+          : 0;
+        const record = Object.fromEntries(characterInputs.map((input) => [
+          input.name,
+          typeof savedRecord[input.name] === "string" ? savedRecord[input.name] : defaults.character.record[input.name]
+        ]));
+        const quantities = Object.fromEntries(Object.entries(defaults.inventory.quantities).map(([itemId, defaultQuantity]) => {
+          const quantity = Number(savedQuantities[itemId]);
+          return [itemId, Number.isSafeInteger(quantity) && quantity >= 0 ? quantity : defaultQuantity];
+        }));
+
+        return {
+          schemaVersion: PLAYER_DATA_VERSION,
+          rulesReference: PLAYER_RULES_REFERENCE,
+          conditionSnapshot,
+          conditionSequence,
+          conditionPushedAt: conditionSnapshot && typeof saved.conditionPushedAt === "string" ? saved.conditionPushedAt : null,
+          character: {
+            record,
+            changeRequests: Array.isArray(savedCharacter.changeRequests) ? savedCharacter.changeRequests.filter(isRecord) : []
+          },
+          inventory: {
+            quantities,
+            selectedItemId: itemRecords[savedInventory.selectedItemId] ? savedInventory.selectedItemId : defaults.inventory.selectedItemId,
+            itemProposals: Array.isArray(savedInventory.itemProposals) ? savedInventory.itemProposals.filter(isRecord) : []
+          }
+        };
+      } catch (error) {
+        playerStorageWritable = false;
+        storageStatus.textContent = "Browser store / unavailable";
+        console.warn("Could not load player-terminal data from browser storage.", error);
+        return defaults;
+      }
+    }
+
+    let playerData = loadPlayerData();
+    characterInputs.forEach((input) => {
+      input.value = playerData.character.record[input.name] ?? input.value;
+    });
+    let selectedItemId = playerData.inventory.selectedItemId;
+    let proposalNumber = playerData.inventory.itemProposals.reduce((latest, proposal) => Math.max(latest, Number(proposal.number) || 0), 0);
+    let characterProposalNumber = playerData.character.changeRequests.reduce((latest, request) => Math.max(latest, Number(request.number) || 0), 0);
+    let characterEditBaseline = new Map();
+
+    function persistPlayerData() {
+      if (!playerStorageWritable) return false;
+      if (characterInputs.every((input) => input.disabled)) {
+        playerData.character.record = Object.fromEntries(characterInputs.map((input) => [input.name, input.value]));
+      }
+      playerData.inventory.quantities = Object.fromEntries([...document.querySelectorAll(".item-row")].map((row) => [row.dataset.itemId, Number(row.querySelector(".item-qty").textContent)]));
+      playerData.inventory.selectedItemId = selectedItemId;
+      playerData.rulesReference = PLAYER_RULES_REFERENCE;
+      try {
+        localStorage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(playerData));
+        storageStatus.textContent = "Browser store / saved";
+        return true;
+      } catch (error) {
+        storageStatus.textContent = "Browser store / unavailable";
+        console.warn("Could not save player-terminal data to browser storage.", error);
+        return false;
+      }
+    }
+
+    function setMapZoom(nextZoom, preserveCenter = true) {
+      const previousZoom = mapZoom;
+      const centerX = (mapViewport.scrollLeft + mapViewport.clientWidth / 2) / previousZoom;
+      const centerY = (mapViewport.scrollTop + mapViewport.clientHeight / 2) / previousZoom;
+      mapZoom = Math.min(maxMapZoom, Math.max(minMapZoom, Math.round(nextZoom * 100) / 100));
+      mapArt.style.transform = `scale(${mapZoom})`;
+      mapSurface.style.width = `${Math.round(mapWidth * mapZoom)}px`;
+      mapSurface.style.height = `${Math.round(mapHeight * mapZoom)}px`;
+      mapZoomLevel.textContent = `${Math.round(mapZoom * 100)}%`;
+      mapZoomButtons.forEach((button) => {
+        const proposedZoom = mapZoom + Number(button.dataset.mapZoom);
+        button.disabled = proposedZoom < minMapZoom || proposedZoom > maxMapZoom;
+      });
+      if (preserveCenter && mapViewport.clientWidth) {
+        mapViewport.scrollLeft = centerX * mapZoom - mapViewport.clientWidth / 2;
+        mapViewport.scrollTop = centerY * mapZoom - mapViewport.clientHeight / 2;
+      }
+    }
+
+    function centerMapOnPlayer() {
+      const marker = mapArt.querySelector(".map-marker.current");
+      if (!marker || !mapViewport.clientWidth) return;
+      const markerX = (mapArt.offsetLeft + marker.offsetLeft + marker.offsetWidth / 2) * mapZoom;
+      const markerY = (mapArt.offsetTop + marker.offsetTop + marker.offsetHeight / 2) * mapZoom;
+      mapViewport.scrollLeft = markerX - mapViewport.clientWidth / 2;
+      mapViewport.scrollTop = markerY - mapViewport.clientHeight / 2;
+    }
+
+    mapZoomButtons.forEach((button) => button.addEventListener("click", () => {
+      setMapZoom(mapZoom + Number(button.dataset.mapZoom));
+    }));
+    mapResetButton.addEventListener("click", () => {
+      setMapZoom(0.75, false);
+      centerMapOnPlayer();
+    });
+    setMapZoom(mapZoom, false);
+
+    function updateCharacterSendState() {
+      const hasChanges = characterInputs.some((input) => input.value.trim() !== characterEditBaseline.get(input.name));
+      sendCharacterButton.disabled = !hasChanges;
+    }
+
+    function updateCharacterDerivedValues() {
+      characterInputs.filter((input) => input.matches("[data-rating-input]")).forEach((input) => {
+        const dieOutput = document.querySelector(`[data-die-for="${input.name}"]`);
+        if (dieOutput) dieOutput.textContent = ratingDice[input.value] || "Not set";
+      });
+
+      const calculateCapacity = (definition) => {
+        const sizes = definition.attributes.map((attribute) => ratingDieSizes[document.querySelector(`[name="${attribute}"]`).value]);
+        return sizes.every(Boolean) ? String(Math.ceil(sizes.reduce((total, size) => total + size, 0) / definition.divisor)) : "Not set";
+      };
+      document.querySelector("#hit-capacity").textContent = calculateCapacity(PLAYER_RULES_REFERENCE.tables.capacities.hit);
+      document.querySelector("#stress-capacity").textContent = calculateCapacity(PLAYER_RULES_REFERENCE.tables.capacities.stress);
+    }
+
+    function renderConditionSnapshot() {
+      const snapshot = playerData.conditionSnapshot;
+      ["damage", "stress"].forEach((track) => {
+        const value = snapshot?.[track];
+        document.querySelectorAll(`[data-condition-track="${track}"]`).forEach((box) => {
+          box.checked = value !== null && value !== undefined && Number(box.dataset.trackMark) <= value;
+        });
+        document.querySelector(`#condition-${track}-count`).textContent = value === null || value === undefined
+          ? "Not linked"
+          : `${value} / 6`;
+      });
+
+      document.querySelector("#condition-cuf").textContent = snapshot?.coolnessUnderFire || "Not linked";
+      document.querySelector("#condition-unit-morale").textContent = snapshot?.unitMorale || "Not linked";
+      document.querySelectorAll("[data-armor-slot]").forEach((output) => {
+        const value = snapshot?.armor?.[output.dataset.armorSlot];
+        output.textContent = snapshot ? value || "Not recorded" : "Not linked";
+      });
+      document.querySelectorAll("[data-condition-flag]").forEach((input) => {
+        input.checked = snapshot?.conditions?.[input.dataset.conditionFlag] === true;
+      });
+      document.querySelector("#condition-critical-injuries").textContent = snapshot
+        ? snapshot.criticalInjuries.join("; ") || "None reported"
+        : "Not linked";
+      document.querySelector("#condition-diseases").textContent = snapshot
+        ? snapshot.diseases.join("; ") || "None reported"
+        : "Not linked";
+      document.querySelector("#condition-radiation-temporary").textContent = snapshot?.radiation?.temporary ?? "Not linked";
+      document.querySelector("#condition-radiation-permanent").textContent = snapshot?.radiation?.permanent ?? "Not linked";
+      document.querySelector("#condition-sync-state").textContent = snapshot
+        ? `GM update ${playerData.conditionSequence} / ${playerData.conditionPushedAt || "time not supplied"}`
+        : "Awaiting GM push";
+    }
+
+    function applyGmConditionPush(input) {
+      let envelope = input;
+      if (typeof input === "string") {
+        try {
+          envelope = JSON.parse(input);
+        } catch {
+          return false;
+        }
+      }
+      if (!isRecord(envelope)
+        || envelope.schemaVersion !== 1
+        || envelope.seatId !== PLAYER_SEAT_ID
+        || !Number.isSafeInteger(envelope.sequence)
+        || envelope.sequence < 1
+        || envelope.sequence <= playerData.conditionSequence) return false;
+
+      const snapshot = normalizeConditionSnapshot(envelope.condition);
+      if (!snapshot) return false;
+      playerData.conditionSnapshot = snapshot;
+      playerData.conditionSequence = envelope.sequence;
+      playerData.conditionPushedAt = typeof envelope.pushedAt === "string" && envelope.pushedAt.trim()
+        ? envelope.pushedAt.trim().slice(0, 40)
+        : new Date().toISOString();
+      renderConditionSnapshot();
+      persistPlayerData();
+      return true;
+    }
+
+    function receiveStoredConditionPush(value) {
+      if (value) applyGmConditionPush(value);
+    }
+
+    renderConditionSnapshot();
+    window.addEventListener("storage", (event) => {
+      if (event.key === GM_CONDITION_PUSH_KEY) receiveStoredConditionPush(event.newValue);
+    });
+    window.addEventListener("fieldbook:gm-condition-push", (event) => applyGmConditionPush(event.detail));
+    if ("BroadcastChannel" in window) {
+      try {
+        const gmConditionChannel = new BroadcastChannel(GM_CONDITION_CHANNEL);
+        gmConditionChannel.addEventListener("message", (event) => applyGmConditionPush(event.data));
+      } catch (error) {
+        console.warn("Could not listen for GM condition updates.", error);
+      }
+    }
+    try {
+      receiveStoredConditionPush(localStorage.getItem(GM_CONDITION_PUSH_KEY));
+    } catch (error) {
+      console.warn("Could not read the latest GM condition update.", error);
+    }
+
+    function selectCharacterTab(target, moveFocus = false) {
+      characterTabButtons.forEach((button) => {
+        const selected = button.dataset.characterTab === target;
+        button.setAttribute("aria-selected", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+        if (selected && moveFocus) button.focus();
+      });
+      characterPanes.forEach((pane) => {
+        const active = pane.dataset.characterPane === target;
+        pane.classList.toggle("active", active);
+        pane.hidden = !active;
+      });
+    }
+
+    function setCharacterEditing(editing) {
+      if (editing) {
+        characterEditBaseline = new Map(characterInputs.map((input) => [input.name, input.value.trim()]));
+        characterInputs.forEach((input) => { input.disabled = false; });
+        editCharacterButton.textContent = "Cancel edit";
+        sendCharacterButton.disabled = true;
+        characterReviewStatus.textContent = "Draft only. The accepted character record remains unchanged.";
+        document.querySelector(".character-pane.active [data-character-input]")?.focus();
+        return;
+      }
+
+      characterInputs.forEach((input) => {
+        input.value = characterEditBaseline.get(input.name) || "";
+        input.disabled = true;
+      });
+      editCharacterButton.textContent = "Edit values";
+      sendCharacterButton.disabled = true;
+      characterReviewStatus.textContent = "Changes require GM approval. Sending a request does not update the accepted character record.";
+      updateCharacterDerivedValues();
+    }
+
+    editCharacterButton.addEventListener("click", () => {
+      setCharacterEditing(characterInputs.some((input) => !input.disabled) ? false : true);
+    });
+    characterInputs.forEach((input) => input.addEventListener("input", () => {
+      updateCharacterSendState();
+      updateCharacterDerivedValues();
+    }));
+    characterTabButtons.forEach((button, index) => {
+      button.addEventListener("click", () => selectCharacterTab(button.dataset.characterTab));
+      button.addEventListener("keydown", (event) => {
+        let nextIndex = index;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % characterTabButtons.length;
+        else if (event.key === "ArrowLeft") nextIndex = (index - 1 + characterTabButtons.length) % characterTabButtons.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = characterTabButtons.length - 1;
+        else return;
+        event.preventDefault();
+        selectCharacterTab(characterTabButtons[nextIndex].dataset.characterTab, true);
+      });
+    });
+    openInventoryButton.addEventListener("click", () => {
+      buttons.find((button) => button.dataset.target === "inventory")?.click();
+    });
+    selectCharacterTab("condition");
+    updateCharacterDerivedValues();
+
+    function renderCharacterProposal(request) {
+      const card = document.createElement("article");
+      card.className = "proposal-card";
+      const summary = document.createElement("div");
+      const heading = document.createElement("strong");
+      heading.textContent = `Character update request ${String(request.number).padStart(2, "0")}`;
+      summary.append(heading);
+      (Array.isArray(request.changes) ? request.changes : []).forEach((change) => {
+        const detail = document.createElement("p");
+        detail.textContent = `${String(change.field || "Field")}: ${String(change.value || "")}`;
+        summary.append(detail);
+      });
+      const status = document.createElement("span");
+      status.className = "dispatch-stamp";
+      status.textContent = "Pending GM";
+      const review = document.createElement("div");
+      review.className = "proposal-status";
+      review.textContent = "Pending GM review / accepted character data unchanged";
+      card.append(summary, status, review);
+      characterProposalList.prepend(card);
+    }
+
+    playerData.character.changeRequests.slice().reverse().forEach(renderCharacterProposal);
+    if (playerData.character.changeRequests.length) {
+      characterReviewStatus.textContent = `${playerData.character.changeRequests.length} local request(s) pending GM review; accepted values unchanged.`;
+    }
+
+    sendCharacterButton.addEventListener("click", () => {
+      const changes = characterInputs
+        .filter((input) => input.value.trim() !== characterEditBaseline.get(input.name))
+        .map((input) => ({ field: input.name, value: input.value.trim() }));
+      if (!changes.length) return;
+
+      characterProposalNumber += 1;
+      const request = { number: characterProposalNumber, changes };
+      playerData.character.changeRequests.unshift(request);
+      renderCharacterProposal(request);
+      setCharacterEditing(false);
+      characterReviewStatus.textContent = "Saved in this browser only; not delivered to a GM service.";
+      persistPlayerData();
+    });
+
+    function renderDispatchStatus(button, record) {
+      const state = button.querySelector("[data-message-state]");
+      const recentNewIds = Object.entries(dispatchRecords)
+        .filter(([, message]) => message.isNew && !message.isRead)
+        .sort((left, right) => right[1].receivedOrder - left[1].receivedOrder)
+        .slice(0, 3)
+        .map(([id]) => id);
+      const label = record.isRead ? "READ" : recentNewIds.includes(button.dataset.dispatchId) ? "NEW" : "UNREAD";
+      state.textContent = label;
+      state.classList.toggle("new", label === "NEW");
+    }
+
+    function selectDispatch(messageId, markRead = true) {
+      const record = dispatchRecords[messageId];
+      const button = dispatchButtons.find((item) => item.dataset.dispatchId === messageId && item.isConnected);
+      if (!record || !button) return;
+      selectedDispatchId = messageId;
+      if (markRead) {
+        record.isRead = true;
+        record.isNew = false;
+      }
+      dispatchButtons.forEach((item) => {
+        if (!item.isConnected) return;
+        item.setAttribute("aria-current", String(item === button));
+        renderDispatchStatus(item, dispatchRecords[item.dataset.dispatchId]);
+      });
+      document.querySelector("#dispatch-sector").textContent = record.sector;
+      document.querySelector("#dispatch-title").textContent = record.title;
+      document.querySelector("#dispatch-date").textContent = record.date;
+      document.querySelector("#dispatch-time").textContent = record.time;
+      document.querySelector("#dispatch-sender").textContent = record.sender;
+      document.querySelector("#dispatch-recipient").textContent = record.recipient;
+      document.querySelector("#dispatch-origin").textContent = record.origin;
+      document.querySelector("#dispatch-visibility").textContent = record.visibility;
+      document.querySelector("#dispatch-message").textContent = record.message;
+      deleteDispatchButton.disabled = false;
+    }
+
+    dispatchButtons.forEach((button) => {
+      renderDispatchStatus(button, dispatchRecords[button.dataset.dispatchId]);
+      button.addEventListener("click", () => selectDispatch(button.dataset.dispatchId));
+    });
+    dispatchComposeForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const message = dispatchMessageInput.value.trim();
+      if (!message) return;
+
+      outgoingMessageNumber += 1;
+      const messageId = `player-${outgoingMessageNumber}`;
+      const record = {
+        sector: "Player sent / outbound",
+        title: `Message from ${playerName}`,
+        date: gameClock.date,
+        time: gameClock.time,
+        sender: playerName,
+        recipient: "GM + all players",
+        origin: `Sent by ${playerName} / game time`,
+        visibility: "GM + all players / preview only",
+        message,
+        isNew: false,
+        isRead: true,
+        receivedOrder: Object.values(dispatchRecords).reduce((latest, item) => Math.max(latest, item.receivedOrder || 0), 0) + 1
+      };
+      dispatchRecords[messageId] = record;
+
+      const listButton = document.createElement("button");
+      listButton.className = "dispatch-select";
+      listButton.type = "button";
+      listButton.dataset.dispatchId = messageId;
+      listButton.setAttribute("aria-current", "false");
+      const summary = document.createElement("span");
+      const messageTitle = document.createElement("strong");
+      messageTitle.textContent = record.title;
+      const messageTime = document.createElement("small");
+      messageTime.textContent = `${record.date} / ${record.time}`;
+      summary.append(messageTitle, messageTime);
+      const state = document.createElement("span");
+      state.className = "message-state";
+      state.dataset.messageState = "";
+      listButton.append(summary, state);
+      renderDispatchStatus(listButton, record);
+      listButton.addEventListener("click", () => selectDispatch(messageId));
+      dispatchButtons.push(listButton);
+      document.querySelector(".dispatch-index-head").after(listButton);
+      document.querySelector("#dispatch-count").textContent = String(dispatchButtons.filter((button) => button.isConnected).length).padStart(2, "0");
+      selectDispatch(messageId, false);
+
+      dispatchMessageInput.value = "";
+      dispatchSendFeedback.textContent = `Added to this preview at ${gameClock.time}; other browsers will not receive it until messaging is connected.`;
+    });
+    deleteDispatchButton.addEventListener("click", () => {
+      if (!selectedDispatchId || !dispatchRecords[selectedDispatchId]) return;
+      const selectedButton = dispatchButtons.find((item) => item.dataset.dispatchId === selectedDispatchId && item.isConnected);
+      delete dispatchRecords[selectedDispatchId];
+      selectedButton?.remove();
+      const remainingButton = dispatchButtons.find((item) => item.isConnected);
+      const remainingCount = document.querySelectorAll(".dispatch-select").length;
+      document.querySelector("#dispatch-count").textContent = String(remainingCount).padStart(2, "0");
+      dispatchFeedback.textContent = "Message deleted from this player's preview inbox; GM publication is unchanged.";
+      if (remainingButton) {
+        selectDispatch(remainingButton.dataset.dispatchId, false);
+      } else {
+        selectedDispatchId = null;
+        document.querySelector("#dispatch-sector").textContent = "Player mailbox / seat 02";
+        document.querySelector("#dispatch-title").textContent = "No messages";
+        document.querySelector("#dispatch-date").textContent = "—";
+        document.querySelector("#dispatch-time").textContent = "—";
+        document.querySelector("#dispatch-sender").textContent = "—";
+        document.querySelector("#dispatch-recipient").textContent = "—";
+        document.querySelector("#dispatch-origin").textContent = "No player inbox message selected";
+        document.querySelector("#dispatch-visibility").textContent = "Preview only";
+        document.querySelector("#dispatch-message").textContent = "No messages remain in this preview inbox. The GM archive is unchanged.";
+        deleteDispatchButton.disabled = true;
+      }
+    });
+
+    function selectItem(itemId, persist = true) {
+      const item = itemRecords[itemId];
+      const row = document.querySelector(`[data-item-id="${itemId}"]`);
+      if (!item || !row) return;
+      selectedItemId = itemId;
+      itemSelectButtons.forEach((button) => {
+        const selected = button.dataset.itemSelect === itemId;
+        button.setAttribute("aria-pressed", String(selected));
+        button.closest(".item-row").classList.toggle("selected", selected);
+      });
+      document.querySelector("#record-item-name").textContent = item.name;
+      document.querySelector("#record-item-class").textContent = item.itemClass;
+      document.querySelector("#record-item-quantity").textContent = row.querySelector(".item-qty").textContent.trim();
+      document.querySelector("#record-item-category").textContent = item.sourceCategory;
+      document.querySelector("#record-item-source").textContent = item.source;
+      document.querySelector("#record-item-note").textContent = item.note;
+      if (persist) persistPlayerData();
+    }
+
+    function restoreInventoryState() {
+      document.querySelectorAll(".item-row").forEach((row) => {
+        const quantity = playerData.inventory.quantities[row.dataset.itemId];
+        row.querySelector(".item-qty").textContent = String(quantity).padStart(2, "0");
+        row.querySelector('[data-quantity-step="-1"]').disabled = quantity === 0;
+      });
+      if (!itemRecords[selectedItemId]) selectedItemId = "ration";
+      selectItem(selectedItemId, false);
+    }
+
+    function renderItemProposal(proposal) {
+      const card = document.createElement("article");
+      card.className = "proposal-card";
+      const description = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = `${String(proposal.kind || "Item proposal")}: ${String(proposal.name || "Unnamed item")}`;
+      const details = document.createElement("p");
+      details.textContent = String(proposal.data || "");
+      const source = document.createElement("small");
+      const sourceLabels = { RB: "Rule book", GM: "GM-defined", UF: "Unverified" };
+      source.textContent = `${String(proposal.sourceCategory || "UF")} / ${sourceLabels[proposal.sourceCategory] || "Unverified"} / ${String(proposal.source || "No reference supplied")}`;
+      const status = document.createElement("span");
+      status.className = "dispatch-stamp";
+      status.textContent = `Proposal ${String(proposal.number || 0).padStart(2, "0")}`;
+      const review = document.createElement("div");
+      review.className = "proposal-status";
+      review.textContent = "Pending GM verification and acceptance / inventory unchanged";
+      description.append(name, details, source);
+      card.append(description, status, review);
+      proposalList.prepend(card);
+    }
+
+    playerData.inventory.itemProposals.slice().reverse().forEach(renderItemProposal);
+    restoreInventoryState();
+    itemSelectButtons.forEach((button) => button.addEventListener("click", () => selectItem(button.dataset.itemSelect)));
+    document.querySelector("[data-inspect-item]").addEventListener("click", (event) => selectItem(event.currentTarget.dataset.inspectItem));
+    quantityButtons.forEach((button) => button.addEventListener("click", () => {
+      const row = button.closest(".item-row");
+      const quantity = row.querySelector(".item-qty");
+      const nextQuantity = Math.max(0, Number(quantity.textContent) + Number(button.dataset.quantityStep));
+      quantity.textContent = String(nextQuantity).padStart(2, "0");
+      row.querySelector('[data-quantity-step="-1"]').disabled = nextQuantity === 0;
+      if (row.querySelector("[aria-pressed='true']")) {
+        document.querySelector("#record-item-quantity").textContent = quantity.textContent;
+      }
+      persistPlayerData();
+    }));
+
+    document.querySelector("[data-open-proposal]").addEventListener("click", () => proposalDialog.showModal());
+    document.querySelectorAll("[data-close-proposal]").forEach((button) => button.addEventListener("click", () => proposalDialog.close()));
+    proposalDialog.addEventListener("click", (event) => {
+      if (event.target === proposalDialog) proposalDialog.close();
+    });
+    proposalForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(proposalForm);
+      proposalNumber += 1;
+      const proposal = {
+        number: proposalNumber,
+        kind: data.get("kind"),
+        name: data.get("name").trim(),
+        data: data.get("data").trim(),
+        sourceCategory: data.get("sourceCategory"),
+        source: data.get("source").trim()
+      };
+      playerData.inventory.itemProposals.unshift(proposal);
+      renderItemProposal(proposal);
+      proposalFeedback.textContent = "Saved in this browser only; not sent to a GM or campaign data store.";
+      proposalForm.reset();
+      proposalDialog.close();
+      persistPlayerData();
+    });
+
+    buttons.forEach((button) => button.addEventListener("click", () => {
+      const target = button.dataset.target;
+      panels.forEach((panel) => {
+        const active = panel.dataset.panel === target;
+        panel.classList.toggle("active", active);
+        panel.hidden = !active;
+      });
+      buttons.forEach((item) => {
+        if (item === button) item.setAttribute("aria-current", "page");
+        else item.removeAttribute("aria-current");
+      });
+      title.textContent = button.dataset.title;
+      if (target === "map") requestAnimationFrame(centerMapOnPlayer);
+    }));
+    persistPlayerData();
+    }
+  </script>
+</body>
+</html>
