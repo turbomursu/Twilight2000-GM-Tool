@@ -2054,6 +2054,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
           }).addTo(runtimeRouteMap);
           runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
+          
+          // Initialize map visualization client
+          if (window.mapVisualization) {
+            window.mapVisualization.initializeVisualization(runtimeRouteMap);
+          }
         }
 
         const signature = `${state.runtimeCampaignId}:${positionedStops.map((stop) => `${stop.name}:${stop.mapPosition.lat},${stop.mapPosition.lng}`).join("|")}`;
@@ -2077,6 +2082,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeRouteSignature = signature;
         }
         requestAnimationFrame(() => runtimeRouteMap?.invalidateSize({ pan: false }));
+        
+        // Refresh publication-aware visualization layers
+        if (window.mapVisualization && state.runtimeCampaignId) {
+          window.mapVisualization.refreshVisualizations(state.runtimeCampaignId, route, state.runtimeLocations);
+        }
       }
       function routeLocations() {
         return state.runtimeLocations || [];
