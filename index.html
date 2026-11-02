@@ -1824,6 +1824,37 @@ Military rank || optional</textarea><span class="row-description">One field per 
         });
       });
 
+      // Setup party position drag handler
+      document.addEventListener('mapviz:partyPositionDragged', async (evt) => {
+        if (!runtimeDataLoaded || !state.runtimeCampaignId) return;
+        
+        const { lat, lng } = evt.detail;
+        const campaignId = state.runtimeCampaignId;
+        
+        try {
+          const response = await fetch(
+            `/api/campaigns/${encodeURIComponent(campaignId)}/party-position`,
+            {
+              method: 'PUT',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ position: { lat, lng } })
+            }
+          );
+          
+          if (!response.ok) {
+            const error = await response.json();
+            console.error("Party position update failed:", error.error);
+            showToast("Position update failed: " + (error.error || "Unknown error"), true);
+          } else {
+            const result = await response.json();
+            console.log("Party position updated:", result.position);
+          }
+        } catch (error) {
+          console.error("Party position error:", error);
+          showToast("Position update error", true);
+        }
+      });
+
       function applyRuntimeSnapshot(runtime) {
         const dashboard = runtime.dashboard;
         let distance = 0;
