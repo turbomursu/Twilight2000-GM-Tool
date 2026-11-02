@@ -95,8 +95,8 @@ echo ========================================
 echo.
 echo Next steps:
 echo   1. Run: npm start
-echo      (Server starts on http://localhost:3000)
-echo   2. Open browser to http://localhost:3000
+echo      (Server starts on http://localhost:8080)
+echo   2. Open browser to http://localhost:8080
 echo   3. Use default credentials: admin/admin
 echo.
 echo For detailed setup instructions, see:
