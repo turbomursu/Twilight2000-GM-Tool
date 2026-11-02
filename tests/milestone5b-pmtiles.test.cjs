@@ -150,8 +150,8 @@ test("offline basemap survives campaign restore from backup", () => {
       data: {
         campaign: { runtime_id: campaignId, setup_campaign_id: pkg.campaign.id, schema_version: 1, name: pkg.campaign.name, setting: pkg.campaign.setting, premise: pkg.campaign.premise, era: pkg.campaign.era, revision: 0, active: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         setupImport: { runtime_campaign_id: campaignId, source_campaign_id: pkg.campaign.id, schema_version: 2, imported_at: new Date().toISOString(), sha256: createHash("sha256").update(JSON.stringify(pkg), "utf8").digest("hex"), source_json: JSON.stringify(pkg) },
-        campaignMemberships: [],
-        accountReferences: [],
+        campaignMemberships: [{ campaign_id: campaignId, account_id: "gm-1", role: "gm" }],
+        accountReferences: [{ accountId: "gm-1", username: "test-gm", role: "gm" }],
         maps: [{
           runtime_campaign_id: campaignId,
           source_map_id: "map-restore",
@@ -175,7 +175,7 @@ test("offline basemap survives campaign restore from backup", () => {
         factionInfluenceCells: [],
         settlementFactions: [{ runtime_campaign_id: campaignId, settlement_id: "settlement-3", faction_id: "faction-3", prominence_rank: 0 }],
         gmNotes: [{ runtime_campaign_id: campaignId, id: "note-3", title: "Bridge", body: "Status unknown.", visibility: "gm-only" }],
-        routeStops: [],
+        routeStops: [{ runtime_campaign_id: campaignId, stop_index: 0, name: "Vansbro", location_id: "location-3", stop_type: "settlement", latitude: 60, longitude: 14 }],
         personnel: [],
         journalEntries: [],
         characters: [],
