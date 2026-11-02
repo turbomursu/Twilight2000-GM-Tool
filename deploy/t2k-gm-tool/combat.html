@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Combat Calculator | Twilight: 2000 GM Desk</title>
+  <style>
+    :root {
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --signal: #b74435;
+      --signal-pale: #efdfd8;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      margin: 0;
+      padding: 20px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.8rem; margin: 0 0 1rem; }
+    .form-section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    .form-group {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    label {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--ink);
+    }
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    select { min-width: 200px; }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+    button {
+      padding: 10px 20px;
+      background: #344a40;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    button:hover { background: #2a3b33; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result-box {
+      background: var(--signal-pale);
+      border-left: 4px solid var(--signal);
+      padding: 16px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    .result-outcome {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--signal);
+      margin-bottom: 10px;
+    }
+    .result-detail { margin: 8px 0; }
+    .result-detail strong { color: var(--ink); }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+    }
+    .tab-button {
+      padding: 12px 16px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .tab-button.active {
+      color: var(--ink);
+      border-bottom-color: var(--signal);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .help-text {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎲 Combat Calculator</h1>
+  
+  <div class="tabs">
+    <button class="tab-button active" data-tab="ranged">Ranged</button>
+    <button class="tab-button" data-tab="close">Close Combat</button>
+    <button class="tab-button" data-tab="grenade">Grenade</button>
+    <button class="tab-button" data-tab="heavy">Heavy Weapon</button>
+    <button class="tab-button" data-tab="vehicle">Vehicle</button>
+  </div>
+
+  <!-- Ranged Combat Tab -->
+  <div id="ranged" class="tab-content active">
+    <div class="form-section">
+      <h2>Ranged Attack</h2>
+      <div class="form-group">
+        <label>Weapon Name</label>
+        <input type="text" id="rangedWeapon" placeholder="e.g., AK-74, M16A4">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Base Damage</label>
+          <input type="number" id="rangedBaseDamage" min="0" value="3">
+        </div>
+        <div class="form-group">
+          <label>Damage Threshold</label>
+          <input type="number" id="rangedThreshold" min="1" value="4">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Range</label>
+          <select id="rangedRange">
+            <option value="short">Short</option>
+            <option value="medium" selected>Medium</option>
+            <option value="long">Long</option>
+            <option value="extreme">Extreme</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Shooter STR Die</label>
+          <select id="rangedStrDie">
+            <option value="6">D6 (+1)</option>
+            <option value="8">D8 (+1)</option>
+            <option value="10" selected>D10 (+2)</option>
+            <option value="12">D12 (+2)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Target Armor Level</label>
+          <input type="number" id="rangedArmor" min="0" max="4" value="0">
+        </div>
+        <div class="form-group">
+          <label>Modifiers (comma-separated)</label>
+          <input type="text" id="rangedMods" placeholder="e.g., 1,-1,2">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>Agility Roll (1-12)</label>
+          <input type="number" id="rangedAgiRoll" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Ranged Combat Roll (1-12)</label>
+          <input type="number" id="rangedRCRoll" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Ammo Available</label>
+          <input type="number" id="rangedAmmo" min="0" value="0">
+        </div>
+      </div>
+      <button onclick="resolveRanged()">Resolve Ranged Attack</button>
+      <div id="rangedResult" class="result-box" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Close Combat Tab -->
+  <div id="close" class="tab-content">
+    <div class="form-section">
+      <h2>Close Combat Attack</h2>
+      <div class="form-group">
+        <label>Weapon Name</label>
+        <input type="text" id="ccWeapon" placeholder="e.g., Combat Knife, Rifle Bayonet">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Base Damage</label>
+          <input type="number" id="ccBaseDamage" min="0" value="2">
+        </div>
+        <div class="form-group">
+          <label>Damage Threshold</label>
+          <input type="number" id="ccThreshold" min="1" value="3">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Target Armor Level</label>
+          <input type="number" id="ccArmor" min="0" max="4" value="0">
+        </div>
+        <div class="form-group"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Strength Roll (1-12)</label>
+          <input type="number" id="ccStrRoll" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Close Combat Roll (1-12)</label>
+          <input type="number" id="ccCCRoll" min="1" max="12">
+        </div>
+      </div>
+      <button onclick="resolveCloseCombat()">Resolve Close Combat</button>
+      <div id="closeResult" class="result-box" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Grenade Tab -->
+  <div id="grenade" class="tab-content">
+    <div class="form-section">
+      <h2>Grenade Throw</h2>
+      <div class="form-group">
+        <label>Grenade Name</label>
+        <input type="text" id="grenName" placeholder="e.g., M67 Frag, RGD-33">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Blast Power</label>
+          <input type="number" id="grenPower" min="1" value="6">
+        </div>
+        <div class="form-group">
+          <label>Damage Threshold</label>
+          <input type="number" id="grenThreshold" min="1" value="3">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Agility Roll (1-12)</label>
+          <input type="number" id="grenAgiRoll" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Mobility Roll (1-12)</label>
+          <input type="number" id="grenMobRoll" min="1" max="12">
+        </div>
+      </div>
+      <button onclick="resolveGrenade()">Resolve Grenade Throw</button>
+      <div id="grenadeResult" class="result-box" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Heavy Weapon Tab -->
+  <div id="heavy" class="tab-content">
+    <div class="form-section">
+      <h2>Heavy Weapon Attack</h2>
+      <div class="form-group">
+        <label>Weapon Name</label>
+        <input type="text" id="hwName" placeholder="e.g., PZFAUST 3, AT4">
+      </div>
+      <div class="form-group">
+        <label>Weapon Type</label>
+        <select id="hwType">
+          <option value="grenade-frag">Grenade (Fragmentation)</option>
+          <option value="grenade-shaped">Grenade (Shaped Charge)</option>
+          <option value="mine-anti-personnel">Mine (Anti-Personnel)</option>
+          <option value="mine-anti-vehicle">Mine (Anti-Vehicle)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Base Damage</label>
+          <input type="number" id="hwBaseDamage" min="1" value="6">
+        </div>
+        <div class="form-group">
+          <label>Damage Threshold</label>
+          <input type="number" id="hwThreshold" min="1" value="4">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Target Armor Level</label>
+          <input type="number" id="hwArmor" min="0" max="4" value="0">
+        </div>
+        <div class="form-group">
+          <label>Agility Roll (1-12)</label>
+          <input type="number" id="hwAgiRoll" min="1" max="12">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Mobility Roll (1-12)</label>
+          <input type="number" id="hwMobRoll" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Scatter Roll (1-6, optional)</label>
+          <input type="number" id="hwScatter" min="1" max="6">
+        </div>
+      </div>
+      <button onclick="resolveHeavyWeapon()">Resolve Heavy Weapon</button>
+      <div id="heavyResult" class="result-box" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Vehicle Combat Tab -->
+  <div id="vehicle" class="tab-content">
+    <div class="form-section">
+      <h2>Vehicle Combat</h2>
+      <div class="form-group">
+        <label>Target Vehicle</label>
+        <input type="text" id="vehName" placeholder="e.g., T-80, Humvee">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Vehicle Structure Value</label>
+          <input type="number" id="vehStructure" min="1" value="6">
+        </div>
+        <div class="form-group">
+          <label>Weapon Penetration</label>
+          <input type="number" id="vehPenetration" min="0" value="5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Targeting Type</label>
+        <select id="vehTargeting">
+          <option value="standard">Standard Hit</option>
+          <option value="vulnerable">Vulnerable Spot (×2 penetration)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Range</label>
+          <select id="vehRange">
+            <option value="short">Short</option>
+            <option value="medium" selected>Medium</option>
+            <option value="long">Long</option>
+            <option value="extreme">Extreme</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Modifiers (comma-separated)</label>
+          <input type="text" id="vehMods" placeholder="e.g., -1,1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Agility Roll (1-12)</label>
+          <input type="number" id="vehAgiRoll" min="1" max="12">
+        </div>
+        <div class="form-group">
+          <label>Ranged Combat Roll (1-12)</label>
+          <input type="number" id="vehRCRoll" min="1" max="12">
+        </div>
+      </div>
+      <button onclick="resolveVehicleCombat()">Resolve Vehicle Combat</button>
+      <div id="vehicleResult" class="result-box" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/combat-client.js"></script>
+<script>
+  let combatClient = null;
+
+  // Initialize combat client
+  function initCombat() {
+    const campaignId = new URLSearchParams(window.location.search).get('campaign') || 'demo';
+    combatClient = new CombatClient(campaignId);
+  }
+
+  // Tab switching
+  document.querySelectorAll('.tab-button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      e.target.classList.add('active');
+      document.getElementById(e.target.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Combat resolvers
+  async function resolveRanged() {
+    try {
+      const mods = document.getElementById('rangedMods').value
+        .split(',')
+        .map(m => parseInt(m.trim()))
+        .filter(m => !isNaN(m));
+      
+      const result = await combatClient.resolveRangedAttack({
+        weaponName: document.getElementById('rangedWeapon').value || 'Unknown',
+        weaponBaseDamage: document.getElementById('rangedBaseDamage').value,
+        weaponThreshold: document.getElementById('rangedThreshold').value,
+        range: document.getElementById('rangedRange').value,
+        shooterStrengthBonus: document.getElementById('rangedStrDie').value,
+        agilityRoll: document.getElementById('rangedAgiRoll').value,
+        rangedCombatRoll: document.getElementById('rangedRCRoll').value,
+        targetArmorLevel: document.getElementById('rangedArmor').value,
+        modifierDeltas: mods,
+        ammoAvailable: document.getElementById('rangedAmmo').value
+      });
+
+      displayResult(result, 'rangedResult');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
+  async function resolveCloseCombat() {
+    try {
+      const result = await combatClient.resolveCloseCombat({
+        weaponName: document.getElementById('ccWeapon').value || 'Unknown',
+        weaponBaseDamage: document.getElementById('ccBaseDamage').value,
+        weaponThreshold: document.getElementById('ccThreshold').value,
+        strengthRoll: document.getElementById('ccStrRoll').value,
+        closeCombatRoll: document.getElementById('ccCCRoll').value,
+        targetArmorLevel: document.getElementById('ccArmor').value
+      });
+
+      displayResult(result, 'closeResult');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
+  async function resolveGrenade() {
+    try {
+      const result = await combatClient.resolveGrenade({
+        grenadeName: document.getElementById('grenName').value || 'Unknown',
+        blastPower: document.getElementById('grenPower').value,
+        threshold: document.getElementById('grenThreshold').value,
+        agilityRoll: document.getElementById('grenAgiRoll').value,
+        mobilityRoll: document.getElementById('grenMobRoll').value
+      });
+
+      displayResult(result, 'grenadeResult');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
+  async function resolveHeavyWeapon() {
+    try {
+      const result = await combatClient.resolveHeavyWeapon({
+        weaponName: document.getElementById('hwName').value || 'Unknown',
+        baseDamage: document.getElementById('hwBaseDamage').value,
+        threshold: document.getElementById('hwThreshold').value,
+        weaponType: document.getElementById('hwType').value,
+        agilityRoll: document.getElementById('hwAgiRoll').value,
+        mobilityRoll: document.getElementById('hwMobRoll').value,
+        targetArmorLevel: document.getElementById('hwArmor').value,
+        scatterRoll: document.getElementById('hwScatter').value || null
+      });
+
+      displayResult(result, 'heavyResult');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
+  async function resolveVehicleCombat() {
+    try {
+      const mods = document.getElementById('vehMods').value
+        .split(',')
+        .map(m => parseInt(m.trim()))
+        .filter(m => !isNaN(m));
+
+      const result = await combatClient.resolveVehicleCombat({
+        vehicleName: document.getElementById('vehName').value || 'Unknown',
+        targetingType: document.getElementById('vehTargeting').value,
+        vehicleStructureValue: document.getElementById('vehStructure').value,
+        weaponPenetration: document.getElementById('vehPenetration').value,
+        range: document.getElementById('vehRange').value,
+        agilityRoll: document.getElementById('vehAgiRoll').value,
+        rangedCombatRoll: document.getElementById('vehRCRoll').value,
+        modifierDeltas: mods
+      });
+
+      displayResult(result, 'vehicleResult');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
+  function displayResult(result, elementId) {
+    const elem = document.getElementById(elementId);
+    let html = '<div class="result-outcome">';
+    html += result.summary?.outcome || (result.hit?.isHit ? 'HIT' : 'MISS');
+    html += '</div>';
+
+    if (result.weapon) {
+      html += '<div class="result-detail"><strong>Weapon:</strong> ' + result.weapon.name + '</div>';
+    }
+
+    if (result.damage?.total !== undefined) {
+      html += '<div class="result-detail"><strong>Damage:</strong> ' + result.damage.total + '</div>';
+    }
+
+    if (result.blast?.primaryHexDamage !== undefined) {
+      html += '<div class="result-detail"><strong>Primary Damage:</strong> ' + result.blast.primaryHexDamage + '</div>';
+      if (result.blast.adjacentHexDamage > 0) {
+        html += '<div class="result-detail"><strong>Adjacent Damage:</strong> ' + result.blast.adjacentHexDamage + '</div>';
+        html += '<div class="result-detail"><strong>Affected Hexes:</strong> ' + result.blast.affectedHexes + '</div>';
+      }
+    }
+
+    if (result.critical) {
+      html += '<div class="result-detail"><strong>⚡ CRITICAL HIT</strong></div>';
+    }
+
+    if (result.effect?.outcome) {
+      html += '<div class="result-detail"><strong>Vehicle Effect:</strong> ' + result.effect.outcome + '</div>';
+    }
+
+    if (result.summary?.description) {
+      html += '<div class="result-detail">' + result.summary.description + '</div>';
+    }
+
+    elem.innerHTML = html;
+    elem.style.display = 'block';
+  }
+
+  // Initialize on load
+  document.addEventListener('DOMContentLoaded', initCombat);
+</script>
+</body>
+</html>

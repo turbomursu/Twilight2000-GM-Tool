@@ -1,0 +1,2896 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Campaign Setup | Fieldbook</title>
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --fern: #687e68;
+      --signal: #b74435;
+      --signal-pale: #efdfd8;
+      --sky: #487c87;
+      --sky-pale: #dae7e7;
+      --gold: #a97832;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 980px; min-height: 100vh; background: var(--paper); }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #82a9ad; outline-offset: 2px; }
+    .app-shell { display: grid; grid-template-columns: 232px minmax(0,1fr); min-height: 100vh; }
+    .rail { display: flex; flex-direction: column; min-height: 100vh; padding: 25px 16px 18px; color: #e8eee7; background: var(--forest-deep); border-right: 1px solid #526158; box-shadow: inset -4px 0 #111b17; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 9px 26px; }
+    .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid #839783; border-radius: 3px; color: #d4dfcb; font: 700 11px var(--mono); background: linear-gradient(145deg,#293d33,#1d2b24); box-shadow: inset 0 1px #ffffff18,0 2px 0 #0e1713; }
+    .brand-copy { display: grid; gap: 2px; }
+    .brand-copy strong { font: 700 15px var(--serif); }
+    .brand-copy span { color: #a7b5a8; font: 9px var(--mono); text-transform: uppercase; }
+    .rail-label { padding: 0 11px 9px; color: #899a8d; font: 9px var(--mono); text-transform: uppercase; }
+    .steps { display: grid; gap: 4px; }
+    .step-button { display: grid; grid-template-columns: 26px minmax(0,1fr) auto; align-items: center; width: 100%; gap: 9px; padding: 11px 10px; border: 1px solid transparent; border-radius: 2px; color: #c5d0c4; background: transparent; text-align: left; font-size: 12px; }
+    .step-button:hover { color: #fff; background: #263b30; }
+    .step-button[aria-current="step"] { border-color: #506354; color: #fff; background: linear-gradient(90deg,#344b3d,#293d32); box-shadow: inset 3px 0 #c2cc91,inset 0 1px #ffffff12; }
+    .step-number { color: #9cad94; font: 9px var(--mono); }
+    .step-state { color: #a5b4a1; font: 8px var(--mono); text-transform: uppercase; }
+    .rail-card { margin: 22px 8px 0; padding: 12px; border: 1px solid #43594c; border-left: 3px solid #9aaf82; background: #1d2d25; }
+    .rail-card .eyebrow { color: #a6b69f; }
+    .rail-card strong { display: block; margin-top: 6px; color: #f0f3ec; font: 15px var(--serif); }
+    .rail-card small { display: block; margin-top: 5px; color: #aab8a9; font: 9px var(--mono); }
+    .rail-bottom { margin-top: auto; padding: 18px 9px 2px; }
+    .rail-link { display: block; padding: 9px 0; color: #bdc9bc; font: 9px var(--mono); text-decoration: none; text-transform: uppercase; }
+    .rail-link:hover { color: #fff; }
+    .storage-line { display: flex; align-items: center; gap: 8px; color: #aab8a9; font: 9px var(--mono); text-transform: uppercase; }
+    .storage-dot { width: 7px; height: 7px; border-radius: 50%; background: #88a67c; box-shadow: 0 0 0 3px #304436; }
+    main { min-width: 0; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 68px; gap: 16px; padding: 0 32px; border-bottom: 1px solid var(--line); background: #e2e7df; box-shadow: 0 2px 0 #aeb8ac; }
+    .crumb { display: flex; align-items: center; gap: 9px; color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .crumb b { color: #a5aea3; font-weight: 400; }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 35px; gap: 7px; padding: 0 12px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: linear-gradient(180deg,#f0f2ec,#dfe5dc); font-size: 10px; font-weight: 700; text-decoration: none; text-transform: uppercase; box-shadow: inset 0 1px #ffffffb8,0 1px 0 #aab4aa; }
+    .button:hover { border-color: #758579; background: linear-gradient(180deg,#f8f9f4,#e5eae2); }
+    .button-primary { border-color: #263a30; color: #fff; background: linear-gradient(180deg,#40594b,#2d4338); }
+    .button-primary:hover { border-color: #24382e; background: linear-gradient(180deg,#4a6654,#344c3e); }
+    .button:disabled { cursor: not-allowed; opacity: .48; }
+    .button[hidden] { display: none; }
+    .content { width: min(1440px,100%); margin: 0 auto; padding: 28px 32px 48px; background-image: linear-gradient(90deg,#344a4008 1px,transparent 1px),linear-gradient(#344a4008 1px,transparent 1px); background-size: 24px 24px; }
+    .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+    .eyebrow { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .heading-tag { color: var(--signal); font: 9px var(--mono); text-transform: uppercase; }
+    h1 { margin: 6px 0 0; font: 700 31px/1.05 var(--serif); text-transform: uppercase; }
+    .page-heading p { max-width: 470px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .setup-panel { display: none; animation: appear .2s ease-out; }
+    .setup-panel.active { display: block; }
+    @keyframes appear { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 15px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg,#eff1eb,#e1e7df); }
+    .panel-heading h2 { margin: 0; font: 700 16px var(--serif); }
+    .panel { min-width: 0; border: 1px solid #a3aea3; border-radius: 2px; background: var(--surface); box-shadow: inset 0 1px #ffffffb8,0 2px 0 #b5beb4; }
+    .panel-body { padding: 16px; }
+    .brief-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(280px,.7fr); gap: 16px; align-items: start; }
+    .form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px 14px; }
+    .field { display: grid; align-content: start; gap: 6px; min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    .field label, .field-label { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .field input, .field textarea, .field select { width: 100%; min-height: 37px; padding: 8px 10px; border: 1px solid #aab5aa; border-radius: 2px; color: var(--ink); background: #f6f7f2; font-size: 12px; }
+    .field textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
+    .field input::placeholder, .field textarea::placeholder { color: #87938a; }
+    .callout { padding: 14px; border-left: 3px solid var(--sky); background: var(--sky-pale); }
+    .callout strong { display: block; font: 10px var(--mono); text-transform: uppercase; }
+    .callout p { margin: 8px 0 0; color: #465e61; font-size: 11px; line-height: 1.5; }
+    .form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #c5cec4; }
+    .form-foot p { margin: 0; color: var(--muted); font: 9px/1.4 var(--mono); }
+    .map-layout { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(310px,.75fr); gap: 15px; align-items: start; }
+    .map-controls { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+    .map-search { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px; }
+    .map-search input { width: 100%; min-width: 0; min-height: 35px; padding: 7px 9px; border: 1px solid #aab5aa; border-radius: 2px; color: var(--ink); background: #f6f7f2; font-size: 11px; }
+    .map-frame { position: relative; border: 1px solid #7d8b7b; background: #dce5d2; }
+    #leaflet-map { width: 100%; height: 480px; background: #dce5d2; }
+    .map-frame.placing-location { box-shadow: inset 0 0 0 4px #b7443578; }
+    .map-frame.drawing-area { cursor: crosshair; box-shadow: inset 0 0 0 4px #487c8778; }
+    .map-grid-label { position: absolute; z-index: 500; top: 12px; left: 12px; max-width: 55%; padding: 6px 8px; border: 1px solid #a3aea3; color: #344239; background: #f7f9f2e8; font: 8px var(--mono); overflow-wrap: anywhere; text-transform: uppercase; pointer-events: none; }
+    .map-place-hint { position: absolute; z-index: 500; bottom: 12px; left: 50%; max-width: 75%; transform: translateX(-50%); padding: 7px 10px; color: #38453b; background: #f7f9f2e8; font: 8px var(--mono); text-align: center; text-transform: uppercase; pointer-events: none; }
+    .map-frame.drawing-area .map-place-hint { border: 1px solid #487c87; color: #345b63; }
+    .map-frame.placing-location .map-place-hint { border: 1px solid #b74435; color: #8c392f; }
+    .leaflet-div-icon.location-icon { border: 0; background: transparent; }
+    .leaflet-location-marker { display: grid; justify-items: center; gap: 3px; transform: translateY(-4px); }
+    .leaflet-location-dot { display: grid; width: 19px; height: 19px; place-items: center; border: 2px solid #f6f7f2; border-radius: 50%; color: #fff; background: var(--signal); box-shadow: 0 0 0 2px #8f3d34; font: 7px var(--mono); }
+    .leaflet-location-marker.start .leaflet-location-dot { background: var(--forest); box-shadow: 0 0 0 2px #344a40; }
+    .leaflet-location-label { max-width: 145px; padding: 3px 5px; border: 1px solid #9aa692; color: #29362c; background: #f4f6edeb; font: 8px var(--mono); overflow-wrap: anywhere; text-transform: uppercase; white-space: normal; }
+    .leaflet-location-grid { color: #42543f; font: 7px var(--mono); }
+    .leaflet-hex-label { border: 0; color: #33473f; background: transparent; font: 7px var(--mono); text-align: center; text-shadow: 0 0 3px #f4f6ed,0 0 5px #f4f6ed; white-space: nowrap; }
+    .leaflet-area-handle { width: 13px !important; height: 13px !important; margin: -7px 0 0 -7px !important; border: 2px solid #fff; border-radius: 50%; background: #487c87; box-shadow: 0 0 0 2px #315d67; }
+    .map-status { min-height: 15px; margin: 0 0 8px; color: var(--muted); font: 8px/1.4 var(--mono); }
+    .map-status.error { color: #9b4136; }
+    .map-status.success { color: #356044; }
+    .map-usage-note { margin: 0; padding: 8px 11px; border-top: 1px solid #c1cbbf; color: var(--muted); font: 8px/1.45 var(--mono); }
+    .map-usage-note a { color: #355d61; }
+    .fieldpapers-tools { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px 14px; align-items: center; margin: 0 0 12px; padding: 11px 13px; border: 1px solid #a3aea3; border-left: 3px solid var(--sky); background: #e4ece8; }
+    .fieldpapers-tools strong { display: block; font: 9px var(--mono); text-transform: uppercase; }
+    .fieldpapers-tools p { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .fieldpapers-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: end; }
+    .fieldpapers-status { grid-column: 1 / -1; min-height: 14px; margin: 0 !important; color: var(--muted); font: 8px/1.4 var(--mono) !important; }
+    .fieldpapers-status.error { color: #9b4136; }
+    .fieldpapers-status.success { color: #356044; }
+    .fieldpapers-atlas-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .fieldpapers-atlas-meta a { color: #355d61; }
+    .fieldpapers-preview { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 7px; border-top: 1px solid #c1cbbf; }
+    .offline-basemap-tools { display: grid; gap: 10px; margin-top: 12px; padding: 13px; border: 1px solid #96a394; background: #e5eae2; }
+    .offline-basemap-tools h3 { margin: 0; font: 700 12px var(--mono); text-transform: uppercase; }
+    .offline-basemap-tools p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .offline-basemap-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.3fr) auto; align-items: end; gap: 9px; }
+    .fieldpapers-preview[hidden] { display: none; }
+    .map-workspace[hidden] { display: none; }
+    #fieldpapers-file { display: none; }
+    .map-grid-label { position: absolute; top: 12px; left: 12px; padding: 6px 8px; border: 1px solid #a3aea3; color: #344239; background: #f7f9f2d9; font: 8px var(--mono); text-transform: uppercase; }
+    .map-north { position: absolute; top: 11px; right: 14px; color: #344239; font: 9px var(--mono); text-align: center; }
+    .map-north strong { display: block; font-size: 17px; }
+    .map-scale { position: absolute; right: 12px; bottom: 12px; padding: 5px 8px; border: 1px solid #a3aea3; color: #435247; background: #f7f9f2d9; font: 8px var(--mono); text-transform: uppercase; }
+    .map-place-hint { position: absolute; left: 50%; bottom: 13px; transform: translateX(-50%); padding: 7px 10px; color: #38453b; background: #f7f9f2e8; font: 8px var(--mono); text-align: center; text-transform: uppercase; pointer-events: none; }
+    .map-canvas.placing .map-place-hint { border: 1px solid #b74435; color: #8c392f; }
+    .map-marker { position: absolute; z-index: 2; display: grid; justify-items: center; gap: 3px; max-width: 140px; padding: 0; border: 0; color: #29362c; background: transparent; transform: translate(-50%,-50%); text-align: center; }
+    .map-marker-dot { display: grid; width: 18px; height: 18px; place-items: center; border: 2px solid #f6f7f2; border-radius: 50%; color: #fff; background: var(--signal); box-shadow: 0 0 0 2px #8f3d34; font: 7px var(--mono); }
+    .map-marker.start .map-marker-dot { background: var(--forest); box-shadow: 0 0 0 2px #344a40; }
+    .map-marker[aria-pressed="true"] .map-marker-dot { box-shadow: 0 0 0 4px #487c877d; }
+    .map-marker-name { max-width: 140px; padding: 3px 5px; border: 1px solid #9aa692; background: #f4f6edeb; font: 8px var(--mono); overflow-wrap: anywhere; text-transform: uppercase; }
+    .map-legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 9px 11px; border-top: 1px solid #c1cbbf; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); }
+    .legend-dot.start { background: var(--forest); }
+    .map-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+    .map-tools span { color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .location-side { display: grid; gap: 12px; }
+    .location-form { display: grid; gap: 10px; padding: 13px; border-bottom: 1px solid #c5cec4; }
+    .location-form .field textarea { min-height: 61px; }
+    .location-coordinate { color: var(--muted); font: 8px var(--mono); }
+    .location-row.is-editing { background: #edf1e9; }
+    .terrain-editor-grid { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(280px,.75fr); gap: 12px; align-items: start; }
+    .terrain-editor-grid .map-frame { min-width: 0; }
+    .terrain-editor-grid #leaflet-map { height: min(62vh,600px); min-height: 380px; }
+    #terrain-map-host { min-width: 0; min-height: 380px; overflow: hidden; border: 1px solid #7d8b7b; background: #dce5d2; }
+    #terrain-map-host #leaflet-map { height: min(62vh,600px); min-height: 380px; }
+    .terrain-side { display: grid; gap: 10px; }
+    .terrain-side .panel-body { display: grid; gap: 10px; }
+    .terrain-selected-cell { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border-left: 3px solid var(--sky); background: var(--sky-pale); font: 9px var(--mono); }
+    .terrain-selected-cell strong { color: #355d61; }
+    .terrain-data-table { max-width: 100%; overflow: auto; border: 1px solid #c5cec4; }
+    .terrain-data-table table { width: 100%; min-width: 570px; border-collapse: collapse; font-size: 8px; }
+    .terrain-data-table caption { padding: 7px; color: var(--muted); font: 8px var(--mono); text-align: left; text-transform: uppercase; }
+    .terrain-data-table th, .terrain-data-table td { padding: 5px 6px; border-top: 1px solid #d5ddd3; text-align: left; white-space: nowrap; }
+    .terrain-data-table th { color: var(--muted); background: #edf1e9; font: 8px var(--mono); text-transform: uppercase; }
+    .terrain-data-table ul { min-width: 540px; margin: 0; padding: 8px 20px; color: var(--muted); font-size: 8px; }
+    .terrain-assignments { max-height: 190px; overflow: auto; }
+    .terrain-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid #d5ddd3; font: 8px var(--mono); }
+    .terrain-row:last-child { border-bottom: 0; }
+    .terrain-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border: 1px solid #59665f; vertical-align: -1px; }
+    .terrain-grid-polygon { cursor: pointer; }
+    .setup-panel[data-panel="locations"] .terrain-grid-polygon { cursor: default; }
+    .terrain-grid-polygon.selected { color: #b74435; stroke-width: 3px; }
+    .location-list { display: grid; gap: 0; }
+    .empty-state { padding: 17px 13px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .location-row, .entity-row, .note-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; align-items: start; padding: 11px 13px; border-bottom: 1px solid #d5ddd3; }
+    .location-row:last-child, .entity-row:last-child, .note-row:last-child { border-bottom: 0; }
+    .row-title { display: flex; align-items: center; gap: 7px; color: var(--ink); font-size: 11px; font-weight: 700; }
+    .row-title small { color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .row-description { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .row-action { display: flex; gap: 4px; }
+    .icon-button { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid #aab5aa; border-radius: 2px; color: #445247; background: #f4f6ef; font: 12px var(--mono); }
+    .icon-button:hover { border-color: #758579; background: #fff; }
+    .start-badge { padding: 3px 5px; border: 1px solid #738875; color: #34503e; font: 7px var(--mono); text-transform: uppercase; }
+    .visibility-badge { padding: 3px 5px; border: 1px solid #9aab9b; color: #405248; font: 7px var(--mono); text-transform: uppercase; }
+    .visibility-badge.players { border-color: #487c87; color: #315d67; background: #e2eeee; }
+    .entity-layout { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 15px; align-items: start; }
+    .entity-form { display: grid; gap: 10px; padding: 13px; border-bottom: 1px solid #c5cec4; }
+    .entity-form .field textarea { min-height: 65px; }
+    .faction-settlement-choices { display: grid; max-height: 190px; overflow: auto; border-top: 1px solid #c5cec4; }
+    .faction-settlement-choice { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: center; gap: 8px; min-height: 36px; border-bottom: 1px solid #d5ddd3; color: var(--ink); font-size: 10px; }
+    .faction-settlement-choice small { color: var(--muted); font: 8px var(--mono); }
+    .settlement-prominence-list { display: grid; gap: 3px; margin-top: 7px; }
+    .settlement-prominence-row { display: grid; grid-template-columns: 26px minmax(0,1fr) auto; align-items: center; gap: 5px; font: 8px var(--mono); }
+    .settlement-prominence-row .icon-button { width: 23px; height: 23px; }
+    .note-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 15px; align-items: start; }
+    .private-stamp { display: inline-flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid #b88648; color: #755526; background: #f1e7d4; font: 8px var(--mono); text-transform: uppercase; }
+    .note-form { display: grid; gap: 10px; }
+    .note-form textarea { min-height: 150px; }
+    .notes-list { display: grid; gap: 0; margin-top: 13px; border-top: 1px solid #c5cec4; }
+    .package-layout { display: grid; grid-template-columns: minmax(0,1fr) 325px; gap: 15px; align-items: start; }
+    .package-checks { display: grid; gap: 0; }
+    .check-row { display: grid; grid-template-columns: 19px minmax(0,1fr); gap: 9px; padding: 11px 0; border-bottom: 1px solid #d5ddd3; }
+    .check-mark { display: grid; width: 17px; height: 17px; place-items: center; border: 1px solid #aab5aa; color: #34503e; font: 10px var(--mono); }
+    .check-mark.ready { border-color: #829480; background: #e1e9dd; }
+    .check-row strong { display: block; font-size: 10px; }
+    .check-row small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .package-preview { min-height: 315px; max-height: 540px; overflow: auto; margin: 0; padding: 13px; border: 1px solid #435247; color: #dce6d7; background: #1b2922; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .feedback { min-height: 16px; margin: 0; color: var(--muted); font: 9px/1.4 var(--mono); }
+    .feedback.error { color: #9b4136; }
+    .feedback.success { color: #356044; }
+    .step-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 15px; }
+    .step-footer .button-group { display: flex; gap: 7px; }
+    .draft-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; padding: 9px 12px; border-top: 1px solid #aab5aa; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .draft-bar strong { color: #416148; font-weight: 400; }
+    .modal { width: min(720px,calc(100vw - 40px)); max-height: 80vh; padding: 0; border: 1px solid #435247; border-radius: 3px; color: var(--ink); background: var(--surface); box-shadow: 0 18px 60px #10191480; }
+    .modal::backdrop { background: #142119b8; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+    .modal-head h2 { margin: 0; font: 700 16px var(--serif); }
+    .modal-body { padding: 15px; }
+    .modal-body pre { max-height: 54vh; overflow: auto; margin: 0; padding: 13px; color: #dce6d7; background: #1b2922; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 1120px) {
+      .app-shell { grid-template-columns: 205px minmax(0,1fr); }
+      .rail { padding-left: 11px; padding-right: 11px; }
+      .topbar { padding: 0 20px; }
+      .content { padding: 24px 20px 40px; }
+      .map-layout { grid-template-columns: minmax(0,1.15fr) minmax(290px,.85fr); }
+      .brief-grid { grid-template-columns: minmax(0,1fr) 270px; }
+      #leaflet-map { height: 430px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Campaign setup">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">T2K</div><div class="brand-copy"><strong>Fieldbook</strong><span>Campaign setup</span></div></div>
+      <div class="rail-label">Initial package</div>
+      <nav class="steps" aria-label="Setup sections">
+        <button class="step-button" type="button" data-step="brief" aria-current="step"><span class="step-number">01</span><span>Campaign brief</span><span class="step-state" data-step-state="brief">Draft</span></button>
+        <button class="step-button" type="button" data-step="map"><span class="step-number">02</span><span>Import atlas</span><span class="step-state" data-step-state="map">Required</span></button>
+        <button class="step-button" type="button" data-step="terrain"><span class="step-number">03</span><span>Terrain grid</span><span class="step-state" data-step-state="terrain">0</span></button>
+        <button class="step-button" type="button" data-step="locations"><span class="step-number">04</span><span>Locations</span><span class="step-state" data-step-state="locations">0</span></button>
+        <button class="step-button" type="button" data-step="settlements"><span class="step-number">05</span><span>Settlements</span><span class="step-state" data-step-state="settlements">0</span></button>
+        <button class="step-button" type="button" data-step="factions"><span class="step-number">06</span><span>Factions</span><span class="step-state" data-step-state="factions">0</span></button>
+        <button class="step-button" type="button" data-step="notes"><span class="step-number">07</span><span>Scenario notes</span><span class="step-state" data-step-state="notes">0</span></button>
+        <button class="step-button" type="button" data-step="package"><span class="step-number">08</span><span>Package review</span><span class="step-state" data-step-state="package">Check</span></button>
+      </nav>
+      <div class="rail-card"><span class="eyebrow">Setup package</span><strong id="rail-campaign-name">Untitled campaign</strong><small>Initial state only / version 1</small></div>
+      <div class="rail-bottom">
+        <a class="rail-link" href="index.html">← GM runtime</a>
+        <div class="storage-line"><span class="storage-dot"></span><span id="draft-status">Local draft / ready</span></div>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div class="crumb"><span>Campaign authoring</span><b>/</b><span id="current-step-label">Campaign brief</span></div>
+        <div class="top-actions">
+          <a class="button" href="index.html">GM runtime</a>
+          <a class="button" href="player-interface.html">Player preview</a>
+          <button class="button" type="button" data-go-step="package">Review package</button>
+          <button class="button button-primary" type="button" id="export-package-top">Export setup JSON</button>
+          <button class="button" type="button" data-auth-logout>Sign out</button>
+        </div>
+      </header>
+      <div class="content">
+        <header class="page-heading">
+          <div><div class="heading-tag">GM-only authoring / starting campaign data</div><h1 id="page-title">Campaign brief</h1></div>
+          <p>Prepare the initial campaign package for GM runtime import. Live campaign changes and player publication stay in the GM Tool.</p>
+        </header>
+
+        <section class="setup-panel active" data-panel="brief" aria-labelledby="brief-title">
+          <div class="brief-grid">
+            <section class="panel">
+              <div class="panel-heading"><div><span class="eyebrow">01 / Campaign identity</span><h2 id="brief-title">The starting brief</h2></div><span class="private-stamp">GM draft</span></div>
+              <div class="panel-body">
+                <div class="form-grid">
+                  <div class="field"><label for="campaign-name">Campaign name</label><input id="campaign-name" maxlength="80" placeholder="Name this campaign"></div>
+                  <div class="field"><label for="campaign-setting">Setting / region</label><input id="campaign-setting" maxlength="100" placeholder="Country, region, or homebrew setting"></div>
+                  <div class="field full"><label for="campaign-premise">Premise</label><textarea id="campaign-premise" maxlength="1200" placeholder="Describe the campaign's initial situation"></textarea></div>
+                  <div class="field"><label for="map-name">Initial map name</label><input id="map-name" maxlength="80" placeholder="Name the starting map"></div>
+                  <div class="field"><label for="campaign-era">Campaign era / date label</label><input id="campaign-era" maxlength="60" placeholder="Optional / e.g. May 2000"></div>
+                </div>
+                <div class="form-foot"><p>These fields describe the package's starting point; they do not advance campaign state.</p><button class="button button-primary" type="button" data-go-step="map">Import map →</button></div>
+              </div>
+            </section>
+            <aside class="callout"><strong>Package boundary</strong><p>This setup package is the initial campaign definition. The GM runtime owns changes made during play. Nothing on this page is published to players.</p></aside>
+          </div>
+          <div class="draft-bar"><span>Separate from running-campaign saves</span><strong id="brief-saved">Autosave / browser-local draft</strong></div>
+        </section>
+
+        <section class="setup-panel" data-panel="map" aria-labelledby="map-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">02 / Base map</span><h2 id="map-title">Import atlas</h2></div><span class="eyebrow">Field Papers GeoJSON</span></div>
+          <div class="panel-body">
+            <section class="fieldpapers-tools" aria-label="Field Papers atlas import"><div><strong>Import the base atlas</strong><p>Choose the atlas GeoJSON downloaded from Field Papers. It supplies the geographic bounds and page layout; the printable PDF is the offline map image.</p></div><div class="fieldpapers-actions"><button class="button button-primary" type="button" id="choose-fieldpapers-file">Import atlas GeoJSON</button><input id="fieldpapers-file" type="file" accept=".json,.geojson,application/json,application/geo+json"></div><p class="fieldpapers-status" id="fieldpapers-status" role="status">Import a Field Papers atlas GeoJSON to continue.</p><div class="fieldpapers-atlas-meta" id="fieldpapers-atlas-meta" hidden></div><div class="fieldpapers-preview" id="fieldpapers-import-preview" hidden><span class="fieldpapers-status" id="fieldpapers-import-summary"></span><button class="button button-primary" type="button" id="apply-fieldpapers-import" disabled>Apply imported atlas</button></div></section>
+            <section class="offline-basemap-tools" aria-label="Offline basemap asset"><div><h3>Offline interactive basemap / raster PMTiles</h3><p>Upload a licensed raster PMTiles archive. It is stored locally on this GM server and can be used without public map tiles. Keep the provider attribution with the archive.</p></div><div class="offline-basemap-fields"><label class="field"><span class="field-label">Required attribution</span><input id="offline-basemap-attribution" maxlength="300" placeholder="Map provider / license"></label><label class="field"><span class="field-label">PMTiles archive / max 50 MiB</span><input id="offline-basemap-file" type="file" accept=".pmtiles,application/vnd.pmtiles,application/octet-stream"></label><button class="button button-primary" type="button" id="upload-offline-basemap" disabled>Upload and use</button></div><div class="button-group"><button class="button" type="button" id="use-online-basemap">Use online OSM reference</button></div><p class="fieldpapers-status" id="offline-basemap-status" role="status">No offline basemap selected. Online OSM remains the reference layer.</p></section>
+            <div class="step-footer"><p class="feedback">Import the atlas before terrain assignment or location entry. The imported map stays in campaign data.</p><div class="button-group"><button class="button" type="button" data-go-step="brief">← Brief</button><button class="button button-primary" type="button" id="continue-to-terrain" data-go-step="terrain" disabled>Terrain →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="locations" aria-labelledby="locations-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">04 / Initial sites</span><h2 id="locations-title">Campaign locations</h2></div><span class="eyebrow" id="location-count">0 locations</span></div>
+          <div class="panel-body">
+            <p class="map-status" id="location-map-status" data-map-status role="status">Add the campaign's initial locations. Coordinates are assigned from the 10 km terrain grid.</p>
+            <div class="map-layout">
+              <section class="panel" aria-label="Location placement map"><div id="location-map-host"></div><div class="map-legend"><span class="legend-item"><i class="legend-dot start"></i>Starting location</span><span class="legend-item"><i class="legend-dot"></i>Initial location</span><span>Labels use Q/R travel-hex coordinates</span></div></section>
+              <aside class="location-side">
+                <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Add to initial campaign data</span><h2>New location</h2></div></div>
+                  <form class="location-form" id="location-form"><div class="field"><label for="location-name">Name</label><input id="location-name" maxlength="70" required placeholder="Bridge, village, rally point"></div><div class="field"><label for="location-kind">Location type</label><select id="location-kind"><option value="Location">Location</option><option value="Settlement">Settlement</option><option value="Landmark">Landmark</option><option value="Crossing">Crossing</option><option value="Site">Site</option></select></div><div class="field"><label for="location-visibility">Player visibility / GM-managed</label><select id="location-visibility"><option value="gm-only">GM-only</option><option value="players">Player-visible / eligible for explicit publication</option></select><p class="feedback">This flag does not publish information. The GM controls publication separately.</p></div><div class="field"><label for="location-description">Description</label><textarea id="location-description" maxlength="500" placeholder="Starting campaign detail"></textarea></div><p class="location-coordinate" id="location-coordinate">No grid reference selected</p><p class="feedback" id="location-feedback" role="status">Place a location on the map, or edit an existing entry.</p><div class="button-group"><button class="button" type="button" id="place-location">Place on map</button><button class="button button-primary" type="button" id="add-location" disabled>Add to package</button><button class="button" type="button" id="cancel-location-edit" hidden>Cancel edit</button></div></form>
+                </section>
+                <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Initial map entries</span><h2>Locations</h2></div></div><div class="location-list" id="location-list"><div class="empty-state">No initial locations yet.</div></div></section>
+              </aside>
+            </div>
+            <div class="step-footer"><p class="feedback" id="locations-feedback">Location identity is stored as a Q/R travel-hex reference; map position is retained separately.</p><div class="button-group"><button class="button" type="button" data-go-step="terrain">← Terrain</button><button class="button button-primary" type="button" data-go-step="settlements">Settlements →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="terrain" aria-labelledby="terrain-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">03 / Strategic play / Referee Aid</span><h2 id="terrain-title">Assign terrain by travel hex</h2></div><span class="eyebrow">10 km per hex / campaign data only</span></div>
+          <div class="panel-body">
+            <form class="map-controls" id="map-search-form"><div class="field"><label for="map-search-input">Find a real-world place</label><div class="map-search"><input id="map-search-input" type="search" maxlength="120" placeholder="City, region, or coordinates"><button class="button" type="submit" id="map-search-button">Find</button></div></div><button class="button" type="button" id="draw-area">Mark area</button><button class="button" type="button" id="clear-area" disabled>Clear area</button></form>
+            <form class="map-bounds-editor" id="map-bounds-form" aria-label="Edit campaign map bounds"><span class="eyebrow">Campaign bounds / latitude and longitude</span><div class="map-bounds-fields"><label class="field"><span class="field-label">South</span><input id="map-bound-south" type="number" step="any" min="-90" max="90" required></label><label class="field"><span class="field-label">West</span><input id="map-bound-west" type="number" step="any" min="-180" max="180" required></label><label class="field"><span class="field-label">North</span><input id="map-bound-north" type="number" step="any" min="-90" max="90" required></label><label class="field"><span class="field-label">East</span><input id="map-bound-east" type="number" step="any" min="-180" max="180" required></label><button class="button" type="submit" id="apply-map-bounds">Apply bounds</button></div><p class="feedback">You can also drag the two map corners. Bounds must contain all campaign locations.</p></form>
+            <p class="map-status" id="terrain-map-status" data-map-status role="status">Select a hex to assign a strategic terrain type.</p>
+            <div class="terrain-editor-grid">
+              <section class="panel" aria-label="Terrain assignment map"><div id="terrain-map-host"><div class="map-frame" id="map-frame"><div id="leaflet-map" aria-label="Imported campaign map with 10 km hex grid"></div><span class="map-grid-label" id="map-grid-label">UNNAMED AREA / INITIAL MAP</span><span class="map-place-hint" id="map-place-hint">Select a hex to assign terrain</span></div></div><p class="map-usage-note">Grid origin is the imported atlas northwest corner. Hexes are 10 km travel-scale cells. Terrain entries are campaign labels; no tactical effects are applied.</p><div class="map-usage-note"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap licensing</a> / <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noreferrer">Tile policy</a></div></section>
+              <aside class="terrain-side">
+                <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Selected travel hex</span><h2>Terrain assignment</h2></div></div><div class="panel-body">
+                  <div class="terrain-selected-cell"><span id="terrain-selected-coordinate">Select a hex</span><strong id="terrain-selected-status">No selection</strong></div>
+                  <label class="field"><span class="field-label">Strategic terrain type</span><select id="terrain-type-select"><option value="">Unassigned</option><option value="road">Road</option><option value="open">Open</option><option value="woods">Woods</option><option value="hills">Hills</option><option value="mountains">Mountains</option><option value="lake-river">Lake / river</option><option value="swamp">Swamp</option><option value="ruins">Ruins</option></select></label>
+                  <div class="button-group"><button class="button" type="button" id="terrain-batch-mode" aria-pressed="false">Select multiple</button><button class="button button-primary" type="button" id="save-terrain-type" disabled>Save terrain</button><button class="button" type="button" id="remove-terrain-type" disabled>Clear selected</button></div>
+                  <p class="feedback">Source: T2K Referee Aid / Strategic Play / Terrain Types. These entries do not apply tactical combat rules.</p>
+                </div></section>
+                <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Saved terrain</span><h2>Campaign hexes</h2></div><span class="eyebrow" id="terrain-assignment-count">0</span></div><div class="terrain-assignments" id="terrain-assignments"><div class="empty-state">No terrain labels assigned.</div></div></section>
+                <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Faction map layer</span><h2>Influence areas</h2></div></div><div class="panel-body">
+                  <label class="field"><span class="field-label">Faction layer</span><select id="influence-faction-select"><option value="">Add a faction first</option></select></label>
+                  <div class="button-group"><button class="button" type="button" id="influence-batch-mode" aria-pressed="false" disabled>Select influence hexes</button><button class="button button-primary" type="button" id="save-influence-cells" disabled>Save layer</button><button class="button" type="button" id="clear-influence-cells" disabled>Clear selected</button></div>
+                  <button class="button" type="button" id="finish-faction-influence" hidden>Done editing faction</button>
+                  <p class="feedback" id="influence-feedback" role="status">Influence is a GM-managed map layer; it does not apply game effects.</p>
+                  <p class="feedback">Free = no faction influence assigned to this hex.</p>
+                  <div class="terrain-assignments" id="faction-influence-list"><div class="empty-state">No faction influence assigned.</div></div>
+                </div></section>
+              </aside>
+            </div>
+            <section class="panel terrain-reference" aria-labelledby="terrain-reference-title"><div class="panel-heading"><div><span class="eyebrow">Rules reference</span><h2 id="terrain-reference-title">Strategic Play terrain</h2></div><span class="eyebrow">T2K Referee Aid / Terrain Types</span></div><div class="panel-body"><div class="terrain-data-table" id="terrain-data-table"></div></div></section>
+            <div class="step-footer"><p class="feedback">Terrain assignment is optional starting campaign data; locations come next.</p><div class="button-group"><button class="button" type="button" data-go-step="map">← Import atlas</button><button class="button button-primary" type="button" data-go-step="locations">Locations →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="settlements" aria-labelledby="settlements-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">05 / Initial settlements</span><h2 id="settlements-title">Settlement creator</h2></div><span class="eyebrow" id="settlement-count">0</span></div>
+          <div class="panel-body">
+            <section class="panel"><div class="panel-heading"><div><span class="eyebrow">GM-defined generator</span><h2>Settlement draft</h2></div><span class="eyebrow">Not Fourth Edition rules</span></div><div class="panel-body">
+              <p class="row-description">Uses locations marked Settlement in the Locations step. Generated descriptors are editable scenario ideas, not a rules procedure. Population remains a GM estimate.</p>
+              <form class="entity-form" id="settlement-form">
+                <div class="field"><label for="settlement-location">Settlement location</label><select id="settlement-location" name="locationId" required><option value="">Add a Settlement location in Locations first</option></select><p class="feedback" id="settlement-source-status" role="status">Settlement names and map positions come from the Locations step.</p></div>
+                <button class="button" type="button" id="generate-settlement-draft" disabled>Generate GM draft</button>
+                <p class="feedback" id="settlement-generation-status" role="status">Choose a location, then generate editable scenario descriptors.</p>
+                <div class="form-grid">
+                  <div class="field"><label for="settlement-scale">Scale / GM label</label><select id="settlement-scale"><option value="">Choose scale</option><option>Camp</option><option>Village</option><option>Town</option><option>City</option><option>Major urban center</option></select></div>
+                  <div class="field"><label for="settlement-population">Population estimate / GM entered</label><input id="settlement-population" type="number" min="0" max="100000000" step="1" placeholder="Not estimated"></div>
+                  <div class="field"><label for="settlement-security">Security posture / GM-defined</label><select id="settlement-security"><option value="">Choose posture</option><option>Unsecured</option><option>Local watch</option><option>Controlled perimeter</option><option>Contested</option></select></div>
+                  <div class="field"><label for="settlement-attitude">Local attitude / GM-defined</label><select id="settlement-attitude"><option value="">Choose attitude</option><option>Unknown</option><option>Hostile</option><option>Wary</option><option>Neutral</option><option>Cooperative</option></select></div>
+                  <div class="field full"><label for="settlement-leadership">Local leadership / GM-defined</label><select id="settlement-leadership"><option value="">Choose leadership</option><option>Community council</option><option>Local administrator</option><option>Military command</option><option>Faction-appointed authority</option><option>No clear authority</option></select></div>
+                  <div class="field full"><label for="settlement-situation">Current situation / editable GM prompt</label><textarea id="settlement-situation" maxlength="500" placeholder="Optional situation prompt"></textarea></div>
+                  <div class="field full"><label for="settlement-description">Starting description / GM notes</label><textarea id="settlement-description" maxlength="500" placeholder="Starting campaign detail"></textarea></div>
+                </div>
+                <button class="button button-primary" type="submit">Add settlement</button>
+              </form>
+            </div></section>
+            <div class="location-list" id="settlement-list"><div class="empty-state">No settlements added.</div></div>
+            <div class="step-footer"><p class="feedback" role="status">Starting descriptions only; no settlement simulation is performed here.</p><div class="button-group"><button class="button" type="button" data-go-step="locations">← Locations</button><button class="button button-primary" type="button" data-go-step="factions">Factions →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="factions" aria-labelledby="factions-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">06 / Initial campaign actors</span><h2 id="factions-title">Faction creator</h2></div><span class="eyebrow" id="faction-count">0</span></div>
+          <div class="panel-body">
+            <form class="entity-form" id="faction-form"><div class="field"><label for="faction-name">Faction name</label><input id="faction-name" maxlength="70" required placeholder="Name"></div><div class="field"><label for="faction-description">Starting description</label><textarea id="faction-description" maxlength="500" placeholder="Known presence or identity at campaign start"></textarea></div><button class="button button-primary" type="submit">Create faction</button></form>
+            <div class="location-list" id="faction-list"><div class="empty-state">No factions added.</div></div>
+            <section class="panel" id="faction-setup-panel" hidden><div class="panel-heading"><div><span class="eyebrow">Faction workflow</span><h2 id="faction-setup-title">Configure faction</h2></div><span class="eyebrow">GM-managed / non-exclusive</span></div><div class="panel-body">
+              <p class="row-description">Select every settlement this faction influences. Influence may overlap; prominence order is set on each settlement. Then paint this faction's map area.</p>
+              <div id="faction-settlement-choices" class="faction-settlement-choices"></div>
+              <div class="button-group"><button class="button button-primary" type="button" id="save-faction-settlements">Save settlements</button><button class="button" type="button" id="paint-faction-influence">Paint influence on map →</button><button class="button" type="button" id="finish-faction-setup">Finish faction</button></div>
+              <p class="feedback" id="faction-setup-status" role="status">Choose settlements, then paint influence on the map.</p>
+            </div></section>
+            <div class="step-footer"><p class="feedback" role="status">Create a faction, select settlements, paint its influence, then repeat. Choose “All factions done” when finished.</p><div class="button-group"><button class="button" type="button" data-go-step="settlements">← Settlements</button><button class="button button-primary" type="button" data-go-step="notes">All factions done →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="notes" aria-labelledby="notes-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">07 / GM preparation</span><h2 id="notes-title">Scenario notes</h2></div><span class="private-stamp">GM-only / unpublished</span></div>
+          <div class="panel-body">
+            <div class="note-layout">
+              <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Private setup material</span><h2>Add a scenario note</h2></div></div><div class="panel-body">
+                <form class="note-form" id="note-form"><div class="field"><label for="note-title">Note title</label><input id="note-title" maxlength="100" required placeholder="Internal title"></div><div class="field"><label for="note-body">GM note</label><textarea id="note-body" maxlength="3000" required placeholder="Starting situation, secrets, or preparation notes"></textarea></div><div class="private-stamp">Included in GM package / never auto-published</div><div><button class="button button-primary" type="submit">Add GM-only note</button></div></form>
+                <div class="notes-list" id="notes-list"><div class="empty-state">No scenario notes added.</div></div>
+              </div></section>
+              <aside class="callout"><strong>Visibility boundary</strong><p>Setup notes remain GM-only in the exported package. The GM Tool must create a separate player-facing projection and publish it explicitly.</p></aside>
+            </div>
+            <div class="step-footer"><p class="feedback" id="notes-feedback" role="status"></p><div class="button-group"><button class="button" type="button" data-go-step="factions">← Factions</button><button class="button button-primary" type="button" data-go-step="package">Review package →</button></div></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-panel="package" aria-labelledby="package-title" hidden>
+          <div class="panel-heading"><div><span class="eyebrow">08 / Handoff to GM runtime</span><h2 id="package-title">Package review</h2></div><span class="eyebrow">Setup package / schema v2</span></div>
+          <div class="panel-body">
+            <div class="package-layout">
+              <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Preflight</span><h2>Validation</h2></div><div class="button-group"><button class="button" type="button" id="open-package-file">Open setup JSON</button><input id="package-file" type="file" accept=".json,application/json" hidden><button class="button" type="button" id="validate-package">Validate package</button></div></div><div class="panel-body">
+                <div class="package-checks" id="package-checks"></div>
+                <p class="feedback" id="package-feedback" role="status">Add a campaign name, setting, premise, map name, and a starting location.</p>
+                <div class="step-footer"><button class="button" type="button" data-go-step="notes">← Scenario notes</button><div class="button-group"><button class="button" type="button" id="preview-package">Preview JSON</button><button class="button button-primary" type="button" id="export-package" disabled>Export setup JSON</button></div></div>
+              </div></section>
+              <aside><div class="panel-heading"><div><span class="eyebrow">Portable handoff</span><h2>Package contents</h2></div></div><pre class="package-preview" id="package-summary" aria-live="polite">Validate the setup package to preview its contents.</pre></aside>
+            </div>
+          </div>
+        </section>
+        <p class="draft-bar"><span>Setup package is separate from runtime campaign saves.</span><strong id="footer-status">Local draft / unsaved changes</strong></p>
+      </div>
+    </main>
+  </div>
+  <dialog class="modal" id="preview-dialog" aria-labelledby="preview-title"><div class="modal-head"><h2 id="preview-title">Setup package preview</h2><button class="icon-button" type="button" id="close-preview" aria-label="Close package preview">×</button></div><div class="modal-body"><pre id="preview-json"></pre></div></dialog>
+  <dialog class="modal" id="import-package-dialog" aria-labelledby="import-package-title"><div class="modal-head"><h2 id="import-package-title">Open setup package</h2><button class="icon-button" type="button" id="close-import-package" aria-label="Close setup package import">×</button></div><div class="modal-body"><p class="feedback" id="import-package-status" role="status"></p><pre id="import-package-summary" hidden></pre><p class="row-description">Applying this package replaces the current browser-local setup draft. It does not change a running campaign or publish player information.</p><div class="dialog-actions"><button class="button" type="button" id="cancel-import-package">Cancel</button><button class="button button-primary" type="button" id="apply-import-package" disabled>Replace local draft</button></div></div></dialog>
+
+  <script src="/vendor/leaflet.js"></script>
+  <script src="/vendor/pmtiles.js"></script>
+  <script src="campaign-package-contract.js"></script>
+  <script src="/auth-client.js" defer></script>
+  <script>
+    (() => {
+      const STORAGE_KEY = "fieldbook-campaign-setup-draft-v1";
+      const MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+      const NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search";
+      const DEFAULT_MAP_VIEW = { lat: 55, lng: 15, zoom: 4 };
+      const TRAVEL_HEX_KM = 10;
+      const TERRAIN_TYPES = {
+        road: { label: "Road", color: "#737a77", speed: "x1", driving: "+3", foraging: "As terrain", hunting: "As terrain", scrounging: "+1", encounter: "2D10x2***" },
+        open: { label: "Open", color: "#c2af70", speed: "x1", driving: "+1", foraging: "-1", hunting: "+1", scrounging: "—", encounter: "2D10x4" },
+        woods: { label: "Woods", color: "#44624b", speed: "x1/2", driving: "-1", foraging: "+1", hunting: "+1", scrounging: "-1", encounter: "2D10" },
+        hills: { label: "Hills", color: "#9aad75", speed: "x1/2", driving: "0", foraging: "0", hunting: "0", scrounging: "-1", encounter: "2D10x2" },
+        mountains: { label: "Mountains", color: "#9b8876", speed: "x1/3", driving: "-1", foraging: "-2", hunting: "-1", scrounging: "-2", encounter: "2D10x3" },
+        "lake-river": { label: "Lake / river", color: "#6eabb2", speed: "x1**", driving: "+2", foraging: "—", hunting: "0", scrounging: "—", encounter: "2D10x4" },
+        swamp: { label: "Swamp", color: "#527b78", speed: "x1/4", driving: "-1", foraging: "-1", hunting: "0", scrounging: "-2", encounter: "2D10x2" },
+        ruins: { label: "Ruins", color: "#575856", speed: "x1/2", driving: "0", foraging: "-2", hunting: "-1", scrounging: "+2", encounter: "2D10" }
+      };
+      const stepLabels = { brief: "Campaign brief", map: "Import atlas", terrain: "Terrain grid", locations: "Locations", settlements: "Settlements", factions: "Factions", notes: "Scenario notes", package: "Package review" };
+      const panels = [...document.querySelectorAll("[data-panel]")];
+      const stepButtons = [...document.querySelectorAll("[data-step]")];
+      const campaignNameInput = document.querySelector("#campaign-name");
+      const campaignSettingInput = document.querySelector("#campaign-setting");
+      const campaignPremiseInput = document.querySelector("#campaign-premise");
+      const mapNameInput = document.querySelector("#map-name");
+      const campaignEraInput = document.querySelector("#campaign-era");
+      const locationNameInput = document.querySelector("#location-name");
+      const locationKindInput = document.querySelector("#location-kind");
+      const locationVisibilityInput = document.querySelector("#location-visibility");
+      const locationDescriptionInput = document.querySelector("#location-description");
+      const mapFrame = document.querySelector("#map-frame");
+      const mapElement = document.querySelector("#leaflet-map");
+      const locationMapHost = document.querySelector("#location-map-host");
+      const mapSearchForm = document.querySelector("#map-search-form");
+      const mapSearchInput = document.querySelector("#map-search-input");
+      const mapSearchButton = document.querySelector("#map-search-button");
+      const drawAreaButton = document.querySelector("#draw-area");
+      const clearAreaButton = document.querySelector("#clear-area");
+      const boundsForm = document.querySelector("#map-bounds-form");
+      const boundsInputs = {
+        south: document.querySelector("#map-bound-south"),
+        west: document.querySelector("#map-bound-west"),
+        north: document.querySelector("#map-bound-north"),
+        east: document.querySelector("#map-bound-east")
+      };
+      const addLocationButton = document.querySelector("#add-location");
+      const cancelLocationEditButton = document.querySelector("#cancel-location-edit");
+      const chooseFieldPapersFileButton = document.querySelector("#choose-fieldpapers-file");
+      const fieldPapersFileInput = document.querySelector("#fieldpapers-file");
+      const offlineBasemapAttributionInput = document.querySelector("#offline-basemap-attribution");
+      const offlineBasemapFileInput = document.querySelector("#offline-basemap-file");
+      const uploadOfflineBasemapButton = document.querySelector("#upload-offline-basemap");
+      const useOnlineBasemapButton = document.querySelector("#use-online-basemap");
+      const offlineBasemapStatus = document.querySelector("#offline-basemap-status");
+      const fieldPapersStatus = document.querySelector("#fieldpapers-status");
+      const fieldPapersAtlasMeta = document.querySelector("#fieldpapers-atlas-meta");
+      const fieldPapersImportPreview = document.querySelector("#fieldpapers-import-preview");
+      const applyFieldPapersImportButton = document.querySelector("#apply-fieldpapers-import");
+      const terrainMapHost = document.querySelector("#terrain-map-host");
+      const terrainTypeSelect = document.querySelector("#terrain-type-select");
+      const terrainDataTable = document.querySelector("#terrain-data-table");
+      const saveTerrainButton = document.querySelector("#save-terrain-type");
+      const removeTerrainButton = document.querySelector("#remove-terrain-type");
+      const terrainAssignmentsList = document.querySelector("#terrain-assignments");
+      const influenceFactionSelect = document.querySelector("#influence-faction-select");
+      const influenceBatchModeButton = document.querySelector("#influence-batch-mode");
+      const saveInfluenceButton = document.querySelector("#save-influence-cells");
+      const clearInfluenceButton = document.querySelector("#clear-influence-cells");
+      const influenceFeedback = document.querySelector("#influence-feedback");
+      const factionInfluenceList = document.querySelector("#faction-influence-list");
+      const settlementLocationSelect = document.querySelector("#settlement-location");
+      const settlementSourceStatus = document.querySelector("#settlement-source-status");
+      const settlementForm = document.querySelector("#settlement-form");
+      const generateSettlementDraftButton = document.querySelector("#generate-settlement-draft");
+      const saveFactionSettlementsButton = document.querySelector("#save-faction-settlements");
+      const paintFactionInfluenceButton = document.querySelector("#paint-faction-influence");
+      const finishFactionSetupButton = document.querySelector("#finish-faction-setup");
+      const finishFactionInfluenceButton = document.querySelector("#finish-faction-influence");
+      const factionSetupPanel = document.querySelector("#faction-setup-panel");
+      const factionSetupTitle = document.querySelector("#faction-setup-title");
+      const factionSettlementChoices = document.querySelector("#faction-settlement-choices");
+      const factionSetupStatus = document.querySelector("#faction-setup-status");
+      let activeFactionId = null;
+      let returnToFactionSetup = false;
+      let pendingFactionSettlementIds = new Set();
+      const exportButton = document.querySelector("#export-package");
+      const previewDialog = document.querySelector("#preview-dialog");
+      const packageFileInput = document.querySelector("#package-file");
+      const importPackageDialog = document.querySelector("#import-package-dialog");
+      const importPackageStatus = document.querySelector("#import-package-status");
+      const importPackageSummaryElement = document.querySelector("#import-package-summary");
+      const applyImportedPackageButton = document.querySelector("#apply-import-package");
+      const factionInfluenceColors = ["#b74435", "#487c87", "#a97832", "#687e68", "#6d7196", "#955d78"];
+      const settlementDraftOptions = {
+        scale: ["Camp", "Village", "Town", "City", "Major urban center"],
+        security: ["Unsecured", "Local watch", "Controlled perimeter", "Contested"],
+        attitude: ["Unknown", "Hostile", "Wary", "Neutral", "Cooperative"],
+        leadership: ["Community council", "Local administrator", "Military command", "Faction-appointed authority", "No clear authority"],
+        situations: [
+          "Food stores are running low, and leaders are debating how to ration them.",
+          "A damaged crossing has slowed travel and trade through the area.",
+          "Two local groups disagree over access to a shared resource.",
+          "A recent arrival has put pressure on shelter and supplies.",
+          "A critical repair needs skills or materials the settlement lacks.",
+          "The local leadership is changing, and residents are unsure who is in charge.",
+          "An unresolved security concern has restricted movement after dark."
+        ]
+      };
+      let leafletMap = null;
+      let baseMapLayer = null;
+      let locationMarkerLayer = null;
+      let hexGridLayer = null;
+      let areaLayer = null;
+      let fieldPapersLayer = null;
+      let areaRectangle = null;
+      let areaHandles = [];
+      let drawingArea = false;
+      let selectedTerrainCell = null;
+      const selectedTerrainCells = new Map();
+      const selectedInfluenceCells = new Map();
+      let terrainBatchMode = false;
+      let influenceBatchMode = false;
+      let placementMode = false;
+      let pendingPosition = null;
+      let editingLocationId = null;
+      let lastGeocodeRequest = 0;
+      let mapSaveTimer = null;
+      let pendingFieldPapersFeatures = [];
+      let pendingFieldPapersAtlas = null;
+      let pendingImportedPackage = null;
+      let storageAvailable = true;
+      let state = createBlankState();
+
+      function makeId(prefix) {
+        return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`}`;
+      }
+
+      function createBlankState() {
+        return {
+          schemaVersion: 2,
+          campaign: { id: makeId("campaign"), name: "", setting: "", premise: "", mapName: "", era: "" },
+          map: { center: { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng }, zoom: DEFAULT_MAP_VIEW.zoom, bounds: null, grid: { cellKm: TRAVEL_HEX_KM, origin: null, terrainCells: {} }, atlas: null, offlineAnnotations: [], offlineBasemap: null },
+          locations: [],
+          factions: [],
+          settlements: [],
+          scenarioNotes: []
+        };
+      }
+
+      function isRecord(value) {
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+      }
+
+      function isValidCoordinate(lat, lng) {
+        return Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lng) && lng >= -180 && lng <= 180;
+      }
+
+      function normalizeAreaBounds(bounds) {
+        if (!isRecord(bounds)) return null;
+        const { south, west, north, east } = bounds;
+        if (![south, west, north, east].every(Number.isFinite) || south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) return null;
+        return { south, west, north, east };
+      }
+
+      function renderBoundsFields() {
+        const bounds = state.map.bounds;
+        Object.entries(boundsInputs).forEach(([key, input]) => { input.value = bounds ? String(bounds[key]) : ""; });
+      }
+
+      function normalizeTerrainCells(cells) {
+        if (!isRecord(cells)) return {};
+        return Object.fromEntries(Object.entries(cells).filter(([key, terrain]) => /^-?\d+,-?\d+$/.test(key) && Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrain)));
+      }
+
+      function normalizeInfluenceCells(cells) {
+        if (!Array.isArray(cells)) return [];
+        return [...new Set(cells.filter((key) => {
+          if (typeof key !== "string" || !/^-?\d+,-?\d+$/.test(key)) return false;
+          return key.split(",").every((value) => Number.isSafeInteger(Number(value)) && Math.abs(Number(value)) <= 10000);
+        }))];
+      }
+
+      function ensureGridOrigin(bounds = state.map.bounds) {
+        if (state.map.grid?.origin && isValidCoordinate(state.map.grid.origin.lat, state.map.grid.origin.lng)) return;
+        if (!bounds) return;
+        state.map.grid = {
+          ...state.map.grid,
+          cellKm: TRAVEL_HEX_KM,
+          origin: { lat: bounds.north, lng: bounds.west },
+          terrainCells: normalizeTerrainCells(state.map.grid?.terrainCells)
+        };
+      }
+
+      function formatAxialCoordinate(q, r) {
+        const format = (value) => `${value < 0 ? "-" : "+"}${String(Math.abs(value)).padStart(2, "0")}`;
+        return `Q${format(q)} R${format(r)}`;
+      }
+
+      function roundAxialCoordinates(q, r) {
+        const x = q;
+        const z = r;
+        const y = -x - z;
+        let roundedX = Math.round(x);
+        let roundedY = Math.round(y);
+        let roundedZ = Math.round(z);
+        const xDiff = Math.abs(roundedX - x);
+        const yDiff = Math.abs(roundedY - y);
+        const zDiff = Math.abs(roundedZ - z);
+        if (xDiff > yDiff && xDiff > zDiff) roundedX = -roundedY - roundedZ;
+        else if (yDiff > zDiff) roundedY = -roundedX - roundedZ;
+        else roundedZ = -roundedX - roundedY;
+        return { q: roundedX, r: roundedZ };
+      }
+
+      function gridCoordinatesForPosition(position) {
+        ensureGridOrigin();
+        const origin = state.map.grid?.origin;
+        if (!origin || !isValidCoordinate(position?.lat, position?.lng)) return null;
+        const metersPerLat = 111132;
+        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+        const eastMeters = (position.lng - origin.lng) * metersPerLng;
+        const northMeters = (position.lat - origin.lat) * metersPerLat;
+        const radiusMeters = TRAVEL_HEX_KM * 1000 / Math.sqrt(3);
+        const q = (Math.sqrt(3) / 3 * eastMeters - northMeters / 3) / radiusMeters;
+        const r = (2 / 3 * northMeters) / radiusMeters;
+        const axial = roundAxialCoordinates(q, r);
+        return { ...axial, ref: formatAxialCoordinate(axial.q, axial.r) };
+      }
+
+      function localMetersToPosition(x, y) {
+        const origin = state.map.grid?.origin;
+        if (!origin) return null;
+        const metersPerLat = 111132;
+        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+        return { lat: origin.lat + y / metersPerLat, lng: origin.lng + x / metersPerLng };
+      }
+
+      function safeFieldPapersUrl(value, allowPdf = false) {
+        if (typeof value !== "string") return null;
+        try {
+          const url = new URL(value);
+          const isAtlasUrl = url.protocol === "https:" && url.hostname === "fieldpapers.org" && /^\/atlases\/[a-z0-9]+\/?$/i.test(url.pathname);
+          const isPdfUrl = allowPdf && url.protocol === "https:" && url.hostname === "s3.amazonaws.com" && url.pathname.startsWith("/files.fieldpapers.org/atlases/");
+          return isAtlasUrl || isPdfUrl ? url.href : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function atlasMetadataFromFeatures(features, fallbackTitle = "Imported Field Papers atlas") {
+        const feature = features.find((item) => item.properties.type === "atlas" || item.properties.role === "campaign-area");
+        if (!feature) return null;
+        const properties = feature.properties;
+        return {
+          source: "Field Papers",
+          title: properties.title || properties.name || fallbackTitle,
+          url: safeFieldPapersUrl(properties.url),
+          pdfUrl: safeFieldPapersUrl(properties.url_pdf, true),
+          pages: Number.isSafeInteger(properties.pages) && properties.pages > 0 ? properties.pages : features.filter((item) => item.properties.type === "page").length,
+          paperSize: properties.paper_size || null,
+          orientation: properties.orientation || null
+        };
+      }
+
+      function normalizeAtlasMetadata(atlas) {
+        if (!isRecord(atlas) || typeof atlas.title !== "string") return null;
+        return {
+          source: "Field Papers",
+          title: atlas.title.slice(0, 160),
+          url: safeFieldPapersUrl(atlas.url),
+          pdfUrl: safeFieldPapersUrl(atlas.pdfUrl, true),
+          pages: Number.isSafeInteger(atlas.pages) && atlas.pages > 0 ? atlas.pages : 0,
+          paperSize: typeof atlas.paperSize === "string" ? atlas.paperSize.slice(0, 20) : null,
+          orientation: typeof atlas.orientation === "string" ? atlas.orientation.slice(0, 20) : null
+        };
+      }
+
+      function normalizeOfflineBasemap(basemap) {
+        if (basemap === null || basemap === undefined) return null;
+        if (!isRecord(basemap) || Object.keys(basemap).length !== 3
+          || !Object.hasOwn(basemap, "format") || basemap.format !== "raster-pmtiles"
+          || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
+          || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) return null;
+        return { format: "raster-pmtiles", assetId: basemap.assetId, attribution: basemap.attribution.trim() };
+      }
+
+      function renderFieldPapersAtlas() {
+        const atlas = state.map.atlas;
+        fieldPapersAtlasMeta.replaceChildren();
+        fieldPapersAtlasMeta.hidden = !atlas;
+        if (!atlas) return;
+        const summary = document.createElement("span");
+        summary.textContent = `${atlas.title} / ${atlas.pages || "?"} page(s)${atlas.paperSize ? ` / ${atlas.paperSize} ${atlas.orientation || ""}` : ""}`;
+        fieldPapersAtlasMeta.append(summary);
+        if (atlas.url) {
+          const atlasLink = document.createElement("a");
+          atlasLink.href = atlas.url;
+          atlasLink.target = "_blank";
+          atlasLink.rel = "noreferrer";
+          atlasLink.textContent = "View atlas";
+          fieldPapersAtlasMeta.append(atlasLink);
+        }
+        if (atlas.pdfUrl) {
+          const pdfLink = document.createElement("a");
+          pdfLink.href = atlas.pdfUrl;
+          pdfLink.target = "_blank";
+          pdfLink.rel = "noreferrer";
+          pdfLink.textContent = "Open printable PDF";
+          fieldPapersAtlasMeta.append(pdfLink);
+        }
+      }
+
+      function renderOfflineBasemapControls() {
+        const basemap = state.map.offlineBasemap;
+        if (basemap) {
+          offlineBasemapAttributionInput.value = basemap.attribution;
+          offlineBasemapStatus.textContent = `Offline raster archive selected / ${basemap.assetId}.pmtiles / ${basemap.attribution}`;
+        } else {
+          offlineBasemapStatus.textContent = "No offline basemap selected. Online OSM remains the reference layer.";
+        }
+        uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim();
+      }
+
+      function renderMapBaseLayer() {
+        if (!leafletMap) return;
+        if (baseMapLayer) leafletMap.removeLayer(baseMapLayer);
+        baseMapLayer = null;
+        if (state.map.offlineBasemap) {
+          if (!window.pmtiles?.PMTiles || !window.pmtiles?.leafletRasterLayer) {
+            setMapStatus("PMTiles renderer unavailable. Restore the local map libraries and reload.", "error");
+            return;
+          }
+          const archiveUrl = `/offline-basemaps/${encodeURIComponent(state.map.offlineBasemap.assetId)}.pmtiles`;
+          const archive = new window.pmtiles.PMTiles(archiveUrl);
+          baseMapLayer = window.pmtiles.leafletRasterLayer(archive, { attribution: escapeHtml(state.map.offlineBasemap.attribution) }).addTo(leafletMap);
+          baseMapLayer.on("tileerror", () => setMapStatus("Offline PMTiles archive is unavailable on this server.", "error"));
+          return;
+        }
+        baseMapLayer = L.tileLayer(MAP_TILE_URL, {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+        }).addTo(leafletMap);
+        baseMapLayer.on("tileerror", () => setMapStatus("Map tiles could not be loaded. Check your connection or try again later.", "error"));
+      }
+
+      function isValidCoordinateTree(coordinates) {
+        if (!Array.isArray(coordinates) || !coordinates.length) return false;
+        if (typeof coordinates[0] === "number" && typeof coordinates[1] === "number") return isValidCoordinate(coordinates[1], coordinates[0]);
+        return coordinates.every(isValidCoordinateTree);
+      }
+
+      function normalizeGeoJSONFeatures(input) {
+        const features = Array.isArray(input)
+          ? input
+          : input?.type === "FeatureCollection" && Array.isArray(input.features)
+          ? input.features
+          : input?.type === "Feature" ? [input] : [];
+        return features.slice(0, 300).flatMap((feature) => {
+          const validTypes = ["Point", "MultiPoint", "LineString", "MultiLineString", "Polygon", "MultiPolygon"];
+          if (!isRecord(feature) || feature.type !== "Feature" || !isRecord(feature.geometry)
+            || !validTypes.includes(feature.geometry.type) || !isValidCoordinateTree(feature.geometry.coordinates)) return [];
+          const sourceProperties = isRecord(feature.properties) ? feature.properties : {};
+          const properties = {};
+          ["name", "title", "description", "note", "kind", "role", "type", "page_number", "provider", "campaignLocationId", "isStartingLocation"].forEach((key) => {
+            const value = sourceProperties[key];
+            if (typeof value === "string") properties[key] = value.slice(0, 300);
+            else if (key === "isStartingLocation" && typeof value === "boolean") properties[key] = value;
+          });
+          if (Number.isFinite(sourceProperties.zoom)) properties.zoom = sourceProperties.zoom;
+          return [{ type: "Feature", properties, geometry: JSON.parse(JSON.stringify(feature.geometry)) }];
+        });
+      }
+
+      function boundsFromGeometry(geometry) {
+        const points = [];
+        const collect = (coordinates) => {
+          if (Array.isArray(coordinates) && typeof coordinates[0] === "number" && typeof coordinates[1] === "number") {
+            points.push({ lat: coordinates[1], lng: coordinates[0] });
+            return;
+          }
+          if (Array.isArray(coordinates)) coordinates.forEach(collect);
+        };
+        collect(geometry.coordinates);
+        if (!points.length) return null;
+        const lats = points.map((point) => point.lat);
+        const lngs = points.map((point) => point.lng);
+        return normalizeAreaBounds({ south: Math.min(...lats), west: Math.min(...lngs), north: Math.max(...lats), east: Math.max(...lngs) });
+      }
+
+      function isInsideArea(position, bounds = state.map.bounds) {
+        return Boolean(position && bounds
+          && position.lat >= bounds.south && position.lat <= bounds.north
+          && position.lng >= bounds.west && position.lng <= bounds.east);
+      }
+
+      function loadDraft() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          if (!isRecord(parsed)) return createBlankState();
+          if (![1, 2].includes(parsed.schemaVersion) || !isRecord(parsed.campaign)) {
+            storageAvailable = false;
+            return createBlankState();
+          }
+          const legacySchematic = parsed.schemaVersion === 1;
+          const savedMap = !legacySchematic && isRecord(parsed.map) ? parsed.map : {};
+          const center = isRecord(savedMap.center) && isValidCoordinate(savedMap.center.lat, savedMap.center.lng)
+            ? { lat: savedMap.center.lat, lng: savedMap.center.lng }
+            : { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng };
+          const zoom = Number.isFinite(savedMap.zoom) ? Math.min(18, Math.max(2, savedMap.zoom)) : DEFAULT_MAP_VIEW.zoom;
+          const savedGrid = isRecord(savedMap.grid) ? savedMap.grid : {};
+          const gridOrigin = isRecord(savedGrid.origin) && isValidCoordinate(savedGrid.origin.lat, savedGrid.origin.lng)
+            ? { lat: savedGrid.origin.lat, lng: savedGrid.origin.lng }
+            : null;
+          const savedFactions = Array.isArray(parsed.factions) ? parsed.factions.filter(isRecord).map((faction) => ({
+            ...faction,
+            influenceCells: normalizeInfluenceCells(faction.influenceCells)
+          })) : [];
+          const savedSettlements = Array.isArray(parsed.settlements) ? parsed.settlements.filter(isRecord).map((settlement) => {
+            const location = Array.isArray(parsed.locations)
+              ? parsed.locations.find((item) => isRecord(item) && item.id === settlement.locationId)
+              : null;
+            const position = isRecord(location?.position) && isValidCoordinate(location.position.lat, location.position.lng)
+              ? { lat: location.position.lat, lng: location.position.lng }
+              : null;
+            return {
+              ...settlement,
+              locationId: typeof location?.id === "string" ? location.id : null,
+              name: typeof location?.name === "string" ? location.name : typeof settlement.name === "string" ? settlement.name : "Unlinked settlement",
+              gridRef: typeof location?.gridRef === "string" ? location.gridRef : null,
+              position,
+              visibility: location?.visibility === "players" ? "players" : settlement.visibility === "players" ? "players" : "gm-only",
+              prominentFactionIds: Array.isArray(settlement.prominentFactionIds) ? settlement.prominentFactionIds.filter((id) => typeof id === "string") : [],
+              scale: typeof settlement.scale === "string" ? settlement.scale.slice(0, 80) : null,
+              populationEstimate: Number.isSafeInteger(settlement.populationEstimate) && settlement.populationEstimate >= 0 ? settlement.populationEstimate : null,
+              security: typeof settlement.security === "string" ? settlement.security.slice(0, 100) : null,
+              attitude: typeof settlement.attitude === "string" ? settlement.attitude.slice(0, 100) : null,
+              leadership: typeof settlement.leadership === "string" ? settlement.leadership.slice(0, 100) : null,
+              situation: typeof settlement.situation === "string" ? settlement.situation.slice(0, 500) : ""
+            };
+          }) : [];
+          savedSettlements.forEach((settlement) => {
+            settlement.prominentFactionIds = [...new Set(settlement.prominentFactionIds.filter((id) => savedFactions.some((faction) => faction.id === id)))];
+          });
+          savedFactions.forEach((faction) => {
+            if (typeof faction.settlementId === "string") {
+              const legacySettlement = savedSettlements.find((settlement) => settlement.id === faction.settlementId);
+              if (legacySettlement && !legacySettlement.prominentFactionIds.includes(faction.id)) legacySettlement.prominentFactionIds.push(faction.id);
+              delete faction.settlementId;
+            }
+          });
+          return {
+            schemaVersion: 2,
+            campaign: {
+              id: typeof parsed.campaign.id === "string" ? parsed.campaign.id : makeId("campaign"),
+              name: typeof parsed.campaign.name === "string" ? parsed.campaign.name : "",
+              setting: typeof parsed.campaign.setting === "string" ? parsed.campaign.setting : "",
+              premise: typeof parsed.campaign.premise === "string" ? parsed.campaign.premise : "",
+              mapName: typeof parsed.campaign.mapName === "string" ? parsed.campaign.mapName : "",
+              era: typeof parsed.campaign.era === "string" ? parsed.campaign.era : ""
+            },
+            map: {
+              center,
+              zoom,
+              bounds: normalizeAreaBounds(savedMap.bounds),
+              grid: { cellKm: TRAVEL_HEX_KM, origin: legacySchematic ? null : gridOrigin, terrainCells: legacySchematic ? {} : normalizeTerrainCells(savedGrid.terrainCells) },
+              atlas: legacySchematic ? null : normalizeAtlasMetadata(savedMap.atlas),
+              offlineAnnotations: legacySchematic ? [] : normalizeGeoJSONFeatures(savedMap.offlineAnnotations),
+              offlineBasemap: legacySchematic ? null : normalizeOfflineBasemap(savedMap.offlineBasemap)
+            },
+            locations: Array.isArray(parsed.locations) ? parsed.locations.filter(isRecord).map((location) => {
+              const validPosition = isRecord(location.position) && isValidCoordinate(location.position.lat, location.position.lng)
+                ? { lat: location.position.lat, lng: location.position.lng }
+                : null;
+              return {
+                ...location,
+                position: legacySchematic ? null : validPosition,
+                visibility: location.visibility === "players" ? "players" : "gm-only",
+                gridRef: typeof location.gridRef === "string" ? location.gridRef : null,
+                ...(legacySchematic && isRecord(location.position) ? { legacySchematicPosition: { ...location.position } } : {})
+              };
+            }) : [],
+            factions: savedFactions,
+            settlements: savedSettlements,
+            scenarioNotes: Array.isArray(parsed.scenarioNotes) ? parsed.scenarioNotes.filter(isRecord) : []
+          };
+        } catch (error) {
+          storageAvailable = false;
+          console.warn("Could not load the campaign setup draft.", error);
+          return createBlankState();
+        }
+      }
+
+      function saveDraft() {
+        state.campaign = {
+          ...state.campaign,
+          name: campaignNameInput.value.trim(),
+          setting: campaignSettingInput.value.trim(),
+          premise: campaignPremiseInput.value.trim(),
+          mapName: mapNameInput.value.trim(),
+          era: campaignEraInput.value.trim()
+        };
+        ensureGridOrigin();
+        state.locations.forEach((location) => {
+          const grid = location.position ? gridCoordinatesForPosition(location.position) : null;
+          location.gridRef = grid?.ref || null;
+          location.grid = grid ? { q: grid.q, r: grid.r } : null;
+        });
+        if (leafletMap) {
+          const center = leafletMap.getCenter();
+          state.map.center = { lat: center.lat, lng: center.lng };
+          state.map.zoom = leafletMap.getZoom();
+        }
+        if (!storageAvailable) {
+          setSaveStatus("Browser storage unavailable", false);
+          return;
+        }
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          setSaveStatus("Draft saved locally", true);
+        } catch (error) {
+          storageAvailable = false;
+          setSaveStatus("Browser storage unavailable", false);
+        }
+        updateSidebar();
+        updateStepCounts();
+      }
+
+      function setSaveStatus(message, saved) {
+        document.querySelector("#draft-status").textContent = saved ? "Local draft / saved" : `Local draft / ${message.toLowerCase()}`;
+        document.querySelector("#footer-status").textContent = message;
+      }
+
+      function restoreFields() {
+        campaignNameInput.value = state.campaign.name;
+        campaignSettingInput.value = state.campaign.setting;
+        campaignPremiseInput.value = state.campaign.premise;
+        mapNameInput.value = state.campaign.mapName;
+        campaignEraInput.value = state.campaign.era;
+        renderFieldPapersAtlas();
+        renderOfflineBasemapControls();
+        document.querySelector("#continue-to-terrain").disabled = !state.map.atlas;
+        fieldPapersStatus.textContent = state.map.atlas
+          ? "Saved Field Papers atlas restored. Add campaign locations or import offline markup."
+          : "Import a Field Papers atlas GeoJSON to unlock map and location editing.";
+        renderLocations();
+        renderTerrainDataTable();
+        renderTerrainAssignments();
+        renderEntities("faction");
+        renderEntities("settlement");
+        renderNotes();
+        updateSidebar();
+        updateStepCounts();
+        if (storageAvailable) setSaveStatus("Draft restored from this browser", true);
+      }
+
+      function updateSidebar() {
+        document.querySelector("#rail-campaign-name").textContent = state.campaign.name || "Untitled campaign";
+        document.querySelector("#map-grid-label").textContent = `${state.campaign.mapName || "Unnamed area"} / initial map`;
+      }
+
+      function updateStepCounts() {
+        document.querySelector('[data-step-state="brief"]').textContent = state.campaign.name ? "Named" : "Draft";
+        document.querySelector('[data-step-state="map"]').textContent = state.map.atlas ? "Ready" : "Required";
+        document.querySelector('[data-step-state="terrain"]').textContent = String(Object.keys(state.map.grid.terrainCells).length);
+        document.querySelector('[data-step-state="locations"]').textContent = String(state.locations.length);
+        document.querySelector('[data-step-state="settlements"]').textContent = String(state.settlements.length);
+        document.querySelector('[data-step-state="factions"]').textContent = String(state.factions.length);
+        document.querySelector('[data-step-state="notes"]').textContent = String(state.scenarioNotes.length);
+        const valid = validatePackage(false).length === 0;
+        document.querySelector('[data-step-state="package"]').textContent = valid ? "Ready" : "Check";
+        exportButton.disabled = !valid;
+        document.querySelector("#export-package-top").disabled = !valid;
+      }
+
+      function showStep(step) {
+        panels.forEach((panel) => {
+          const active = panel.dataset.panel === step;
+          panel.classList.toggle("active", active);
+          panel.hidden = !active;
+        });
+        stepButtons.forEach((button) => {
+          if (button.dataset.step === step) button.setAttribute("aria-current", "step");
+          else button.removeAttribute("aria-current");
+        });
+        document.querySelector("#current-step-label").textContent = stepLabels[step];
+        document.querySelector("#page-title").textContent = stepLabels[step];
+        if ((step === "terrain" || step === "locations") && state.map.atlas) {
+          initializeMap();
+          const mapHost = step === "locations" ? locationMapHost : terrainMapHost;
+          if (mapHost && mapFrame.parentNode !== mapHost) mapHost.append(mapFrame);
+          if (leafletMap) {
+            leafletMap.invalidateSize({ pan: false });
+            renderHexGrid();
+            requestAnimationFrame(() => {
+              leafletMap.invalidateSize({ pan: false });
+              renderHexGrid();
+            });
+          }
+        }
+        if ((step === "terrain" || step === "locations") && !state.map.atlas) {
+          showStep("map");
+          return;
+        }
+        if (step === "package") renderValidation();
+      }
+
+      function setMapStatus(message, type = "") {
+        document.querySelectorAll("[data-map-status]").forEach((status) => {
+          status.className = `map-status${type ? ` ${type}` : ""}`;
+          status.textContent = message;
+        });
+      }
+
+      function formatCoordinate(position) {
+        const grid = position ? gridCoordinatesForPosition(position) : null;
+        return grid ? `10 km travel hex / ${grid.ref}` : "Grid reference unavailable";
+      }
+
+      function renderLocationCoordinate() {
+        document.querySelector("#location-coordinate").textContent = formatCoordinate(pendingPosition);
+        addLocationButton.disabled = !pendingPosition || !locationNameInput.value.trim();
+      }
+
+      function initializeMap() {
+        if (leafletMap) return;
+        if (!window.L) {
+          setMapStatus("Map library unavailable. Check network access and reload this page.", "error");
+          return;
+        }
+
+        leafletMap = L.map(mapElement, { minZoom: 2, maxZoom: 18 }).setView([state.map.center.lat, state.map.center.lng], state.map.zoom);
+        renderMapBaseLayer();
+        L.control.scale({ metric: true, imperial: true, maxWidth: 140 }).addTo(leafletMap);
+        locationMarkerLayer = L.layerGroup().addTo(leafletMap);
+        hexGridLayer = L.layerGroup().addTo(leafletMap);
+        areaHandles = [];
+        renderLocations();
+        renderArea();
+        leafletMap.on("click", handleMapClick);
+        leafletMap.on("moveend", () => { scheduleMapSave(); renderHexGrid(); });
+        leafletMap.on("zoomend", () => { scheduleMapSave(); renderHexGrid(); });
+        if (state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
+        else setMapStatus("OpenStreetMap / search a place, mark the campaign area, and place locations.");
+      }
+
+      function scheduleMapSave() {
+        window.clearTimeout(mapSaveTimer);
+        mapSaveTimer = window.setTimeout(saveDraft, 400);
+      }
+
+      function renderHexGrid() {
+        if (!leafletMap || !hexGridLayer) return;
+        const terrainEditing = !document.querySelector('[data-panel="terrain"]').hidden;
+        hexGridLayer.clearLayers();
+        const influenceByCell = new Map();
+        state.factions.forEach((faction, factionIndex) => {
+          (faction.influenceCells || []).forEach((key) => {
+            if (!influenceByCell.has(key)) influenceByCell.set(key, []);
+            influenceByCell.get(key).push(factionInfluenceColors[factionIndex % factionInfluenceColors.length]);
+          });
+        });
+        const area = normalizeAreaBounds(state.map.bounds);
+        if (!area) return;
+        ensureGridOrigin(area);
+        const origin = state.map.grid.origin;
+        const metersPerLat = 111132;
+        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+        const radius = TRAVEL_HEX_KM * 1000 / Math.sqrt(3);
+        const view = leafletMap.getBounds();
+        const corners = [view.getSouthWest(), view.getNorthWest(), view.getNorthEast(), view.getSouthEast()];
+        const axialCorners = corners.map((corner) => {
+          const x = (corner.lng - origin.lng) * metersPerLng;
+          const y = (corner.lat - origin.lat) * metersPerLat;
+          return { q: (Math.sqrt(3) / 3 * x - y / 3) / radius, r: (2 / 3 * y) / radius };
+        });
+        const qMin = Math.floor(Math.min(...axialCorners.map((point) => point.q))) - 2;
+        const qMax = Math.ceil(Math.max(...axialCorners.map((point) => point.q))) + 2;
+        const rMin = Math.floor(Math.min(...axialCorners.map((point) => point.r))) - 2;
+        const rMax = Math.ceil(Math.max(...axialCorners.map((point) => point.r))) + 2;
+        const estimatedCells = (qMax - qMin + 1) * (rMax - rMin + 1);
+        if (estimatedCells > 900) {
+          setMapStatus("Zoom in to view the 10 km hex grid.");
+          return;
+        }
+
+        for (let q = qMin; q <= qMax; q += 1) {
+          for (let r = rMin; r <= rMax; r += 1) {
+            const x = radius * Math.sqrt(3) * (q + r / 2);
+            const y = radius * 1.5 * r;
+            const center = localMetersToPosition(x, y);
+            if (!center || !isInsideArea(center, area) || !view.contains([center.lat, center.lng])) continue;
+            const vertices = Array.from({ length: 6 }, (_, index) => {
+              const angle = (30 + index * 60) * Math.PI / 180;
+              return localMetersToPosition(x + radius * Math.cos(angle), y + radius * Math.sin(angle));
+            }).filter(Boolean).map((point) => [point.lat, point.lng]);
+            if (vertices.length !== 6) continue;
+            const key = `${q},${r}`;
+            const terrainType = state.map.grid.terrainCells[key] || "";
+            const terrain = TERRAIN_TYPES[terrainType];
+            const influenceColors = influenceByCell.get(key) || [];
+            const selectedCell = selectedTerrainCells.has(key) || selectedInfluenceCells.has(key);
+            const polygon = L.polygon(vertices, {
+              color: terrain?.color || (influenceColors.length ? "#344a40" : "#788779"),
+              weight: terrainEditing && selectedCell ? 3 : 1,
+              opacity: terrain ? .75 : .7,
+              fill: true,
+              fillColor: terrain?.color || (influenceColors.length ? "#344a40" : "#e4ece2"),
+              fillOpacity: terrain ? .34 : influenceColors.length ? .04 : .12,
+              interactive: terrainEditing,
+              className: terrainEditing ? "terrain-grid-polygon" : ""
+            }).addTo(hexGridLayer);
+            influenceColors.forEach((color, index) => {
+              L.polygon(vertices, {
+                color,
+                weight: terrainEditing && selectedInfluenceCells.has(key) ? 4 : 2,
+                opacity: .95,
+                fill: true,
+                fillColor: color,
+                fillOpacity: influenceColors.length > 1 ? .1 : .2,
+                interactive: false,
+                className: `faction-influence-cell faction-influence-${index}`
+              }).addTo(hexGridLayer);
+            });
+            if (leafletMap.getZoom() >= 9) {
+              const ref = formatAxialCoordinate(q, r);
+              const label = L.marker([center.lat, center.lng], {
+                interactive: false,
+                keyboard: false,
+                icon: L.divIcon({ className: "leaflet-hex-label", html: ref, iconSize: [62, 12], iconAnchor: [31, 6] })
+              }).addTo(hexGridLayer);
+            }
+          }
+        }
+        document.querySelectorAll("[data-map-status]").forEach((status) => {
+          if (status.textContent.startsWith("Zoom in to view")) status.textContent = "Select a hex to assign a strategic terrain type.";
+        });
+      }
+
+      function selectTerrainCell(q, r, centerMap = false) {
+        const key = `${q},${r}`;
+        const cell = { q, r, key, ref: formatAxialCoordinate(q, r) };
+        if (terrainBatchMode) {
+          if (selectedTerrainCells.has(key)) selectedTerrainCells.delete(key);
+          else selectedTerrainCells.set(key, cell);
+          selectedTerrainCell = cell;
+        } else {
+          selectedTerrainCells.clear();
+          selectedTerrainCells.set(key, cell);
+          selectedTerrainCell = cell;
+          terrainTypeSelect.value = state.map.grid.terrainCells[key] || "";
+        }
+        renderTerrainSelection();
+        if (centerMap && leafletMap) {
+          const radius = TRAVEL_HEX_KM * 1000 / Math.sqrt(3);
+          const x = radius * Math.sqrt(3) * (q + r / 2);
+          const y = radius * 1.5 * r;
+          const position = localMetersToPosition(x, y);
+          if (position) leafletMap.panTo([position.lat, position.lng]);
+        }
+        renderHexGrid();
+      }
+
+      function renderTerrainSelection() {
+        const selected = [...selectedTerrainCells.values()];
+        const coordinate = document.querySelector("#terrain-selected-coordinate");
+        const status = document.querySelector("#terrain-selected-status");
+        if (!selected.length) {
+          coordinate.textContent = "Select a hex";
+          status.textContent = "No selection";
+        } else if (selected.length === 1) {
+          const cell = selected[0];
+          const terrainType = state.map.grid.terrainCells[cell.key] || "";
+          coordinate.textContent = cell.ref;
+          status.textContent = terrainType ? TERRAIN_TYPES[terrainType].label : "Unassigned";
+        } else {
+          coordinate.textContent = `${selected.length} hexes selected`;
+          status.textContent = terrainBatchMode ? "Multi-select" : "Selected";
+        }
+        saveTerrainButton.disabled = influenceBatchMode || !selected.length || !Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrainTypeSelect.value);
+        removeTerrainButton.disabled = influenceBatchMode || !selected.some((cell) => state.map.grid.terrainCells[cell.key]);
+      }
+
+      function renderInfluenceControls() {
+        const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
+        const selectedCount = selectedInfluenceCells.size;
+        influenceBatchModeButton.disabled = !faction;
+        influenceBatchModeButton.setAttribute("aria-pressed", String(influenceBatchMode));
+        influenceBatchModeButton.classList.toggle("button-primary", influenceBatchMode);
+        influenceBatchModeButton.textContent = influenceBatchMode ? "Finish influence selection" : "Select influence hexes";
+        saveInfluenceButton.disabled = !faction || !selectedCount;
+        clearInfluenceButton.disabled = !faction || !selectedCount || ![...selectedInfluenceCells.keys()].some((key) => faction.influenceCells?.includes(key));
+        if (!faction) influenceFeedback.textContent = "Add a faction in the Factions step first.";
+        else if (selectedCount) influenceFeedback.textContent = `${selectedCount} hex(es) selected for ${faction.name}. Save the layer to keep these edits.`;
+        else influenceFeedback.textContent = influenceBatchMode ? `Select hexes for ${faction.name}; saved cells stay visible on the map.` : `${faction.name}: ${(faction.influenceCells || []).length} influence hex(es).`;
+      }
+
+      function renderInfluenceList() {
+        factionInfluenceList.replaceChildren();
+        if (!state.factions.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No factions added.";
+          factionInfluenceList.append(empty);
+          return;
+        }
+        state.factions.forEach((faction, index) => {
+          const row = document.createElement("div");
+          row.className = "terrain-row";
+          const name = document.createElement("span");
+          const swatch = document.createElement("i");
+          swatch.className = "terrain-swatch";
+          swatch.style.backgroundColor = factionInfluenceColors[index % factionInfluenceColors.length];
+          name.append(swatch, document.createTextNode(faction.name));
+          const count = document.createElement("span");
+          count.textContent = `${(faction.influenceCells || []).length} hex(es)`;
+          row.append(name, count);
+          factionInfluenceList.append(row);
+        });
+      }
+
+      function renderInfluenceFactionOptions() {
+        const currentId = influenceFactionSelect.value;
+        influenceFactionSelect.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = state.factions.length ? "Choose a faction" : "Add a faction first";
+        influenceFactionSelect.append(placeholder);
+        state.factions.forEach((faction) => {
+          const option = document.createElement("option");
+          option.value = faction.id;
+          option.textContent = faction.name;
+          influenceFactionSelect.append(option);
+        });
+        if (state.factions.some((faction) => faction.id === currentId)) influenceFactionSelect.value = currentId;
+        else if (state.factions.length === 1) influenceFactionSelect.value = state.factions[0].id;
+        if (!influenceFactionSelect.value) influenceBatchMode = false;
+        renderInfluenceList();
+        renderInfluenceControls();
+      }
+
+      function selectInfluenceCell(q, r) {
+        const key = `${q},${r}`;
+        if (selectedInfluenceCells.has(key)) selectedInfluenceCells.delete(key);
+        else selectedInfluenceCells.set(key, { q, r, key, ref: formatAxialCoordinate(q, r) });
+        renderInfluenceControls();
+        renderHexGrid();
+      }
+
+      function renderTerrainDataTable() {
+        const table = document.createElement("table");
+        const caption = document.createElement("caption");
+        caption.textContent = "Strategic Play / Terrain Types";
+        table.append(caption);
+        const columns = [
+          ["Terrain", "label"],
+          ["Travel speed", "speed"],
+          ["Driving", "driving"],
+          ["Foraging", "foraging"],
+          ["Hunting", "hunting"],
+          ["Scrounging", "scrounging"],
+          ["Encounter distance", "encounter"]
+        ];
+        const head = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        columns.forEach(([label]) => {
+          const cell = document.createElement("th");
+          cell.scope = "col";
+          cell.textContent = label;
+          headerRow.append(cell);
+        });
+        head.append(headerRow);
+        table.append(head);
+        const body = document.createElement("tbody");
+        Object.values(TERRAIN_TYPES).forEach((terrain) => {
+          const row = document.createElement("tr");
+          columns.forEach(([, key]) => {
+            const cell = document.createElement("td");
+            cell.textContent = terrain[key];
+            row.append(cell);
+          });
+          body.append(row);
+        });
+        table.append(body);
+        const notes = document.createElement("ul");
+        [
+          "* Travel speed factor is off-road only; marching/on-road speed is x1.",
+          "** Lake/river speed requires a boat or amphibious vehicle.",
+          "*** Minimum encounter distance applies only to roads through woods or ruins."
+        ].forEach((text) => {
+          const item = document.createElement("li");
+          item.textContent = text;
+          notes.append(item);
+        });
+        terrainDataTable.replaceChildren(table, notes);
+      }
+
+      function renderTerrainAssignments() {
+        const list = terrainAssignmentsList;
+        list.replaceChildren();
+        const entries = Object.entries(state.map.grid.terrainCells).sort((left, right) => left[0].localeCompare(right[0], undefined, { numeric: true }));
+        document.querySelector("#terrain-assignment-count").textContent = String(entries.length);
+        if (!entries.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No terrain labels assigned.";
+          list.append(empty);
+          return;
+        }
+        entries.forEach(([key, terrainType]) => {
+          const [q, r] = key.split(",").map(Number);
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = "terrain-row";
+          row.setAttribute("aria-label", `Edit ${formatAxialCoordinate(q, r)}, ${TERRAIN_TYPES[terrainType].label}`);
+          const title = document.createElement("span");
+          const swatch = document.createElement("i");
+          swatch.className = "terrain-swatch";
+          swatch.style.backgroundColor = TERRAIN_TYPES[terrainType].color;
+          title.append(swatch, document.createTextNode(`${formatAxialCoordinate(q, r)} / ${TERRAIN_TYPES[terrainType].label}`));
+          const edit = document.createElement("span");
+          edit.textContent = "Edit";
+          row.append(title, edit);
+          row.addEventListener("click", () => selectTerrainCell(q, r, true));
+          list.append(row);
+        });
+      }
+
+      function makeAreaHandleIcon() {
+        return L.divIcon({ className: "leaflet-area-handle", iconSize: [13, 13] });
+      }
+
+      function clearAreaLayers() {
+        if (areaRectangle && leafletMap) leafletMap.removeLayer(areaRectangle);
+        areaRectangle = null;
+        areaHandles.forEach((handle) => leafletMap?.removeLayer(handle));
+        areaHandles = [];
+        if (fieldPapersLayer && leafletMap) leafletMap.removeLayer(fieldPapersLayer);
+        fieldPapersLayer = null;
+      }
+
+      function updateAreaFromHandles() {
+        if (areaHandles.length !== 2) return;
+        const first = areaHandles[0].getLatLng();
+        const second = areaHandles[1].getLatLng();
+        const south = Math.min(first.lat, second.lat);
+        const north = Math.max(first.lat, second.lat);
+        const west = Math.min(first.lng, second.lng);
+        const east = Math.max(first.lng, second.lng);
+        if (south === north || west === east) {
+          setMapStatus("Area corners must enclose a visible area.", "error");
+          return;
+        }
+        state.map.bounds = { south, west, north, east };
+        renderBoundsFields();
+        areaRectangle?.setBounds([[south, west], [north, east]]);
+        renderHexGrid();
+        scheduleMapSave();
+        clearAreaButton.disabled = false;
+        setMapStatus("Campaign area saved. Drag either corner to adjust it.", "success");
+      }
+
+      function renderArea() {
+        if (!leafletMap) return;
+        clearAreaLayers();
+        const bounds = normalizeAreaBounds(state.map.bounds);
+        renderBoundsFields();
+        clearAreaButton.disabled = !bounds;
+        if (bounds) {
+          const southWest = [bounds.south, bounds.west];
+          const northEast = [bounds.north, bounds.east];
+          areaRectangle = L.rectangle([southWest, northEast], { color: "#487c87", weight: 2, fillColor: "#487c87", fillOpacity: 0.12, interactive: false }).addTo(leafletMap);
+          areaHandles = [southWest, northEast].map((corner) => {
+            const handle = L.marker(corner, { draggable: true, icon: makeAreaHandleIcon(), keyboard: true, title: "Drag to resize campaign area" }).addTo(leafletMap);
+            handle.on("dragend", updateAreaFromHandles);
+            return handle;
+          });
+        }
+        const annotations = state.map.offlineAnnotations.filter((feature) => feature.geometry.type !== "Point" && feature.properties.role !== "campaign-area" && feature.properties.type !== "atlas");
+        if (annotations.length) {
+          fieldPapersLayer = L.geoJSON({ type: "FeatureCollection", features: annotations }, {
+            style: { color: "#b74435", weight: 3, fillColor: "#b74435", fillOpacity: 0.16 }
+          }).addTo(leafletMap);
+        }
+        ensureGridOrigin(bounds);
+        renderHexGrid();
+      }
+
+      function handleMapClick(event) {
+        if (!document.querySelector('[data-panel="terrain"]').hidden && event.originalEvent.target.closest?.(".terrain-grid-polygon")) {
+          const cell = gridCoordinatesForPosition(event.latlng);
+          if (cell) {
+            if (influenceBatchMode) selectInfluenceCell(cell.q, cell.r);
+            else selectTerrainCell(cell.q, cell.r);
+          }
+          return;
+        }
+        if (placementMode) {
+          pendingPosition = { lat: event.latlng.lat, lng: event.latlng.lng };
+          placementMode = false;
+          mapFrame.classList.remove("placing-location");
+          document.querySelector("#place-location").textContent = editingLocationId ? "Move location" : "Place on map";
+          document.querySelector("#map-place-hint").textContent = "Position selected / confirm in location panel";
+          renderLocationCoordinate();
+          setMapStatus(`Location position selected / ${formatCoordinate(pendingPosition)}. Confirm it in the location panel.`, "success");
+          return;
+        }
+        if (!drawingArea) return;
+        if (!areaStart) {
+          areaStart = event.latlng;
+          document.querySelector("#map-place-hint").textContent = "First corner saved / choose the opposite corner";
+          setMapStatus("First corner selected. Click the opposite corner to finish the campaign area.");
+          return;
+        }
+        const south = Math.min(areaStart.lat, event.latlng.lat);
+        const north = Math.max(areaStart.lat, event.latlng.lat);
+        const west = Math.min(areaStart.lng, event.latlng.lng);
+        const east = Math.max(areaStart.lng, event.latlng.lng);
+        drawingArea = false;
+        areaStart = null;
+        mapFrame.classList.remove("drawing-area");
+        drawAreaButton.textContent = state.map.bounds ? "Edit area" : "Mark area";
+        if (south === north || west === east) {
+          setMapStatus("Choose two distinct corners to mark the campaign area.", "error");
+          return;
+        }
+        state.map.bounds = { south, west, north, east };
+        renderArea();
+        leafletMap.fitBounds([[south, west], [north, east]], { padding: [28, 28] });
+        saveDraft();
+        setMapStatus("Campaign area saved. Drag either corner to adjust it.", "success");
+      }
+
+      function beginLocationEdit(location) {
+        editingLocationId = location.id;
+        locationNameInput.value = location.name;
+        locationKindInput.value = location.kind || "Location";
+        locationVisibilityInput.value = location.visibility === "players" ? "players" : "gm-only";
+        locationDescriptionInput.value = location.description || "";
+        pendingPosition = location.position ? { ...location.position } : null;
+        document.querySelector("#add-location").textContent = "Save location";
+        cancelLocationEditButton.hidden = false;
+        renderLocationCoordinate();
+        if (location.position && leafletMap) leafletMap.panTo([location.position.lat, location.position.lng]);
+        setMapStatus(pendingPosition ? `Editing ${location.name} / drag its marker or choose a new map position.` : `Editing ${location.name} / place it on the map first.`, "success");
+      }
+
+      function cancelLocationEdit() {
+        editingLocationId = null;
+        pendingPosition = null;
+        locationNameInput.value = "";
+        locationKindInput.value = "Location";
+        locationVisibilityInput.value = "gm-only";
+        locationDescriptionInput.value = "";
+        document.querySelector("#add-location").textContent = "Add to package";
+        cancelLocationEditButton.hidden = true;
+        renderLocationCoordinate();
+        setMapStatus("Location edit cancelled.");
+      }
+
+      function renderLocations() {
+        const list = document.querySelector("#location-list");
+        list.replaceChildren();
+        locationMarkerLayer?.clearLayers();
+        if (!state.locations.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No initial locations yet.";
+          list.append(empty);
+        }
+        state.locations.forEach((location, index) => {
+          const row = document.createElement("article");
+          row.className = "location-row";
+          const info = document.createElement("div");
+          const title = document.createElement("div");
+          title.className = "row-title";
+          const name = document.createElement("span");
+          name.textContent = location.name;
+          title.append(name);
+          if (location.isStartingLocation) {
+            const badge = document.createElement("span");
+            badge.className = "start-badge";
+            badge.textContent = "Start";
+            title.append(badge);
+          }
+          const kind = document.createElement("small");
+          kind.textContent = location.kind;
+          title.append(kind);
+          const visibility = document.createElement("small");
+          visibility.className = `visibility-badge${location.visibility === "players" ? " players" : ""}`;
+          visibility.textContent = location.visibility === "players" ? "Players" : "GM-only";
+          title.append(visibility);
+          info.append(title);
+          if (location.description) {
+            const description = document.createElement("p");
+            description.className = "row-description";
+            description.textContent = location.description;
+            info.append(description);
+          }
+          const coordinate = document.createElement("p");
+          coordinate.className = "row-description location-coordinate";
+          const grid = location.position ? gridCoordinatesForPosition(location.position) : null;
+          location.gridRef = grid?.ref || null;
+          location.grid = grid ? { q: grid.q, r: grid.r } : null;
+          coordinate.textContent = location.position ? `10 km travel hex / ${location.gridRef}` : "Needs real-world position";
+                      const markerHtml = `<div class="leaflet-location-marker${location.isStartingLocation ? " start" : ""}"><span class="leaflet-location-dot">${location.isStartingLocation ? "S" : String(index + 1).padStart(2, "0")}</span><span class="leaflet-location-label">${escapeHtml(location.name)}</span><span class="leaflet-location-grid">${escapeHtml(location.gridRef || "")}</span></div>`;
+          info.append(coordinate);
+          const actions = document.createElement("div");
+          actions.className = "row-action";
+          const editButton = document.createElement("button");
+          editButton.className = "icon-button";
+          editButton.type = "button";
+          editButton.title = `Edit ${location.name}`;
+          editButton.setAttribute("aria-label", `Edit ${location.name}`);
+          editButton.textContent = "✎";
+          editButton.addEventListener("click", () => beginLocationEdit(location));
+          const startButton = document.createElement("button");
+          startButton.className = "icon-button";
+          startButton.type = "button";
+          startButton.title = location.isStartingLocation ? "Starting location" : "Set as starting location";
+          startButton.setAttribute("aria-label", startButton.title);
+          startButton.textContent = location.isStartingLocation ? "★" : "☆";
+          startButton.disabled = location.isStartingLocation;
+          startButton.addEventListener("click", () => {
+            state.locations.forEach((item) => { item.isStartingLocation = false; });
+            state.locations[index].isStartingLocation = true;
+            renderLocations();
+            saveDraft();
+          });
+          const removeButton = document.createElement("button");
+          removeButton.className = "icon-button";
+          removeButton.type = "button";
+          removeButton.title = "Remove location";
+          removeButton.setAttribute("aria-label", `Remove ${location.name}`);
+          removeButton.textContent = "×";
+          removeButton.addEventListener("click", () => {
+            if (state.settlements.some((settlement) => settlement.locationId === location.id)) {
+              document.querySelector("#location-feedback").className = "feedback error";
+              document.querySelector("#location-feedback").textContent = "This location backs a settlement. Remove that settlement before deleting its location.";
+              return;
+            }
+            state.locations.splice(index, 1);
+            if (!state.locations.some((item) => item.isStartingLocation) && state.locations[0]) state.locations[0].isStartingLocation = true;
+            if (editingLocationId === location.id) cancelLocationEdit();
+            renderLocations();
+            saveDraft();
+          });
+          actions.append(editButton, startButton, removeButton);
+          row.append(info, actions);
+          list.append(row);
+
+          if (leafletMap && locationMarkerLayer && location.position && isValidCoordinate(location.position.lat, location.position.lng)) {
+            const markerHtml = `<div class="leaflet-location-marker${location.isStartingLocation ? " start" : ""}"><span class="leaflet-location-dot">${location.isStartingLocation ? "S" : String(index + 1).padStart(2, "0")}</span><span class="leaflet-location-label">${escapeHtml(location.name)}</span><span class="leaflet-location-grid">${escapeHtml(location.gridRef || "")}</span></div>`;
+            const icon = L.divIcon({ className: "location-icon", html: markerHtml, iconSize: [150, 43], iconAnchor: [75, 20] });
+            const marker = L.marker([location.position.lat, location.position.lng], { icon, draggable: true, title: location.name, bubblingMouseEvents: false }).addTo(locationMarkerLayer);
+            marker.on("click", () => beginLocationEdit(location));
+            marker.on("dragend", () => {
+              const moved = marker.getLatLng();
+              location.position = { lat: moved.lat, lng: moved.lng };
+              renderLocations();
+              saveDraft();
+              setMapStatus(`${location.name} moved to ${formatCoordinate(location.position)}.`, "success");
+            });
+          }
+        });
+        document.querySelector("#location-count").textContent = `${state.locations.length} location${state.locations.length === 1 ? "" : "s"}`;
+        document.querySelector("#map-place-hint").textContent = drawingArea ? areaStart ? "First corner saved / choose opposite corner" : "Choose first area corner" : placementMode ? "Placement active / click map to set position" : state.locations.length ? "Initial locations / select marker to edit" : "Search, mark an area, or place a location";
+        drawAreaButton.textContent = drawingArea ? "Cancel area" : state.map.bounds ? "Edit area" : "Mark area";
+        clearAreaButton.disabled = !state.map.bounds;
+        syncSettlementLocations();
+        renderSettlementLocationOptions();
+        renderEntities("settlement");
+      }
+
+      function syncSettlementLocations() {
+        const claimedLocationIds = new Set();
+        state.settlements.forEach((settlement) => {
+          let location = state.locations.find((item) => item.id === settlement.locationId);
+          if (!location && !settlement.locationId) {
+            const matches = state.locations.filter((item) => item.kind === "Settlement" && item.name === settlement.name && !claimedLocationIds.has(item.id));
+            if (matches.length === 1) location = matches[0];
+          }
+          if (!location) return;
+          if (claimedLocationIds.has(location.id)) return;
+          claimedLocationIds.add(location.id);
+          settlement.locationId = location.id;
+          settlement.name = location.name;
+          settlement.gridRef = location.gridRef || null;
+          settlement.position = location.position ? { ...location.position } : null;
+          settlement.visibility = location.visibility === "players" ? "players" : "gm-only";
+        });
+      }
+
+      function renderSettlementLocationOptions() {
+        const selectedId = settlementLocationSelect.value;
+        const occupiedLocationIds = new Set(state.settlements.map((settlement) => settlement.locationId).filter(Boolean));
+        const availableLocations = state.locations.filter((location) => location.kind === "Settlement"
+          && (!occupiedLocationIds.has(location.id) || location.id === selectedId));
+        settlementLocationSelect.replaceChildren();
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = availableLocations.length ? "Choose a Settlement location" : "Add a Settlement location in Locations first";
+        settlementLocationSelect.append(placeholder);
+        availableLocations.forEach((location) => {
+          const option = document.createElement("option");
+          option.value = location.id;
+          option.textContent = `${location.name}${location.gridRef ? ` / ${location.gridRef}` : " / map position needed"}`;
+          settlementLocationSelect.append(option);
+        });
+        if (availableLocations.some((location) => location.id === selectedId)) settlementLocationSelect.value = selectedId;
+        generateSettlementDraftButton.disabled = !settlementLocationSelect.value;
+        settlementSourceStatus.textContent = availableLocations.length
+          ? "Names and map positions are inherited from Settlement locations; each location can be used once."
+          : "Create a location with type Settlement in the Locations step first.";
+      }
+
+      function renderFactionSetupPanel() {
+        const faction = state.factions.find((item) => item.id === activeFactionId);
+        factionSetupPanel.hidden = !faction;
+        document.querySelector("#faction-form button[type='submit']").disabled = Boolean(faction);
+        if (!faction) return;
+        factionSetupTitle.textContent = `Configure ${faction.name}`;
+        factionSettlementChoices.replaceChildren();
+        if (!state.settlements.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "Create settlements before assigning faction presence.";
+          factionSettlementChoices.append(empty);
+        }
+        state.settlements.forEach((settlement) => {
+          const label = document.createElement("label");
+          label.className = "faction-settlement-choice";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = settlement.id;
+          checkbox.checked = pendingFactionSettlementIds.has(settlement.id);
+          checkbox.addEventListener("change", () => {
+            if (checkbox.checked) pendingFactionSettlementIds.add(settlement.id);
+            else pendingFactionSettlementIds.delete(settlement.id);
+            factionSetupStatus.textContent = `${pendingFactionSettlementIds.size} settlement(s) selected for ${faction.name}. Save these links before painting influence.`;
+          });
+          const name = document.createElement("span");
+          name.textContent = settlement.name;
+          const gridRef = document.createElement("small");
+          gridRef.textContent = settlement.gridRef || "No Q/R reference";
+          label.append(checkbox, name, gridRef);
+          factionSettlementChoices.append(label);
+        });
+        const assignedCount = state.settlements.filter((settlement) => settlement.prominentFactionIds?.includes(faction.id)).length;
+        factionSetupStatus.textContent = `${assignedCount} settlement(s) currently assigned to ${faction.name}. Select any number; shared influence is allowed.`;
+      }
+
+      function openFactionSetup(factionId) {
+        const faction = state.factions.find((item) => item.id === factionId);
+        if (!faction) return;
+        activeFactionId = faction.id;
+        pendingFactionSettlementIds = new Set(state.settlements
+          .filter((settlement) => settlement.prominentFactionIds?.includes(faction.id))
+          .map((settlement) => settlement.id));
+        renderFactionSetupPanel();
+        document.querySelector('[data-panel="factions"]').scrollIntoView({ block: "start" });
+      }
+
+      function saveFactionSettlementAssignments() {
+        const faction = state.factions.find((item) => item.id === activeFactionId);
+        if (!faction) return;
+        state.settlements.forEach((settlement) => {
+          const existingIds = Array.isArray(settlement.prominentFactionIds) ? [...settlement.prominentFactionIds] : [];
+          const isAssigned = pendingFactionSettlementIds.has(settlement.id);
+          const alreadyAssigned = existingIds.includes(faction.id);
+          if (isAssigned && !alreadyAssigned) existingIds.push(faction.id);
+          if (!isAssigned && alreadyAssigned) settlement.prominentFactionIds = existingIds.filter((id) => id !== faction.id);
+          else settlement.prominentFactionIds = [...new Set(existingIds)];
+        });
+        renderEntities("settlement");
+        renderEntities("faction");
+        saveDraft();
+        factionSetupStatus.textContent = `Saved ${pendingFactionSettlementIds.size} settlement link(s) for ${faction.name}. Existing prominence order was preserved.`;
+      }
+
+      function moveSettlementFaction(settlementId, factionIndex, direction) {
+        const settlement = state.settlements.find((item) => item.id === settlementId);
+        if (!settlement) return;
+        const ids = (settlement.prominentFactionIds || []).filter((id) => state.factions.some((faction) => faction.id === id));
+        const nextIndex = factionIndex + direction;
+        if (nextIndex < 0 || nextIndex >= ids.length) return;
+        [ids[factionIndex], ids[nextIndex]] = [ids[nextIndex], ids[factionIndex]];
+        settlement.prominentFactionIds = ids;
+        saveDraft();
+        renderEntities("settlement");
+        renderEntities("faction");
+        renderHexGrid();
+      }
+
+      function paintActiveFactionOnMap() {
+        const faction = state.factions.find((item) => item.id === activeFactionId);
+        if (!faction) return;
+        saveFactionSettlementAssignments();
+        returnToFactionSetup = true;
+        influenceBatchMode = true;
+        selectedInfluenceCells.clear();
+        influenceFactionSelect.value = faction.id;
+        finishFactionInfluenceButton.hidden = false;
+        showStep("terrain");
+        const button = document.querySelector("#influence-batch-mode");
+        button.setAttribute("aria-pressed", "true");
+        button.classList.add("button-primary");
+        button.textContent = "Finish influence selection";
+        renderInfluenceControls();
+        renderHexGrid();
+        setMapStatus(`Painting influence for ${faction.name}. Overlap with other factions is allowed.`, "success");
+        mapFrame.scrollIntoView({ block: "center" });
+      }
+
+      function finishActiveFactionSetup() {
+        activeFactionId = null;
+        pendingFactionSettlementIds.clear();
+        factionSetupPanel.hidden = true;
+        document.querySelector("#faction-form button[type='submit']").disabled = false;
+        document.querySelector('[data-panel="factions"]').scrollIntoView({ block: "start" });
+      }
+
+      function renderEntities(type) {
+        const isFaction = type === "faction";
+        const records = isFaction ? state.factions : state.settlements;
+        const list = document.querySelector(isFaction ? "#faction-list" : "#settlement-list");
+        list.replaceChildren();
+        if (!records.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = isFaction ? "No factions added." : "No settlements added.";
+          list.append(empty);
+        }
+        records.forEach((record, index) => {
+          const row = document.createElement("article");
+          row.className = "entity-row";
+          const info = document.createElement("div");
+          const name = document.createElement("div");
+          name.className = "row-title";
+          name.textContent = record.name;
+          if (!isFaction) {
+            const visibility = document.createElement("small");
+            visibility.className = `visibility-badge${record.visibility === "players" ? " players" : ""}`;
+            visibility.textContent = record.visibility === "players" ? "Players" : "GM-only";
+            name.append(visibility);
+          }
+          info.append(name);
+          if (isFaction) {
+            const linkedSettlements = state.settlements.filter((settlement) => settlement.prominentFactionIds?.includes(record.id));
+            const presence = document.createElement("p");
+            presence.className = "row-description";
+            presence.textContent = linkedSettlements.length
+              ? `Influences ${linkedSettlements.length} settlement(s): ${linkedSettlements.map((settlement) => settlement.name).join(", ")}`
+              : "No settlements selected";
+            info.append(presence);
+          }
+          if (!isFaction) {
+            const location = state.locations.find((item) => item.id === record.locationId);
+            const details = document.createElement("p");
+            details.className = "row-description";
+            details.textContent = location
+              ? `Location / ${location.gridRef || "map position not set"} · ${record.scale || "Scale not set"}${record.populationEstimate !== null && record.populationEstimate !== undefined ? ` · GM population estimate ${record.populationEstimate}` : ""}`
+              : "No linked Settlement location / legacy or unlinked record";
+            info.append(details);
+            const orderedFactionIds = (record.prominentFactionIds || []).filter((id) => state.factions.some((faction) => faction.id === id));
+            const prominentFaction = state.factions.find((faction) => faction.id === orderedFactionIds[0]);
+            const alignment = document.createElement("p");
+            alignment.className = "row-description";
+            alignment.textContent = `Alignment / ${prominentFaction?.name || "Independent"}`;
+            info.append(alignment);
+            if (record.security || record.attitude || record.leadership || record.situation) {
+              const descriptors = document.createElement("p");
+              descriptors.className = "row-description";
+              descriptors.textContent = [record.security, record.attitude, record.leadership, record.situation].filter(Boolean).join(" · ");
+              info.append(descriptors);
+            }
+            const prominence = document.createElement("div");
+            prominence.className = "settlement-prominence-list";
+            if (!orderedFactionIds.length) {
+              const emptyProminence = document.createElement("small");
+              emptyProminence.className = "row-description";
+              emptyProminence.textContent = "No prominent factions assigned.";
+              prominence.append(emptyProminence);
+            }
+            orderedFactionIds.forEach((factionId, factionIndex) => {
+              const faction = state.factions.find((item) => item.id === factionId);
+              const prominenceRow = document.createElement("div");
+              prominenceRow.className = "settlement-prominence-row";
+              const rank = document.createElement("span");
+              rank.textContent = `${factionIndex + 1}.`;
+              const factionName = document.createElement("span");
+              factionName.textContent = faction?.name || "Unknown faction";
+              const controls = document.createElement("span");
+              const moveUp = document.createElement("button");
+              moveUp.type = "button";
+              moveUp.className = "icon-button";
+              moveUp.textContent = "↑";
+              moveUp.title = `Increase prominence of ${faction?.name || "faction"}`;
+              moveUp.setAttribute("aria-label", moveUp.title);
+              moveUp.disabled = factionIndex === 0;
+              moveUp.addEventListener("click", () => moveSettlementFaction(record.id, factionIndex, -1));
+              const moveDown = document.createElement("button");
+              moveDown.type = "button";
+              moveDown.className = "icon-button";
+              moveDown.textContent = "↓";
+              moveDown.title = `Decrease prominence of ${faction?.name || "faction"}`;
+              moveDown.setAttribute("aria-label", moveDown.title);
+              moveDown.disabled = factionIndex === orderedFactionIds.length - 1;
+              moveDown.addEventListener("click", () => moveSettlementFaction(record.id, factionIndex, 1));
+              controls.append(moveUp, moveDown);
+              prominenceRow.append(rank, factionName, controls);
+              prominence.append(prominenceRow);
+            });
+            info.append(prominence);
+          }
+          if (record.description) {
+            const description = document.createElement("p");
+            description.className = "row-description";
+            description.textContent = record.description;
+            info.append(description);
+          }
+          const remove = document.createElement("button");
+          remove.className = "icon-button";
+          remove.type = "button";
+          remove.setAttribute("aria-label", `Remove ${record.name}`);
+          remove.title = `Remove ${record.name}`;
+          remove.textContent = "×";
+          remove.addEventListener("click", () => {
+            const [removed] = records.splice(index, 1);
+            if (isFaction) {
+              state.settlements.forEach((settlement) => {
+                settlement.prominentFactionIds = (settlement.prominentFactionIds || []).filter((id) => id !== removed.id);
+              });
+              if (activeFactionId === removed.id) finishActiveFactionSetup();
+            }
+            renderEntities(type);
+            renderSettlementLocationOptions();
+            renderFactionSetupPanel();
+            saveDraft();
+          });
+          const actions = document.createElement("div");
+          actions.className = "row-action";
+          if (isFaction) {
+            const editSettlements = document.createElement("button");
+            editSettlements.type = "button";
+            editSettlements.className = "button";
+            editSettlements.textContent = "Settlements";
+            editSettlements.title = `Edit settlements for ${record.name}`;
+            editSettlements.addEventListener("click", () => openFactionSetup(record.id));
+            const paintInfluence = document.createElement("button");
+            paintInfluence.type = "button";
+            paintInfluence.className = "button";
+            paintInfluence.textContent = "Paint influence";
+            paintInfluence.title = `Paint influence for ${record.name}`;
+            paintInfluence.addEventListener("click", () => {
+              openFactionSetup(record.id);
+              paintActiveFactionOnMap();
+            });
+            actions.append(editSettlements, paintInfluence);
+          }
+          actions.append(remove);
+          row.append(info, actions);
+          list.append(row);
+        });
+        document.querySelector(isFaction ? "#faction-count" : "#settlement-count").textContent = String(records.length);
+        if (isFaction) renderInfluenceFactionOptions();
+        else renderSettlementLocationOptions();
+        renderFactionSetupPanel();
+      }
+
+      function generateSettlementDraft() {
+        const location = state.locations.find((item) => item.id === settlementLocationSelect.value && item.kind === "Settlement");
+        if (!location) {
+          document.querySelector("#settlement-generation-status").textContent = "Choose a Settlement location from the Locations step first.";
+          return;
+        }
+        const choose = (options) => options[Math.floor(Math.random() * options.length)];
+        settlementForm.querySelector("#settlement-scale").value = choose(settlementDraftOptions.scale);
+        settlementForm.querySelector("#settlement-security").value = choose(settlementDraftOptions.security);
+        settlementForm.querySelector("#settlement-attitude").value = choose(settlementDraftOptions.attitude);
+        settlementForm.querySelector("#settlement-leadership").value = choose(settlementDraftOptions.leadership);
+        settlementForm.querySelector("#settlement-situation").value = choose(settlementDraftOptions.situations);
+        document.querySelector("#settlement-generation-status").className = "feedback success";
+        document.querySelector("#settlement-generation-status").textContent = "Generated editable GM scenario descriptors. Enter or revise the population estimate manually.";
+      }
+
+      function renderNotes() {
+        const list = document.querySelector("#notes-list");
+        list.replaceChildren();
+        if (!state.scenarioNotes.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No scenario notes added.";
+          list.append(empty);
+        }
+        state.scenarioNotes.forEach((note, index) => {
+          const row = document.createElement("article");
+          row.className = "note-row";
+          const info = document.createElement("div");
+          const title = document.createElement("div");
+          title.className = "row-title";
+          title.textContent = note.title;
+          const body = document.createElement("p");
+          body.className = "row-description";
+          body.textContent = note.body;
+          const privateTag = document.createElement("small");
+          privateTag.className = "eyebrow";
+          privateTag.textContent = "GM-only";
+          info.append(title, body, privateTag);
+          const remove = document.createElement("button");
+          remove.className = "icon-button";
+          remove.type = "button";
+          remove.setAttribute("aria-label", `Remove note ${note.title}`);
+          remove.title = `Remove note ${note.title}`;
+          remove.textContent = "×";
+          remove.addEventListener("click", () => {
+            state.scenarioNotes.splice(index, 1);
+            renderNotes();
+            saveDraft();
+          });
+          row.append(info, remove);
+          list.append(row);
+        });
+      }
+
+      function collectPackage() {
+        state.campaign = {
+          ...state.campaign,
+          name: campaignNameInput.value.trim(),
+          setting: campaignSettingInput.value.trim(),
+          premise: campaignPremiseInput.value.trim(),
+          mapName: mapNameInput.value.trim(),
+          era: campaignEraInput.value.trim()
+        };
+        return {
+          packageType: "fieldbook.campaign-setup",
+          schemaVersion: 2,
+          campaign: { ...state.campaign },
+          map: {
+            id: `${state.campaign.id}-map`,
+            name: state.campaign.mapName,
+            provider: state.map.offlineBasemap ? "PMTiles raster" : "OpenStreetMap",
+            center: { ...state.map.center },
+            zoom: state.map.zoom,
+            bounds: state.map.bounds ? { ...state.map.bounds } : null,
+            grid: {
+              cellKm: TRAVEL_HEX_KM,
+              coordinateSystem: "axial-q-r",
+              origin: state.map.grid?.origin ? { ...state.map.grid.origin } : null,
+              originDescription: "northwest corner of imported Field Papers atlas bounds",
+              terrainCells: Object.entries(state.map.grid.terrainCells).map(([key, terrainType]) => {
+                const [q, r] = key.split(",").map(Number);
+                return { q, r, coordinate: formatAxialCoordinate(q, r), terrainType };
+              })
+            },
+            fieldPapersAtlas: state.map.atlas ? { ...state.map.atlas } : null,
+            offlineBasemap: state.map.offlineBasemap ? { ...state.map.offlineBasemap } : null,
+            attribution: state.map.offlineBasemap?.attribution || "© OpenStreetMap contributors",
+            offlineAnnotations: normalizeGeoJSONFeatures(state.map.offlineAnnotations),
+            locations: state.locations.map(({ legacySchematicPosition, position, ...location }) => {
+              const grid = position ? gridCoordinatesForPosition(position) : null;
+              return {
+                ...location,
+                gridRef: grid?.ref || null,
+                coordinates: grid ? { system: "fieldbook.axial-q-r", q: grid.q, r: grid.r, cellKm: TRAVEL_HEX_KM } : null,
+                mapPosition: position ? { lat: position.lat, lng: position.lng } : null
+              };
+            })
+          },
+          factions: state.factions.map((item) => ({ ...item })),
+          settlements: state.settlements.map((item) => ({ ...item })),
+          scenarioNotes: state.scenarioNotes.map((note) => ({ ...note, visibility: "gm-only" }))
+        };
+      }
+
+      function normalizeImportedPackage(input) {
+        FieldbookCampaignPackageContract.assertCampaignSetupPackage(input);
+        if (!isRecord(input) || input.packageType !== "fieldbook.campaign-setup" || input.schemaVersion !== 2) {
+          throw new Error("Choose a Fieldbook campaign setup package using schema version 2.");
+        }
+        if (!isRecord(input.campaign) || !isRecord(input.map) || !isRecord(input.map.grid)) {
+          throw new Error("The setup package is missing its campaign or map data.");
+        }
+
+        const requireText = (value, label, maxLength) => {
+          if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
+            throw new Error(`${label} is missing or exceeds its allowed length.`);
+          }
+          return value.trim();
+        };
+        const campaign = {
+          id: requireText(input.campaign.id, "Campaign ID", 120),
+          name: requireText(input.campaign.name, "Campaign name", 80),
+          setting: requireText(input.campaign.setting, "Campaign setting", 100),
+          premise: requireText(input.campaign.premise, "Campaign premise", 1200),
+          mapName: requireText(input.campaign.mapName, "Initial map name", 80),
+          era: typeof input.campaign.era === "string" && input.campaign.era.length <= 60 ? input.campaign.era.trim() : ""
+        };
+        const bounds = normalizeAreaBounds(input.map.bounds);
+        if (!bounds) throw new Error("The setup package needs valid campaign-area bounds.");
+
+        const atlas = normalizeAtlasMetadata(input.map.fieldPapersAtlas);
+        if (!atlas) throw new Error("The setup package is missing Field Papers atlas metadata.");
+        if (input.map.grid.coordinateSystem !== "axial-q-r" || input.map.grid.cellKm !== TRAVEL_HEX_KM || !Array.isArray(input.map.grid.terrainCells)) {
+          throw new Error("The setup package contains an unsupported terrain-grid format.");
+        }
+        if (input.map.grid.terrainCells.length > 10000) throw new Error("The terrain grid contains too many cells.");
+
+        const terrainCells = {};
+        input.map.grid.terrainCells.forEach((cell) => {
+          if (!isRecord(cell) || !Number.isSafeInteger(cell.q) || !Number.isSafeInteger(cell.r)
+            || Math.abs(cell.q) > 10000 || Math.abs(cell.r) > 10000
+            || !Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, cell.terrainType)) {
+            throw new Error("The setup package contains an invalid terrain-cell assignment.");
+          }
+          const key = `${cell.q},${cell.r}`;
+          if (Object.prototype.hasOwnProperty.call(terrainCells, key)) throw new Error("The terrain grid contains a duplicate cell.");
+          terrainCells[key] = cell.terrainType;
+        });
+
+        const origin = input.map.grid.origin === null
+          ? { lat: bounds.north, lng: bounds.west }
+          : isRecord(input.map.grid.origin) && isValidCoordinate(input.map.grid.origin.lat, input.map.grid.origin.lng)
+          ? { lat: input.map.grid.origin.lat, lng: input.map.grid.origin.lng }
+          : null;
+        if (!origin) throw new Error("The terrain grid has an invalid coordinate origin.");
+
+        const ids = new Set([campaign.id]);
+        const requireUniqueId = (value, label) => {
+          const id = requireText(value, `${label} ID`, 120);
+          if (ids.has(id)) throw new Error(`The setup package contains a duplicate ID: ${id}.`);
+          ids.add(id);
+          return id;
+        };
+        if (!Array.isArray(input.map.locations) || input.map.locations.length < 1 || input.map.locations.length > 500) {
+          throw new Error("The setup package needs between 1 and 500 initial locations.");
+        }
+        let startingLocations = 0;
+        const locations = input.map.locations.map((location) => {
+          if (!isRecord(location)) throw new Error("The setup package contains an invalid location.");
+          const position = isRecord(location.mapPosition) && isValidCoordinate(location.mapPosition.lat, location.mapPosition.lng)
+            ? { lat: location.mapPosition.lat, lng: location.mapPosition.lng }
+            : null;
+          if (!position || !isInsideArea(position, bounds)) throw new Error("Every imported location must have a position inside the campaign area.");
+          if (typeof location.isStartingLocation !== "boolean") throw new Error("Every imported location needs an explicit starting-location value.");
+          if (location.isStartingLocation) startingLocations += 1;
+          return {
+            id: requireUniqueId(location.id, "Location"),
+            name: requireText(location.name, "Location name", 160),
+            kind: typeof location.kind === "string" ? location.kind.slice(0, 80) : "Location",
+            description: typeof location.description === "string" ? location.description.slice(0, 600) : "",
+            position,
+            visibility: location.visibility === "players" ? "players" : "gm-only",
+            gridRef: typeof location.gridRef === "string" ? location.gridRef.slice(0, 40) : null,
+            isStartingLocation: location.isStartingLocation
+          };
+        });
+        if (startingLocations !== 1) throw new Error("The setup package must have exactly one starting location.");
+
+        const normalizeRecords = (records, label) => {
+          if (!Array.isArray(records) || records.length > 500) throw new Error(`The ${label.toLowerCase()} list is invalid or too large.`);
+          return records.map((record) => {
+            if (!isRecord(record)) throw new Error(`The setup package contains an invalid ${label.toLowerCase()}.`);
+            return {
+              id: requireUniqueId(record.id, label),
+              name: requireText(record.name, `${label} name`, 160),
+              description: typeof record.description === "string" ? record.description.slice(0, 600) : ""
+            };
+          });
+        };
+        const linkedSettlementLocations = new Set();
+        const settlements = normalizeRecords(input.settlements, "Settlement").map((settlement, index) => {
+          const raw = input.settlements[index];
+          const locationId = typeof raw.locationId === "string" ? raw.locationId : null;
+          const location = locationId ? locations.find((item) => item.id === locationId) : null;
+          if (locationId && (!location || location.kind !== "Settlement")) {
+            throw new Error(`Settlement ${settlement.name} must link to a Settlement location from the Locations step.`);
+          }
+          if (location && linkedSettlementLocations.has(location.id)) {
+            throw new Error(`The Settlement location ${location.name} is linked to more than one settlement record.`);
+          }
+          if (location) linkedSettlementLocations.add(location.id);
+          const populationEstimate = raw.populationEstimate ?? null;
+          if (populationEstimate !== null && (!Number.isSafeInteger(populationEstimate) || populationEstimate < 0 || populationEstimate > 100000000)) {
+            throw new Error(`Settlement ${settlement.name} has an invalid GM population estimate.`);
+          }
+          const prominentFactionIds = raw.prominentFactionIds ?? [];
+          if (!Array.isArray(prominentFactionIds) || prominentFactionIds.length > 500
+            || prominentFactionIds.some((id) => typeof id !== "string")
+            || new Set(prominentFactionIds).size !== prominentFactionIds.length) {
+            throw new Error(`Settlement ${settlement.name} has an invalid prominence order.`);
+          }
+          return {
+            ...settlement,
+            name: location?.name || settlement.name,
+            locationId: location?.id || null,
+            gridRef: location?.gridRef || null,
+            position: location?.position ? { ...location.position } : null,
+            visibility: location?.visibility === "players" ? "players" : raw.visibility === "players" ? "players" : "gm-only",
+            prominentFactionIds: [...prominentFactionIds],
+            scale: typeof raw.scale === "string" ? raw.scale.slice(0, 80) : null,
+            populationEstimate,
+            security: typeof raw.security === "string" ? raw.security.slice(0, 100) : null,
+            attitude: typeof raw.attitude === "string" ? raw.attitude.slice(0, 100) : null,
+            leadership: typeof raw.leadership === "string" ? raw.leadership.slice(0, 100) : null,
+            situation: typeof raw.situation === "string" ? raw.situation.slice(0, 500) : ""
+          };
+        });
+        const factions = normalizeRecords(input.factions, "Faction").map((faction, index) => {
+          const raw = input.factions[index];
+          const influenceCells = raw.influenceCells ?? [];
+          if (!Array.isArray(influenceCells) || influenceCells.length > 10000) throw new Error("A faction influence layer is invalid or too large.");
+          const normalizedCells = normalizeInfluenceCells(influenceCells);
+          if (normalizedCells.length !== influenceCells.length) throw new Error(`The influence layer for ${faction.name} contains an invalid or duplicate hex.`);
+          const legacySettlementId = raw.settlementId ?? null;
+          if (legacySettlementId !== null) {
+            const legacySettlement = settlements.find((settlement) => settlement.id === legacySettlementId);
+            if (!legacySettlement) throw new Error(`The legacy prominent settlement for faction ${faction.name} is not in this package.`);
+            if (!legacySettlement.prominentFactionIds.includes(faction.id)) legacySettlement.prominentFactionIds.push(faction.id);
+          }
+          return { ...faction, influenceCells: normalizedCells };
+        });
+        const factionIds = new Set(factions.map((faction) => faction.id));
+        settlements.forEach((settlement) => {
+          if (settlement.prominentFactionIds.some((id) => !factionIds.has(id))) {
+            throw new Error(`Settlement ${settlement.name} prominence order references a faction outside this package.`);
+          }
+        });
+        if (!Array.isArray(input.scenarioNotes) || input.scenarioNotes.length > 500) throw new Error("The scenario-note list is invalid or too large.");
+        const scenarioNotes = input.scenarioNotes.map((note) => {
+          if (!isRecord(note) || note.visibility !== "gm-only") throw new Error("Imported scenario notes must be marked GM-only.");
+          return {
+            id: requireUniqueId(note.id, "Scenario note"),
+            title: requireText(note.title, "Scenario-note title", 100),
+            body: requireText(note.body, "Scenario-note body", 3000),
+            visibility: "gm-only"
+          };
+        });
+
+        if (!Array.isArray(input.map.offlineAnnotations) || input.map.offlineAnnotations.length > 300) {
+          throw new Error("The setup package contains an invalid map-annotation list.");
+        }
+        const offlineAnnotations = normalizeGeoJSONFeatures(input.map.offlineAnnotations);
+        if (offlineAnnotations.length !== input.map.offlineAnnotations.length) {
+          throw new Error("The setup package contains an invalid map annotation.");
+        }
+        const center = isRecord(input.map.center) && isValidCoordinate(input.map.center.lat, input.map.center.lng)
+          ? { lat: input.map.center.lat, lng: input.map.center.lng }
+          : { lat: (bounds.south + bounds.north) / 2, lng: (bounds.west + bounds.east) / 2 };
+        const zoom = Number.isFinite(input.map.zoom) && input.map.zoom >= 2 && input.map.zoom <= 18 ? input.map.zoom : 10;
+
+        return {
+          schemaVersion: 2,
+          campaign,
+          map: {
+            center,
+            zoom,
+            bounds,
+            grid: { cellKm: TRAVEL_HEX_KM, origin, terrainCells },
+            atlas,
+            offlineAnnotations,
+            offlineBasemap: normalizeOfflineBasemap(input.map.offlineBasemap)
+          },
+          locations,
+          factions,
+          settlements,
+          scenarioNotes
+        };
+      }
+
+      function formatImportPackageSummary(importedState) {
+        const start = importedState.locations.find((location) => location.isStartingLocation);
+        return [
+          `Campaign: ${importedState.campaign.name}`,
+          `Setting: ${importedState.campaign.setting}`,
+          `Map: ${importedState.campaign.mapName} / ${importedState.map.atlas.title}`,
+          `Starting location: ${start.name}`,
+          `Locations: ${importedState.locations.length}`,
+          `Terrain cells: ${Object.keys(importedState.map.grid.terrainCells).length}`,
+          `Factions / settlements: ${importedState.factions.length} / ${importedState.settlements.length}`,
+          `GM-only notes: ${importedState.scenarioNotes.length}`
+        ].join("\n");
+      }
+
+      function describeImportedFeatures(features) {
+        const counts = { points: 0, lines: 0, polygons: 0 };
+        features.forEach((feature) => {
+          if (feature.geometry.type === "Point" || feature.geometry.type === "MultiPoint") counts.points += 1;
+          else if (feature.geometry.type.includes("Line")) counts.lines += 1;
+          else if (feature.geometry.type.includes("Polygon")) counts.polygons += 1;
+        });
+        return `${features.length} features found / ${counts.points} point(s), ${counts.lines} line(s), ${counts.polygons} area(s). Points update or add locations; other geometries are imported as overlays.`;
+      }
+
+      function featurePosition(feature) {
+        if (feature.geometry.type !== "Point") return null;
+        const [lng, lat] = feature.geometry.coordinates;
+        return isValidCoordinate(lat, lng) ? { lat, lng } : null;
+      }
+
+      function applyFieldPapersFeatures() {
+        if (!pendingFieldPapersFeatures.length) return;
+        let updatedLocations = 0;
+        let addedLocations = 0;
+        let importedBoundary = null;
+        const annotations = [];
+
+        pendingFieldPapersFeatures.forEach((feature) => {
+          const properties = feature.properties;
+          if (feature.geometry.type.includes("Polygon") && (properties.role === "campaign-area" || properties.type === "atlas")) {
+            importedBoundary = boundsFromGeometry(feature.geometry) || importedBoundary;
+            return;
+          }
+          const position = featurePosition(feature);
+          if (position) {
+            const name = properties.name || properties.title || "Field Papers location";
+            const existing = state.locations.find((location) => location.id === properties.campaignLocationId)
+              || state.locations.find((location) => location.name.toLowerCase() === name.toLowerCase());
+            if (existing) {
+              existing.position = position;
+              if (properties.name) existing.name = properties.name;
+              if (properties.kind) existing.kind = properties.kind;
+              updatedLocations += 1;
+            } else {
+              state.locations.push({ id: makeId("location"), name, kind: properties.kind || "Location", description: properties.description || properties.note || "Imported from Field Papers", position, visibility: "gm-only", isStartingLocation: false });
+              addedLocations += 1;
+            }
+            return;
+          }
+          annotations.push(feature);
+        });
+
+        if (importedBoundary) state.map.bounds = importedBoundary;
+        if (pendingFieldPapersAtlas) state.map.atlas = pendingFieldPapersAtlas;
+        state.map.offlineAnnotations = annotations;
+        if (state.map.atlas) {
+          renderFieldPapersAtlas();
+          document.querySelector("#continue-to-terrain").disabled = false;
+        }
+        renderLocations();
+        renderArea();
+        if (leafletMap && state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
+        saveDraft();
+        pendingFieldPapersFeatures = [];
+        pendingFieldPapersAtlas = null;
+        fieldPapersImportPreview.hidden = true;
+        applyFieldPapersImportButton.disabled = true;
+        fieldPapersFileInput.value = "";
+        fieldPapersStatus.className = "fieldpapers-status success";
+        fieldPapersStatus.textContent = `Imported ${updatedLocations} updated location(s), ${addedLocations} new location(s), ${annotations.length} map annotation(s)${importedBoundary ? ", and updated campaign area" : ""}. Review before exporting.`;
+        if (!document.querySelector('[data-panel="package"]').hidden) renderValidation();
+      }
+
+      function validatePackage(updateUi = true) {
+        syncSettlementLocations();
+        const campaign = {
+          name: campaignNameInput.value.trim(),
+          setting: campaignSettingInput.value.trim(),
+          premise: campaignPremiseInput.value.trim(),
+          mapName: mapNameInput.value.trim()
+        };
+        const errors = [];
+        if (!campaign.name) errors.push("Campaign name is required.");
+        if (!campaign.setting) errors.push("Setting or region is required.");
+        if (!campaign.premise) errors.push("Premise is required.");
+        if (!campaign.mapName) errors.push("Initial map name is required.");
+        if (!state.map.atlas) errors.push("Import a Field Papers atlas before exporting the setup package.");
+        if (!state.map.bounds) errors.push("Mark the real-world campaign area on the map.");
+        if (!state.locations.some((location) => location.isStartingLocation && location.position)) errors.push("Add a positioned location and mark it as the starting location.");
+        if (state.locations.some((location) => !location.position)) errors.push("Place each listed location on the real-world map before export.");
+        if (state.map.bounds && state.locations.some((location) => location.position && !isInsideArea(location.position))) errors.push("Move every location inside the marked campaign area before export.");
+        const locationsById = new Map(state.locations.map((location) => [location.id, location]));
+        const settlementLocationIds = new Set();
+        state.settlements.forEach((settlement) => {
+          const location = locationsById.get(settlement.locationId);
+          if (!location || location.kind !== "Settlement") errors.push(`Settlement ${settlement.name} must use a Settlement location from the Locations step.`);
+          else if (settlementLocationIds.has(location.id)) errors.push(`Settlement location ${location.name} is used by more than one settlement record.`);
+          else settlementLocationIds.add(location.id);
+          if (settlement.populationEstimate !== null && settlement.populationEstimate !== undefined
+            && (!Number.isSafeInteger(settlement.populationEstimate) || settlement.populationEstimate < 0 || settlement.populationEstimate > 100000000)) {
+            errors.push(`Settlement ${settlement.name} has an invalid GM population estimate.`);
+          }
+        });
+        const factionIds = new Set(state.factions.map((faction) => faction.id));
+        state.settlements.forEach((settlement) => {
+          const prominence = settlement.prominentFactionIds || [];
+          if (!Array.isArray(prominence) || new Set(prominence).size !== prominence.length || prominence.some((factionId) => !factionIds.has(factionId))) {
+            errors.push(`Settlement ${settlement.name} has an invalid faction prominence order.`);
+          }
+        });
+        const ids = [...state.locations, ...state.factions, ...state.settlements, ...state.scenarioNotes].map((item) => item.id);
+        if (new Set(ids).size !== ids.length) errors.push("Every package record must have a unique ID.");
+        if (updateUi) renderValidation(errors);
+        return errors;
+      }
+
+      function renderValidation(errors = validatePackage(false)) {
+        const list = document.querySelector("#package-checks");
+        list.replaceChildren();
+        const linkedSettlementLocations = new Set();
+        const settlementsLinked = state.settlements.every((settlement) => {
+          const location = state.locations.find((item) => item.id === settlement.locationId);
+          if (!location || location.kind !== "Settlement" || linkedSettlementLocations.has(location.id)) return false;
+          linkedSettlementLocations.add(location.id);
+          return true;
+        });
+        const factionIds = new Set(state.factions.map((faction) => faction.id));
+        const prominenceOrderValid = state.settlements.every((settlement) => {
+          const order = settlement.prominentFactionIds || [];
+          return Array.isArray(order) && new Set(order).size === order.length && order.every((factionId) => factionIds.has(factionId));
+        });
+        const checks = [
+          { label: "Campaign identity, setting, and premise", ready: Boolean(campaignNameInput.value.trim() && campaignSettingInput.value.trim() && campaignPremiseInput.value.trim()), detail: "Required starting brief" },
+          { label: "Field Papers atlas imported", ready: Boolean(state.map.atlas), detail: state.map.atlas?.title || "Import the atlas GeoJSON file" },
+          { label: "Real-world campaign area", ready: Boolean(state.map.bounds), detail: state.map.bounds ? "Geographic bounds saved" : "Mark two opposite corners" },
+          { label: "Initial locations and starting point", ready: state.locations.length > 0 && state.locations.every((location) => location.position && isInsideArea(location.position)) && state.locations.some((location) => location.isStartingLocation), detail: `${state.locations.length} location${state.locations.length === 1 ? "" : "s"} positioned inside the marked area` },
+          { label: "Settlements and faction links", ready: settlementsLinked && prominenceOrderValid, detail: `${linkedSettlementLocations.size} linked settlements / ${state.factions.length} factions` },
+          { label: "Scenario notes", ready: true, detail: `${state.scenarioNotes.length} GM-only note${state.scenarioNotes.length === 1 ? "" : "s"}` },
+          { label: "Visibility boundary", ready: true, detail: "Per-location visibility is GM-managed; nothing is published by Setup" }
+        ];
+        checks.forEach((check) => {
+          const row = document.createElement("div");
+          row.className = "check-row";
+          const mark = document.createElement("span");
+          mark.className = `check-mark${check.ready ? " ready" : ""}`;
+          mark.textContent = check.ready ? "✓" : "·";
+          const text = document.createElement("div");
+          const label = document.createElement("strong");
+          label.textContent = check.label;
+          const detail = document.createElement("small");
+          detail.textContent = check.detail;
+          text.append(label, detail);
+          row.append(mark, text);
+          list.append(row);
+        });
+        exportButton.disabled = errors.length > 0;
+        document.querySelector("#export-package-top").disabled = errors.length > 0;
+        const feedback = document.querySelector("#package-feedback");
+        feedback.className = `feedback${errors.length ? " error" : " success"}`;
+        feedback.textContent = errors.length ? errors.join(" ") : "Package is valid for preview and export. It is not a running-campaign save.";
+        document.querySelector("#package-summary").textContent = JSON.stringify(collectPackage(), null, 2);
+      }
+
+      function renderEntitiesAndSave(type, form) {
+        const records = type === "faction" ? state.factions : state.settlements;
+        if (type === "settlement") {
+          const location = state.locations.find((item) => item.id === settlementLocationSelect.value && item.kind === "Settlement");
+          if (!location) {
+            settlementSourceStatus.textContent = "Choose a valid Settlement location from the Locations step.";
+            return;
+          }
+          if (state.settlements.some((settlement) => settlement.locationId === location.id)) {
+            settlementSourceStatus.textContent = "This location already has a settlement record. Choose another Settlement location.";
+            return;
+          }
+          const populationInput = form.querySelector("#settlement-population").value.trim();
+          const populationEstimate = populationInput === "" ? null : Number(populationInput);
+          records.push({
+            id: makeId("settlement"),
+            locationId: location.id,
+            name: location.name,
+            gridRef: location.gridRef || null,
+            position: location.position ? { ...location.position } : null,
+            visibility: location.visibility === "players" ? "players" : "gm-only",
+            prominentFactionIds: [],
+            scale: form.querySelector("#settlement-scale").value || null,
+            populationEstimate,
+            security: form.querySelector("#settlement-security").value || null,
+            attitude: form.querySelector("#settlement-attitude").value || null,
+            leadership: form.querySelector("#settlement-leadership").value || null,
+            situation: form.querySelector("#settlement-situation").value.trim(),
+            description: form.querySelector("#settlement-description").value.trim()
+          });
+          form.reset();
+          renderEntities(type);
+          renderSettlementLocationOptions();
+          saveDraft();
+          return;
+        }
+        const faction = {
+          id: makeId("faction"),
+          name: form.querySelector("#faction-name").value.trim(),
+          description: form.querySelector("#faction-description").value.trim(),
+          influenceCells: []
+        };
+        records.push(faction);
+        form.reset();
+        activeFactionId = faction.id;
+        pendingFactionSettlementIds.clear();
+        renderEntities(type);
+        saveDraft();
+      }
+
+      function showPreview() {
+        if (validatePackage().length) return;
+        document.querySelector("#preview-json").textContent = JSON.stringify(collectPackage(), null, 2);
+        previewDialog.showModal();
+      }
+
+      function exportPackage() {
+        if (validatePackage().length) {
+          showStep("package");
+          return;
+        }
+        const data = JSON.stringify(collectPackage(), null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const filename = `${(campaignNameInput.value.trim() || "campaign-setup").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-setup-v2.json`;
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+        document.querySelector("#package-feedback").className = "feedback success";
+        document.querySelector("#package-feedback").textContent = `Exported ${filename}. This file contains initial setup data only.`;
+      }
+
+      stepButtons.forEach((button) => button.addEventListener("click", () => showStep(button.dataset.step)));
+      document.querySelectorAll("[data-go-step]").forEach((button) => button.addEventListener("click", () => {
+        if (button.dataset.goStep === "notes" && activeFactionId) {
+          saveFactionSettlementAssignments();
+          finishActiveFactionSetup();
+        }
+        showStep(button.dataset.goStep);
+      }));
+      document.querySelectorAll("#campaign-name,#campaign-setting,#campaign-premise,#map-name,#campaign-era").forEach((input) => input.addEventListener("input", () => {
+        saveDraft();
+        if (!document.querySelector('[data-panel="package"]').hidden) renderValidation();
+      }));
+
+      mapSearchForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = mapSearchInput.value.trim();
+        if (!query) {
+          setMapStatus("Enter a place name or latitude, longitude.", "error");
+          mapSearchInput.focus();
+          return;
+        }
+        const coordinateMatch = query.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+        if (coordinateMatch) {
+          const lat = Number(coordinateMatch[1]);
+          const lng = Number(coordinateMatch[2]);
+          if (!isValidCoordinate(lat, lng)) {
+            setMapStatus("Coordinates must be latitude -90 to 90 and longitude -180 to 180.", "error");
+            return;
+          }
+          leafletMap.setView([lat, lng], 12);
+          setMapStatus(`Map centered at ${lat.toFixed(5)}, ${lng.toFixed(5)}. This does not mark the campaign area.`, "success");
+          return;
+        }
+
+        const now = Date.now();
+        if (now - lastGeocodeRequest < 1000) {
+          setMapStatus("Wait before sending another place search.", "error");
+          return;
+        }
+        lastGeocodeRequest = now;
+        mapSearchButton.disabled = true;
+        setMapStatus("Searching OpenStreetMap for one matching place...");
+        try {
+          const url = new URL(NOMINATIM_ENDPOINT);
+          url.search = new URLSearchParams({ q: query, format: "jsonv2", limit: "1" }).toString();
+          const response = await fetch(url, { headers: { Accept: "application/json" } });
+          if (!response.ok) throw new Error(`Search returned ${response.status}`);
+          const results = await response.json();
+          const result = Array.isArray(results) ? results[0] : null;
+          const lat = result ? Number(result.lat) : NaN;
+          const lng = result ? Number(result.lon) : NaN;
+          if (!result || !isValidCoordinate(lat, lng)) {
+            setMapStatus("No matching place found. Try a more specific name or enter coordinates.", "error");
+            return;
+          }
+          if (Array.isArray(result.boundingbox) && result.boundingbox.length === 4) {
+            const [south, north, west, east] = result.boundingbox.map(Number);
+            if ([south, north, west, east].every(Number.isFinite) && south < north && west < east) {
+              leafletMap.fitBounds([[south, west], [north, east]], { maxZoom: 13, padding: [24, 24] });
+            } else {
+              leafletMap.setView([lat, lng], 12);
+            }
+          } else {
+            leafletMap.setView([lat, lng], 12);
+          }
+          setMapStatus(`Showing ${result.display_name}. Mark the campaign area separately.`, "success");
+        } catch (error) {
+          setMapStatus("Place search failed. Try coordinates or use the map controls to navigate.", "error");
+        } finally {
+          mapSearchButton.disabled = false;
+        }
+      });
+
+      drawAreaButton.addEventListener("click", () => {
+        drawingArea = !drawingArea;
+        areaStart = null;
+        placementMode = false;
+        mapFrame.classList.remove("placing-location");
+        mapFrame.classList.toggle("drawing-area", drawingArea);
+        drawAreaButton.textContent = drawingArea ? "Cancel area" : state.map.bounds ? "Edit area" : "Mark area";
+        document.querySelector("#map-place-hint").textContent = drawingArea ? "Choose first area corner" : state.map.bounds ? "Campaign area marked" : "Pan and zoom / mark an area";
+        setMapStatus(drawingArea ? "Click two opposite corners to mark the campaign's initial real-world area." : "Area edit cancelled.");
+      });
+
+      clearAreaButton.addEventListener("click", () => {
+        drawingArea = false;
+        areaStart = null;
+        mapFrame.classList.remove("drawing-area");
+        state.map.bounds = null;
+        renderArea();
+        saveDraft();
+        setMapStatus("Campaign area cleared. Mark an area before export.");
+      });
+      boundsForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const bounds = normalizeAreaBounds(Object.fromEntries(Object.entries(boundsInputs).map(([key, input]) => [key, Number(input.value)])));
+        if (!bounds) {
+          setMapStatus("Enter valid bounds with south below north and west below east.", "error");
+          return;
+        }
+        const outsideLocation = state.locations.find((location) => location.position && !isInsideArea(location.position, bounds));
+        if (outsideLocation) {
+          setMapStatus(`The new bounds exclude ${outsideLocation.name}. Move that location before shrinking the campaign area.`, "error");
+          return;
+        }
+        state.map.bounds = bounds;
+        renderArea();
+        leafletMap?.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]], { padding: [28, 28] });
+        saveDraft();
+        setMapStatus("Campaign bounds updated and saved.", "success");
+      });
+
+      chooseFieldPapersFileButton.addEventListener("click", () => fieldPapersFileInput.click());
+      applyFieldPapersImportButton.addEventListener("click", applyFieldPapersFeatures);
+      offlineBasemapAttributionInput.addEventListener("input", renderOfflineBasemapControls);
+      offlineBasemapFileInput.addEventListener("change", renderOfflineBasemapControls);
+      uploadOfflineBasemapButton.addEventListener("click", async () => {
+        const file = offlineBasemapFileInput.files[0];
+        const attribution = offlineBasemapAttributionInput.value.trim();
+        if (!file || !attribution) {
+          offlineBasemapStatus.textContent = "Choose an archive and enter its required attribution first.";
+          return;
+        }
+        uploadOfflineBasemapButton.disabled = true;
+        offlineBasemapStatus.textContent = "Uploading and validating raster PMTiles archive...";
+        try {
+          const response = await fetch("/api/offline-basemaps", { method: "POST",
+            headers: { "Content-Type": "application/vnd.pmtiles" }, body: file });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Basemap upload failed.");
+          state.map.offlineBasemap = { format: "raster-pmtiles", assetId: result.asset.assetId, attribution };
+          saveDraft();
+          renderOfflineBasemapControls();
+          renderMapBaseLayer();
+          offlineBasemapStatus.textContent = `Offline basemap ready / ${result.asset.byteLength} bytes / ${attribution}`;
+        } catch (error) {
+          offlineBasemapStatus.textContent = `Basemap not installed: ${error.message}`;
+        } finally {
+          uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim();
+        }
+      });
+      useOnlineBasemapButton.addEventListener("click", () => {
+        state.map.offlineBasemap = null;
+        offlineBasemapFileInput.value = "";
+        offlineBasemapAttributionInput.value = "";
+        saveDraft();
+        renderOfflineBasemapControls();
+        renderMapBaseLayer();
+      });
+      document.querySelector("#terrain-batch-mode").addEventListener("click", (event) => {
+        terrainBatchMode = !terrainBatchMode;
+        if (terrainBatchMode) {
+          influenceBatchMode = false;
+          selectedTerrainCells.clear();
+          selectedInfluenceCells.clear();
+        }
+        event.currentTarget.setAttribute("aria-pressed", String(terrainBatchMode));
+        event.currentTarget.classList.toggle("button-primary", terrainBatchMode);
+        event.currentTarget.textContent = terrainBatchMode ? "Exit multi-select" : "Select multiple";
+        renderTerrainSelection();
+        renderInfluenceControls();
+        setMapStatus(terrainBatchMode ? "Multi-select active. Click hexes to add or remove them from the selection." : "Multi-select ended. Save or clear the selected hexes.");
+      });
+      influenceBatchModeButton.addEventListener("click", () => {
+        influenceBatchMode = !influenceBatchMode;
+        if (influenceBatchMode) {
+          terrainBatchMode = false;
+          selectedTerrainCells.clear();
+          selectedInfluenceCells.clear();
+        }
+        const terrainModeButton = document.querySelector("#terrain-batch-mode");
+        terrainModeButton.setAttribute("aria-pressed", String(terrainBatchMode));
+        terrainModeButton.classList.toggle("button-primary", terrainBatchMode);
+        terrainModeButton.textContent = terrainBatchMode ? "Exit multi-select" : "Select multiple";
+        renderTerrainSelection();
+        renderInfluenceControls();
+        renderHexGrid();
+        setMapStatus(influenceBatchMode ? "Influence selection active. Click hexes to add or remove them from this faction's staged layer." : "Influence selection ended.");
+      });
+      influenceFactionSelect.addEventListener("change", () => {
+        selectedInfluenceCells.clear();
+        renderInfluenceControls();
+        renderHexGrid();
+      });
+      saveFactionSettlementsButton.addEventListener("click", saveFactionSettlementAssignments);
+      paintFactionInfluenceButton.addEventListener("click", paintActiveFactionOnMap);
+      finishFactionSetupButton.addEventListener("click", () => {
+        saveFactionSettlementAssignments();
+        finishActiveFactionSetup();
+      });
+      finishFactionInfluenceButton.addEventListener("click", () => {
+        if (selectedInfluenceCells.size) {
+          setMapStatus("Save or clear the staged influence hexes before returning to faction setup.", "error");
+          return;
+        }
+        returnToFactionSetup = false;
+        influenceBatchMode = false;
+        finishFactionInfluenceButton.hidden = true;
+        const modeButton = document.querySelector("#influence-batch-mode");
+        modeButton.setAttribute("aria-pressed", "false");
+        modeButton.classList.remove("button-primary");
+        modeButton.textContent = "Select influence hexes";
+        showStep("factions");
+        renderInfluenceControls();
+        renderHexGrid();
+      });
+      saveInfluenceButton.addEventListener("click", () => {
+        const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
+        if (!faction || !selectedInfluenceCells.size) return;
+        const savedCount = selectedInfluenceCells.size;
+        faction.influenceCells = [...new Set([...(faction.influenceCells || []), ...selectedInfluenceCells.keys()])].sort();
+        selectedInfluenceCells.clear();
+        saveDraft();
+        renderInfluenceList();
+        renderInfluenceControls();
+        renderHexGrid();
+        influenceFeedback.textContent = `Saved ${savedCount} influence hex(es) for ${faction.name}.`;
+      });
+      clearInfluenceButton.addEventListener("click", () => {
+        const faction = state.factions.find((item) => item.id === influenceFactionSelect.value);
+        if (!faction || !selectedInfluenceCells.size) return;
+        const selected = new Set(selectedInfluenceCells.keys());
+        const removedCount = (faction.influenceCells || []).filter((key) => selected.has(key)).length;
+        faction.influenceCells = (faction.influenceCells || []).filter((key) => !selected.has(key));
+        selectedInfluenceCells.clear();
+        saveDraft();
+        renderInfluenceList();
+        renderInfluenceControls();
+        renderHexGrid();
+        influenceFeedback.textContent = `Cleared ${removedCount} influence hex(es) from ${faction.name}.`;
+      });
+      terrainTypeSelect.addEventListener("change", renderTerrainSelection);
+      saveTerrainButton.addEventListener("click", () => {
+        if (!selectedTerrainCells.size) return;
+        const terrainType = terrainTypeSelect.value;
+        if (!Object.prototype.hasOwnProperty.call(TERRAIN_TYPES, terrainType)) return;
+        const savedCount = selectedTerrainCells.size;
+        selectedTerrainCells.forEach((cell, key) => { state.map.grid.terrainCells[key] = terrainType; });
+        selectedTerrainCells.clear();
+        selectedTerrainCell = null;
+        saveDraft();
+        renderTerrainAssignments();
+        renderTerrainSelection();
+        renderHexGrid();
+        setMapStatus(`Saved ${TERRAIN_TYPES[terrainType].label} to ${savedCount} hex(es). Select another terrain type to continue.`, "success");
+      });
+      removeTerrainButton.addEventListener("click", () => {
+        if (!selectedTerrainCells.size) return;
+        const clearedCount = selectedTerrainCells.size;
+        selectedTerrainCells.forEach((cell, key) => { delete state.map.grid.terrainCells[key]; });
+        selectedTerrainCells.clear();
+        selectedTerrainCell = null;
+        saveDraft();
+        renderTerrainAssignments();
+        renderTerrainSelection();
+        renderHexGrid();
+        setMapStatus(`Cleared terrain from ${clearedCount} selected hex(es).`, "success");
+      });
+      fieldPapersFileInput.addEventListener("change", async () => {
+        const file = fieldPapersFileInput.files?.[0];
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          pendingFieldPapersFeatures = normalizeGeoJSONFeatures(parsed);
+          if (!pendingFieldPapersFeatures.length) throw new Error("No supported geographic features were found.");
+          pendingFieldPapersAtlas = atlasMetadataFromFeatures(pendingFieldPapersFeatures, file.name.replace(/\.(geojson|json)$/i, ""));
+          if (!state.map.atlas && !pendingFieldPapersAtlas) throw new Error("Import the atlas GeoJSON from Field Papers first. It must include the atlas area feature.");
+          document.querySelector("#fieldpapers-import-summary").textContent = describeImportedFeatures(pendingFieldPapersFeatures);
+          fieldPapersImportPreview.hidden = false;
+          applyFieldPapersImportButton.disabled = false;
+          fieldPapersStatus.className = "fieldpapers-status";
+          fieldPapersStatus.textContent = `${file.name} is ready for review. Existing locations will be matched by ID or name where possible.`;
+        } catch (error) {
+          pendingFieldPapersFeatures = [];
+          pendingFieldPapersAtlas = null;
+          fieldPapersImportPreview.hidden = true;
+          applyFieldPapersImportButton.disabled = true;
+          fieldPapersStatus.className = "fieldpapers-status error";
+          fieldPapersStatus.textContent = error instanceof SyntaxError ? "Could not read that GeoJSON file." : error.message;
+        }
+      });
+
+      document.querySelector("#place-location").addEventListener("click", () => {
+        if (!leafletMap) {
+          setMapStatus("The map is not available. Check network access and reload.", "error");
+          return;
+        }
+        if (!locationNameInput.value.trim()) {
+          document.querySelector("#location-feedback").className = "feedback error";
+          document.querySelector("#location-feedback").textContent = "Enter a location name before placing it.";
+          locationNameInput.focus();
+          return;
+        }
+        drawingArea = false;
+        areaStart = null;
+        mapFrame.classList.remove("drawing-area");
+        placementMode = !placementMode;
+        mapFrame.classList.toggle("placing-location", placementMode);
+        document.querySelector("#place-location").textContent = placementMode ? "Cancel placement" : editingLocationId ? "Move location" : "Place on map";
+        document.querySelector("#map-place-hint").textContent = placementMode ? "Placement active / click map to set position" : state.map.bounds ? "Campaign area marked" : "Pan and zoom / mark an area";
+        setMapStatus(placementMode ? "Click the map to set this location's real-world position." : "Placement cancelled.");
+      });
+
+      locationNameInput.addEventListener("input", renderLocationCoordinate);
+      cancelLocationEditButton.addEventListener("click", cancelLocationEdit);
+      settlementLocationSelect.addEventListener("change", renderSettlementLocationOptions);
+      generateSettlementDraftButton.addEventListener("click", generateSettlementDraft);
+
+      addLocationButton.addEventListener("click", () => {
+        if (!pendingPosition || !locationNameInput.value.trim()) return;
+        const existing = editingLocationId ? state.locations.find((location) => location.id === editingLocationId) : null;
+        if (existing) {
+          if (locationKindInput.value !== "Settlement" && state.settlements.some((settlement) => settlement.locationId === existing.id)) {
+            document.querySelector("#location-feedback").className = "feedback error";
+            document.querySelector("#location-feedback").textContent = "This location backs a settlement and must keep the Settlement type.";
+            return;
+          }
+          existing.name = locationNameInput.value.trim();
+          existing.kind = locationKindInput.value;
+          existing.visibility = locationVisibilityInput.value === "players" ? "players" : "gm-only";
+          existing.description = locationDescriptionInput.value.trim();
+          existing.position = { ...pendingPosition };
+        } else {
+          const isStartingLocation = !state.locations.some((location) => location.isStartingLocation);
+          state.locations.push({
+            id: makeId("location"),
+            name: locationNameInput.value.trim(),
+            kind: locationKindInput.value,
+            visibility: locationVisibilityInput.value === "players" ? "players" : "gm-only",
+            description: locationDescriptionInput.value.trim(),
+            position: { ...pendingPosition },
+            isStartingLocation
+          });
+        }
+        editingLocationId = null;
+        pendingPosition = null;
+        locationNameInput.value = "";
+        locationDescriptionInput.value = "";
+        locationKindInput.value = "Location";
+        addLocationButton.textContent = "Add to package";
+        cancelLocationEditButton.hidden = true;
+        addLocationButton.disabled = true;
+        renderLocationCoordinate();
+        document.querySelector("#location-feedback").className = "feedback";
+        document.querySelector("#location-feedback").textContent = "Choose a location on the map to add another entry.";
+        renderLocations();
+        saveDraft();
+        if (!document.querySelector('[data-panel="package"]').hidden) renderValidation();
+      });
+
+      document.querySelector("#faction-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        renderEntitiesAndSave("faction", event.currentTarget);
+      });
+      document.querySelector("#settlement-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        renderEntitiesAndSave("settlement", event.currentTarget);
+      });
+      document.querySelector("#note-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        state.scenarioNotes.push({ id: makeId("note"), title: form.querySelector("input").value.trim(), body: form.querySelector("textarea").value.trim(), visibility: "gm-only" });
+        form.reset();
+        renderNotes();
+        saveDraft();
+      });
+      document.querySelector("#open-package-file").addEventListener("click", () => {
+        packageFileInput.value = "";
+        packageFileInput.click();
+      });
+      packageFileInput.addEventListener("change", async () => {
+        const file = packageFileInput.files?.[0];
+        if (!file) return;
+        pendingImportedPackage = null;
+        applyImportedPackageButton.disabled = true;
+        importPackageSummaryElement.hidden = true;
+        importPackageStatus.className = "feedback";
+        importPackageStatus.textContent = "Checking setup package…";
+        importPackageDialog.showModal();
+        try {
+          if (file.size > 25 * 1024 * 1024) throw new Error("Setup packages must be smaller than 25 MB.");
+          const parsed = JSON.parse(await file.text());
+          pendingImportedPackage = normalizeImportedPackage(parsed);
+          importPackageSummaryElement.textContent = formatImportPackageSummary(pendingImportedPackage);
+          importPackageSummaryElement.hidden = false;
+          importPackageStatus.className = "feedback success";
+          importPackageStatus.textContent = `Validated ${file.name}. Applying it will replace the current local setup draft.`;
+          applyImportedPackageButton.disabled = false;
+        } catch (error) {
+          importPackageStatus.className = "feedback error";
+          importPackageStatus.textContent = error instanceof Error ? error.message : "Could not read this setup package.";
+        }
+      });
+      const closeImportPackageDialog = () => {
+        pendingImportedPackage = null;
+        importPackageDialog.close();
+      };
+      document.querySelector("#close-import-package").addEventListener("click", closeImportPackageDialog);
+      document.querySelector("#cancel-import-package").addEventListener("click", closeImportPackageDialog);
+      document.querySelector("#apply-import-package").addEventListener("click", () => {
+        if (!pendingImportedPackage) return;
+        state = pendingImportedPackage;
+        pendingImportedPackage = null;
+        storageAvailable = true;
+        editingLocationId = null;
+        placementMode = false;
+        pendingPosition = null;
+        restoreFields();
+        if (leafletMap) {
+          leafletMap.setView([state.map.center.lat, state.map.center.lng], state.map.zoom);
+          if (state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
+          renderArea();
+          renderLocations();
+          renderTerrainDataTable();
+          renderTerrainAssignments();
+          leafletMap.invalidateSize({ pan: false });
+        }
+        saveDraft();
+        renderValidation();
+        importPackageDialog.close();
+        setMapStatus(`Setup package opened: ${state.campaign.name}.`, "success");
+      });
+      importPackageDialog.addEventListener("click", (event) => {
+        if (event.target === importPackageDialog) closeImportPackageDialog();
+      });
+      document.querySelector("#validate-package").addEventListener("click", () => renderValidation());
+      document.querySelector("#preview-package").addEventListener("click", showPreview);
+      document.querySelector("#export-package").addEventListener("click", exportPackage);
+      document.querySelector("#export-package-top").addEventListener("click", exportPackage);
+      document.querySelector("#close-preview").addEventListener("click", () => previewDialog.close());
+      previewDialog.addEventListener("click", (event) => {
+        if (event.target === previewDialog) previewDialog.close();
+      });
+
+      state = loadDraft();
+      restoreFields();
+    })();
+  </script>
+</body>
+</html>

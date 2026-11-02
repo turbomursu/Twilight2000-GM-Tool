@@ -26,13 +26,13 @@ if errorlevel 1 (
 for /f "tokens=*" %%i in ('node --version') do set NODE_VERSION=%%i
 echo       Found Node.js !NODE_VERSION!
 
-REM Verify Node.js version (24+)
-for /f "tokens=1,2,3 delims=." %%a in ('node --version ^| findstr /r "v[0-9]"') do (
+REM Verify Node.js version (18+)
+for /f "tokens=1 delims=." %%a in ('node --version ^| findstr /r "v[0-9]"') do (
     set MAJOR=%%a
     set MAJOR=!MAJOR:v=!
-    if !MAJOR! lss 24 (
+    if !MAJOR! lss 18 (
         echo.
-        echo ERROR: Node.js 24.x or later required (found !NODE_VERSION!)
+        echo ERROR: Node.js 18.x or later required (found !NODE_VERSION!)
         echo Please upgrade from https://nodejs.org/
         echo.
         pause

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather & Travel | Fieldbook</title>
+  <style>
+    :root {
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --accent: #c2cc91;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { 
+      font-family: var(--sans); 
+      color: var(--ink);
+      background: var(--paper);
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1000px; margin: 0 auto; }
+    
+    h1 { font-size: 28px; margin: 0 0 8px; font-weight: 700; }
+    h2 { font-size: 16px; margin: 20px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 13px; margin: 15px 0 8px; color: var(--muted); }
+    
+    label { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--muted); font-weight: 500; }
+    input, select { 
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      font-family: var(--sans);
+      font-size: 12px;
+    }
+
+    button {
+      background: var(--forest);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    button:hover { background: var(--forest-deep); }
+    button:active { transform: translateY(1px); }
+
+    .panel {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .result {
+      background: #f0f8ff;
+      border-left: 3px solid var(--accent);
+      padding: 12px;
+      margin-top: 12px;
+      border-radius: 2px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .error {
+      background: #ffe8e8;
+      border-left: 3px solid #cc4444;
+      padding: 12px;
+      color: #660000;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    .info {
+      background: #e8f0e0;
+      border-left: 3px solid var(--accent);
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .status-ok { color: #008800; font-weight: 600; }
+    .status-warning { color: #cc7700; font-weight: 600; }
+    .status-error { color: #cc0000; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⛈️ Weather & Travel</h1>
+    <p style="color: var(--muted); font-size: 12px; margin: 0;">Strategic play tools for Twilight: 2000</p>
+
+    <div class="info">
+      ℹ️ Verified against T2K 4E Referee Aid: Strategic Play.
+      Metrics are in hexes (10km each). Rations are 1 per person per day.
+    </div>
+
+    <!-- Weather System -->
+    <div class="panel">
+      <h2>Weather Roll</h2>
+      <div class="form-row">
+        <div>
+          <label for="weatherCurrent">Current Weather</label>
+          <select id="weatherCurrent">
+            <option value="Fair">Fair (clear skies)</option>
+            <option value="Cloudy">Cloudy (overcast)</option>
+            <option value="Rain/Snow">Rain/Snow (heavy precipitation)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="weatherDie">Die Result</label>
+          <select id="weatherDie">
+            <option value="0">No symbols (no change)</option>
+            <option value="1">Single symbol (worsen)</option>
+            <option value="2">Double symbols (improve)</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="rollWeather()">Roll Weather</button>
+      <div id="weatherResult"></div>
+    </div>
+
+    <!-- Travel Distance -->
+    <div class="panel">
+      <h2>Travel Distance</h2>
+      <h3>Marching: 2 hex/shift (road/open), 1 hex/shift (other)</h3>
+      <h3>Driving: 5 hex/shift base, modified by terrain</h3>
+
+      <div class="form-row">
+        <div>
+          <label for="movementType">Movement Type</label>
+          <select id="movementType">
+            <option value="march">March (on foot)</option>
+            <option value="drive">Drive (vehicle)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="terrain">Terrain</label>
+          <select id="terrain">
+            <option value="road">Road (x1 drive)</option>
+            <option value="open">Open ground (x1 drive)</option>
+            <option value="woods">Woods (x0.5 drive)</option>
+            <option value="hills">Hills (x0.75 drive)</option>
+            <option value="mountains">Mountains (x0.25 drive)</option>
+            <option value="swamp">Swamp (x0.5 drive)</option>
+            <option value="ruins">Ruins (x0.5 drive)</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label for="shiftsCount">Shifts</label>
+        <input type="number" id="shiftsCount" min="1" max="4" value="1">
+      </div>
+
+      <button onclick="calculateDistance()">Calculate Distance</button>
+      <div id="distanceResult"></div>
+    </div>
+
+    <!-- Fuel Consumption -->
+    <div class="panel">
+      <h2>Fuel Consumption</h2>
+      <h3>1 liter per hex (10km). Alcohol fuel = 2x.</h3>
+
+      <div class="form-row">
+        <div>
+          <label for="fuelType">Fuel Type</label>
+          <select id="fuelType">
+            <option value="gasoline">Gasoline (1x)</option>
+            <option value="diesel">Diesel (1x)</option>
+            <option value="alcohol">Alcohol (2x)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="hexesTraveled">Hexes Traveled</label>
+          <input type="number" id="hexesTraveled" min="0" value="5">
+        </div>
+      </div>
+
+      <button onclick="calculateFuel()">Calculate Consumption</button>
+      <div id="fuelResult"></div>
+    </div>
+
+    <!-- Rations Needed -->
+    <div class="panel">
+      <h2>Rations Calculator</h2>
+      <h3>1 ration per person per day (food & water separate)</h3>
+
+      <div class="form-row">
+        <div>
+          <label for="rationType">Type</label>
+          <select id="rationType">
+            <option value="food">Food rations</option>
+            <option value="water">Water rations</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="personCount">Number of People</label>
+          <input type="number" id="personCount" min="1" max="100" value="4">
+        </div>
+      </div>
+
+      <div>
+        <label for="daysCount">Days</label>
+        <input type="number" id="daysCount" min="1" max="30" value="7">
+      </div>
+
+      <button onclick="calculateRations()">Calculate Rations</button>
+      <div id="rationResult"></div>
+    </div>
+
+    <!-- Terrain Modifiers -->
+    <div class="panel">
+      <h2>Terrain Modifiers for Tasks</h2>
+      
+      <div class="form-row">
+        <div>
+          <label for="modTerrain">Terrain</label>
+          <select id="modTerrain">
+            <option value="road">Road</option>
+            <option value="open">Open</option>
+            <option value="woods">Woods</option>
+            <option value="hills">Hills</option>
+            <option value="mountains">Mountains</option>
+            <option value="swamp">Swamp</option>
+            <option value="ruins">Ruins</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="modTask">Task</label>
+          <select id="modTask">
+            <option value="foraging">Foraging</option>
+            <option value="hunting">Hunting</option>
+            <option value="scrounging">Scrounging</option>
+            <option value="driving">Driving</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="getTerrainMod()">Get Modifier</button>
+      <div id="modResult"></div>
+    </div>
+
+    <!-- Encounter Distance -->
+    <div class="panel">
+      <h2>Encounter Distance in Shift</h2>
+      <h3>Encounters occur about halfway through travel</h3>
+
+      <div class="form-row">
+        <div>
+          <label for="hexPerShift">Hexes per Shift</label>
+          <input type="number" id="hexPerShift" min="1" value="5">
+        </div>
+
+        <div>
+          <label for="shiftsEncounter">Shifts Count</label>
+          <input type="number" id="shiftsEncounter" min="1" value="1">
+        </div>
+      </div>
+
+      <button onclick="getEncounterDist()">Calculate Distance</button>
+      <div id="encounterResult"></div>
+    </div>
+  </div>
+
+  <script src="weather-client.js"></script>
+</body>
+</html>

@@ -36,9 +36,9 @@ Write-Host "       Found Node.js $nodeVersion"
 
 # Extract major version number
 $majorVersion = [int]($nodeVersion -replace 'v', '' -split '\.' | Select-Object -First 1)
-if ($majorVersion -lt 24) {
+if ($majorVersion -lt 18) {
     Write-Host ""
-    Write-Host "ERROR: Node.js 24.x or later required (found $nodeVersion)"
+    Write-Host "ERROR: Node.js 18.x or later required (found $nodeVersion)"
     Write-Host "Please upgrade from https://nodejs.org/"
     Write-Host ""
     Read-Host "Press Enter to exit"
