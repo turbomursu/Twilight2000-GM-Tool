@@ -16,7 +16,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 **Deployment:** Run the authoritative service on a GM-controlled Raspberry Pi or laptop on the local network, with browser clients connecting over LAN using plain HTTP. Store runtime campaign state in SQLite on that host; retain versioned JSON for setup-package exchange and backups. HTTP is unencrypted, so the service must remain on a trusted LAN and must not be exposed to the internet or untrusted networks. Remote hosting is out of initial scope and requires a separate deployment and security decision if added later.
 
-## Current Baseline (02 Nov 2026 — End of Phase 3.3)
+## Current Baseline (02 Nov 2026 — Phase 3.4 Backend Complete)
 
 **Implemented & Production-Ready:**
 - Owner-scoped campaign persistence via SQLite on LAN host
@@ -64,11 +64,35 @@ Keep a setup package distinct from a running campaign save. Importing setup data
   - Full CSS styling matching design system
   - 22 comprehensive backend tests verified working
   - Production-ready code
+- Map publication system (Phase 3.4 — Backend Complete, UI In Progress)
+  - Publication state API with atomic transactions
+    - getMapPublicationState() - fetch current publication flags
+    - updateMapPublicationState() - update route/location/position/faction flags
+    - getPublicationHistory() - paginated audit trail of publication changes
+  - Party position management with bounds validation
+    - getPartyPosition() - fetch current party marker position
+    - updatePartyPosition() - update with bounds checking
+  - REST API endpoints (5 total)
+    - GET/PUT `/api/campaigns/:id/map-publication`
+    - GET `/api/campaigns/:id/map-publication/history`
+    - GET/PUT `/api/campaigns/:id/party-position`
+  - Map visualization client (map-visualization-client.js)
+    - Route polyline rendering with numbered stop markers
+    - Location circle marker rendering (color-coded by publication status)
+    - Party position marker (draggable for GM, static for players)
+    - Publication-aware rendering (different opacity/color for published vs GM-only)
+    - Event dispatch for UI integration
+  - Database schema: map_publication_state, party_position, publication_history tables
+  - Campaign isolation enforcement at database query level
+  - All mutations use atomic transactions with rollback
+  - 233/233 tests passing (no regressions)
 - 233/233 tests passing (100% coverage maintained, zero regressions)
 
 **Not Yet Implemented (But Planned):**
-- Route map visualization with polylines (Phase 3.4)
-- Route publication controls for GM/player visibility (Phase 3.4)
+- Route map visualization UI integration with index.html (Phase 3.4)
+- GM publication control panel (checkboxes for route/location/position/factions) (Phase 3.4)
+- Player interface publication enforcement (show/hide layers based on publication flags) (Phase 3.4)
+- Publication history UI display (Phase 3.4)
 - Campaign Setup Tool (UI for initial campaign authoring)
 - Encounter and NPC generation
 - Scheduled backups and cross-host recovery
