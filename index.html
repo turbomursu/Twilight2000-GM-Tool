@@ -1161,6 +1161,20 @@
           </div>
         </section>
 
+        <!-- Publication History View -->
+        <section class="view" id="view-publication-history" aria-labelledby="publication-history-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">GM record / audit trail</div><h1 id="publication-history-title">Map publication history</h1></div>
+            <div class="audit-controls">
+              <button class="button button-icon" id="history-refresh" type="button" title="Refresh history" aria-label="Refresh publication history" disabled>&#8635;</button>
+              <button class="button button-icon" id="history-newer" type="button" title="Newer entries" aria-label="Show newer entries" disabled>&#8679;</button>
+              <button class="button button-icon" id="history-older" type="button" title="Older entries" aria-label="Show older entries" disabled>&#8592;</button>
+            </div>
+          </div>
+          <p class="feedback" id="history-status" role="status">Select a runtime campaign.</p>
+          <div class="audit-table-wrap" role="region" tabindex="0" aria-label="Scrollable publication history"><table class="audit-table" aria-label="Map publication change history"><thead><tr><th>Recorded / UTC</th><th>Actor</th><th>Element</th><th>Old Value</th><th>New Value</th><th>Revision</th></tr></thead><tbody id="history-rows"></tbody></table></div>
+        </section>
+
         <section class="view" id="view-journal" aria-labelledby="journal-title">
           <div class="page-heading">
             <div><div class="heading-tag">Campaign / dispatch archive</div><h1 id="journal-title">Field journal</h1></div>
@@ -1747,6 +1761,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
           
           const { state } = await response.json();
           updatePublicationUI(state);
+          
+          // Also enable history controls and load initial history
+          document.getElementById('history-refresh').disabled = false;
+          document.getElementById('history-status').textContent = 'Loading history...';
+          await loadPublicationHistory(campaignId, 0);
         } catch (error) {
           console.error("Publication state error:", error);
           showPublicationError(error.message);
@@ -1852,6 +1871,81 @@ Military rank || optional</textarea><span class="row-description">One field per 
         } catch (error) {
           console.error("Party position error:", error);
           showToast("Position update error", true);
+        }
+      });
+
+      // Publication history state
+      let historyOffset = 0;
+      const historyPageSize = 10;
+
+      async function loadPublicationHistory(campaignId, offset = 0) {
+        try {
+          const response = await fetch(
+            `/api/campaigns/${encodeURIComponent(campaignId)}/map-publication/history?offset=${offset}&limit=${historyPageSize}`
+          );
+          if (!response.ok) throw new Error("Failed to load history");
+          
+          const result = await response.json();
+          renderPublicationHistory(result.history, result.total);
+          historyOffset = offset;
+        } catch (error) {
+          console.error("History load error:", error);
+          document.getElementById('history-status').textContent = "Failed to load history: " + error.message;
+        }
+      }
+
+      function renderPublicationHistory(entries, total) {
+        const tbody = document.getElementById('history-rows');
+        tbody.replaceChildren();
+        
+        if (!entries.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">No publication history yet</td></tr>';
+          return;
+        }
+        
+        entries.forEach(entry => {
+          const row = document.createElement('tr');
+          const recordedAt = new Date(entry.recordedAt).toLocaleString();
+          const oldVal = entry.oldValue !== null ? String(entry.oldValue) : '—';
+          const newVal = entry.newValue !== null ? String(entry.newValue) : '—';
+          
+          row.innerHTML = `
+            <td>${escapeHtml(recordedAt)}</td>
+            <td>${escapeHtml(entry.actor || 'System')}</td>
+            <td>${escapeHtml(entry.target)}</td>
+            <td><code>${escapeHtml(oldVal)}</code></td>
+            <td><code>${escapeHtml(newVal)}</code></td>
+            <td style="font-family: var(--mono); font-size: 11px;">${entry.revision}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        // Update pagination buttons
+        const hasOlder = historyOffset + historyPageSize < total;
+        const hasNewer = historyOffset > 0;
+        document.getElementById('history-older').disabled = !hasOlder;
+        document.getElementById('history-newer').disabled = !hasNewer;
+        document.getElementById('history-status').textContent = `Showing ${entries.length} of ${total} entries (offset ${historyOffset})`;
+      }
+
+      // Setup history controls
+      document.getElementById('history-refresh').addEventListener('click', () => {
+        if (runtimeDataLoaded && state.runtimeCampaignId) {
+          loadPublicationHistory(state.runtimeCampaignId, 0);
+          showToast('History refreshed');
+        }
+      });
+
+      document.getElementById('history-older').addEventListener('click', () => {
+        if (runtimeDataLoaded && state.runtimeCampaignId) {
+          loadPublicationHistory(state.runtimeCampaignId, historyOffset + historyPageSize);
+        }
+      });
+
+      document.getElementById('history-newer').addEventListener('click', () => {
+        if (runtimeDataLoaded && state.runtimeCampaignId && historyOffset > 0) {
+          const newOffset = Math.max(0, historyOffset - historyPageSize);
+          loadPublicationHistory(state.runtimeCampaignId, newOffset);
         }
       });
 
