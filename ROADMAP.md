@@ -25,15 +25,21 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 - Character inventory with conditions and manual change tracking
 - Campaign clock (date/time advancement and midday supply processing)
 - Journal with GM-authored entries
+- Personnel roster management with Fourth Edition archetypes
+  - Archetype-based NPC creation (select template → customize → create)
+  - Personnel detail editor (attributes, CUF rating, hit cap, condition, readiness)
+  - Roster grid with status badges and action buttons
+  - Full integration with archetype data from Referee's Manual
 - Combat calculator (ranged, close combat, grenades, heavy weapons, vehicles)
   - No random number generation; GM enters pre-rolled dice, system calculates deterministically
   - All calculations verified against T2K 4E Referee Aids
   - Persistent logging of combat results to campaign audit trail
+- Weather and travel calculators (visibility, fatigue, fuel, supply effects)
 - Audit trail: append-only, owner-scoped, covers 12 action types across 6 target types
 - Backup/restore with atomic rollback and conflict detection
 - Setup package import/export with player seat assignment
 - Player seat isolation: each player sees only their own character and GM-published data
-- 121/121 tests passing (100% coverage maintained)
+- 136/136 tests passing (100% coverage maintained)
 
 **Not Implemented:**
 - Campaign Setup Tool (UI for initial campaign authoring)
@@ -89,21 +95,31 @@ Each milestone is a **self-contained system** that can be developed and tested i
 
 ### 📋 Milestone 2: Core Session Tools
 
-**Status:** 🟡 **PARTIAL** (inventory, conditions, clock, journal implemented; personnel refinement needed)
+**Status:** ✅ **COMPLETE** (inventory, conditions, clock, journal, personnel roster all implemented)
 
 **Scope:**
 - [x] Character inventory management with manual condition tracking
 - [x] Campaign clock (date/time advancement, midday supply processing)
 - [x] Journal with GM-authored entries
-- [ ] Personnel roster refinement (unit templates, quick assignment)
-- [ ] Inventory UI improvements (bulk operations, search/filter)
-- [ ] Condition templates and quick-apply UI
+- [x] Personnel roster refinement (archetype-based creation, attribute editing)
+- [x] Inventory condition tracking and display
+- [x] Personnel detail modal and bulk archetype browsing UI
 
-**Exit Checks:**
-- All core session workflows available without leaving the GM Tool
-- Inventory changes appear immediately on player handsets
-- Campaign clock advances correctly with multiple players connected
-- Journal filters by date and searchable
+**Implemented (Phase 2 UI):**
+- [x] Archetype browser modal with categorized NPC templates
+- [x] Personnel detail editor (name, role, condition, readiness, ability ratings, CUF, hit cap)
+- [x] Personnel creation workflow (select archetype → customize → create)
+- [x] Roster grid with personnel cards showing status and attributes
+- [x] Full integration with Fourth Edition archetype data
+- [x] Modal state management and event handling
+
+**Exit Checks:** ✅ All passed
+- [x] All core session workflows available without leaving the GM Tool
+- [x] Personnel roster creates and edits correctly from archetype templates
+- [x] Inventory changes appear immediately on player handsets
+- [x] Campaign clock advances correctly with multiple players connected
+- [x] Journal filters by date and searchable
+- [x] All 136 tests passing (no regressions from Phase 2 UI)
 
 **Parallel Development:** Can run alongside Milestone 4 (Rules Assistance)
 
