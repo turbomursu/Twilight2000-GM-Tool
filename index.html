@@ -692,6 +692,237 @@
       display: grid;
       gap: 14px;
     }
+
+    /* Route Editor Modal */
+    #route-editor-modal {
+      width: min(720px, calc(100vw - 28px));
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+    }
+    #route-editor-modal::backdrop {
+      background: #15231bb8;
+    }
+    .route-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .route-modal-header h2 {
+      margin: 0;
+      font: 22px var(--serif);
+    }
+    .route-modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 18px 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .route-modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .route-stops-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+    }
+    .stop-card {
+      background: white;
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 2px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stop-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stop-ordinal {
+      display: inline-block;
+      background: var(--forest);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 2px;
+      font-size: 10px;
+      font-weight: bold;
+      font-family: var(--mono);
+      min-width: 30px;
+      text-align: center;
+    }
+    .stop-location {
+      font-weight: bold;
+      font-family: var(--serif);
+      font-size: 13px;
+      flex: 1;
+    }
+    .stop-gridref {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .stop-detail {
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.4;
+    }
+    .stop-km {
+      font-size: 11px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stop-km strong {
+      color: var(--forest);
+    }
+    .stop-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .stop-actions button {
+      flex: 1;
+      padding: 6px 4px;
+      font-size: 9px;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    #stop-editor-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 14px;
+      margin: 8px 0;
+      border-radius: 2px;
+    }
+    #stop-editor-panel h3 {
+      margin: 0 0 12px;
+      font: 14px var(--serif);
+    }
+    #stop-editor-form {
+      display: grid;
+      gap: 12px;
+    }
+    #stop-editor-form label {
+      display: grid;
+      gap: 4px;
+      font-size: 11px;
+    }
+    #stop-editor-form label > span {
+      font-weight: 600;
+      color: var(--ink);
+    }
+    #stop-editor-form input,
+    #stop-editor-form select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-family: var(--sans);
+      font-size: 11px;
+    }
+    #stop-editor-form input:focus,
+    #stop-editor-form select:focus {
+      outline: none;
+      border-color: var(--sky);
+      box-shadow: 0 0 0 2px var(--sky-pale);
+    }
+    .form-feedback {
+      padding: 8px 10px;
+      border-radius: 2px;
+      font-size: 10px;
+      min-height: 1.2em;
+    }
+    .form-feedback.error {
+      background: #fde8e6;
+      color: #c52e00;
+      border-left: 3px solid #c52e00;
+    }
+    .form-feedback.success {
+      background: #e8f0e6;
+      color: #1a5c29;
+      border-left: 3px solid #1a5c29;
+    }
+    .route-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      border-left: 3px solid var(--sky);
+    }
+    .summary-stat {
+      text-align: center;
+    }
+    .summary-label {
+      font-size: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .summary-value {
+      font-weight: bold;
+      font-size: 18px;
+      font-family: var(--mono);
+      color: var(--forest);
+    }
+    .route-preview {
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      display: grid;
+      gap: 10px;
+    }
+    .route-stops-compact {
+      display: grid;
+      gap: 4px;
+    }
+    .stop-compact {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-size: 11px;
+    }
+    .stop-number {
+      display: inline-block;
+      background: var(--forest);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 1px;
+      font-family: var(--mono);
+      font-weight: bold;
+      font-size: 9px;
+    }
   </style>
 </head>
 <body>
@@ -872,7 +1103,7 @@
           <div class="movement-grid">
             <section class="panel" aria-labelledby="travel-day-title">
               <div class="travel-controls"><div><div class="eyebrow">Campaign clock / GM-defined rations at 12:00</div><strong id="travel-date"></strong></div><div class="stepper"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of rations" title="Use one day of rations">−</button><output id="travel-day-count"></output><button class="button button-icon" data-action="advance-time" aria-label="Advance campaign six hours" title="Advance six hours / daily rations at midday">+6h</button></div></div>
-              <div class="panel-body"><div class="section-bar" style="margin:0 0 12px"><div><h2>Planned route</h2></div><div class="supply-control"><span class="inline-hint" id="movement-distance"></span><button class="button" id="edit-runtime-route" type="button" hidden>Edit route</button><button class="button" data-action="next-stop">Mark next waypoint</button></div></div><div class="route-list" id="movement-route"></div></div>
+              <div class="panel-body"><div class="section-bar" style="margin:0 0 12px"><div><h2>Planned route</h2></div><div class="supply-control"><span class="inline-hint" id="movement-distance"></span><button class="button" id="edit-runtime-route" type="button" hidden>Edit route</button><button class="button" data-action="open-route-editor">Manage route</button><button class="button" data-action="next-stop">Mark next waypoint</button></div></div><div class="route-list" id="movement-route"></div></div>
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="supply-title"><div class="panel-head"><div><div class="eyebrow">Column inventory</div><h2 id="supply-title">Provisions</h2></div><span class="heading-tag">Days remaining</span></div><div class="panel-body"><div class="supply-line"><div><strong>Food</strong><small>Shared ration reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="use-rations" aria-label="Use one day of food" title="Use one day of food">−</button><output id="food-count"></output><button class="button button-icon" data-action="add-rations" aria-label="Add one day of food" title="Add one day of food">+</button></div></div><div class="supply-line"><div><strong>Fuel</strong><small>Estimated vehicle reserve</small></div><div class="supply-control"><button class="button button-icon" data-action="fuel-down" aria-label="Reduce fuel reserve" title="Reduce fuel reserve">−</button><output id="fuel-count"></output><button class="button button-icon" data-action="fuel-up" aria-label="Increase fuel reserve" title="Increase fuel reserve">+</button></div></div><div class="supply-line"><div><strong>Distance</strong><small>Logged since leaving the coast</small></div><div class="supply-control"><button class="button button-icon" data-action="distance-down" aria-label="Reduce logged distance" title="Reduce logged distance">−</button><output id="distance-count"></output><button class="button button-icon" data-action="distance-up" aria-label="Add ten kilometers" title="Add ten kilometers">+</button></div></div></div></section>
@@ -1243,6 +1474,64 @@ Military rank || optional</textarea><span class="row-description">One field per 
     </div>
   </dialog>
 
+  <!-- Route Editor Modal -->
+  <dialog id="route-editor-modal" aria-labelledby="route-editor-title">
+    <div class="route-modal-header">
+      <div>
+        <div class="eyebrow">Route / supply ledger</div>
+        <h2 id="route-editor-title">Campaign Route</h2>
+      </div>
+      <button class="icon-button" type="button" data-action="close-route-editor" aria-label="Close route editor">×</button>
+    </div>
+    <div class="route-modal-body">
+      <!-- Route Summary -->
+      <div id="route-summary"></div>
+
+      <!-- Route Stops Grid -->
+      <div>
+        <div class="eyebrow">Route stops</div>
+        <div id="route-stops-list" class="route-stops-grid"></div>
+      </div>
+
+      <!-- Stop Editor Panel -->
+      <div id="stop-editor-panel" style="display: none;">
+        <h3 id="stop-editor-title">Add Stop to Route</h3>
+        <form id="stop-editor-form">
+          <label>
+            <span>Location</span>
+            <select id="stop-location-select" required>
+              <option value="">Select a location...</option>
+            </select>
+          </label>
+          <label>
+            <span>Stop Detail</span>
+            <input type="text" id="stop-detail-input" 
+              placeholder="e.g., Refuel and resupply" 
+              maxlength="160" required>
+          </label>
+          <label>
+            <span>Distance from previous (km)</span>
+            <input type="number" id="stop-km-input" 
+              min="0" step="0.1" value="0" required>
+          </label>
+          <div id="stop-editor-status" class="form-feedback"></div>
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="button button-primary">Save Stop</button>
+            <button type="button" class="button" data-action="close-stop-editor">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Add Stop Button -->
+      <button class="button button-primary" data-action="open-add-stop-form" style="align-self: flex-start;">
+        <span aria-hidden="true">+</span> Add Stop to Route
+      </button>
+    </div>
+    <div class="route-modal-footer">
+      <button class="button" type="button" data-action="close-route-editor">Done</button>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/vendor/leaflet.js"></script>
@@ -1259,6 +1548,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/audit-client.js" defer></script>
   <script src="/personnel-client.js" defer></script>
   <script src="/location-client.js" defer></script>
+  <script src="/route-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -1470,6 +1760,17 @@ Military rank || optional</textarea><span class="row-description">One field per 
         // Load personnel archetypes and roster for the personnel client
         if (window.personnelClient) {
           window.personnelClient.loadPersonnelForCampaign(runtime.campaign.id);
+        }
+        // Load locations for the location client
+        if (window.locationClient) {
+          window.locationClient.loadLocationsForCampaign(runtime.campaign.id);
+        }
+        // Load route for the route client
+        if (window.routeClient) {
+          window.routeClient.loadRouteForCampaign(runtime.campaign.id).then(() => {
+            window.routeClient.renderRouteDisplay();
+            window.routeClient.setupRouteEventListeners();
+          }).catch(error => console.error("Failed to load route:", error));
         }
         syncWeatherEditor();
         document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
@@ -3131,6 +3432,38 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (action === "close-browser") document.getElementById("archetype-browser-modal").close();
         if (action === "close-creation") document.getElementById("archetype-creation-modal").close();
         if (action === "close-location-editor") document.getElementById("location-editor-modal").close();
+        if (action === "open-route-editor") {
+          if (state.runtimeCampaignId) {
+            window.routeClient.openRouteEditorModal();
+          } else {
+            showToast("Select a runtime campaign first.");
+          }
+        }
+        if (action === "close-route-editor") {
+          if (document.getElementById("route-editor-modal")) {
+            document.getElementById("route-editor-modal").close();
+          }
+        }
+        if (action === "open-add-stop-form") {
+          window.routeClient.handleAddStopToRoute();
+        }
+        if (action === "save-stop") {
+          window.routeClient.handleSaveStop();
+        }
+        if (action === "close-stop-editor") {
+          const editorPanel = document.getElementById("stop-editor-panel");
+          if (editorPanel) editorPanel.style.display = "none";
+          const select = document.getElementById("stop-location-select");
+          if (select) select.disabled = false;
+        }
+        if (action && action.startsWith("edit-stop-")) {
+          const ordinal = parseInt(action.split("-")[2], 10);
+          window.routeClient.handleEditStop(ordinal);
+        }
+        if (action && action.startsWith("delete-stop-")) {
+          const ordinal = parseInt(action.split("-")[2], 10);
+          window.routeClient.handleDeleteStop(ordinal);
+        }
         if (action === "open-location-create") {
           if (state.runtimeCampaignId) {
             window.locationClient.openLocationCreationForm();
