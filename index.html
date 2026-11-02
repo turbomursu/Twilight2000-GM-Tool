@@ -1128,6 +1128,35 @@
                   </form>
                 </div>
               </section>
+              <!-- Publication Control Panel -->
+              <section class="panel" aria-labelledby="publication-control-title">
+                <div class="panel-head"><div><div class="eyebrow">Map publication</div><h2 id="publication-control-title">Publish to players</h2></div></div>
+                <div class="panel-body">
+                  <p class="row-description">Select which map elements are visible to players.</p>
+                  <div style="display: grid; gap: 12px;">
+                    <label class="condition-row">
+                      <input type="checkbox" id="pub-route" class="publication-toggle" data-target="route" />
+                      <span>Planned route <span class="inline-hint" id="pub-route-revision" style="margin-left: 8px;"></span></span>
+                    </label>
+                    <label class="condition-row">
+                      <input type="checkbox" id="pub-locations" class="publication-toggle" data-target="locations" />
+                      <span>Named locations <span class="inline-hint" id="pub-locations-revision" style="margin-left: 8px;"></span></span>
+                    </label>
+                    <label class="condition-row">
+                      <input type="checkbox" id="pub-position" class="publication-toggle" data-target="position" />
+                      <span>Party position <span class="inline-hint" id="pub-position-revision" style="margin-left: 8px;"></span></span>
+                    </label>
+                    <label class="condition-row">
+                      <input type="checkbox" id="pub-factions" class="publication-toggle" data-target="factions" />
+                      <span>Faction control <span class="inline-hint" id="pub-factions-revision" style="margin-left: 8px;"></span></span>
+                    </label>
+                  </div>
+                  <div style="margin-top: 12px; font-size: 12px; color: var(--muted);">
+                    <strong>Last modified:</strong> <span id="pub-last-modified">Not set</span>
+                  </div>
+                  <p class="feedback" id="publication-error" role="status" style="color: var(--signal); display: none;"></p>
+                </div>
+              </section>
             </div>
           </div>
         </section>
@@ -1535,6 +1564,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/vendor/leaflet.js"></script>
+  <script src="./map-visualization-client.js"></script>
   <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
   <script src="/auth-client.js" defer></script>
@@ -1708,6 +1738,92 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("journal-list").innerHTML = state.notes.length ? state.notes.map(noteMarkup).join("") : `<div class="empty-state">No entries recorded.</div>`;
         document.getElementById("recent-log").innerHTML = state.notes.slice(0, 3).map((note) => `<article class="log-entry"><time class="log-time">${escapeHtml(dateLabel(note.date, { day: "2-digit", month: "short" }))}</time><div><strong>${escapeHtml(note.title)}</strong><p>${escapeHtml(note.body)}</p></div></article>`).join("") || `<div class="empty-state">No recent dispatches.</div>`;
       }
+
+      // Publication state management functions
+      async function loadPublicationState(campaignId) {
+        try {
+          const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/map-publication`);
+          if (!response.ok) throw new Error("Failed to load publication state");
+          
+          const { state } = await response.json();
+          updatePublicationUI(state);
+        } catch (error) {
+          console.error("Publication state error:", error);
+          showPublicationError(error.message);
+        }
+      }
+
+      function updatePublicationUI(state) {
+        document.getElementById('pub-route').checked = state.route.published;
+        document.getElementById('pub-locations').checked = state.locations.published;
+        document.getElementById('pub-position').checked = state.position.published;
+        document.getElementById('pub-factions').checked = state.factions.published;
+        
+        document.getElementById('pub-route-revision').textContent = `(rev ${state.route.revision})`;
+        document.getElementById('pub-locations-revision').textContent = `(rev ${state.locations.revision})`;
+        document.getElementById('pub-position-revision').textContent = `(rev ${state.position.revision})`;
+        document.getElementById('pub-factions-revision').textContent = `(rev ${state.factions.revision})`;
+        
+        const lastMod = new Date(state.lastModifiedAt).toLocaleString();
+        document.getElementById('pub-last-modified').textContent = lastMod;
+      }
+
+      function showPublicationError(message) {
+        const errorDiv = document.getElementById('publication-error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+      }
+
+      function clearPublicationError() {
+        const errorDiv = document.getElementById('publication-error');
+        errorDiv.style.display = 'none';
+      }
+
+      // Setup publication toggle handlers
+      document.querySelectorAll('.publication-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', async (evt) => {
+          if (!runtimeDataLoaded || !state.runtimeCampaignId) {
+            showToast("Runtime campaign not loaded");
+            evt.target.checked = !evt.target.checked;
+            return;
+          }
+
+          const target = evt.target.dataset.target;
+          const campaignId = state.runtimeCampaignId;
+          
+          try {
+            clearPublicationError();
+            
+            const pubState = {};
+            pubState[target] = evt.target.checked;
+            
+            const response = await fetch(
+              `/api/campaigns/${encodeURIComponent(campaignId)}/map-publication`,
+              {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({state: pubState})
+              }
+            );
+            
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Publication update failed');
+            }
+            
+            const result = await response.json();
+            updatePublicationUI(result.state);
+            showToast(`${target} ${evt.target.checked ? 'published' : 'unpublished'}`);
+            
+          } catch (error) {
+            console.error("Publication update error:", error);
+            showPublicationError(error.message);
+            // Revert checkbox
+            evt.target.checked = !evt.target.checked;
+          }
+        });
+      });
+
       function applyRuntimeSnapshot(runtime) {
         const dashboard = runtime.dashboard;
         let distance = 0;
@@ -1772,6 +1888,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
             window.routeClient.setupRouteEventListeners();
           }).catch(error => console.error("Failed to load route:", error));
         }
+        // Load publication state for map publication
+        loadPublicationState(runtime.campaign.id);
         syncWeatherEditor();
         document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
         document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
