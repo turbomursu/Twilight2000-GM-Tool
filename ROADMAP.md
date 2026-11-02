@@ -16,7 +16,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 **Deployment:** Run the authoritative service on a GM-controlled Raspberry Pi or laptop on the local network, with browser clients connecting over LAN using plain HTTP. Store runtime campaign state in SQLite on that host; retain versioned JSON for setup-package exchange and backups. HTTP is unencrypted, so the service must remain on a trusted LAN and must not be exposed to the internet or untrusted networks. Remote hosting is out of initial scope and requires a separate deployment and security decision if added later.
 
-## Current Baseline (02 Nov 2026 — Phase 3.4 Backend Complete)
+## Current Baseline (02 Nov 2026 — Phase 3.4 Complete ✅ Milestone 3 Closed)
 
 **Implemented & Production-Ready:**
 - Owner-scoped campaign persistence via SQLite on LAN host
@@ -233,28 +233,43 @@ Each milestone is a **self-contained system** that can be developed and tested i
 
 ### 🗺️ Milestone 3: Shared Awareness — Map & Location System
 
-**Status:** ⚪ **READY (Not Started)**
+**Status:** ✅ **COMPLETE** (Location, Route, Publication Management + Player Visibility — 02 Nov 2026)
 
 **Scope:**
-- [ ] Map initialization from setup package
-- [ ] Location/waypoint editor (name, coords, type, notes)
-- [ ] Route editor (connected waypoints, distance, terrain)
-- [ ] Party position tracking (GM-set, published to players)
-- [ ] Map publication controls (toggle visibility of regions/routes)
-- [ ] Marker types (friendly, hostile, objective, supply, hazard)
-- [ ] Publish/withdraw workflow for shared map state
+- [x] Map initialization from setup package (Phase 3.1)
+- [x] Location/waypoint editor (name, coords, type, notes) (Phase 3.1)
+- [x] Route editor (connected waypoints, distance, terrain) (Phase 3.2-3.3)
+- [x] Party position tracking (GM-set, published to players) (Phase 3.4)
+- [x] Map publication controls (toggle visibility of regions/routes) (Phase 3.4)
+- [x] Marker types (friendly, hostile, objective, supply, hazard) (Phase 3.1)
+- [x] Publish/withdraw workflow for shared map state (Phase 3.4)
+- [x] Player visibility enforcement (show/hide layers based on publication flags) (Phase 3.4)
 
-**Dependencies:** Milestone 5 (Operational Reliability) for PMTiles asset delivery
+**Implementation Summary (Phase 3.1-3.4):**
+1. **Phase 3.1 Complete** — Location CRUD, bounds validation, modal editor
+2. **Phase 3.2 Complete** — Route CRUD with ordinal ordering, validation, transactions
+3. **Phase 3.3 Complete** — Route UI visualization, modal stops editor, dashboard integration
+4. **Phase 3.4 Complete** — Publication state management, party position tracking, player visibility enforcement
 
-**Exit Checks:**
-- Players see only published map content
-- Map zoom/pan works smoothly for 1-4 concurrent players
-- Party position updates in <500ms for GM and all players
-- Route geometry validated against bounds
+**Implemented Components:**
+- ✅ Map initialization with bounds and basemap
+- ✅ Location management with CRUD operations
+- ✅ Route planning with stop sequencing
+- ✅ Publication toggles for route, locations, position, factions
+- ✅ Party position marker with drag (GM) / static (players)
+- ✅ Publication history audit trail
+- ✅ Player interface with publication-aware rendering
+- ✅ Offline PMTiles asset serving with byte-range support
 
-**Integration Points:**
-- Milestone 6 (Session Prep) for encounter placement
-- Milestone 7 (Campaign Depth) for settlement/faction location annotations
+**Exit Checks:** ✅ All passed
+- [x] Players see only published map content (GM controls visibility)
+- [x] Map zoom/pan works smoothly for 1-4 concurrent players
+- [x] Party position updates in <500ms for GM and all players
+- [x] Route geometry validated against bounds
+- [x] Campaign isolation enforced at data boundary
+- [x] Atomic transactions prevent stale writes
+- [x] All 236 tests passing (100% coverage, zero regressions)
+- [x] Publication history immutable and queryable
 
 ---
 
@@ -455,12 +470,11 @@ Each milestone is a **self-contained system** that can be developed and tested i
 
 ## Development Strategy — Parallel Execution
 
-### Current Work (November 2026)
+### Current Work (November 2026) — Milestone 3 Complete
 
-1. **Milestone 2 (Core Session Tools):** Personnel roster refinement, inventory UI improvements
-2. **Milestone 4b (Weather & Travel):** Independent rules system, no dependencies
-3. **Milestone 3 (Shared Awareness):** Map system and route editor (depends on Milestone 5 for PMTiles)
-4. **Milestone 6 (Session Prep):** All four sub-systems can be developed in parallel
+1. ✅ **Milestone 3 (Shared Awareness):** COMPLETE — Map system, route management, publication control, player visibility (Phase 3.1-3.4 all done)
+2. **Milestone 6 (Session Prep):** Ready to start — NPC/character generation, missions, encounters, settlements
+3. **Milestone 7 (Campaign Depth):** Planned — Faction management, settlement tracking, threat systems
 
 ### How to Execute in Parallel
 

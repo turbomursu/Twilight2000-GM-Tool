@@ -640,6 +640,16 @@ function openRuntimeDatabase(path = ":memory:") {
       ALTER TABLE personnel ADD COLUMN archetype_id TEXT;
       ALTER TABLE personnel ADD COLUMN created_at TEXT;
       ALTER TABLE personnel ADD COLUMN updated_at TEXT;
+      PRAGMA user_version = 18;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 19) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`ALTER TABLE personnel ADD COLUMN rank TEXT;
+      ALTER TABLE personnel ADD COLUMN specialty TEXT;
+      ALTER TABLE personnel ADD COLUMN notes TEXT DEFAULT '';
       PRAGMA user_version = 19;`);
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
