@@ -107,9 +107,8 @@ function projectMap(map, offlineBasemapUrl = null) {
 function getGMMap(database, accountId, campaignId) {
   const campaign = getRuntimeCampaign(database, accountId, campaignId);
   if (!campaign) return null;
-  const source = database.prepare("SELECT name, bounds_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
-  const setup = database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId);
-  const offlineBasemap = setup ? JSON.parse(setup.source_json).map.offlineBasemap ?? null : null;
+  const source = database.prepare("SELECT name, bounds_json, offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
+  const offlineBasemap = source.offlineBasemap_json ? JSON.parse(source.offlineBasemap_json) : null;
   const locations = database.prepare(`SELECT id, name, kind, map_position_json, visibility_eligibility
     FROM locations WHERE runtime_campaign_id = ? ORDER BY name, id`).all(campaignId).map((location) => ({
     id: location.id, name: location.name, kind: location.kind,

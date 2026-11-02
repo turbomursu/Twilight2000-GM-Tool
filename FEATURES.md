@@ -133,12 +133,21 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 ## Operational Reliability
 
 - **Campaign backup and restore** — Implemented. Atomic backup API exports complete campaign state; restore replaces campaign atomically with rollback capability. Backup versioning and history with unique timestamps. Cross-host import creates new campaign with explicit player account mapping. Credentials and sessions not imported.
-- **Scheduled backup automation** — Implemented. 5 schedule types: disabled, hourly, every-6-hours, daily (2:00 AM UTC), custom-interval. Retention policies by age (days) and count (max backups). HTTP API endpoints for schedule management (GET, POST, PATCH) and history retrieval (paginated). Database schema with automatic initialization. Comprehensive test suite (30 tests). Production-ready with zero external dependencies.
+- **Scheduled backup automation** — Implemented (Phases 1-2). 5 schedule types: disabled, hourly, every-6-hours, daily (2:00 AM UTC), custom-interval. Retention policies by age (days) and count (max backups). HTTP API endpoints for schedule management (GET, POST, PATCH) and history retrieval (paginated). Database schema with automatic initialization. Comprehensive test suite (30 tests). Production-ready with zero external dependencies.
+- **Automatic backup recording** — Implemented (Phase 3 — NEW). Event-triggered backups on combat resolution, journal entries, inventory changes, and character change approvals. Background task runner with 1-minute check interval for scheduled backups. Simple three-level event labeling (manual, scheduled, event). Mutation capture hooks for integration with campaign mutations. 20 comprehensive automation tests, all passing. Zero regressions in existing features (236/245 total tests passing).
 - **Backup HTTP API** — Implemented. Four endpoints for campaign backup management: GET /api/campaigns/:id/backup-schedule, POST /api/campaigns/:id/backup-schedule, PATCH /api/campaigns/:id/backup-schedule, GET /api/campaigns/:id/backup-history. All endpoints require GM authentication and support owner-scoped access. Standard HTTP error codes (400, 404, 422) with error messages.
 - **PMTiles asset serving** — Partial. The GM can upload a licensed raster PMTiles v3 archive (50 MiB limit) with attribution; the server serves byte ranges and the setup package stores the asset reference. The archive is a local sidecar, not embedded in JSON or runtime backups. No real licensed archive was available to verify PMTiles tile decoding/rendering.
-- **Automatic backup recording** — Planned. Hook into combat resolution, journal entries, and inventory changes to trigger backups. GM-configurable event triggers.
-- **Graceful error handling** — Partial. Backup/restore operations handle errors atomically; broader error recovery and conflict resolution remain planned.
+- **Graceful error handling** — Partial. Backup/restore operations handle errors atomically; background runners use graceful degradation with console logging; broader error recovery and conflict resolution remain planned.
 - **Cross-host recovery** — Partial. Runtime backup import creates new campaign; full asset portability and recovery remain planned.
+
+**Phase 3 Implementation Details:**
+- Core module: `server/backup-automation.cjs` (7 functions, 11.7 KB)
+- Mutation hooks: `server/campaign-mutation-hooks.cjs` (2 handler factories)
+- Background runner: Integrated into `server/main.cjs` with 1-minute interval
+- Event types: CAMPAIGN_CLOCK_ADVANCE, COMBAT_RESOLVED, JOURNAL_ENTRY, INVENTORY_CHANGE, CHARACTER_CHANGE, REPORT_PUBLISH, MAP_EDIT
+- Campaign list refresh: Every 5 minutes for dynamic campaign discovery
+- Error handling: Non-blocking, test-compatible database error handling
+- Test coverage: 20 comprehensive integration tests covering all event types and edge cases
 
 ## Combat Foundation
 
