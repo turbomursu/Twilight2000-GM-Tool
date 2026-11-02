@@ -262,7 +262,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 17) {
+    if (version > 18) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -568,6 +568,51 @@ function openRuntimeDatabase(path = ":memory:") {
       PRAGMA user_version = 17;`);
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 18) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE npc_archetypes (
+        campaign_id TEXT,
+        id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        description TEXT,
+        attribute_strength TEXT NOT NULL CHECK (attribute_strength IN ('A', 'B', 'C', 'D')),
+        attribute_agility TEXT NOT NULL CHECK (attribute_agility IN ('A', 'B', 'C', 'D')),
+        attribute_intelligence TEXT NOT NULL CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D')),
+        attribute_empathy TEXT NOT NULL CHECK (attribute_empathy IN ('A', 'B', 'C', 'D')),
+        hit_cap INTEGER NOT NULL CHECK (hit_cap >= 3),
+        cuf_rating TEXT NOT NULL CHECK (cuf_rating IN ('A', 'B', 'C', 'D')),
+        skills_json TEXT NOT NULL,
+        equipment_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (campaign_id, id)
+      ) STRICT;
+      CREATE INDEX npc_archetypes_by_category ON npc_archetypes(campaign_id, category);
+      ALTER TABLE personnel ADD COLUMN attribute_strength TEXT CHECK (attribute_strength IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN attribute_agility TEXT CHECK (attribute_agility IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN attribute_intelligence TEXT CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN attribute_empathy TEXT CHECK (attribute_empathy IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN hit_cap INTEGER CHECK (hit_cap >= 3);
+      ALTER TABLE personnel ADD COLUMN cuf_rating TEXT CHECK (cuf_rating IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN skills_json TEXT DEFAULT '[]';
+      ALTER TABLE personnel ADD COLUMN equipment_json TEXT DEFAULT '[]';
+      ALTER TABLE personnel ADD COLUMN morale_state TEXT DEFAULT 'normal' CHECK (morale_state IN ('high', 'normal', 'low', 'broken'));
+      ALTER TABLE personnel ADD COLUMN stress_damage INTEGER NOT NULL DEFAULT 0 CHECK (stress_damage >= 0);
+      ALTER TABLE personnel ADD COLUMN archetype_id TEXT;
+      ALTER TABLE personnel ADD COLUMN created_at TEXT;
+      ALTER TABLE personnel ADD COLUMN updated_at TEXT;
+      PRAGMA user_version = 18;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  database.exec("BEGIN");
+  try {
+    loadDefaultNPCArchetypes(database);
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
   }
   return database;
 }
@@ -2326,6 +2371,177 @@ function getPartyFaction(database, accountId, runtimeId) {
   };
 }
 
+function loadDefaultNPCArchetypes(database) {
+  try {
+    const { readFileSync } = require("node:fs");
+    const { join } = require("node:path");
+    const archetypesPath = join(__dirname, "..", "gmpack", "npc-archetypes.json");
+    let archetypesData;
+    try {
+      const fileContent = readFileSync(archetypesPath, "utf8");
+      archetypesData = JSON.parse(fileContent);
+    } catch (fileError) {
+      console.error(`Failed to read archetypes file at ${archetypesPath}:`, fileError.message);
+      throw fileError;
+    }
+    
+    if (!archetypesData.archetypes || !Array.isArray(archetypesData.archetypes)) {
+      throw new Error("Invalid archetype data format: missing 'archetypes' array");
+    }
+    
+    const timestamp = new Date().toISOString();
+    const insert = database.prepare(`INSERT INTO npc_archetypes
+      (campaign_id, id, name, category, description, attribute_strength, attribute_agility,
+       attribute_intelligence, attribute_empathy, hit_cap, cuf_rating, skills_json, equipment_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    
+    for (const archetype of archetypesData.archetypes) {
+      try {
+        insert.run(
+          null,
+          archetype.id,
+          archetype.name,
+          archetype.category,
+          archetype.description || "",
+          archetype.attributes.strength,
+          archetype.attributes.agility,
+          archetype.attributes.intelligence,
+          archetype.attributes.empathy,
+          archetype.hitCap,
+          archetype.cuf,
+          JSON.stringify(archetype.skills),
+          JSON.stringify(archetype.equipment),
+          timestamp
+        );
+      } catch (insertError) {
+        if (!/UNIQUE constraint failed/i.test(insertError.message)) {
+          console.error(`Failed to insert archetype ${archetype.id}:`, insertError.message);
+          throw insertError;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load default NPC archetypes:", error.message);
+    throw error;
+  }
+}
+
+function listNPCArchetypes(database, campaignId) {
+  const query = campaignId 
+    ? `SELECT * FROM npc_archetypes
+       WHERE campaign_id IS NULL OR campaign_id = ?
+       ORDER BY category, name`
+    : `SELECT * FROM npc_archetypes
+       WHERE campaign_id IS NULL
+       ORDER BY category, name`;
+  
+  const rows = campaignId
+    ? database.prepare(query).all(campaignId)
+    : database.prepare(query).all();
+    
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    attributes: {
+      strength: row.attribute_strength,
+      agility: row.attribute_agility,
+      intelligence: row.attribute_intelligence,
+      empathy: row.attribute_empathy
+    },
+    hitCap: row.hit_cap,
+    cufRating: row.cuf_rating,
+    skills: JSON.parse(row.skills_json),
+    equipment: JSON.parse(row.equipment_json)
+  }));
+}
+
+function getNPCArchetype(database, archetypeId) {
+  const row = database.prepare(`SELECT * FROM npc_archetypes WHERE id = ?`).get(archetypeId);
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    attributes: {
+      strength: row.attribute_strength,
+      agility: row.attribute_agility,
+      intelligence: row.attribute_intelligence,
+      empathy: row.attribute_empathy
+    },
+    hitCap: row.hit_cap,
+    cufRating: row.cuf_rating,
+    skills: JSON.parse(row.skills_json),
+    equipment: JSON.parse(row.equipment_json)
+  };
+}
+
+function createPersonnelFromArchetype(database, accountId, campaignId, archetypeId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Personnel creation input is required.");
+  const name = requireText(input.name, "Personnel name", 100);
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const archetype = getNPCArchetype(database, archetypeId);
+    if (!archetype) throw new Error("NPC archetype not found.");
+    
+    const maxRow = database.prepare("SELECT MAX(sort_order) AS max_order FROM personnel WHERE campaign_id = ?")
+      .get(campaignId);
+    const maxOrder = maxRow?.max_order ?? -1;
+    const newSortOrder = maxOrder + 1;
+    const personId = randomUUID();
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    
+    database.prepare(`INSERT INTO personnel
+      (campaign_id, id, name, role, condition, readiness, sort_order,
+       attribute_strength, attribute_agility, attribute_intelligence, attribute_empathy,
+       hit_cap, cuf_rating, skills_json, equipment_json, morale_state, stress_damage,
+       archetype_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        campaignId,
+        personId,
+        name,
+        input.role || archetype.category,
+        input.condition || "OK",
+        input.readiness || "ready",
+        newSortOrder,
+        archetype.attributes.strength,
+        archetype.attributes.agility,
+        archetype.attributes.intelligence,
+        archetype.attributes.empathy,
+        archetype.hitCap,
+        archetype.cufRating,
+        JSON.stringify(archetype.skills),
+        JSON.stringify(archetype.equipment),
+        "normal",
+        0,
+        archetypeId,
+        timestamp,
+        timestamp
+      );
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return database.prepare(`SELECT * FROM personnel WHERE campaign_id = ? AND id = ?`)
+      .get(campaignId, personId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 module.exports = {
   advanceRuntimeTime,
   rollRuntimeWeather,
@@ -2355,5 +2571,9 @@ module.exports = {
   finalizePlayerSeed,
   createCharacterChangeRequest,
   listCharacterChangeRequests,
-  reviewCharacterChangeRequest
+  reviewCharacterChangeRequest,
+  loadDefaultNPCArchetypes,
+  listNPCArchetypes,
+  getNPCArchetype,
+  createPersonnelFromArchetype
 };

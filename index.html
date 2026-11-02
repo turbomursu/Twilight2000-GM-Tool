@@ -404,6 +404,212 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
+
+    /* Personnel Management Styles */
+    .personnel-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+    }
+    .personnel-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .personnel-name {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      flex: 1;
+    }
+    .personnel-name strong {
+      font: 14px var(--serif);
+      overflow-wrap: anywhere;
+    }
+    .personnel-name small {
+      color: var(--muted);
+      font: 9px var(--mono);
+    }
+    .personnel-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .condition-badge {
+      padding: 4px 8px;
+      border-radius: 2px;
+      font: 9px var(--mono);
+      font-weight: 700;
+      background: #e0e6dd;
+      color: #344a40;
+    }
+    .personnel-status.status-wounded .condition-badge {
+      background: #f0e9d8;
+      color: #a97832;
+    }
+    .personnel-status.status-eliminated .condition-badge {
+      background: #efdfd8;
+      color: #b74435;
+    }
+    .readiness-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font: 12px var(--mono);
+      background: #f6f7f2;
+      color: var(--muted);
+    }
+    .personnel-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 0;
+      border-top: 1px solid #e8ece5;
+      border-bottom: 1px solid #e8ece5;
+    }
+    .stat-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 11px;
+    }
+    .stat-line .label {
+      color: var(--muted);
+      font: 9px var(--mono);
+      text-transform: uppercase;
+    }
+    .stat-line .value {
+      font: 11px var(--mono);
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .personnel-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .personnel-actions .button {
+      flex: 1;
+      min-width: 60px;
+      font-size: 10px;
+      padding: 8px 6px;
+    }
+
+    /* Archetype Browser Modal */
+    .archetype-category {
+      margin-bottom: 20px;
+    }
+    .archetype-category h3 {
+      margin: 0 0 10px;
+      font: 13px var(--serif);
+      color: var(--ink);
+      text-transform: capitalize;
+    }
+    .archetype-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .archetype-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: white;
+      cursor: pointer;
+      text-align: left;
+      transition: all .15s ease;
+    }
+    .archetype-card:hover {
+      border-color: var(--forest);
+      background: #f9faf6;
+      box-shadow: 0 2px 4px #17231f22;
+    }
+    .archetype-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font: 12px var(--serif);
+      color: var(--ink);
+    }
+    .archetype-card small {
+      display: block;
+      color: var(--muted);
+      font: 9px var(--mono);
+      margin-bottom: 8px;
+      min-height: 18px;
+      line-height: 1.4;
+    }
+    .archetype-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font: 9px var(--mono);
+      color: var(--muted);
+      border-top: 1px solid #e8ece5;
+      padding-top: 6px;
+    }
+    .archetype-stats span {
+      display: block;
+    }
+
+    /* Personnel Detail Modal */
+    #personnel-detail-modal .dialog-form {
+      display: grid;
+      gap: 14px;
+    }
+    .attribute-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 12px 0;
+      border: 1px solid #e8ece5;
+      padding: 12px;
+      border-radius: 2px;
+      background: #f9faf6;
+    }
+    .attribute-group .field {
+      margin: 0;
+    }
+    .attribute-group label {
+      font-size: 10px;
+    }
+
+    /* Archetype Creation Form */
+    #archetype-creation-modal .dialog-form {
+      display: grid;
+      gap: 14px;
+    }
+    .archetype-preview {
+      padding: 12px;
+      background: #f9faf6;
+      border: 1px solid #e8ece5;
+      border-radius: 2px;
+      margin-bottom: 6px;
+    }
+    .archetype-preview strong {
+      display: block;
+      font: 13px var(--serif);
+      margin-bottom: 6px;
+    }
+    .archetype-preview .preview-stat {
+      font: 10px var(--mono);
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    /* Roster Grid Responsive */
+    @media (max-width: 700px) {
+      .archetype-grid { grid-template-columns: 1fr; }
+      .personnel-actions .button { font-size: 9px; padding: 6px 5px; }
+    }
   </style>
 </head>
 <body>
@@ -755,6 +961,141 @@ Military rank || optional</textarea><span class="row-description">One field per 
       <div class="dialog-actions"><button class="button" id="cancel-runtime-import" type="button">Cancel</button><button class="button button-primary" id="apply-runtime-import" type="button" disabled>Import as new campaign</button></div>
     </div>
   </dialog>
+  <dialog id="personnel-detail-modal" aria-labelledby="detail-modal-title">
+    <div class="dialog-head"><div><div class="eyebrow">Column / personnel</div><h2 id="detail-modal-title">Personnel Details</h2></div><button class="icon-button" type="button" data-action="close-detail-modal" aria-label="Close personnel details">×</button></div>
+    <div class="dialog-form">
+      <div class="field">
+        <label for="detail-name">Name</label>
+        <input id="detail-name" type="text" maxlength="160" required>
+      </div>
+      <div class="field">
+        <label for="detail-role">Role</label>
+        <input id="detail-role" type="text" maxlength="80">
+      </div>
+      <div class="field">
+        <label for="detail-condition">Condition</label>
+        <select id="detail-condition">
+          <option value="OK">OK</option>
+          <option value="Wounded">Wounded</option>
+          <option value="Out of Action">Out of Action</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="detail-readiness">Readiness</label>
+        <select id="detail-readiness">
+          <option value="ready">Ready</option>
+          <option value="fatigued">Fatigued</option>
+          <option value="exhausted">Exhausted</option>
+        </select>
+      </div>
+      <div class="attribute-group">
+        <div class="field">
+          <label for="detail-str">Strength</label>
+          <select id="detail-str">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="detail-agi">Agility</label>
+          <select id="detail-agi">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="detail-int">Intelligence</label>
+          <select id="detail-int">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="detail-emp">Empathy</label>
+          <select id="detail-emp">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="detail-cuf">CUF Rating</label>
+        <select id="detail-cuf">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="detail-hit-cap">Hit Cap</label>
+        <input id="detail-hit-cap" type="number" min="3" max="6" value="4">
+      </div>
+      <p class="feedback" id="detail-status" role="status"></p>
+      <div class="dialog-actions">
+        <button class="button" type="button" id="detail-cancel">Cancel</button>
+        <button class="button button-primary" type="button" id="detail-save">Save changes</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="archetype-browser-modal" aria-labelledby="browser-title">
+    <div class="dialog-head"><div><div class="eyebrow">Column / personnel creation</div><h2 id="browser-title">Select archetype</h2></div><button class="icon-button" type="button" data-action="close-browser" aria-label="Close archetype browser">×</button></div>
+    <div class="dialog-form">
+      <p class="row-description">Choose an NPC archetype from the Referee's Manual. Customize the personnel details on the next screen.</p>
+      <div id="archetype-list" class="empty-state">Loading archetypes…</div>
+      <div class="dialog-actions">
+        <button class="button" type="button" id="cancel-browser">Cancel</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="archetype-creation-modal" aria-labelledby="creation-title">
+    <div class="dialog-head"><div><div class="eyebrow">Column / personnel creation</div><h2 id="creation-title">Create from archetype</h2></div><button class="icon-button" type="button" data-action="close-creation" aria-label="Close archetype creation">×</button></div>
+    <div class="dialog-form">
+      <div class="archetype-preview">
+        <strong id="creation-archetype-name">Archetype</strong>
+        <div class="preview-stat">Customize the personnel details below, then create.</div>
+      </div>
+      <div class="field">
+        <label for="creation-name">Personnel Name *</label>
+        <input id="creation-name" type="text" maxlength="160" required placeholder="e.g., Pvt. Williams">
+      </div>
+      <div class="field">
+        <label for="creation-role">Role</label>
+        <input id="creation-role" type="text" maxlength="80" placeholder="e.g., Rifleman">
+      </div>
+      <div class="field">
+        <label for="creation-condition">Initial Condition</label>
+        <select id="creation-condition">
+          <option value="OK">OK</option>
+          <option value="Wounded">Wounded</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="creation-readiness">Initial Readiness</label>
+        <select id="creation-readiness">
+          <option value="ready">Ready</option>
+          <option value="fatigued">Fatigued</option>
+          <option value="exhausted">Exhausted</option>
+        </select>
+      </div>
+      <p class="feedback" id="creation-status" role="status"></p>
+      <div class="dialog-actions">
+        <button class="button" type="button" id="creation-cancel">Cancel</button>
+        <button class="button button-primary" type="button" id="creation-create">Create personnel</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/vendor/leaflet.js"></script>
@@ -769,6 +1110,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/inventory-client.js" defer></script>
   <script src="/conditions-client.js" defer></script>
   <script src="/audit-client.js" defer></script>
+  <script src="/personnel-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -977,6 +1319,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeLocations: runtime.locations
         };
         runtimeDataLoaded = true;
+        // Load personnel archetypes and roster for the personnel client
+        if (window.personnelClient) {
+          window.personnelClient.loadPersonnelForCampaign(runtime.campaign.id);
+        }
         syncWeatherEditor();
         document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
         document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
@@ -2615,7 +2961,16 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
         if (action === "open-note") document.getElementById("note-dialog").showModal();
         if (action === "close-note") document.getElementById("note-dialog").close();
-        if (action === "open-person") openPersonDialog();
+        if (action === "open-person") {
+          // Load personnel for current runtime campaign, then open archetype browser
+          if (state.runtimeCampaignId) {
+            window.personnelClient.loadArchetypesForCampaign(state.runtimeCampaignId).then(() => {
+              window.personnelClient.openArchetypeBrowserModal();
+            });
+          } else {
+            showToast("Select a runtime campaign first to create personnel.");
+          }
+        }
         if (action === "edit-person") {
           const person = state.people.find((entry) => String(entry.id) === button.dataset.id);
           if (person) openPersonDialog(person);
@@ -2624,6 +2979,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           document.getElementById("person-dialog").close();
           editingPersonId = null;
         }
+        if (action === "close-detail-modal") document.getElementById("personnel-detail-modal").close();
+        if (action === "close-browser") document.getElementById("archetype-browser-modal").close();
+        if (action === "close-creation") document.getElementById("archetype-creation-modal").close();
         if (action === "export-record") {
           const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), campaign: state }, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
@@ -2921,6 +3279,37 @@ Military rank || optional</textarea><span class="row-description">One field per 
           personSubmitButton.disabled = false;
         }
       });
+
+      // Personnel modal event listeners
+      const detailModal = document.getElementById("personnel-detail-modal");
+      const detailForm = detailModal?.querySelector(".dialog-form");
+      const detailCancel = document.getElementById("detail-cancel");
+      const detailSave = document.getElementById("detail-save");
+      
+      if (detailCancel) detailCancel.addEventListener("click", () => detailModal?.close());
+      if (detailSave) detailSave.addEventListener("click", async () => {
+        // Handler for saving personnel details - will be connected by personnel-client
+        if (window.personnelClient?.handleDetailSave) {
+          await window.personnelClient.handleDetailSave();
+        }
+      });
+
+      const browserModal = document.getElementById("archetype-browser-modal");
+      const cancelBrowser = document.getElementById("cancel-browser");
+      if (cancelBrowser) cancelBrowser.addEventListener("click", () => browserModal?.close());
+
+      const creationModal = document.getElementById("archetype-creation-modal");
+      const creationCancel = document.getElementById("creation-cancel");
+      const creationCreate = document.getElementById("creation-create");
+      
+      if (creationCancel) creationCancel.addEventListener("click", () => creationModal?.close());
+      if (creationCreate) creationCreate.addEventListener("click", async () => {
+        // Handler for creating personnel - will be connected by personnel-client
+        if (window.personnelClient?.handleCreationSubmit) {
+          await window.personnelClient.handleCreationSubmit();
+        }
+      });
+
       const routeEditorDialog = document.getElementById("route-editor-dialog");
       const routeEditorForm = document.getElementById("route-editor-form");
       const routeEditorStatus = document.getElementById("route-editor-status");

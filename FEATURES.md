@@ -88,9 +88,11 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 
 ## Environment
 
-- **Dynamic weather** — Partial. Verified Fair/Cloudy/Rain-Snow state progression and one-shift duration are supported; GM-defined conditions remain manual and do not receive guessed rules effects.
-- **Route modifiers** — Planned. Verify any rules-based movement or travel effects against Fourth Edition sources; keep campaign-specific conditions separate.
-- **Travel conditions** — Planned. Support GM-managed conditions and clearly label any unverified interpretation.
+- **Dynamic weather** — Implemented. Fair/Cloudy/Rain-Snow state progression with die roll interpretation (0 symbols = no change, 1 = worsen, 2 = improve). Auto-revert: Rain/Snow reverts to Cloudy after 1 shift. Visibility modifiers by condition and light level (daylight/darkness/moon). Attack/march/drive modifiers apply: Rain/Snow -1 attack, -1 march, -2 drive. GM interface at `/weather.html` with 6 calculator panels. Full T2K 4E rules verified against Referee Aid - Strategic Play.
+- **Travel calculations** — Implemented. Marching distances (2 hexes/shift road/open, 1 hex/shift other terrain). Driving distances (base 5 hexes/shift with terrain multipliers: road/open ×1, woods ×0.5, hills ×0.75, mountains ×0.25, lake ×1, swamp ×0.5, ruins ×0.5). Fuel consumption (1 liter per hex, alcohol ×2). Rations calculator (1 per person per day, separate food/water). Terrain modifiers for Foraging/Hunting/Scrounging/Driving tasks across all 8 terrain types. Encounter distance (halfway point in shift). GM-facing calculator and HTTP API. All mechanics verified against Referee Aid - Strategic Play.
+- **Supply & conditions** — Implemented. Starvation effects (cannot heal, -1/week, dies week 3). Dehydration effects (cannot heal, -1/day, dies day 3). Sleep deprivation effects (cannot heal stress, -1/day). Hypothermia mechanics (Stamina roll in cold, GM-adjudicated frequency). Status tracking per person/group. Integrated with travel system.
+- **Route modifiers** — Planned. Weather and terrain modifiers are implemented; scenario-specific conditions and strategic campaign modifiers remain planned.
+- **Travel conditions** — Implemented. Full travel system supports weather, terrain, fuel, supply, and affliction tracking. Campaign-specific event conditions remain GM-managed.
 
 ## Logistics
 

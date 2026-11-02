@@ -1,5 +1,5 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard } = require("./runtime-store.cjs");
+const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard, listNPCArchetypes, createPersonnelFromArchetype } = require("./runtime-store.cjs");
 const { createCombatHandler } = require("./combat-api.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
@@ -401,6 +401,36 @@ function createCampaignHandler({ database }) {
         const status = error instanceof HttpError ? error.status
           : error.code?.startsWith("ERR_SQLITE_CONSTRAINT") || /constraint failed/i.test(error.message) || /already|no more than four|cannot also/.test(error.message) ? 409
             : /GM ownership|Campaign not found|Player seed template not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    const archetypesMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/npc-archetypes$/);
+    if (archetypesMatch && request.method === "GET") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(archetypesMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+        const archetypes = listNPCArchetypes(database, campaignId);
+        return sendJson(response, 200, { archetypes });
+      } catch (error) {
+        return sendJson(response, 404, { error: error.message });
+      }
+    }
+    const personnelMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/personnel\/from-archetype$/);
+    if (personnelMatch && request.method === "POST") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(personnelMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const body = await readJsonBody(request);
+        if (!body.archetypeId) throw new HttpError(400, "Archetype ID is required.");
+        const personnel = createPersonnelFromArchetype(database, account.id, campaignId, body.archetypeId, body);
+        return sendJson(response, 201, { personnel });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|access denied/.test(error.message) ? 404
+            : /archetype not found/.test(error.message) ? 404 : 422;
         return sendJson(response, status, { error: error.message });
       }
     }

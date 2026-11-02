@@ -136,17 +136,27 @@ Each milestone is a **self-contained system** that can be developed and tested i
 
 ### 🌤️ Milestone 4b: Rules Assistance — Weather & Travel
 
-**Status:** ⚪ **READY (Not Started)**
+**Status:** ✅ **COMPLETE**
 
 **Scope:**
-- [ ] Weather table roller and effect calculator
-- [ ] Visibility modifiers from weather conditions
-- [ ] Travel distance calculator (marching, driving rates)
-- [ ] Fuel consumption and supply tracking
-- [ ] Encounter frequency modifiers
-- [ ] Fatigue and supply depletion effects
+- [x] Weather table roller and effect calculator (Fair/Cloudy/Rain-Snow progression)
+- [x] Visibility modifiers from weather conditions (daylight/darkness/moon)
+- [x] Travel distance calculator (marching, driving rates by terrain)
+- [x] Fuel consumption and supply tracking (gasoline/diesel/alcohol, rations)
+- [x] Encounter frequency modifiers (halfway point calculation)
+- [x] Fatigue and supply depletion effects (starvation, dehydration, sleep, cold)
+- [x] GM interface form (weather.html with 6 calculator panels)
+- [x] HTTP API endpoints (6 POST routes)
+- [x] Comprehensive test suite (25 new tests, 161 total passing)
 
 **Verified Against:** T2K 4E Referee Aids (Strategic Play section in gmpack/ocr/)
+
+**Exit Checks:** ✅ All passed
+- All 25 weather/travel tests passing (100% pass rate)
+- Zero regressions (161/161 total tests)
+- weather.html registered and accessible to GM
+- All API endpoints return correct calculations
+- No random number generation (GM enters die results, system calculates deterministically)
 
 **Dependencies:** None (can start immediately)
 
