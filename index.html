@@ -610,6 +610,88 @@
       .archetype-grid { grid-template-columns: 1fr; }
       .personnel-actions .button { font-size: 9px; padding: 6px 5px; }
     }
+
+    /* Location Management Styles */
+    .location-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .location-controls select {
+      flex: 1;
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid var(--line);
+      background: white;
+      font-size: 11px;
+    }
+    .location-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .location-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: white;
+      cursor: pointer;
+    }
+    .location-card:hover {
+      border-color: var(--forest);
+      background: #f9faf6;
+      box-shadow: 0 2px 4px #17231f22;
+    }
+    .location-card h3 {
+      margin: 0 0 4px;
+      font: 12px var(--serif);
+      color: var(--ink);
+    }
+    .location-card .kind {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #e8ece5;
+      border-radius: 2px;
+      font: 9px var(--mono);
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: capitalize;
+    }
+    .location-card .coords {
+      font: 9px var(--mono);
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .location-card .visibility-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #f0e9d8;
+      border-radius: 2px;
+      font: 8px var(--mono);
+      color: #a97832;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .location-card .visibility-badge.gm-only {
+      background: #efdfd8;
+      color: #b74435;
+    }
+    .location-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .location-actions button {
+      flex: 1;
+      font-size: 9px;
+      padding: 6px 4px;
+    }
+
+    /* Location Editor Modal */
+    #location-editor-modal .dialog-form {
+      display: grid;
+      gap: 14px;
+    }
   </style>
 </head>
 <body>
@@ -1096,6 +1178,71 @@ Military rank || optional</textarea><span class="row-description">One field per 
     </div>
   </dialog>
 
+  <dialog id="location-editor-modal" aria-labelledby="location-editor-title">
+    <div class="dialog-head">
+      <div>
+        <div class="eyebrow">GM runtime / map</div>
+        <h2 id="location-editor-title">Edit location</h2>
+      </div>
+      <button class="icon-button" type="button" data-action="close-location-editor" aria-label="Close location editor">×</button>
+    </div>
+    <div class="dialog-form">
+      <div class="field">
+        <label for="location-name">Location Name *</label>
+        <input id="location-name" type="text" maxlength="160" required placeholder="e.g., Sälen">
+      </div>
+      <div class="field">
+        <label for="location-kind">Location Type</label>
+        <select id="location-kind">
+          <option value="Settlement">Settlement</option>
+          <option value="Checkpoint">Checkpoint</option>
+          <option value="Supply Cache">Supply Cache</option>
+          <option value="Base">Military Base</option>
+          <option value="Ruin">Ruin/Abandoned Site</option>
+          <option value="Point of Interest">Point of Interest</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="location-description">Description</label>
+        <input id="location-description" type="text" maxlength="300" placeholder="Brief description for players">
+      </div>
+      <div class="field">
+        <label for="location-gridref">Grid Reference</label>
+        <input id="location-gridref" type="text" maxlength="40" placeholder="e.g., A1, 12,34">
+      </div>
+      <div class="field">
+        <label>Map Position *</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label for="location-lat" style="display: block; font: 9px var(--mono); margin-bottom: 4px;">Latitude</label>
+            <input id="location-lat" type="number" step="0.01" placeholder="61.4" required>
+          </div>
+          <div>
+            <label for="location-lng" style="display: block; font: 9px var(--mono); margin-bottom: 4px;">Longitude</label>
+            <input id="location-lng" type="number" step="0.01" placeholder="14.9" required>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="location-visibility">Visibility</label>
+        <select id="location-visibility">
+          <option value="gm-only">GM Only</option>
+          <option value="players">Players</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="location-notes">GM Notes (hidden from players)</label>
+        <textarea id="location-notes" maxlength="1000" rows="3" placeholder="Internal notes, threats, secrets"></textarea>
+      </div>
+      <p class="feedback" id="location-editor-status" role="status"></p>
+      <div class="dialog-actions">
+        <button class="button" type="button" id="location-editor-cancel">Cancel</button>
+        <button class="button button-primary" type="button" id="location-editor-save">Save location</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/vendor/leaflet.js"></script>
@@ -1111,6 +1258,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/conditions-client.js" defer></script>
   <script src="/audit-client.js" defer></script>
   <script src="/personnel-client.js" defer></script>
+  <script src="/location-client.js" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -2982,6 +3130,24 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (action === "close-detail-modal") document.getElementById("personnel-detail-modal").close();
         if (action === "close-browser") document.getElementById("archetype-browser-modal").close();
         if (action === "close-creation") document.getElementById("archetype-creation-modal").close();
+        if (action === "close-location-editor") document.getElementById("location-editor-modal").close();
+        if (action === "open-location-create") {
+          if (state.runtimeCampaignId) {
+            window.locationClient.openLocationCreationForm();
+          } else {
+            showToast("Select a runtime campaign first.");
+          }
+        }
+        if (action === "edit-location") {
+          const locationId = button.dataset.locationId;
+          window.locationClient.openLocationEditorModal(locationId);
+        }
+        if (action === "delete-location") {
+          const locationId = button.dataset.locationId;
+          if (confirm("Delete this location? Cannot undo.")) {
+            window.locationClient.deleteLocationViaAPI(locationId).catch(error => showToast("Error: " + error.message));
+          }
+        }
         if (action === "export-record") {
           const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), campaign: state }, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);

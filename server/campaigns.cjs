@@ -1,6 +1,7 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard, listNPCArchetypes, createPersonnelFromArchetype } = require("./runtime-store.cjs");
+const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard, listNPCArchetypes, createPersonnelFromArchetype, listLocationsForCampaign, createLocation, updateLocation, deleteLocation } = require("./runtime-store.cjs");
 const { createCombatHandler } = require("./combat-api.cjs");
+const { BackupScheduleType, createBackupSchedule, getBackupSchedule, updateBackupSchedule, getBackupHistory, initializeBackupScheduler } = require("./backup-scheduler.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
@@ -405,6 +406,48 @@ function createCampaignHandler({ database }) {
       }
     }
 
+    const locationsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/locations(?:\/([^/]+))?$/);
+    if (locationsMatch) {
+      if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        let locationId;
+        try { 
+          campaignId = decodeURIComponent(locationsMatch[1]); 
+          locationId = locationsMatch[2] ? decodeURIComponent(locationsMatch[2]) : null;
+        } catch { throw new HttpError(400, "Invalid campaign or location ID."); }
+
+        if (request.method === "GET" && !locationId) {
+          const locations = listLocationsForCampaign(database, account.id, campaignId);
+          return sendJson(response, 200, { locations });
+        }
+
+        if (request.method === "POST" && !locationId) {
+          const body = await readJsonBody(request);
+          const location = createLocation(database, account.id, campaignId, body);
+          return sendJson(response, 201, { location });
+        }
+
+        if (request.method === "PUT" && locationId) {
+          const body = await readJsonBody(request);
+          const location = updateLocation(database, account.id, campaignId, locationId, body);
+          return sendJson(response, 200, { location });
+        }
+
+        if (request.method === "DELETE" && locationId) {
+          const result = deleteLocation(database, account.id, campaignId, locationId);
+          return sendJson(response, 200, result);
+        }
+
+        throw new HttpError(405, "Method not allowed for this endpoint.");
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|Location not found|access denied/.test(error.message) ? 404
+            : /while it is used in the campaign route/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
     const archetypesMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/npc-archetypes$/);
     if (archetypesMatch && request.method === "GET") {
       try {
@@ -448,6 +491,68 @@ function createCampaignHandler({ database }) {
         ? sendJson(response, 200, { campaign })
         : sendJson(response, 404, { error: "Campaign not found." });
     }
+
+    // Backup Schedule Routes
+    const backupScheduleMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup-schedule$/);
+    if (backupScheduleMatch) {
+      if (!["GET", "POST", "PATCH"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(backupScheduleMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          initializeBackupScheduler(database);
+          const schedule = getBackupSchedule(database, campaignId);
+          return sendJson(response, 200, { schedule: schedule || null });
+        }
+
+        if (request.method === "POST") {
+          const body = await readJsonBody(request);
+          if (!body.scheduleType) throw new HttpError(400, "Schedule type is required.");
+          initializeBackupScheduler(database);
+          createBackupSchedule(database, campaignId, body.scheduleType, body.options || {});
+          const schedule = getBackupSchedule(database, campaignId);
+          return sendJson(response, 201, { schedule });
+        }
+
+        if (request.method === "PATCH") {
+          const body = await readJsonBody(request);
+          if (!body.updates || typeof body.updates !== "object") throw new HttpError(400, "Updates object is required.");
+          initializeBackupScheduler(database);
+          updateBackupSchedule(database, campaignId, body.updates);
+          const schedule = getBackupSchedule(database, campaignId);
+          return sendJson(response, 200, { schedule });
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Backup History Routes
+    const backupHistoryMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup-history$/);
+    if (backupHistoryMatch && request.method === "GET") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(backupHistoryMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit")) || 50, 1), 500);
+
+        initializeBackupScheduler(database);
+        const history = getBackupHistory(database, campaignId, limit);
+        return sendJson(response, 200, { history, count: history.length });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
     if (url.pathname.startsWith("/api/campaigns/")) return sendJson(response, 405, { error: "Method not allowed." });
     return sendJson(response, 404, { error: "Not found." });
   };

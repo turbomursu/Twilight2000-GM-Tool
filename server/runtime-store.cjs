@@ -2478,6 +2478,210 @@ function getNPCArchetype(database, archetypeId) {
   };
 }
 
+function listLocationsForCampaign(database, accountId, campaignId) {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const locations = database.prepare(`SELECT * FROM locations WHERE runtime_campaign_id = ? ORDER BY name`)
+      .all(campaignId);
+    
+    database.exec("COMMIT");
+    return locations.map(loc => ({
+      id: loc.id,
+      name: loc.name,
+      kind: loc.kind,
+      description: loc.description,
+      gridRef: loc.grid_ref,
+      mapPosition: loc.map_position_json ? JSON.parse(loc.map_position_json) : { lat: 0, lng: 0 },
+      visibilityEligibility: loc.visibility_eligibility,
+      isStartingLocation: loc.is_starting_location === 1
+    }));
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function createLocation(database, accountId, campaignId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Location input is required.");
+  
+  const name = requireText(input.name, "Location name", 160);
+  const kind = requireText(input.kind || "", "Location kind", 80);
+  const description = requireText(input.description || "", "Description", 500);
+  const visibilityEligibility = requireText(input.visibilityEligibility || "gm-only", "Visibility", 20);
+  
+  if (!["gm-only", "players"].includes(visibilityEligibility)) {
+    throw new Error("Visibility must be 'gm-only' or 'players'.");
+  }
+  
+  if (!input.mapPosition || typeof input.mapPosition !== "object") {
+    throw new Error("Map position is required.");
+  }
+  
+  const lat = input.mapPosition.lat;
+  const lng = input.mapPosition.lng;
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    throw new Error("Map position must have lat and lng numbers.");
+  }
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
+      .get(campaignId);
+    if (mapData) {
+      const bounds = JSON.parse(mapData.bounds_json);
+      if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
+        throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
+      }
+    }
+    
+    const locationId = randomUUID();
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    
+    database.prepare(`INSERT INTO locations
+      (runtime_campaign_id, id, name, kind, description, grid_ref, coordinates_json, map_position_json, visibility_eligibility, is_starting_location)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        campaignId,
+        locationId,
+        name,
+        kind,
+        description,
+        input.gridRef || null,
+        null,
+        JSON.stringify({ lat, lng }),
+        visibilityEligibility,
+        input.isStartingLocation ? 1 : 0
+      );
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function updateLocation(database, accountId, campaignId, locationId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Location update input is required.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+    if (!location) throw new Error("Location not found.");
+    
+    const name = input.name !== undefined ? requireText(input.name, "Location name", 160) : location.name;
+    const kind = input.kind !== undefined ? requireText(input.kind, "Location kind", 80) : location.kind;
+    const description = input.description !== undefined ? requireText(input.description, "Description", 500) : location.description;
+    const visibilityEligibility = input.visibilityEligibility !== undefined ? requireText(input.visibilityEligibility, "Visibility", 20) : location.visibility_eligibility;
+    
+    if (!["gm-only", "players"].includes(visibilityEligibility)) {
+      throw new Error("Visibility must be 'gm-only' or 'players'.");
+    }
+    
+    let mapPosition = location.map_position_json ? JSON.parse(location.map_position_json) : { lat: 0, lng: 0 };
+    if (input.mapPosition && typeof input.mapPosition === "object") {
+      const lat = input.mapPosition.lat;
+      const lng = input.mapPosition.lng;
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        throw new Error("Map position must have lat and lng numbers.");
+      }
+      
+      const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
+        .get(campaignId);
+      if (mapData) {
+        const bounds = JSON.parse(mapData.bounds_json);
+        if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
+          throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
+        }
+      }
+      
+      mapPosition = { lat, lng };
+    }
+    
+    const gridRef = input.gridRef !== undefined ? input.gridRef : location.grid_ref;
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    
+    database.prepare(`UPDATE locations SET 
+      name = ?, kind = ?, description = ?, grid_ref = ?, map_position_json = ?, 
+      visibility_eligibility = ? 
+      WHERE runtime_campaign_id = ? AND id = ?`)
+      .run(
+        name, kind, description, gridRef, JSON.stringify(mapPosition),
+        visibilityEligibility, campaignId, locationId
+      );
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function deleteLocation(database, accountId, campaignId, locationId, options = {}) {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+    if (!location) throw new Error("Location not found.");
+    
+    const inRoute = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND location_id = ?")
+      .get(campaignId, locationId);
+    if (inRoute && inRoute.count > 0) {
+      throw new Error("Cannot delete location while it is used in the campaign route.");
+    }
+    
+    database.prepare("DELETE FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .run(campaignId, locationId);
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return { success: true };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 function createPersonnelFromArchetype(database, accountId, campaignId, archetypeId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Personnel creation input is required.");
   const name = requireText(input.name, "Personnel name", 100);
@@ -2575,5 +2779,9 @@ module.exports = {
   loadDefaultNPCArchetypes,
   listNPCArchetypes,
   getNPCArchetype,
+  listLocationsForCampaign,
+  createLocation,
+  updateLocation,
+  deleteLocation,
   createPersonnelFromArchetype
 };
