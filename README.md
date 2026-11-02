@@ -16,7 +16,7 @@ Run the roadmap and feature pages independently from the GM app with `node serve
 
 ## LAN Auth API
 
-The Node service enforces GM/player roles and campaign ownership. Conditions, inventories/proposals, supported campaign records, publications, and COMMS persist in SQLite. Players receive only their assigned character's public condition record; private GM notes are excluded. The GM manages condition and inventory state. Derived condition/carrying effects, verified item catalogs, and dice-governed actions remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 without encryption. Use only on a trusted LAN, never the internet or untrusted networks.
+The Node service enforces GM/player roles and campaign ownership. Conditions, inventories/proposals, supported campaign records, publications, and COMMS persist in SQLite. The GM runtime includes a GM-only descriptive conflict/incident ledger; it does not calculate escalation or publish incidents to players. Players receive only their assigned character's public condition record; private GM notes are excluded. The GM manages condition and inventory state. Derived condition/carrying effects, verified item catalogs, and dice-governed actions remain unconnected. Node 24 or newer is required; HTTP defaults to port 8080 without encryption. Use only on a trusted LAN, never the internet or untrusted networks.
 
 In PowerShell, configure a one-time bootstrap token before starting the service:
 

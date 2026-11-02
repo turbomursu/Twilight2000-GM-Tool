@@ -66,6 +66,7 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 
 - **Runtime route and map editing** — Partial. The GM can reorder route stops, edit leg details/distances, and move campaign location points within imported map bounds. Saves are owner/revision checked, audited, and backed up. Setup geometry remains immutable and player map publication remains a separate explicit workflow; broader map editing is planned.
 - **Personnel roster editing** — Partial. The GM can add, edit, and remove personnel through the owner-scoped runtime API. Saves use the campaign revision; stale edits reload current roster state while preserving the open draft for review and retry. Runtime backups preserve personnel fields. Broader roster history and derived rules effects remain unimplemented.
+- **Conflict incident tracking** — Partial. The GM-only runtime ledger stores descriptive incident category, status, date, title, and GM notes. Saves are owner/revision checked and audited; runtime backup recovery preserves the records. It does not calculate escalation or create encounters, and incidents are not player-published.
 - **Campaign audit history** — Implemented metadata slice. Owner-only Audit view shows actor/target snapshots, record and campaign revisions, UTC time, campaign date/day, and live/recovered origin with pagination. Condition save/clear, inventory stock/correction/removal and proposal decisions, report/map draft/publish/withdraw, manual dashboard and journal updates, faction influence/prominence edits, character change request reviews, player seat assignments, and restores are audited in their mutation transactions. Failed writes and read-only previews create no events. SQLite rejects event updates/deletes; backup restore preserves later live entries, merges missing saved events as backup-origin metadata, rejects conflicting IDs, and appends a restore event. API permissions, atomic failures, file reopen, recovery, and browser paging/safe-text/player denial checks pass. This is not a cryptographic tamper-proof log. Player proposals/COMMS and account/auth events are not audited by this slice; full snapshots, retention tooling, and wider coverage remain planned. Historical pre-upgrade actions are not fabricated or backfilled.
 
 - **Development runtime fixture** — Implemented for development/testing only. `node server/seed-sample.cjs --db <dev-db-path> --gm <gm-username>` creates an idempotent `The Long Road` campaign with dashboard counters, route stops, personnel, journal entries, and one sample player seed. It refuses the configured/default live DB. The owning GM can read the normalized snapshot from `GET /api/campaigns/:id/runtime`; supported Situation, Personnel, Movement, and Journal fields, including campaign era/premise display, connect to it. Remaining dashboard panels are still incomplete.
@@ -121,12 +122,10 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 
 ## Conflict
 
-- **Conflict escalation** — Planned.
-- **Border incidents** — Planned.
-- **Trade disruption** — Planned.
+- **Conflict and incident ledger** — Partial. The GM can record, edit, monitor, and resolve campaign-scoped border incidents, trade disruptions, convoy attacks, and other threats. Records are owner- and revision-checked, audited, and included in runtime backup recovery. Categories and status are descriptive only; escalation calculations, generated scenarios, and player publication are not implemented.
+- **Conflict escalation** — Planned. No escalation thresholds or consequences are calculated.
 - **Territorial control** — Planned.
 - **Threat generation** — Planned.
-- **Convoy attacks** — Planned.
 
 ## Combat Foundation
 

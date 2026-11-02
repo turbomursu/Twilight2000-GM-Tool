@@ -151,6 +151,7 @@ Integration check (01 Nov 2026): combined recovery, cross-host runtime import wi
 - Generate threat intelligence, missions, ambushes, raids, roadblocks, sabotage encounters, and opposing forces as GM-reviewed scenario material.
 - Implement tactical encounter tools and the battle calculator using verified Fourth Edition procedures.
 - Keep encounter generation separate from rules resolution; label assumptions and homebrew.
+- Initial implementation slice: a GM-only, manually authored conflict/incident ledger. It records descriptive categories and status without calculating escalation, resolving encounters, or publishing to players.
 
 **Exit checks:** Rules-backed calculations match source-checked examples; generated threats and encounters remain editable proposals; reports identify their sources and uncertainty.
 

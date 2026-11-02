@@ -974,6 +974,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           status.textContent = "GM-only bookkeeping. No rules effects are calculated.";
         }
         const entries = state.conflicts || [];
+        if (runtimeDataLoaded && editingConflictId === null && !document.getElementById("conflict-date").value) {
+          document.getElementById("conflict-date").value = state.date;
+        }
         document.getElementById("conflict-list").innerHTML = entries.length
           ? entries.map((incident) => `<article class="conflict-card"><div class="conflict-card-head"><div><h3>${escapeHtml(incident.title)}</h3><div class="conflict-card-meta">${escapeHtml(conflictTypeLabel(incident.type))} / ${escapeHtml(dateLabel(incident.incidentDate))}</div></div><div class="conflict-card-actions"><span class="conflict-status ${incident.status === "resolved" ? "resolved" : ""}">${escapeHtml(incident.status)}</span><button class="button" data-action="edit-conflict" data-id="${escapeHtml(incident.id)}">Edit</button>${incident.status !== "resolved" ? `<button class="button" data-action="resolve-conflict" data-id="${escapeHtml(incident.id)}">Resolve</button>` : ""}</div></div>${incident.notes ? `<p>${escapeHtml(incident.notes)}</p>` : ""}</article>`).join("")
           : `<div class="empty-state">${runtimeDataLoaded ? "No incidents recorded." : "Select a runtime campaign to load its GM-only incidents."}</div>`;
@@ -2725,7 +2728,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
           const incident = state.conflicts.find((entry) => String(entry.id) === button.dataset.id);
           if (!incident || !runtimeDataLoaded) return;
           const conflicts = state.conflicts.map((entry) => String(entry.id) === String(incident.id) ? { ...entry, status: "resolved" } : entry);
-          await commitRuntimeUpdate({ conflicts }, () => { state.conflicts = conflicts; }, "Incident marked resolved.");
+          const saved = await commitRuntimeUpdate({ conflicts }, () => { state.conflicts = conflicts; }, "Incident marked resolved.");
+          if (saved && String(editingConflictId) === String(incident.id)) clearConflictForm();
         }
         if (action === "edit-person") {
           const person = state.people.find((entry) => String(entry.id) === button.dataset.id);
