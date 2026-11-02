@@ -217,6 +217,21 @@
     .person-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
     .person-meta span { padding: 5px 7px; border: 1px solid var(--line); color: #56635a; font: 9px var(--mono); text-transform: uppercase; }
     .person-actions { display: flex; gap: 3px; }
+    .conflict-list { display: grid; gap: 10px; }
+    .conflict-card { padding: 14px; border: 1px solid var(--line); background: var(--surface); }
+    .conflict-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .conflict-card h3 { margin: 0 0 5px; font: 17px var(--serif); }
+    .conflict-card-meta { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .conflict-card p { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .conflict-card-actions { display: flex; gap: 5px; }
+    .conflict-form { display: grid; gap: 10px; }
+    .conflict-form fieldset { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+    .conflict-form fieldset:disabled { opacity: .6; }
+    .conflict-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .conflict-form input, .conflict-form select, .conflict-form textarea { width: 100%; }
+    .conflict-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .conflict-status { color: var(--muted); font: 10px var(--mono); }
+    .conflict-status.resolved { color: #60795e; }
     .icon-button { display: inline-grid; width: 29px; height: 29px; place-items: center; border: 1px solid transparent; border-radius: 2px; color: var(--muted); background: transparent; font: 14px var(--mono); }
     .icon-button:hover { border-color: var(--line); color: var(--signal); background: #fff; }
     .section-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 28px 0 12px; }
@@ -427,6 +442,7 @@
         <button class="nav-item" data-view="conditions"><span class="nav-icon" aria-hidden="true">09</span>Conditions</button>
         <button class="nav-item" data-view="audit"><span class="nav-icon" aria-hidden="true">10</span>Audit</button>
         <button class="nav-item" data-view="roster"><span class="nav-icon" aria-hidden="true">02</span>Personnel</button>
+        <button class="nav-item" data-view="conflicts"><span class="nav-icon" aria-hidden="true">11</span>Conflicts</button>
         <button class="nav-item" data-view="movement"><span class="nav-icon" aria-hidden="true">03</span>Movement</button>
         <button class="nav-item" data-view="journal"><span class="nav-icon" aria-hidden="true">04</span>Field journal</button>
         <button class="nav-item" data-view="influence"><span class="nav-icon" aria-hidden="true">05</span>Faction influence</button>
@@ -574,6 +590,37 @@
           </div>
           <div class="section-bar"><div><h2>Attached personnel</h2><p id="roster-count"></p></div><span class="inline-hint">LOCAL CAMPAIGN RECORD</span></div>
           <div class="roster-grid" id="roster-grid"></div>
+        </section>
+
+        <section class="view" id="view-conflicts" aria-labelledby="conflicts-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">GM-only / campaign record</div><h1 id="conflicts-title">Conflict ledger</h1></div>
+          </div>
+          <p>Record incidents and threats for GM review. Categories and status are descriptive only; this ledger does not calculate escalation, generate encounters, or publish to players.</p>
+          <div class="conflict-layout movement-grid">
+            <section class="panel" aria-labelledby="conflict-form-title">
+              <div class="panel-head"><div><div class="eyebrow">Manual record</div><h2 id="conflict-form-title">New incident</h2></div></div>
+              <div class="panel-body">
+                <form id="conflict-form" class="conflict-form">
+                  <fieldset id="conflict-fields" disabled>
+                    <label class="field"><span class="eyebrow">Title</span><input id="conflict-title" maxlength="120" required></label>
+                    <div class="conflict-form-row">
+                      <label class="field"><span class="eyebrow">Category</span><select id="conflict-type"><option value="border-incident">Border incident</option><option value="trade-disruption">Trade disruption</option><option value="convoy-attack">Convoy attack</option><option value="active-threat">Active threat</option><option value="other">Other</option></select></label>
+                      <label class="field"><span class="eyebrow">Status</span><select id="conflict-status"><option value="open">Open</option><option value="monitoring">Monitoring</option><option value="resolved">Resolved</option></select></label>
+                    </div>
+                    <label class="field"><span class="eyebrow">Incident date</span><input id="conflict-date" type="date" required></label>
+                    <label class="field"><span class="eyebrow">GM notes / source / uncertainty</span><textarea id="conflict-notes" maxlength="4000" rows="4"></textarea></label>
+                    <div class="conflict-form-actions"><button class="button button-primary" id="conflict-submit" type="submit">Save incident</button><button class="button" type="button" data-action="clear-conflict-form">Clear form</button></div>
+                  </fieldset>
+                  <p class="feedback" id="conflict-form-status" role="status" aria-live="polite">Select a runtime campaign to manage incidents.</p>
+                </form>
+              </div>
+            </section>
+            <section class="panel" aria-labelledby="conflict-list-title">
+              <div class="panel-head"><div><div class="eyebrow">Campaign-specific / GM-only</div><h2 id="conflict-list-title">Recorded incidents</h2></div></div>
+              <div class="panel-body"><div class="conflict-list" id="conflict-list"></div></div>
+            </section>
+          </div>
         </section>
 
         <section class="view" id="view-movement" aria-labelledby="movement-title">
@@ -792,6 +839,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           { id: 3, name: "Lena Fors", role: "Scout", condition: "Stable", status: "Ready" },
           { id: 4, name: "Tomas Varga", role: "Mechanic", condition: "Exhausted", status: "Watch" }
         ],
+        conflicts: [],
         notes: [
           { id: 3, title: "A light on the ridge", body: "A single light moved above the treeline after dusk. No sound carried down to the road. Keep the column off the skyline tomorrow.", date: "2000-05-11", kind: "Observation" },
           { id: 2, title: "Fuel tally", body: "The truck is running rough. Tomas wants to check the filter before the next long stretch.", date: "2000-05-10", kind: "Logistics" },
@@ -848,6 +896,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let liveInfluenceEditing = false;
       let runtimeDataLoaded = false;
       let editingPersonId = null;
+      let editingConflictId = null;
+      let editingConflictCampaignId = null;
       let runtimeFactionLayers = null;
       let factionSavePending = false;
 
@@ -905,6 +955,29 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("roster-preview").innerHTML = state.people.slice(0, 4).map(personPreview).join("") || `<div class="empty-state">No personnel recorded.</div>`;
         document.getElementById("roster-count").textContent = `${state.people.length} ${state.people.length === 1 ? "person" : "people"} attached to the column`;
       }
+      function conflictTypeLabel(type) {
+        return ({ "border-incident": "Border incident", "trade-disruption": "Trade disruption", "convoy-attack": "Convoy attack",
+          "active-threat": "Active threat", other: "Other" })[type] || "Other";
+      }
+      function renderConflicts() {
+        const fields = document.getElementById("conflict-fields");
+        const status = document.getElementById("conflict-form-status");
+        const submit = document.getElementById("conflict-submit");
+        fields.disabled = !runtimeDataLoaded;
+        if (!runtimeDataLoaded) {
+          status.className = "feedback";
+          status.textContent = "Select a runtime campaign to manage incidents.";
+          submit.textContent = "Save incident";
+          document.getElementById("conflict-form-title").textContent = "New incident";
+        } else if (editingConflictId === null && status.textContent.startsWith("Select a runtime campaign")) {
+          status.className = "feedback";
+          status.textContent = "GM-only bookkeeping. No rules effects are calculated.";
+        }
+        const entries = state.conflicts || [];
+        document.getElementById("conflict-list").innerHTML = entries.length
+          ? entries.map((incident) => `<article class="conflict-card"><div class="conflict-card-head"><div><h3>${escapeHtml(incident.title)}</h3><div class="conflict-card-meta">${escapeHtml(conflictTypeLabel(incident.type))} / ${escapeHtml(dateLabel(incident.incidentDate))}</div></div><div class="conflict-card-actions"><span class="conflict-status ${incident.status === "resolved" ? "resolved" : ""}">${escapeHtml(incident.status)}</span><button class="button" data-action="edit-conflict" data-id="${escapeHtml(incident.id)}">Edit</button>${incident.status !== "resolved" ? `<button class="button" data-action="resolve-conflict" data-id="${escapeHtml(incident.id)}">Resolve</button>` : ""}</div></div>${incident.notes ? `<p>${escapeHtml(incident.notes)}</p>` : ""}</article>`).join("")
+          : `<div class="empty-state">${runtimeDataLoaded ? "No incidents recorded." : "Select a runtime campaign to load its GM-only incidents."}</div>`;
+      }
       function openPersonDialog(person = null) {
         const form = document.getElementById("person-form");
         const title = document.getElementById("person-dialog-title");
@@ -924,11 +997,36 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
         document.getElementById("person-dialog").showModal();
       }
+      function clearConflictForm() {
+        document.getElementById("conflict-form").reset();
+        document.getElementById("conflict-date").value = state.date;
+        document.getElementById("conflict-form-title").textContent = "New incident";
+        document.getElementById("conflict-submit").textContent = "Save incident";
+        const status = document.getElementById("conflict-form-status");
+        status.className = "feedback";
+        status.textContent = runtimeDataLoaded ? "" : "Select a runtime campaign to manage incidents.";
+        editingConflictId = null;
+        editingConflictCampaignId = null;
+      }
+      function openConflictForm(incident) {
+        if (!incident || !runtimeDataLoaded) return;
+        editingConflictId = incident.id;
+        editingConflictCampaignId = state.runtimeCampaignId;
+        document.getElementById("conflict-title").value = incident.title;
+        document.getElementById("conflict-type").value = incident.type;
+        document.getElementById("conflict-status").value = incident.status;
+        document.getElementById("conflict-date").value = incident.incidentDate;
+        document.getElementById("conflict-notes").value = incident.notes;
+        document.getElementById("conflict-form-title").textContent = "Edit incident";
+        document.getElementById("conflict-submit").textContent = "Save changes";
+        document.getElementById("conflict-form-status").textContent = "Review the manual incident record before saving.";
+      }
       function renderNotes() {
         document.getElementById("journal-list").innerHTML = state.notes.length ? state.notes.map(noteMarkup).join("") : `<div class="empty-state">No entries recorded.</div>`;
         document.getElementById("recent-log").innerHTML = state.notes.slice(0, 3).map((note) => `<article class="log-entry"><time class="log-time">${escapeHtml(dateLabel(note.date, { day: "2-digit", month: "short" }))}</time><div><strong>${escapeHtml(note.title)}</strong><p>${escapeHtml(note.body)}</p></div></article>`).join("") || `<div class="empty-state">No recent dispatches.</div>`;
       }
       function applyRuntimeSnapshot(runtime) {
+        const campaignChanged = state.runtimeCampaignId && state.runtimeCampaignId !== runtime.campaign.id;
         const dashboard = runtime.dashboard;
         let distance = 0;
         route = runtime.route.map((stop) => {
@@ -967,6 +1065,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
             condition: person.condition,
             status: person.readiness
           })),
+          conflicts: runtime.conflicts || [],
           notes: runtime.journal.map((entry) => ({
             id: entry.id,
             title: entry.title,
@@ -977,6 +1076,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeLocations: runtime.locations
         };
         runtimeDataLoaded = true;
+        if (campaignChanged) clearConflictForm();
         syncWeatherEditor();
         document.getElementById("active-campaign-name").textContent = runtime.campaign.name;
         document.getElementById("active-campaign-setting").textContent = runtime.campaign.setting;
@@ -1096,6 +1196,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         renderRoute("route-list");
         renderRoute("movement-route");
         renderPeople();
+        renderConflicts();
         renderNotes();
         if (runtimeDataLoaded) renderRuntimeRouteMap();
         else drawMap();
@@ -1313,7 +1414,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions", audit: "Campaign audit" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", conflicts: "Conflicts", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions", audit: "Campaign audit" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(() => {
           drawMap();
@@ -2616,6 +2717,16 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (action === "open-note") document.getElementById("note-dialog").showModal();
         if (action === "close-note") document.getElementById("note-dialog").close();
         if (action === "open-person") openPersonDialog();
+        if (action === "clear-conflict-form") clearConflictForm();
+        if (action === "edit-conflict") {
+          openConflictForm(state.conflicts.find((incident) => String(incident.id) === button.dataset.id));
+        }
+        if (action === "resolve-conflict") {
+          const incident = state.conflicts.find((entry) => String(entry.id) === button.dataset.id);
+          if (!incident || !runtimeDataLoaded) return;
+          const conflicts = state.conflicts.map((entry) => String(entry.id) === String(incident.id) ? { ...entry, status: "resolved" } : entry);
+          await commitRuntimeUpdate({ conflicts }, () => { state.conflicts = conflicts; }, "Incident marked resolved.");
+        }
         if (action === "edit-person") {
           const person = state.people.find((entry) => String(entry.id) === button.dataset.id);
           if (person) openPersonDialog(person);
@@ -2813,6 +2924,58 @@ Military rank || optional</textarea><span class="row-description">One field per 
             event.currentTarget.reset();
             document.getElementById("note-dialog").close();
           });
+      });
+      document.getElementById("conflict-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!runtimeDataLoaded || !state.runtimeCampaignId) return;
+        const campaignId = state.runtimeCampaignId;
+        const existing = editingConflictId === null
+          ? null
+          : state.conflicts.find((incident) => String(incident.id) === String(editingConflictId));
+        const status = document.getElementById("conflict-form-status");
+        const submit = document.getElementById("conflict-submit");
+        if (editingConflictId !== null && (editingConflictCampaignId !== campaignId || !existing)) {
+          status.className = "feedback error";
+          status.textContent = "This incident no longer exists in the latest campaign state. Your draft is still here.";
+          return;
+        }
+        const incident = {
+          id: existing?.id ?? runtimeRecordId("conflict"),
+          type: document.getElementById("conflict-type").value,
+          status: document.getElementById("conflict-status").value,
+          title: document.getElementById("conflict-title").value.trim(),
+          notes: document.getElementById("conflict-notes").value.trim(),
+          incidentDate: document.getElementById("conflict-date").value
+        };
+        const conflicts = existing
+          ? state.conflicts.map((entry) => String(entry.id) === String(existing.id) ? incident : entry)
+          : [...state.conflicts, incident];
+        submit.disabled = true;
+        status.className = "feedback";
+        status.textContent = "Saving GM-only incident record…";
+        try {
+          const saved = await commitRuntimeUpdate({ conflicts }, () => { state.conflicts = conflicts; },
+            existing ? "Incident record updated." : "Incident recorded.", {
+              onConflict: async () => {
+                if (runtimeCampaignSelect.value !== campaignId) return;
+                try {
+                  await loadRuntimeCampaign(campaignId, false);
+                  status.className = "feedback error";
+                  status.textContent = "Campaign changed. Latest incidents loaded; your draft remains. Review it and save again.";
+                } catch (error) {
+                  status.className = "feedback error";
+                  status.textContent = `Could not reload the campaign. Your draft remains: ${error.message}`;
+                }
+              }
+            });
+          if (saved) clearConflictForm();
+          else if (!status.classList.contains("error")) {
+            status.className = "feedback error";
+            status.textContent = "Incident was not saved. Your draft remains in the form.";
+          }
+        } finally {
+          submit.disabled = false;
+        }
       });
       weatherStateSelect.addEventListener("change", () => {
         weatherD6Result.value = "";

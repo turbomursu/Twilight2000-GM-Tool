@@ -803,7 +803,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
   for (const [tableKey, campaignKey] of Object.entries(campaignKeys)) {
     if (data[tableKey].some((row) => row[campaignKey] !== targetRuntimeId)) fail(`The runtime backup contains a ${tableKey} row for another campaign.`);
   }
-  if (data.conflictIncidents.some((incident) => !incident.id || typeof incident.id !== "string"
+  if (data.conflictIncidents.some((incident) => typeof incident.id !== "string" || !incident.id.trim() || incident.id.length > 120
     || !["border-incident", "trade-disruption", "convoy-attack", "active-threat", "other"].includes(incident.incident_type)
     || !["open", "monitoring", "resolved"].includes(incident.status)
     || typeof incident.title !== "string" || !incident.title.trim() || incident.title.length > 120
@@ -812,6 +812,10 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     || !Number.isSafeInteger(incident.sort_order) || incident.sort_order < 0
     || typeof incident.created_at !== "string" || typeof incident.updated_at !== "string")) {
     fail("The runtime backup contains an invalid conflict incident.");
+  }
+  if (new Set(data.conflictIncidents.map((incident) => incident.id)).size !== data.conflictIncidents.length
+    || new Set(data.conflictIncidents.map((incident) => incident.sort_order)).size !== data.conflictIncidents.length) {
+    fail("The runtime backup contains duplicate conflict incident identifiers or ordering.");
   }
   if (data.dashboardState.campaign_id !== targetRuntimeId || data.routeStops.some((stop, index) => stop.ordinal !== index)) {
     fail("The runtime backup has invalid dashboard or route ordering data.");
@@ -1645,7 +1649,9 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
       if (!Array.isArray(input.conflicts) || input.conflicts.length > 500) throw new Error("Conflict incidents must be a list of at most 500 records.");
       const rows = input.conflicts.map((incident, sortOrder) => {
         if (!incident || typeof incident !== "object" || Array.isArray(incident)
+          || Object.keys(incident).some((key) => !["id", "type", "status", "title", "notes", "incidentDate"].includes(key))
           || typeof incident.id !== "string" && typeof incident.id !== "number"
+          || !String(incident.id).trim() || String(incident.id).length > 120
           || !["border-incident", "trade-disruption", "convoy-attack", "active-threat", "other"].includes(incident.type)
           || !["open", "monitoring", "resolved"].includes(incident.status)
           || typeof incident.title !== "string" || !incident.title.trim() || incident.title.length > 120
