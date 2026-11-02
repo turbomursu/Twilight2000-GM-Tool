@@ -1,8 +1,8 @@
 # Player Party Faction - Phase 1 Implementation Complete
 
-**Status**: ✅ MVP Implementation Complete  
-**Date**: 2026-11-01  
-**Schema Version**: 15  
+**Status**: ✅ MVP Implementation Complete
+**Date**: 2026-11-01
+**Schema Version**: 15
 
 ---
 
@@ -106,12 +106,12 @@ Faction layers returned with party included
 ## Testing & Verification
 
 ### Basic Flow Verified
-✅ Server starts without errors  
-✅ Database schema version 15 creates successfully  
-✅ Campaign import works  
-✅ Party faction auto-created on import  
-✅ Party member sync functions work  
-✅ GET /api/campaigns/{id}/party endpoint accessible  
+✅ Server starts without errors
+✅ Database schema version 15 creates successfully
+✅ Campaign import works
+✅ Party faction auto-created on import
+✅ Party member sync functions work
+✅ GET /api/campaigns/{id}/party endpoint accessible
 
 ### Sample Party Response
 ```json
@@ -161,15 +161,15 @@ Faction layers returned with party included
 - ❌ Party UI in Player Interface
 
 ### Authorization
-✅ Party operations restricted to GM (campaign_memberships.role = 'gm')  
-✅ Player reads only return published data  
-✅ Server enforces all permissions (not just UI hiding)  
+✅ Party operations restricted to GM (campaign_memberships.role = 'gm')
+✅ Player reads only return published data
+✅ Server enforces all permissions (not just UI hiding)
 
 ### Data Consistency
-✅ Party creation atomic within import transaction  
-✅ Member sync idempotent (safe to call multiple times)  
-✅ Removal of characters cascades to party_members  
-✅ Unique party per campaign enforced by index  
+✅ Party creation atomic within import transaction
+✅ Member sync idempotent (safe to call multiple times)
+✅ Removal of characters cascades to party_members
+✅ Unique party per campaign enforced by index
 
 ---
 
@@ -278,6 +278,6 @@ No significant performance impact expected.
 ## See Also
 
 - [PLAYER_PARTY_FACTION_DESIGN.md](./PLAYER_PARTY_FACTION_DESIGN.md) — Full design including phases 2-4
-- [DATA_MODEL.md](../DATA_MODEL.md) — Overall data model
+- [DATA_MODEL.md](../metadata/DATA_MODEL.md) — Overall data model
 - [GAME_LOOP.md](./GAME_LOOP.md) — Campaign progression and party morale context
 - [CHARACTER_AND_NPC_CREATION.md](./CHARACTER_AND_NPC_CREATION.md) — Unit Morale rules reference

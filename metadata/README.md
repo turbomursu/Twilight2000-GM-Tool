@@ -14,7 +14,7 @@ This project is licensed under the **GNU General Public License v3 (GPL v3)**.
 - **You must:** Share any modifications if you distribute them
 - **You get:** No warranty, but complete source code freedom
 
-**Full Details:** See [LICENSE](./LICENSE) and [LICENSE_INFO.md](./LICENSE_INFO.md)
+**Full Details:** See [LICENSE](../LICENSE) and [LICENSE_INFO.md](LICENSE_INFO.md)
 
 **Copyrighted Material Notice:** This tool implements Twilight: 2000 Fourth Edition rules. The game is copyright Fria Ligan/Free League. This tool is an independent fan utility for running campaigns, not an official product.
 
@@ -228,9 +228,9 @@ Integration verification: run `node --test` for API, persistence/recovery, and p
 - Travel day, waypoint, distance, food, fuel, and weather tracking
 - Field journal entries
 - Browser-local autosave and JSON campaign export
-- Standalone [Campaign Setup Tool prototype](campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
+- Standalone [Campaign Setup Tool prototype](../campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
 - Optional development fixture seeds a separate SQLite `The Long Road` runtime with clock/resources, route stops, personnel, journal, and a sample player seed for testing the runtime read API.
-- Authenticated [Player Interface](player-interface.html) with Character, Inventory, published Sitrep/Map, and COMMS. Accepted inventory and own proposals are server-backed; legacy samples remain hidden prototype data.
+- Authenticated [Player Interface](../player-interface.html) with Character, Inventory, published Sitrep/Map, and COMMS. Accepted inventory and own proposals are server-backed; legacy samples remain hidden prototype data.
 
 ## Ruleset Fidelity
 

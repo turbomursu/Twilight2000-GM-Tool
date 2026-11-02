@@ -32,9 +32,9 @@ Treat this as an extensible list of principles. Preserve existing principles whe
 
 Keep the Campaign Setup Tool, GM runtime tool, and Player Interface as distinct surfaces over a shared, versioned campaign data model. Support 1-4 separately identified player seats, each assigned a character. Players may submit change requests only for their own assigned character and inventory; the GM reviews, approves, and applies authoritative changes. The GM can manage all campaign and player-report data. The player-facing view must contain only information explicitly selected for publication by the GM; never expose GM-only notes, another player's private data, or unrevealed campaign state. Enforce these permissions at the authoritative data boundary, not only by hiding controls in the browser.
 
-See `FEATURES.md` for the detailed user and GM feature roadmap and the current prototype status. Keep that overview synchronized when feature scope or implementation status changes.
-See `ROADMAP.md` for the suggested delivery order, dependencies, and phase exit checks. Update it when implementation sequence or product priorities change.
-Keep `project-status.html` and `project-features.html` synchronized with `FEATURES.md` and `ROADMAP.md` whenever implementation or feature status changes. Refresh their update date and next-step prompt when relevant; do not mark a feature complete until its acceptance checks are verified.
+See `metadata/FEATURES.md` for the detailed user and GM feature roadmap and the current prototype status. Keep that overview synchronized when feature scope or implementation status changes.
+See `metadata/ROADMAP.md` for the suggested delivery order, dependencies, and phase exit checks. Update it when implementation sequence or product priorities change.
+Keep `project-status.html` and `project-features.html` synchronized with `metadata/FEATURES.md` and `metadata/ROADMAP.md` whenever implementation or feature status changes. Refresh their update date and next-step prompt when relevant; do not mark a feature complete until its acceptance checks are verified.
 
 ## Ruleset Fidelity
 

@@ -113,9 +113,9 @@ CREATE TABLE IF NOT EXISTS party_members (
 1. **Check if party faction exists**: Query for `faction_type = 'player-party'`
 2. **If not exists**: Create it:
    ```sql
-   INSERT INTO factions (runtime_campaign_id, id, name, description, faction_type, 
+   INSERT INTO factions (runtime_campaign_id, id, name, description, faction_type,
                          is_player_controlled, color, morale_rating)
-   VALUES (?, 'party-' || ?, 'Player Party', 'The player character group', 'player-party', 1, 
+   VALUES (?, 'party-' || ?, 'Player Party', 'The player character group', 'player-party', 1,
            '#4A90E2', 'C')
    ```
 3. **Auto-associate player characters**:
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS party_members (
    - Query starting location (first route stop or GM-configured location)
    - Update factions.current_location_id
    ```sql
-   UPDATE factions SET current_location_id = ? 
+   UPDATE factions SET current_location_id = ?
    WHERE runtime_campaign_id = ? AND faction_type = 'player-party'
    ```
 
@@ -417,7 +417,7 @@ ALTER TABLE factions ADD COLUMN morale_rating TEXT DEFAULT 'C';
 ALTER TABLE factions ADD COLUMN resources_json TEXT;
 
 -- Add constraint check (requires column exists first)
--- ALTER TABLE factions ADD CONSTRAINT check_faction_type 
+-- ALTER TABLE factions ADD CONSTRAINT check_faction_type
 --   CHECK (faction_type IN ('player-party', 'npc'));
 -- ALTER TABLE factions ADD CONSTRAINT check_morale
 --   CHECK (morale_rating IN ('A', 'B', 'C', 'D'));
@@ -435,8 +435,8 @@ CREATE TABLE IF NOT EXISTS party_members (
 );
 
 -- Index for quick party membership queries
-CREATE INDEX idx_party_members_faction 
-  ON party_members(runtime_campaign_id, faction_id) 
+CREATE INDEX idx_party_members_faction
+  ON party_members(runtime_campaign_id, faction_id)
   WHERE is_active = 1;
 ```
 
@@ -506,7 +506,7 @@ Response: { members: [{id, name, condition, readiness}, ...] }
 
 ## See Also
 
-- [DATA_MODEL.md](../DATA_MODEL.md) — Current data model (factions, settlements)
+- [DATA_MODEL.md](../metadata/DATA_MODEL.md) — Current data model (factions, settlements)
 - [GAME_LOOP.md](./gmpack/GAME_LOOP.md) — Campaign progression and party morale rules
 - [CHARACTER_AND_NPC_CREATION.md](./gmpack/CHARACTER_AND_NPC_CREATION.md) — Unit morale mechanics (T2K 4E)
 - ROADMAP.md — Feature delivery sequencing
