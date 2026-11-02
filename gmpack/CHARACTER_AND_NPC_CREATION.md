@@ -236,15 +236,11 @@ Rules:
 
 ## NPC Creation
 
-The Life Path Character Generation aid does not document a separate quick-NPC procedure. NPCs can be created using the same framework:
+The Referee's Manual includes a **Typical NPCs** reference table (p. 37) with ready-to-use profiles. Each profile provides attributes, Hit Capacity, CUF, skills, and typical gear. Use those source profiles when preparing a matching NPC rather than treating the Life Path aid as the only NPC reference.
 
-1. **Assign Attributes** (A–D) based on NPC role/background
-2. **Assign Skills** (A–F) relevant to NPC function and role
-3. **Set CUF** if NPC participates in combat (typically B–D for most NPCs)
-4. **Define Motivation** in narrative terms
-5. **Optional**: Assign specialty skills for expertise areas
+The page 37 table is a reference, not an automated creation procedure. Keep its listed values and equipment as source data; any changes or details not covered by the table are GM-defined. Do not infer derived rules effects from the profiles unless verified separately.
 
-**GM-defined NPCs**: Don't require full life path; GM may assign attributes/skills directly based on narrative needs and role.
+For NPCs not covered by a reference profile, the GM may assign attributes and skills to suit the NPC's role. Mark such choices as GM-defined and keep any unverified rules effects under GM adjudication.
 
 ---
 
