@@ -1677,12 +1677,17 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
       for (const [id, incident] of next) {
         if (!existing.has(id)) changes.push({ action: "conflict.create", id, label: incident.title });
       }
+      const changedIds = new Set(changes.filter((change) => change.action !== "conflict.delete").map((change) => change.id));
       database.prepare("DELETE FROM conflict_incidents WHERE campaign_id = ?").run(runtimeId);
       const insert = database.prepare(`INSERT INTO conflict_incidents
         (campaign_id, id, incident_type, status, title, notes, incident_date, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      rows.forEach((incident) => insert.run(runtimeId, incident.id, incident.type, incident.status, incident.title, incident.notes,
-        incident.incidentDate, incident.sortOrder, timestamp, timestamp));
+      rows.forEach((incident) => {
+        const previous = existing.get(incident.id);
+        insert.run(runtimeId, incident.id, incident.type, incident.status, incident.title, incident.notes,
+          incident.incidentDate, incident.sortOrder, previous?.createdAt ?? timestamp,
+          previous && !changedIds.has(incident.id) ? previous.updatedAt : timestamp);
+      });
       database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
         .run(timestamp, runtimeId);
       for (const change of changes) {
