@@ -35,6 +35,7 @@ const schema = `
     zoom REAL NOT NULL,
     atlas_json TEXT,
     annotations_json TEXT NOT NULL,
+    offlineBasemap_json TEXT,
     attribution TEXT NOT NULL
   ) STRICT;
 
@@ -253,6 +254,42 @@ const runtimeDashboardSchema = `
     created_at TEXT NOT NULL,
     PRIMARY KEY (campaign_id, id)
   ) STRICT;
+
+  CREATE TABLE map_publication_state (
+    campaign_id TEXT NOT NULL PRIMARY KEY REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    route_published INTEGER NOT NULL DEFAULT 0 CHECK (route_published IN (0, 1)),
+    route_revision INTEGER NOT NULL DEFAULT 0,
+    locations_published INTEGER NOT NULL DEFAULT 0 CHECK (locations_published IN (0, 1)),
+    locations_revision INTEGER NOT NULL DEFAULT 0,
+    position_published INTEGER NOT NULL DEFAULT 0 CHECK (position_published IN (0, 1)),
+    position_revision INTEGER NOT NULL DEFAULT 0,
+    factions_published INTEGER NOT NULL DEFAULT 0 CHECK (factions_published IN (0, 1)),
+    factions_revision INTEGER NOT NULL DEFAULT 0,
+    last_modified_by TEXT,
+    last_modified_at TEXT
+  ) STRICT;
+
+  CREATE TABLE party_position (
+    campaign_id TEXT NOT NULL PRIMARY KEY REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0,
+    published INTEGER NOT NULL DEFAULT 0 CHECK (published IN (0, 1)),
+    published_at TEXT,
+    updated_at TEXT NOT NULL
+  ) STRICT;
+
+  CREATE TABLE publication_history (
+    id TEXT NOT NULL PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+    actor TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target TEXT NOT NULL,
+    old_value INTEGER,
+    new_value INTEGER,
+    campaign_revision INTEGER NOT NULL,
+    recorded_at TEXT NOT NULL
+  ) STRICT;
 `;
 
 function openRuntimeDatabase(path = ":memory:") {
@@ -262,7 +299,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 18) {
+  if (version > 21) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -572,24 +609,186 @@ function openRuntimeDatabase(path = ":memory:") {
   if (version < 18) {
     database.exec("BEGIN IMMEDIATE");
     try {
-      database.exec(`CREATE TABLE conflict_incidents (
-        campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+      database.exec(`CREATE TABLE npc_archetypes (
+        campaign_id TEXT,
         id TEXT NOT NULL,
-        incident_type TEXT NOT NULL CHECK (incident_type IN ('border-incident', 'trade-disruption', 'convoy-attack', 'active-threat', 'other')),
-        status TEXT NOT NULL CHECK (status IN ('open', 'monitoring', 'resolved')),
-        title TEXT NOT NULL,
-        notes TEXT NOT NULL,
-        incident_date TEXT NOT NULL,
-        sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        description TEXT,
+        attribute_strength TEXT NOT NULL CHECK (attribute_strength IN ('A', 'B', 'C', 'D')),
+        attribute_agility TEXT NOT NULL CHECK (attribute_agility IN ('A', 'B', 'C', 'D')),
+        attribute_intelligence TEXT NOT NULL CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D')),
+        attribute_empathy TEXT NOT NULL CHECK (attribute_empathy IN ('A', 'B', 'C', 'D')),
+        hit_cap INTEGER NOT NULL CHECK (hit_cap >= 3),
+        cuf_rating TEXT NOT NULL CHECK (cuf_rating IN ('A', 'B', 'C', 'D')),
+        skills_json TEXT NOT NULL,
+        equipment_json TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (campaign_id, id),
-        UNIQUE (campaign_id, sort_order)
+        UNIQUE (campaign_id, id)
       ) STRICT;
-      CREATE INDEX conflict_incidents_by_campaign ON conflict_incidents(campaign_id, incident_date DESC, sort_order);
+      CREATE INDEX npc_archetypes_by_category ON npc_archetypes(campaign_id, category);
+      ALTER TABLE personnel ADD COLUMN attribute_strength TEXT CHECK (attribute_strength IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN attribute_agility TEXT CHECK (attribute_agility IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN attribute_intelligence TEXT CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN attribute_empathy TEXT CHECK (attribute_empathy IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN hit_cap INTEGER CHECK (hit_cap >= 3);
+      ALTER TABLE personnel ADD COLUMN cuf_rating TEXT CHECK (cuf_rating IN ('A', 'B', 'C', 'D'));
+      ALTER TABLE personnel ADD COLUMN skills_json TEXT DEFAULT '[]';
+      ALTER TABLE personnel ADD COLUMN equipment_json TEXT DEFAULT '[]';
+      ALTER TABLE personnel ADD COLUMN morale_state TEXT DEFAULT 'normal' CHECK (morale_state IN ('high', 'normal', 'low', 'broken'));
+      ALTER TABLE personnel ADD COLUMN stress_damage INTEGER NOT NULL DEFAULT 0 CHECK (stress_damage >= 0);
+      ALTER TABLE personnel ADD COLUMN archetype_id TEXT;
+      ALTER TABLE personnel ADD COLUMN created_at TEXT;
+      ALTER TABLE personnel ADD COLUMN updated_at TEXT;
       PRAGMA user_version = 18;`);
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 19) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`ALTER TABLE personnel ADD COLUMN rank TEXT;
+      ALTER TABLE personnel ADD COLUMN specialty TEXT;
+      ALTER TABLE personnel ADD COLUMN notes TEXT DEFAULT '';
+      PRAGMA user_version = 19;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 20) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE faction_relationships (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        from_faction_id TEXT NOT NULL,
+        to_faction_id TEXT NOT NULL,
+        attitude TEXT NOT NULL CHECK (attitude IN ('allied', 'neutral', 'hostile', 'unknown')),
+        notes TEXT DEFAULT '',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, from_faction_id, to_faction_id),
+        FOREIGN KEY (runtime_campaign_id, from_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE CASCADE,
+        FOREIGN KEY (runtime_campaign_id, to_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE CASCADE
+      ) STRICT;
+      CREATE INDEX faction_relationships_from ON faction_relationships(runtime_campaign_id, from_faction_id);
+      CREATE TABLE settlement_resources (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        settlement_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL CHECK (resource_type IN ('food', 'water', 'fuel', 'ammunition', 'medical', 'shelter', 'intel', 'other')),
+        status TEXT NOT NULL CHECK (status IN ('available', 'scarce', 'needed', 'unknown')),
+        notes TEXT DEFAULT '',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, settlement_id, resource_type),
+        FOREIGN KEY (runtime_campaign_id, settlement_id) REFERENCES settlements(runtime_campaign_id, id) ON DELETE CASCADE
+      ) STRICT;
+      CREATE INDEX settlement_resources_by_settlement ON settlement_resources(runtime_campaign_id, settlement_id);
+      CREATE TABLE campaign_events (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        event_type TEXT NOT NULL CHECK (event_type IN ('rumor', 'event', 'discovery', 'faction-action', 'settlement-change', 'threat', 'other')),
+        event_date TEXT NOT NULL,
+        linked_faction_id TEXT,
+        linked_settlement_id TEXT,
+        is_public INTEGER NOT NULL DEFAULT 0 CHECK (is_public IN (0, 1)),
+        gm_notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, id),
+        FOREIGN KEY (runtime_campaign_id, linked_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE SET NULL,
+        FOREIGN KEY (runtime_campaign_id, linked_settlement_id) REFERENCES settlements(runtime_campaign_id, id) ON DELETE SET NULL
+      ) STRICT;
+      CREATE INDEX campaign_events_by_date ON campaign_events(runtime_campaign_id, event_date);
+      CREATE INDEX campaign_events_by_type ON campaign_events(runtime_campaign_id, event_type);
+      CREATE TABLE threat_entries (
+        runtime_campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        threat_level TEXT NOT NULL CHECK (threat_level IN ('low', 'medium', 'high', 'critical')),
+        status TEXT NOT NULL CHECK (status IN ('emerging', 'active', 'contained', 'resolved')),
+        antagonist_type TEXT NOT NULL CHECK (antagonist_type IN ('faction', 'individual', 'force', 'event', 'other')),
+        linked_faction_id TEXT,
+        linked_settlement_id TEXT,
+        goal TEXT DEFAULT '',
+        resources_json TEXT DEFAULT '[]',
+        gm_notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (runtime_campaign_id, id),
+        FOREIGN KEY (runtime_campaign_id, linked_faction_id) REFERENCES factions(runtime_campaign_id, id) ON DELETE SET NULL,
+        FOREIGN KEY (runtime_campaign_id, linked_settlement_id) REFERENCES settlements(runtime_campaign_id, id) ON DELETE SET NULL
+      ) STRICT;
+      CREATE INDEX threat_entries_by_status ON threat_entries(runtime_campaign_id, status);
+      CREATE INDEX threat_entries_by_level ON threat_entries(runtime_campaign_id, threat_level);
+      PRAGMA user_version = 20;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 21) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const personnelColumns = new Set(database.prepare("PRAGMA table_info(personnel)").all().map(({ name }) => name));
+      if (!personnelColumns.has("attribute_strength")) {
+        database.exec(`CREATE TABLE npc_archetypes (
+          campaign_id TEXT,
+          id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT,
+          attribute_strength TEXT NOT NULL CHECK (attribute_strength IN ('A', 'B', 'C', 'D')),
+          attribute_agility TEXT NOT NULL CHECK (attribute_agility IN ('A', 'B', 'C', 'D')),
+          attribute_intelligence TEXT NOT NULL CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D')),
+          attribute_empathy TEXT NOT NULL CHECK (attribute_empathy IN ('A', 'B', 'C', 'D')),
+          hit_cap INTEGER NOT NULL CHECK (hit_cap >= 3),
+          cuf_rating TEXT NOT NULL CHECK (cuf_rating IN ('A', 'B', 'C', 'D')),
+          skills_json TEXT NOT NULL,
+          equipment_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          UNIQUE (campaign_id, id)
+        ) STRICT;
+        CREATE INDEX npc_archetypes_by_category ON npc_archetypes(campaign_id, category);
+        ALTER TABLE personnel ADD COLUMN attribute_strength TEXT CHECK (attribute_strength IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN attribute_agility TEXT CHECK (attribute_agility IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN attribute_intelligence TEXT CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN attribute_empathy TEXT CHECK (attribute_empathy IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN hit_cap INTEGER CHECK (hit_cap >= 3);
+        ALTER TABLE personnel ADD COLUMN cuf_rating TEXT CHECK (cuf_rating IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN skills_json TEXT DEFAULT '[]';
+        ALTER TABLE personnel ADD COLUMN equipment_json TEXT DEFAULT '[]';
+        ALTER TABLE personnel ADD COLUMN morale_state TEXT DEFAULT 'normal' CHECK (morale_state IN ('high', 'normal', 'low', 'broken'));
+        ALTER TABLE personnel ADD COLUMN stress_damage INTEGER NOT NULL DEFAULT 0 CHECK (stress_damage >= 0);
+        ALTER TABLE personnel ADD COLUMN archetype_id TEXT;
+        ALTER TABLE personnel ADD COLUMN created_at TEXT;
+        ALTER TABLE personnel ADD COLUMN updated_at TEXT;`);
+      }
+      const conflictTableExists = database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get();
+      if (!conflictTableExists) {
+        database.exec(`CREATE TABLE conflict_incidents (
+          campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+          id TEXT NOT NULL,
+          incident_type TEXT NOT NULL CHECK (incident_type IN ('border-incident', 'trade-disruption', 'convoy-attack', 'active-threat', 'other')),
+          status TEXT NOT NULL CHECK (status IN ('open', 'monitoring', 'resolved')),
+          title TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          incident_date TEXT NOT NULL,
+          sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (campaign_id, id),
+          UNIQUE (campaign_id, sort_order)
+        ) STRICT;
+        CREATE INDEX conflict_incidents_by_campaign ON conflict_incidents(campaign_id, incident_date DESC, sort_order);`);
+      }
+      database.exec("PRAGMA user_version = 21");
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  database.exec("BEGIN");
+  try {
+    loadDefaultNPCArchetypes(database);
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
   }
   return database;
 }
@@ -852,6 +1051,8 @@ function validateRuntimeSave(backup, targetRuntimeId) {
   parseJson(map.center_json, "map center", coordinate);
   parseJson(map.annotations_json, "map annotations", Array.isArray);
   if (map.atlas_json !== null) parseJson(map.atlas_json, "atlas", isRecord);
+  if (map.offlineBasemap_json !== null) parseJson(map.offlineBasemap_json, "offline basemap", (value) =>
+    isRecord(value) && typeof value.assetId === "string" && typeof value.format === "string" && typeof value.attribution === "string");
   data.locations.forEach((location) => parseJson(location.map_position_json, "location position", coordinate));
   if (data.mapPublication != null) {
     const publication = data.mapPublication;
@@ -1009,7 +1210,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     };
     insertRows("campaign_memberships", ["campaign_id", "account_id", "role", "created_at"], data.campaignMemberships);
     insertRows("setup_imports", ["runtime_campaign_id", "source_campaign_id", "schema_version", "imported_at", "sha256", "source_json"], [data.setupImport]);
-    insertRows("maps", ["runtime_campaign_id", "source_map_id", "name", "bounds_json", "center_json", "zoom", "atlas_json", "annotations_json", "attribution"], data.maps);
+    insertRows("maps", ["runtime_campaign_id", "source_map_id", "name", "bounds_json", "center_json", "zoom", "atlas_json", "annotations_json", "offlineBasemap_json", "attribution"], data.maps);
     insertRows("terrain_cells", ["runtime_campaign_id", "q", "r", "terrain_type"], data.terrainCells);
     insertRows("locations", ["runtime_campaign_id", "id", "name", "kind", "description", "grid_ref", "coordinates_json", "map_position_json", "visibility_eligibility", "is_starting_location"], data.locations);
     insertRows("settlements", ["runtime_campaign_id", "id", "source_location_id", "name", "scale", "population_estimate", "security", "attitude", "leadership", "situation"], data.settlements);
@@ -1210,13 +1411,14 @@ function importSetupPackage(database, sourceJson, options = {}) {
       ? input.map.center
       : { lat: (input.map.bounds.south + input.map.bounds.north) / 2, lng: (input.map.bounds.west + input.map.bounds.east) / 2 };
     database.prepare(`INSERT INTO maps
-      (runtime_campaign_id, source_map_id, name, bounds_json, center_json, zoom, atlas_json, annotations_json, attribution)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (runtime_campaign_id, source_map_id, name, bounds_json, center_json, zoom, atlas_json, annotations_json, offlineBasemap_json, attribution)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(runtimeId, typeof input.map.id === "string" ? input.map.id : null, mapName,
         JSON.stringify(input.map.bounds), JSON.stringify(center),
         Number.isFinite(input.map.zoom) ? input.map.zoom : 10,
         input.map.fieldPapersAtlas ? JSON.stringify(input.map.fieldPapersAtlas) : null,
         JSON.stringify(input.map.offlineAnnotations),
+        input.map.offlineBasemap ? JSON.stringify({ assetId: input.map.offlineBasemap.assetId, format: input.map.offlineBasemap.format, attribution: input.map.offlineBasemap.attribution }) : null,
         typeof input.map.attribution === "string" ? input.map.attribution : "");
 
     const insertTerrain = database.prepare(`INSERT INTO terrain_cells
@@ -2428,6 +2630,898 @@ function getPartyFaction(database, accountId, runtimeId) {
   };
 }
 
+function loadDefaultNPCArchetypes(database) {
+  try {
+    const { readFileSync } = require("node:fs");
+    const { join } = require("node:path");
+    const archetypesPath = join(__dirname, "..", "gmpack", "npc-archetypes.json");
+    let archetypesData;
+    try {
+      const fileContent = readFileSync(archetypesPath, "utf8");
+      archetypesData = JSON.parse(fileContent);
+    } catch (fileError) {
+      console.error(`Failed to read archetypes file at ${archetypesPath}:`, fileError.message);
+      throw fileError;
+    }
+    
+    if (!archetypesData.archetypes || !Array.isArray(archetypesData.archetypes)) {
+      throw new Error("Invalid archetype data format: missing 'archetypes' array");
+    }
+    
+    const timestamp = new Date().toISOString();
+    const insert = database.prepare(`INSERT INTO npc_archetypes
+      (campaign_id, id, name, category, description, attribute_strength, attribute_agility,
+       attribute_intelligence, attribute_empathy, hit_cap, cuf_rating, skills_json, equipment_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    
+    for (const archetype of archetypesData.archetypes) {
+      try {
+        insert.run(
+          null,
+          archetype.id,
+          archetype.name,
+          archetype.category,
+          archetype.description || "",
+          archetype.attributes.strength,
+          archetype.attributes.agility,
+          archetype.attributes.intelligence,
+          archetype.attributes.empathy,
+          archetype.hitCap,
+          archetype.cuf,
+          JSON.stringify(archetype.skills),
+          JSON.stringify(archetype.equipment),
+          timestamp
+        );
+      } catch (insertError) {
+        if (!/UNIQUE constraint failed/i.test(insertError.message)) {
+          console.error(`Failed to insert archetype ${archetype.id}:`, insertError.message);
+          throw insertError;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load default NPC archetypes:", error.message);
+    throw error;
+  }
+}
+
+function listNPCArchetypes(database, campaignId) {
+  const query = campaignId 
+    ? `SELECT * FROM npc_archetypes
+       WHERE campaign_id IS NULL OR campaign_id = ?
+       ORDER BY category, name`
+    : `SELECT * FROM npc_archetypes
+       WHERE campaign_id IS NULL
+       ORDER BY category, name`;
+  
+  const rows = campaignId
+    ? database.prepare(query).all(campaignId)
+    : database.prepare(query).all();
+    
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    attributes: {
+      strength: row.attribute_strength,
+      agility: row.attribute_agility,
+      intelligence: row.attribute_intelligence,
+      empathy: row.attribute_empathy
+    },
+    hitCap: row.hit_cap,
+    cufRating: row.cuf_rating,
+    skills: JSON.parse(row.skills_json),
+    equipment: JSON.parse(row.equipment_json)
+  }));
+}
+
+function getNPCArchetype(database, archetypeId) {
+  const row = database.prepare(`SELECT * FROM npc_archetypes WHERE id = ?`).get(archetypeId);
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    attributes: {
+      strength: row.attribute_strength,
+      agility: row.attribute_agility,
+      intelligence: row.attribute_intelligence,
+      empathy: row.attribute_empathy
+    },
+    hitCap: row.hit_cap,
+    cufRating: row.cuf_rating,
+    skills: JSON.parse(row.skills_json),
+    equipment: JSON.parse(row.equipment_json)
+  };
+}
+
+function listLocationsForCampaign(database, accountId, campaignId) {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const locations = database.prepare(`SELECT * FROM locations WHERE runtime_campaign_id = ? ORDER BY name`)
+      .all(campaignId);
+    
+    database.exec("COMMIT");
+    return locations.map(loc => ({
+      id: loc.id,
+      name: loc.name,
+      kind: loc.kind,
+      description: loc.description,
+      gridRef: loc.grid_ref,
+      mapPosition: loc.map_position_json ? JSON.parse(loc.map_position_json) : { lat: 0, lng: 0 },
+      visibilityEligibility: loc.visibility_eligibility,
+      isStartingLocation: loc.is_starting_location === 1
+    }));
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function createLocation(database, accountId, campaignId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Location input is required.");
+  
+  const name = requireText(input.name, "Location name", 160);
+  const kind = requireText(input.kind || "", "Location kind", 80);
+  const description = (input.description || "").trim();
+  if (description.length > 500) throw new Error("Description exceeds its allowed length.");
+  const visibilityEligibility = requireText(input.visibilityEligibility || "gm-only", "Visibility", 20);
+  
+  if (!["gm-only", "players"].includes(visibilityEligibility)) {
+    throw new Error("Visibility must be 'gm-only' or 'players'.");
+  }
+  
+  if (!input.mapPosition || typeof input.mapPosition !== "object") {
+    throw new Error("Map position is required.");
+  }
+  
+  const lat = input.mapPosition.lat;
+  const lng = input.mapPosition.lng;
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    throw new Error("Map position must have lat and lng numbers.");
+  }
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
+      .get(campaignId);
+    if (mapData) {
+      const bounds = JSON.parse(mapData.bounds_json);
+      if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
+        throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
+      }
+    }
+    
+    const locationId = randomUUID();
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    
+    database.prepare(`INSERT INTO locations
+      (runtime_campaign_id, id, name, kind, description, grid_ref, coordinates_json, map_position_json, visibility_eligibility, is_starting_location)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        campaignId,
+        locationId,
+        name,
+        kind,
+        description,
+        input.gridRef || null,
+        null,
+        JSON.stringify({ lat, lng }),
+        visibilityEligibility,
+        input.isStartingLocation ? 1 : 0
+      );
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function updateLocation(database, accountId, campaignId, locationId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Location update input is required.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+    if (!location) throw new Error("Location not found.");
+    
+    const name = input.name !== undefined ? requireText(input.name, "Location name", 160) : location.name;
+    const kind = input.kind !== undefined ? requireText(input.kind, "Location kind", 80) : location.kind;
+    const description = input.description !== undefined ? ((input.description || "").trim()) : location.description;
+    if (description && description.length > 500) throw new Error("Description exceeds its allowed length.");
+    const visibilityEligibility = input.visibilityEligibility !== undefined ? requireText(input.visibilityEligibility, "Visibility", 20) : location.visibility_eligibility;
+    
+    if (!["gm-only", "players"].includes(visibilityEligibility)) {
+      throw new Error("Visibility must be 'gm-only' or 'players'.");
+    }
+    
+    let mapPosition = location.map_position_json ? JSON.parse(location.map_position_json) : { lat: 0, lng: 0 };
+    if (input.mapPosition && typeof input.mapPosition === "object") {
+      const lat = input.mapPosition.lat;
+      const lng = input.mapPosition.lng;
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        throw new Error("Map position must have lat and lng numbers.");
+      }
+      
+      const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
+        .get(campaignId);
+      if (mapData) {
+        const bounds = JSON.parse(mapData.bounds_json);
+        if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
+          throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
+        }
+      }
+      
+      mapPosition = { lat, lng };
+    }
+    
+    const gridRef = input.gridRef !== undefined ? input.gridRef : location.grid_ref;
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    
+    database.prepare(`UPDATE locations SET 
+      name = ?, kind = ?, description = ?, grid_ref = ?, map_position_json = ?, 
+      visibility_eligibility = ? 
+      WHERE runtime_campaign_id = ? AND id = ?`)
+      .run(
+        name, kind, description, gridRef, JSON.stringify(mapPosition),
+        visibilityEligibility, campaignId, locationId
+      );
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function deleteLocation(database, accountId, campaignId, locationId, options = {}) {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+    if (!location) throw new Error("Location not found.");
+    
+    const inRoute = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND location_id = ?")
+      .get(campaignId, locationId);
+    if (inRoute && inRoute.count > 0) {
+      throw new Error("Cannot delete location while it is used in the campaign route.");
+    }
+    
+    database.prepare("DELETE FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .run(campaignId, locationId);
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return { success: true };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function createPersonnelFromArchetype(database, accountId, campaignId, archetypeId, input, options = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Personnel creation input is required.");
+  const name = requireText(input.name, "Personnel name", 100);
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const archetype = getNPCArchetype(database, archetypeId);
+    if (!archetype) throw new Error("NPC archetype not found.");
+    
+    const maxRow = database.prepare("SELECT MAX(sort_order) AS max_order FROM personnel WHERE campaign_id = ?")
+      .get(campaignId);
+    const maxOrder = maxRow?.max_order ?? -1;
+    const newSortOrder = maxOrder + 1;
+    const personId = randomUUID();
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    
+    database.prepare(`INSERT INTO personnel
+      (campaign_id, id, name, role, condition, readiness, sort_order,
+       attribute_strength, attribute_agility, attribute_intelligence, attribute_empathy,
+       hit_cap, cuf_rating, skills_json, equipment_json, morale_state, stress_damage,
+       archetype_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        campaignId,
+        personId,
+        name,
+        input.role || archetype.category,
+        input.condition || "OK",
+        input.readiness || "ready",
+        newSortOrder,
+        archetype.attributes.strength,
+        archetype.attributes.agility,
+        archetype.attributes.intelligence,
+        archetype.attributes.empathy,
+        archetype.hitCap,
+        archetype.cufRating,
+        JSON.stringify(archetype.skills),
+        JSON.stringify(archetype.equipment),
+        "normal",
+        0,
+        archetypeId,
+        timestamp,
+        timestamp
+      );
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return database.prepare(`SELECT * FROM personnel WHERE campaign_id = ? AND id = ?`)
+      .get(campaignId, personId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function listRouteStopsForCampaign(database, accountId, campaignId) {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const stops = database.prepare(`
+      SELECT 
+        rs.ordinal,
+        rs.location_id,
+        rs.detail,
+        rs.km_from_previous,
+        l.name,
+        l.grid_ref,
+        l.map_position_json
+      FROM route_stops rs
+      JOIN locations l ON l.runtime_campaign_id = rs.campaign_id AND l.id = rs.location_id
+      WHERE rs.campaign_id = ?
+      ORDER BY rs.ordinal
+    `).all(campaignId);
+    
+    database.exec("COMMIT");
+    
+    const result = stops.map(row => ({
+      ordinal: row.ordinal,
+      locationId: row.location_id,
+      locationName: row.name,
+      detail: row.detail,
+      kmFromPrevious: row.km_from_previous,
+      gridRef: row.grid_ref,
+      mapPosition: row.map_position_json ? JSON.parse(row.map_position_json) : { lat: 0, lng: 0 }
+    }));
+    
+    const totalKm = result.reduce((sum, stop) => sum + stop.kmFromPrevious, 0);
+    return { stops: result, totalKm, stopCount: result.length };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function createRouteStop(database, accountId, campaignId, locationId, detail, kmFromPrevious, ordinal, options = {}) {
+  if (!locationId || typeof locationId !== "string") throw new Error("Location ID is required.");
+  const validDetail = requireText(detail, "Stop detail", 160);
+  if (!Number.isInteger(kmFromPrevious) || kmFromPrevious < 0) throw new Error("Distance must be a non-negative integer.");
+  if (!Number.isInteger(ordinal) || ordinal < 0) throw new Error("Ordinal must be a non-negative integer.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, locationId);
+    if (!location) throw new Error("Location not found.");
+    
+    const bounds = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
+    if (!bounds) throw new Error("Campaign map not found.");
+    const boundObj = JSON.parse(bounds.bounds_json);
+    const mapPos = JSON.parse(location.map_position_json);
+    if (!isWithinBounds(mapPos, boundObj)) throw new Error("Location is outside campaign bounds.");
+    
+    const existingAtOrdinal = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
+      .get(campaignId, ordinal);
+    if (existingAtOrdinal && existingAtOrdinal.count > 0) {
+      throw new Error("A stop already exists at this ordinal. Use reordering to adjust.");
+    }
+    
+    const duplicate = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND location_id = ?")
+      .get(campaignId, locationId);
+    if (duplicate && duplicate.count > 0) {
+      throw new Error("This location is already in the route.");
+    }
+    
+    const maxOrdinal = database.prepare("SELECT COALESCE(MAX(ordinal), -1) as max FROM route_stops WHERE campaign_id = ?")
+      .get(campaignId).max;
+    if (ordinal > maxOrdinal + 1) {
+      throw new Error("Ordinal must be sequential (no gaps).");
+    }
+    
+    database.prepare(`INSERT INTO route_stops 
+      (campaign_id, ordinal, location_id, detail, km_from_previous)
+      VALUES (?, ?, ?, ?, ?)`)
+      .run(campaignId, ordinal, locationId, validDetail, kmFromPrevious);
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    return {
+      ordinal,
+      locationId,
+      locationName: location.name,
+      detail: validDetail,
+      kmFromPrevious,
+      gridRef: location.grid_ref,
+      mapPosition: JSON.parse(location.map_position_json)
+    };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function updateRouteStop(database, accountId, campaignId, ordinal, detail, kmFromPrevious, options = {}) {
+  const validDetail = requireText(detail, "Stop detail", 160);
+  if (!Number.isInteger(kmFromPrevious) || kmFromPrevious < 0) throw new Error("Distance must be a non-negative integer.");
+  if (!Number.isInteger(ordinal) || ordinal < 0) throw new Error("Ordinal must be a non-negative integer.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const stop = database.prepare("SELECT * FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
+      .get(campaignId, ordinal);
+    if (!stop) throw new Error("Route stop not found.");
+    
+    database.prepare(`UPDATE route_stops 
+      SET detail = ?, km_from_previous = ?
+      WHERE campaign_id = ? AND ordinal = ?`)
+      .run(validDetail, kmFromPrevious, campaignId, ordinal);
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    
+    const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
+      .get(campaignId, stop.location_id);
+    
+    return {
+      ordinal,
+      locationId: stop.location_id,
+      locationName: location.name,
+      detail: validDetail,
+      kmFromPrevious,
+      gridRef: location.grid_ref,
+      mapPosition: JSON.parse(location.map_position_json)
+    };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function deleteRouteStop(database, accountId, campaignId, ordinal, options = {}) {
+  if (!Number.isInteger(ordinal) || ordinal < 0) throw new Error("Ordinal must be a non-negative integer.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const stop = database.prepare("SELECT * FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
+      .get(campaignId, ordinal);
+    if (!stop) throw new Error("Route stop not found.");
+    
+    database.prepare("DELETE FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
+      .run(campaignId, ordinal);
+    
+    database.prepare(`UPDATE route_stops 
+      SET ordinal = ordinal - 1
+      WHERE campaign_id = ? AND ordinal > ?`)
+      .run(campaignId, ordinal);
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    return { success: true };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function reorderRouteStops(database, accountId, campaignId, orderedLocationIds, options = {}) {
+  if (!Array.isArray(orderedLocationIds)) throw new Error("Ordered location IDs must be an array.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    const current = database.prepare("SELECT location_id FROM route_stops WHERE campaign_id = ? ORDER BY ordinal")
+      .all(campaignId);
+    const currentIds = current.map(r => r.location_id);
+    
+    if (orderedLocationIds.length !== currentIds.length) {
+      throw new Error("Reordering must include all current route stops.");
+    }
+    
+    const missingIds = currentIds.filter(id => !orderedLocationIds.includes(id));
+    const extraIds = orderedLocationIds.filter(id => !currentIds.includes(id));
+    if (missingIds.length > 0 || extraIds.length > 0) {
+      throw new Error("Reordering locations do not match current route.");
+    }
+    
+    // Save current stops before deleting
+    const stops = database.prepare("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal").all(campaignId);
+    const stopsByLocationId = {};
+    stops.forEach(stop => { stopsByLocationId[stop.location_id] = stop; });
+    
+    database.prepare("DELETE FROM route_stops WHERE campaign_id = ?").run(campaignId);
+    
+    for (let i = 0; i < orderedLocationIds.length; i++) {
+      const locationId = orderedLocationIds[i];
+      const oldStop = stopsByLocationId[locationId];
+      database.prepare(`INSERT INTO route_stops 
+        (campaign_id, ordinal, location_id, detail, km_from_previous)
+        VALUES (?, ?, ?, ?, ?)`)
+        .run(campaignId, i, locationId, oldStop.detail, i === 0 ? 0 : oldStop.km_from_previous);
+    }
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    database.exec("COMMIT");
+    return { success: true };
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function getMapPublicationState(database, accountId, campaignId) {
+  const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+    JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+    WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+    .get(campaignId, accountId);
+  if (!campaign) throw new Error("Campaign not found or access denied.");
+  
+  // Initialize if not exists
+  const exists = database.prepare("SELECT 1 FROM map_publication_state WHERE campaign_id = ?")
+    .get(campaignId);
+  if (!exists) {
+    database.prepare(`INSERT INTO map_publication_state 
+      (campaign_id, route_published, locations_published, position_published, factions_published)
+      VALUES (?, 0, 0, 0, 0)`)
+      .run(campaignId);
+  }
+  
+  const state = database.prepare(`SELECT 
+    route_published, route_revision,
+    locations_published, locations_revision,
+    position_published, position_revision,
+    factions_published, factions_revision,
+    last_modified_by, last_modified_at
+    FROM map_publication_state WHERE campaign_id = ?`)
+    .get(campaignId);
+  
+  return {
+    route: {published: Boolean(state.route_published), revision: state.route_revision},
+    locations: {published: Boolean(state.locations_published), revision: state.locations_revision},
+    position: {published: Boolean(state.position_published), revision: state.position_revision},
+    factions: {published: Boolean(state.factions_published), revision: state.factions_revision},
+    lastModifiedBy: state.last_modified_by,
+    lastModifiedAt: state.last_modified_at
+  };
+}
+
+function updateMapPublicationState(database, accountId, campaignId, state, options = {}) {
+  if (typeof state !== 'object' || state === null) throw new Error("Publication state must be an object.");
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    // Ensure publication state exists
+    const exists = database.prepare("SELECT 1 FROM map_publication_state WHERE campaign_id = ?")
+      .get(campaignId);
+    if (!exists) {
+      database.prepare(`INSERT INTO map_publication_state 
+        (campaign_id, route_published, locations_published, position_published, factions_published)
+        VALUES (?, 0, 0, 0, 0)`)
+        .run(campaignId);
+    }
+    
+    const timestamp = (options.now || (() => new Date().toISOString()))();
+    const userId = accountId;
+    
+    // Update each publication state if provided
+    const updates = [];
+    if (typeof state.route === 'boolean') {
+      const current = database.prepare("SELECT route_published, route_revision FROM map_publication_state WHERE campaign_id = ?")
+        .get(campaignId);
+      database.prepare(`UPDATE map_publication_state 
+        SET route_published = ?, route_revision = route_revision + 1 
+        WHERE campaign_id = ?`)
+        .run(state.route ? 1 : 0, campaignId);
+      updates.push({target: 'route', old: current.route_published, new: state.route ? 1 : 0});
+    }
+    
+    if (typeof state.locations === 'boolean') {
+      const current = database.prepare("SELECT locations_published, locations_revision FROM map_publication_state WHERE campaign_id = ?")
+        .get(campaignId);
+      database.prepare(`UPDATE map_publication_state 
+        SET locations_published = ?, locations_revision = locations_revision + 1 
+        WHERE campaign_id = ?`)
+        .run(state.locations ? 1 : 0, campaignId);
+      updates.push({target: 'locations', old: current.locations_published, new: state.locations ? 1 : 0});
+    }
+    
+    if (typeof state.position === 'boolean') {
+      const current = database.prepare("SELECT position_published, position_revision FROM map_publication_state WHERE campaign_id = ?")
+        .get(campaignId);
+      database.prepare(`UPDATE map_publication_state 
+        SET position_published = ?, position_revision = position_revision + 1 
+        WHERE campaign_id = ?`)
+        .run(state.position ? 1 : 0, campaignId);
+      updates.push({target: 'position', old: current.position_published, new: state.position ? 1 : 0});
+    }
+    
+    if (typeof state.factions === 'boolean') {
+      const current = database.prepare("SELECT factions_published, factions_revision FROM map_publication_state WHERE campaign_id = ?")
+        .get(campaignId);
+      database.prepare(`UPDATE map_publication_state 
+        SET factions_published = ?, factions_revision = factions_revision + 1 
+        WHERE campaign_id = ?`)
+        .run(state.factions ? 1 : 0, campaignId);
+      updates.push({target: 'factions', old: current.factions_published, new: state.factions ? 1 : 0});
+    }
+    
+    database.prepare(`UPDATE map_publication_state 
+      SET last_modified_by = ?, last_modified_at = ? 
+      WHERE campaign_id = ?`)
+      .run(userId, timestamp, campaignId);
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(timestamp, campaignId);
+    
+    // Record in audit trail
+    updates.forEach(update => {
+      database.prepare(`INSERT INTO publication_history 
+        (id, campaign_id, actor, action, target, old_value, new_value, campaign_revision, recorded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(
+          `pub-${campaignId}-${Date.now()}-${Math.random()}`,
+          campaignId,
+          userId,
+          'update',
+          update.target,
+          update.old,
+          update.new,
+          campaign.revision + 1,
+          timestamp
+        );
+    });
+    
+    database.exec("COMMIT");
+    
+    return getMapPublicationState(database, accountId, campaignId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function getPublicationHistory(database, accountId, campaignId, limit = 50, offset = 0) {
+  const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+    JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+    WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+    .get(campaignId, accountId);
+  if (!campaign) throw new Error("Campaign not found or access denied.");
+  
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) limit = 50;
+  if (!Number.isInteger(offset) || offset < 0) offset = 0;
+  
+  const history = database.prepare(`SELECT 
+    id, actor, action, target, old_value, new_value, campaign_revision, recorded_at
+    FROM publication_history 
+    WHERE campaign_id = ? 
+    ORDER BY recorded_at DESC 
+    LIMIT ? OFFSET ?`)
+    .all(campaignId, limit, offset);
+  
+  const total = database.prepare("SELECT COUNT(*) as count FROM publication_history WHERE campaign_id = ?")
+    .get(campaignId);
+  
+  return {
+    history: history.map(h => ({
+      id: h.id,
+      actor: h.actor,
+      action: h.action,
+      target: h.target,
+      oldValue: h.old_value,
+      newValue: h.new_value,
+      campaignRevision: h.campaign_revision,
+      recordedAt: h.recorded_at
+    })),
+    total: total.count,
+    limit,
+    offset
+  };
+}
+
+function getPartyPosition(database, accountId, campaignId) {
+  const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+    JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+    WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+    .get(campaignId, accountId);
+  if (!campaign) throw new Error("Campaign not found or access denied.");
+  
+  // Initialize if not exists
+  const exists = database.prepare("SELECT 1 FROM party_position WHERE campaign_id = ?")
+    .get(campaignId);
+  if (!exists) {
+    const timestamp = new Date().toISOString();
+    // Get campaign center as default
+    const map = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
+      .get(campaignId);
+    let centerLat = 0, centerLng = 0;
+    if (map) {
+      const bounds = JSON.parse(map.bounds_json);
+      centerLat = (bounds.north + bounds.south) / 2;
+      centerLng = (bounds.east + bounds.west) / 2;
+    }
+    
+    database.prepare(`INSERT INTO party_position 
+      (campaign_id, lat, lng, revision, published, updated_at)
+      VALUES (?, ?, ?, 0, 0, ?)`)
+      .run(campaignId, centerLat, centerLng, timestamp);
+  }
+  
+  const pos = database.prepare(`SELECT lat, lng, revision, published, published_at, updated_at 
+    FROM party_position WHERE campaign_id = ?`)
+    .get(campaignId);
+  
+  return {
+    lat: pos.lat,
+    lng: pos.lng,
+    revision: pos.revision,
+    published: Boolean(pos.published),
+    publishedAt: pos.published_at,
+    updatedAt: pos.updated_at
+  };
+}
+
+function updatePartyPosition(database, accountId, campaignId, lat, lng, options = {}) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') {
+    throw new Error("Position must have numeric lat/lng.");
+  }
+  
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
+      JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+      WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
+      .get(campaignId, accountId);
+    if (!campaign) throw new Error("Campaign not found or access denied.");
+    
+    // Validate bounds
+    const map = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
+      .get(campaignId);
+    if (map) {
+      const bounds = JSON.parse(map.bounds_json);
+      if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
+        throw new Error("Position outside campaign bounds.");
+      }
+    }
+    
+    // Ensure position exists
+    const exists = database.prepare("SELECT 1 FROM party_position WHERE campaign_id = ?")
+      .get(campaignId);
+    if (!exists) {
+      const timestamp = new Date().toISOString();
+      database.prepare(`INSERT INTO party_position 
+        (campaign_id, lat, lng, revision, published, updated_at)
+        VALUES (?, ?, ?, 0, 0, ?)`)
+        .run(campaignId, lat, lng, timestamp);
+    } else {
+      const timestamp = (options.now || (() => new Date().toISOString()))();
+      database.prepare(`UPDATE party_position 
+        SET lat = ?, lng = ?, revision = revision + 1, updated_at = ? 
+        WHERE campaign_id = ?`)
+        .run(lat, lng, timestamp, campaignId);
+    }
+    
+    database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+      .run(new Date().toISOString(), campaignId);
+    
+    database.exec("COMMIT");
+    
+    return getPartyPosition(database, accountId, campaignId);
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 module.exports = {
   advanceRuntimeTime,
   rollRuntimeWeather,
@@ -2457,5 +3551,23 @@ module.exports = {
   finalizePlayerSeed,
   createCharacterChangeRequest,
   listCharacterChangeRequests,
-  reviewCharacterChangeRequest
+  reviewCharacterChangeRequest,
+  loadDefaultNPCArchetypes,
+  listNPCArchetypes,
+  getNPCArchetype,
+  listLocationsForCampaign,
+  createLocation,
+  updateLocation,
+  deleteLocation,
+  listRouteStopsForCampaign,
+  createRouteStop,
+  updateRouteStop,
+  deleteRouteStop,
+  reorderRouteStops,
+  getMapPublicationState,
+  updateMapPublicationState,
+  getPublicationHistory,
+  getPartyPosition,
+  updatePartyPosition,
+  createPersonnelFromArchetype
 };

@@ -6,6 +6,7 @@ const ROOT = join(__dirname, "..");
 const FILES = new Map([
   ["/project-status.html", ["project-status.html", "text/html; charset=utf-8"]],
   ["/project-features.html", ["project-features.html", "text/html; charset=utf-8"]],
+  ["/gmpack/plan-b.html", ["gmpack/plan-b.html", "text/html; charset=utf-8"]],
   ["/ROADMAP.md", ["ROADMAP.md", "text/markdown; charset=utf-8"]],
   ["/FEATURES.md", ["FEATURES.md", "text/markdown; charset=utf-8"]]
 ]);

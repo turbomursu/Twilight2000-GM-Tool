@@ -1,6 +1,8 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard } = require("./runtime-store.cjs");
+const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard, listNPCArchetypes, createPersonnelFromArchetype, listLocationsForCampaign, createLocation, updateLocation, deleteLocation, listRouteStopsForCampaign, createRouteStop, updateRouteStop, deleteRouteStop, reorderRouteStops, getMapPublicationState, updateMapPublicationState, getPublicationHistory, getPartyPosition, updatePartyPosition } = require("./runtime-store.cjs");
 const { createCombatHandler } = require("./combat-api.cjs");
+const { BackupScheduleType, createBackupSchedule, getBackupSchedule, updateBackupSchedule, getBackupHistory, initializeBackupScheduler } = require("./backup-scheduler.cjs");
+const depthService = require("./campaign-depth-service.cjs");
 
 const MAX_SETUP_PACKAGE_BYTES = 50 * 1024 * 1024;
 const MAX_RUNTIME_BACKUP_BYTES = 100 * 1024 * 1024;
@@ -405,6 +407,147 @@ function createCampaignHandler({ database }) {
       }
     }
 
+    const locationsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/locations(?:\/([^/]+))?$/);
+    if (locationsMatch) {
+      if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        let locationId;
+        try { 
+          campaignId = decodeURIComponent(locationsMatch[1]); 
+          locationId = locationsMatch[2] ? decodeURIComponent(locationsMatch[2]) : null;
+        } catch { throw new HttpError(400, "Invalid campaign or location ID."); }
+
+        if (request.method === "GET" && !locationId) {
+          const locations = listLocationsForCampaign(database, account.id, campaignId);
+          return sendJson(response, 200, { locations });
+        }
+
+        if (request.method === "POST" && !locationId) {
+          const body = await readJsonBody(request);
+          const location = createLocation(database, account.id, campaignId, body);
+          return sendJson(response, 201, { location });
+        }
+
+        if (request.method === "PUT" && locationId) {
+          const body = await readJsonBody(request);
+          const location = updateLocation(database, account.id, campaignId, locationId, body);
+          return sendJson(response, 200, { location });
+        }
+
+        if (request.method === "DELETE" && locationId) {
+          const result = deleteLocation(database, account.id, campaignId, locationId);
+          return sendJson(response, 200, result);
+        }
+
+        throw new HttpError(405, "Method not allowed for this endpoint.");
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|Location not found|access denied/.test(error.message) ? 404
+            : /while it is used in the campaign route/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    const routeMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/route(?:\/stops(?:\/(\d+))?)?$|^\/api\/campaigns\/([^/]+)\/route\/reorder$/);
+    if (routeMatch) {
+      if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId = routeMatch[1] || routeMatch[3];
+        const ordinalStr = routeMatch[2];
+        const isReorder = /\/reorder$/.test(url.pathname);
+        
+        try { campaignId = decodeURIComponent(campaignId); } 
+        catch { throw new HttpError(400, "Invalid campaign ID."); }
+
+        // GET /api/campaigns/:id/route
+        if (request.method === "GET" && !ordinalStr && !isReorder) {
+          const result = listRouteStopsForCampaign(database, account.id, campaignId);
+          return sendJson(response, 200, result);
+        }
+
+        // POST /api/campaigns/:id/route/stops
+        if (request.method === "POST" && !ordinalStr && !isReorder) {
+          const body = await readJsonBody(request);
+          if (!body.locationId) throw new HttpError(400, "Location ID is required.");
+          if (body.detail === undefined) throw new HttpError(400, "Stop detail is required.");
+          if (body.kmFromPrevious === undefined) throw new HttpError(400, "Distance from previous is required.");
+          if (body.ordinal === undefined) throw new HttpError(400, "Ordinal is required.");
+          
+          const stop = createRouteStop(database, account.id, campaignId, body.locationId, body.detail, body.kmFromPrevious, body.ordinal);
+          return sendJson(response, 201, { stop });
+        }
+
+        // PUT /api/campaigns/:id/route/stops/:ordinal
+        if (request.method === "PUT" && ordinalStr && !isReorder) {
+          const ordinal = parseInt(ordinalStr, 10);
+          if (!Number.isInteger(ordinal) || ordinal < 0) throw new HttpError(400, "Invalid ordinal.");
+          
+          const body = await readJsonBody(request);
+          if (body.detail === undefined) throw new HttpError(400, "Stop detail is required.");
+          if (body.kmFromPrevious === undefined) throw new HttpError(400, "Distance from previous is required.");
+          
+          const stop = updateRouteStop(database, account.id, campaignId, ordinal, body.detail, body.kmFromPrevious);
+          return sendJson(response, 200, { stop });
+        }
+
+        // DELETE /api/campaigns/:id/route/stops/:ordinal
+        if (request.method === "DELETE" && ordinalStr && !isReorder) {
+          const ordinal = parseInt(ordinalStr, 10);
+          if (!Number.isInteger(ordinal) || ordinal < 0) throw new HttpError(400, "Invalid ordinal.");
+          
+          const result = deleteRouteStop(database, account.id, campaignId, ordinal);
+          return sendJson(response, 200, result);
+        }
+
+        // PUT /api/campaigns/:id/route/reorder
+        if (request.method === "PUT" && isReorder) {
+          const body = await readJsonBody(request);
+          if (!Array.isArray(body.orderedLocationIds)) throw new HttpError(400, "Ordered location IDs array is required.");
+          
+          const result = reorderRouteStops(database, account.id, campaignId, body.orderedLocationIds);
+          return sendJson(response, 200, result);
+        }
+
+        throw new HttpError(405, "Method not allowed for this endpoint.");
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|Route stop not found|Location not found|access denied/.test(error.message) ? 404
+            : /already in the route|Reordering locations do not match/.test(error.message) ? 409 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    const archetypesMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/npc-archetypes$/);
+    if (archetypesMatch && request.method === "GET") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(archetypesMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+        const archetypes = listNPCArchetypes(database, campaignId);
+        return sendJson(response, 200, { archetypes });
+      } catch (error) {
+        return sendJson(response, 404, { error: error.message });
+      }
+    }
+    const personnelMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/personnel\/from-archetype$/);
+    if (personnelMatch && request.method === "POST") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(personnelMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const body = await readJsonBody(request);
+        if (!body.archetypeId) throw new HttpError(400, "Archetype ID is required.");
+        const personnel = createPersonnelFromArchetype(database, account.id, campaignId, body.archetypeId, body);
+        return sendJson(response, 201, { personnel });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|access denied/.test(error.message) ? 404
+            : /archetype not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
     const match = url.pathname.match(/^\/api\/campaigns\/([^/]+)$/);
     if (request.method === "GET" && match) {
       let runtimeId;
@@ -418,6 +561,368 @@ function createCampaignHandler({ database }) {
         ? sendJson(response, 200, { campaign })
         : sendJson(response, 404, { error: "Campaign not found." });
     }
+
+    // Backup Schedule Routes
+    const backupScheduleMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup-schedule$/);
+    if (backupScheduleMatch) {
+      if (!["GET", "POST", "PATCH"].includes(request.method)) return sendJson(response, 405, { error: "Method not allowed." });
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(backupScheduleMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          initializeBackupScheduler(database);
+          const schedule = getBackupSchedule(database, campaignId);
+          return sendJson(response, 200, { schedule: schedule || null });
+        }
+
+        if (request.method === "POST") {
+          const body = await readJsonBody(request);
+          if (!body.scheduleType) throw new HttpError(400, "Schedule type is required.");
+          initializeBackupScheduler(database);
+          createBackupSchedule(database, campaignId, body.scheduleType, body.options || {});
+          const schedule = getBackupSchedule(database, campaignId);
+          return sendJson(response, 201, { schedule });
+        }
+
+        if (request.method === "PATCH") {
+          const body = await readJsonBody(request);
+          if (!body.updates || typeof body.updates !== "object") throw new HttpError(400, "Updates object is required.");
+          initializeBackupScheduler(database);
+          updateBackupSchedule(database, campaignId, body.updates);
+          const schedule = getBackupSchedule(database, campaignId);
+          return sendJson(response, 200, { schedule });
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Backup History Routes
+    const backupHistoryMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/backup-history$/);
+    if (backupHistoryMatch && request.method === "GET") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(backupHistoryMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit")) || 50, 1), 500);
+
+        initializeBackupScheduler(database);
+        const history = getBackupHistory(database, campaignId, limit);
+        return sendJson(response, 200, { history, count: history.length });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Map Publication State Routes
+    const mapPublicationMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/map-publication$/);
+    if (mapPublicationMatch && ["GET", "PUT"].includes(request.method)) {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(mapPublicationMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          const state = getMapPublicationState(database, account.id, campaignId);
+          return sendJson(response, 200, { state });
+        }
+
+        if (request.method === "PUT") {
+          const body = await readJsonBody(request);
+          if (!body.state || typeof body.state !== "object") throw new HttpError(400, "Publication state object is required.");
+          const updated = updateMapPublicationState(database, account.id, campaignId, body.state);
+          return sendJson(response, 200, { state: updated });
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404
+          : /access denied/.test(error.message) ? 403 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Publication History Routes
+    const publicationHistoryMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/map-publication\/history$/);
+    if (publicationHistoryMatch && request.method === "GET") {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(publicationHistoryMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit")) || 50, 1), 500);
+        const offset = Math.max(parseInt(url.searchParams.get("offset")) || 0, 0);
+        const result = getPublicationHistory(database, account.id, campaignId, limit, offset);
+        return sendJson(response, 200, { history: result.history, total: result.total, limit, offset });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404
+          : /access denied/.test(error.message) ? 403 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Party Position Routes
+    const partyPositionMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/party-position$/);
+    if (partyPositionMatch && ["GET", "PUT"].includes(request.method)) {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(partyPositionMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          const pos = getPartyPosition(database, account.id, campaignId);
+          return sendJson(response, 200, { position: pos });
+        }
+
+        if (request.method === "PUT") {
+          const body = await readJsonBody(request);
+          if (typeof body.lat !== "number" || typeof body.lng !== "number") {
+            throw new HttpError(400, "Latitude and longitude must be numbers.");
+          }
+          const updated = updatePartyPosition(database, account.id, campaignId, body.lat, body.lng);
+          return sendJson(response, 200, { position: updated });
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found/.test(error.message) ? 404
+          : /access denied/.test(error.message) ? 403
+          : /outside campaign bounds/.test(error.message) ? 422 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Milestone 7: Campaign Depth — Factions
+    const factionsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/factions(?:\/([^/]+))?$/);
+    if (factionsMatch && ["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
+      try {
+        let campaignId;
+        try { campaignId = decodeURIComponent(factionsMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        const factionId = factionsMatch[2] ? decodeURIComponent(factionsMatch[2]) : null;
+
+        if (request.method === "GET") {
+          if (factionId) {
+            const faction = depthService.getFaction(database, campaignId, factionId);
+            if (!faction) return sendJson(response, 404, { error: "Faction not found." });
+            return sendJson(response, 200, { faction });
+          }
+          const factions = depthService.listFactions(database, campaignId);
+          return sendJson(response, 200, { factions });
+        }
+
+        if (request.method === "POST") {
+          const body = await readJsonBody(request);
+          const faction = depthService.createFaction(database, campaignId, body);
+          return sendJson(response, 201, { faction });
+        }
+
+        if (request.method === "PUT") {
+          if (!factionId) throw new HttpError(400, "Faction ID required for update.");
+          const body = await readJsonBody(request);
+          const faction = depthService.updateFaction(database, campaignId, factionId, body);
+          return sendJson(response, 200, { faction });
+        }
+
+        if (request.method === "DELETE") {
+          if (!factionId) throw new HttpError(400, "Faction ID required for delete.");
+          depthService.deleteFaction(database, campaignId, factionId);
+          return sendJson(response, 204, {});
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|Faction not found/.test(error.message) ? 404
+          : /required and must be/.test(error.message) ? 422 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Milestone 7: Faction Relationships
+    const relationshipsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/factions\/([^/]+)\/relationships(?:\/([^/]+))?$/);
+    if (relationshipsMatch && ["GET", "POST", "PUT"].includes(request.method)) {
+      try {
+        let campaignId = decodeURIComponent(relationshipsMatch[1]);
+        const fromFactionId = decodeURIComponent(relationshipsMatch[2]);
+        const toFactionId = relationshipsMatch[3] ? decodeURIComponent(relationshipsMatch[3]) : null;
+
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          if (toFactionId) {
+            const rel = depthService.getFactionRelationship(database, campaignId, fromFactionId, toFactionId);
+            if (!rel) return sendJson(response, 404, { error: "Relationship not found." });
+            return sendJson(response, 200, { relationship: rel });
+          }
+          const rels = depthService.getFactionRelationships(database, campaignId, fromFactionId);
+          return sendJson(response, 200, { relationships: rels });
+        }
+
+        if (request.method === "POST" || request.method === "PUT") {
+          if (!toFactionId) throw new HttpError(400, "To-faction ID required.");
+          const body = await readJsonBody(request);
+          const rel = depthService.setFactionRelationship(database, campaignId, fromFactionId, toFactionId, body.attitude, body.notes);
+          return sendJson(response, 200, { relationship: rel });
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|not found/.test(error.message) ? 404
+          : /must be one of/.test(error.message) ? 422 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Milestone 7: Settlement Resources
+    const resourcesMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/settlements\/([^/]+)\/resources(?:\/([^/]+))?$/);
+    if (resourcesMatch && ["GET", "POST", "PUT"].includes(request.method)) {
+      try {
+        let campaignId = decodeURIComponent(resourcesMatch[1]);
+        const settlementId = decodeURIComponent(resourcesMatch[2]);
+        const resourceType = resourcesMatch[3] ? decodeURIComponent(resourcesMatch[3]) : null;
+
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          if (resourceType) {
+            const res = depthService.getSettlementResource(database, campaignId, settlementId, resourceType);
+            if (!res) return sendJson(response, 404, { error: "Resource not found." });
+            return sendJson(response, 200, { resource: res });
+          }
+          const resources = depthService.getSettlementResources(database, campaignId, settlementId);
+          return sendJson(response, 200, { resources });
+        }
+
+        if (request.method === "POST" || request.method === "PUT") {
+          if (!resourceType) throw new HttpError(400, "Resource type required.");
+          const body = await readJsonBody(request);
+          const res = depthService.setSettlementResource(database, campaignId, settlementId, resourceType, body.status, body.notes);
+          return sendJson(response, 200, { resource: res });
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|not found/.test(error.message) ? 404
+          : /must be one of/.test(error.message) ? 422 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Milestone 7: Campaign Events
+    const eventsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/events(?:\/([^/]+))?$/);
+    if (eventsMatch && ["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
+      try {
+        let campaignId = decodeURIComponent(eventsMatch[1]);
+        const eventId = eventsMatch[2] ? decodeURIComponent(eventsMatch[2]) : null;
+
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          if (eventId) {
+            const event = depthService.getEvent(database, campaignId, eventId);
+            if (!event) return sendJson(response, 404, { error: "Event not found." });
+            return sendJson(response, 200, { event });
+          }
+          const filters = {};
+          if (url.searchParams.has("eventType")) filters.eventType = url.searchParams.get("eventType");
+          if (url.searchParams.has("linkedFactionId")) filters.linkedFactionId = url.searchParams.get("linkedFactionId");
+          if (url.searchParams.has("linkedSettlementId")) filters.linkedSettlementId = url.searchParams.get("linkedSettlementId");
+          if (url.searchParams.has("isPublic")) filters.isPublic = url.searchParams.get("isPublic") === "true";
+          const events = depthService.listEvents(database, campaignId, filters);
+          return sendJson(response, 200, { events });
+        }
+
+        if (request.method === "POST") {
+          const body = await readJsonBody(request);
+          const event = depthService.createEvent(database, campaignId, body);
+          return sendJson(response, 201, { event });
+        }
+
+        if (request.method === "PUT") {
+          if (!eventId) throw new HttpError(400, "Event ID required for update.");
+          const body = await readJsonBody(request);
+          const event = depthService.updateEvent(database, campaignId, eventId, body);
+          return sendJson(response, 200, { event });
+        }
+
+        if (request.method === "DELETE") {
+          if (!eventId) throw new HttpError(400, "Event ID required for delete.");
+          depthService.deleteEvent(database, campaignId, eventId);
+          return sendJson(response, 204, {});
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|not found/.test(error.message) ? 404
+          : /required and must be|must be one of/.test(error.message) ? 422 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
+    // Milestone 7: Threat Tracker
+    const threatsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/threats(?:\/([^/]+))?$/);
+    if (threatsMatch && ["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
+      try {
+        let campaignId = decodeURIComponent(threatsMatch[1]);
+        const threatId = threatsMatch[2] ? decodeURIComponent(threatsMatch[2]) : null;
+
+        const campaign = getRuntimeCampaign(database, account.id, campaignId);
+        if (!campaign) return sendJson(response, 404, { error: "Campaign not found." });
+
+        if (request.method === "GET") {
+          if (threatId) {
+            const threat = depthService.getThreat(database, campaignId, threatId);
+            if (!threat) return sendJson(response, 404, { error: "Threat not found." });
+            return sendJson(response, 200, { threat });
+          }
+          const filters = {};
+          if (url.searchParams.has("status")) filters.status = url.searchParams.get("status");
+          if (url.searchParams.has("threatLevel")) filters.threatLevel = url.searchParams.get("threatLevel");
+          if (url.searchParams.has("antagonistType")) filters.antagonistType = url.searchParams.get("antagonistType");
+          if (url.searchParams.has("linkedFactionId")) filters.linkedFactionId = url.searchParams.get("linkedFactionId");
+          if (url.searchParams.has("linkedSettlementId")) filters.linkedSettlementId = url.searchParams.get("linkedSettlementId");
+          const threats = depthService.listThreats(database, campaignId, filters);
+          return sendJson(response, 200, { threats });
+        }
+
+        if (request.method === "POST") {
+          const body = await readJsonBody(request);
+          const threat = depthService.createThreat(database, campaignId, body);
+          return sendJson(response, 201, { threat });
+        }
+
+        if (request.method === "PUT") {
+          if (!threatId) throw new HttpError(400, "Threat ID required for update.");
+          const body = await readJsonBody(request);
+          const threat = depthService.updateThreat(database, campaignId, threatId, body);
+          return sendJson(response, 200, { threat });
+        }
+
+        if (request.method === "DELETE") {
+          if (!threatId) throw new HttpError(400, "Threat ID required for delete.");
+          depthService.deleteThreat(database, campaignId, threatId);
+          return sendJson(response, 204, {});
+        }
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status
+          : /Campaign not found|not found/.test(error.message) ? 404
+          : /required and must be|must be one of/.test(error.message) ? 422 : 422;
+        return sendJson(response, status, { error: error.message });
+      }
+    }
+
     if (url.pathname.startsWith("/api/campaigns/")) return sendJson(response, 405, { error: "Method not allowed." });
     return sendJson(response, 404, { error: "Not found." });
   };

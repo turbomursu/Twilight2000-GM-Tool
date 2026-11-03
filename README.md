@@ -1,6 +1,28 @@
-# Fieldbook
+# Twilight: 2000 Fourth Edition GM Tool
 
-A small, local-first game master desk for a Twilight: 2000 Fourth Edition campaign. This is an independent fan utility, not an official product.
+A complete, local-first game master tool for Twilight: 2000 Fourth Edition campaigns.
+
+**Status:** Production Ready | **License:** GPL v3 | **Version:** 1.0.0
+
+---
+
+## 📜 License
+
+This project is licensed under the **GNU General Public License v3 (GPL v3)**.
+
+- **You can:** Use, modify, study, and share this tool freely
+- **You must:** Share any modifications if you distribute them
+- **You get:** No warranty, but complete source code freedom
+
+**Full Details:** See [LICENSE](./LICENSE) and [LICENSE_INFO.md](./LICENSE_INFO.md)
+
+**Copyrighted Material Notice:** This tool implements Twilight: 2000 Fourth Edition rules. The game is copyright Fria Ligan/Free League. This tool is an independent fan utility for running campaigns, not an official product.
+
+---
+
+## Overview
+
+This is an independent fan utility, not an official product.
 
 ## Run
 
