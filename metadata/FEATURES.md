@@ -65,7 +65,7 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 ## Game Master Features
 
 - **Runtime route and map editing** — Partial. The GM can reorder route stops, edit leg details/distances, and move campaign location points within imported map bounds. Saves are owner/revision checked, audited, and backed up. Setup geometry remains immutable and player map publication remains a separate explicit workflow; broader map editing is planned.
-- **Personnel roster editing** — Implemented. The GM can create personnel from Fourth Edition NPC archetypes, customize name/role/condition/readiness, and edit all attributes (ability ratings, CUF rating, hit cap). Archetype browser modal displays available templates grouped by category. Creation workflow: select archetype → customize → create. Detail modal allows full attribute editing with status feedback. Roster grid displays personnel cards with condition badges, readiness indicators, and action buttons. Saves use campaign revision; stale edits reload current roster state while preserving the draft. Runtime backups preserve personnel fields. Archetype data verified against Referee's Manual. Bulk operations (condition application, reordering) planned for Phase 3.
+- **Personnel roster editing** — Partial. The GM can create personnel from Fourth Edition NPC archetypes, customize name/role/condition/readiness, edit attributes, and remove records through the owner-scoped runtime API. The archetype browser groups available templates, and saves use the campaign revision; stale edits reload current roster state while preserving the open draft for review and retry. Runtime backups preserve personnel fields. Bulk operations, broader roster history, and derived rules effects remain unimplemented.
 - **Campaign audit history** — Implemented metadata slice. Owner-only Audit view shows actor/target snapshots, record and campaign revisions, UTC time, campaign date/day, and live/recovered origin with pagination. Condition save/clear, inventory stock/correction/removal and proposal decisions, report/map draft/publish/withdraw, manual dashboard and journal updates, faction influence/prominence edits, character change request reviews, player seat assignments, and restores are audited in their mutation transactions. Failed writes and read-only previews create no events. SQLite rejects event updates/deletes; backup restore preserves later live entries, merges missing saved events as backup-origin metadata, rejects conflicting IDs, and appends a restore event. API permissions, atomic failures, file reopen, recovery, and browser paging/safe-text/player denial checks pass. This is not a cryptographic tamper-proof log. Player proposals/COMMS and account/auth events are not audited by this slice; full snapshots, retention tooling, and wider coverage remain planned. Historical pre-upgrade actions are not fabricated or backfilled.
 
 - **Development runtime fixture** — Implemented for development/testing only. `node server/seed-sample.cjs --db <dev-db-path> --gm <gm-username>` creates an idempotent `The Long Road` campaign with dashboard counters, route stops, personnel, journal entries, and one sample player seed. It refuses the configured/default live DB. The owning GM can read the normalized snapshot from `GET /api/campaigns/:id/runtime`; supported Situation, Personnel, Movement, and Journal fields, including campaign era/premise display, connect to it. Remaining dashboard panels are still incomplete.
@@ -123,12 +123,10 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 
 ## Conflict
 
-- **Conflict escalation** — Planned.
-- **Border incidents** — Planned.
-- **Trade disruption** — Planned.
+- **Conflict and incident ledger** — Partial. The GM can record, edit, monitor, and resolve campaign-scoped border incidents, trade disruptions, convoy attacks, and other threats. Records are owner- and revision-checked, audited, and included in runtime backup recovery. Categories and status are descriptive only; escalation calculations, generated scenarios, and player publication are not implemented.
+- **Conflict escalation** — Planned. No escalation thresholds or consequences are calculated.
 - **Territorial control** — Planned.
 - **Threat generation** — Planned.
-- **Convoy attacks** — Planned.
 
 ## Operational Reliability
 
@@ -167,7 +165,7 @@ Integration verified on 01 Nov 2026: combined runtime recovery retains character
 
 ## Session Preparation — Milestone 6
 
-- **NPC Creation System** — Partial. Service module (server/npc-service.cjs) provides complete CRUD operations for NPC management: createNPC, getNPC, listNPCs, updateNPC, deleteNPC, cloneNPC. Archetype system loads 17 pre-defined T2K 4E NPC templates from gmpack/npc-archetypes.json (4 civilian, 4 soviet-military, 4 us-military, 5 other-military). NPCs inherit attributes (strength, agility, intelligence, empathy), hit cap, CUF rating, and equipment from selected archetypes; all values can be customized. Campaign-scoped isolation ensures NPCs remain in their assigned campaign. Comprehensive test suite (10 tests) verifies archetype loading, NPC creation from templates, custom attributes, roster management, cloning, deletion, and campaign isolation. All 236 project tests passing. REST API endpoints and GM UI for NPC roster remain planned.
+- **NPC Creation System** — Partial. Owner-scoped runtime APIs load 17 archetypes and create personnel from a selected template; the GM roster supports archetype browsing and personnel editing. Fifteen archetype tests pass. NPC life-path automation, encounter generation, and broader roster operations remain planned.
 - **Settlement drafts** — Planned. Settlement template system for quick generator (name, key features, leadership); editable notes; link to campaign locations.
 - **Mission & encounter design** — Planned. Mission template system; encounter types (ambush, roadblock, settlement, checkpoint); opposing force composition; GM/player briefing separation.
 - **Scenario packages** — Planned. Import/export scenarios as JSON; scenario versioning; bundled templates.
