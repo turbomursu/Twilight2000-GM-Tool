@@ -677,4 +677,117 @@ Progress is tracked in three places:
 - **[project-status.html](project-status.html)** — Snapshot of current test count, milestones, and verification
 - **This roadmap** — Development sequence and parallel work strategy
 
+## Phase 2: Characters and AI-Assisted Campaign Setup
+
+**Goal:** Add verified character/NPC creation and optional AI assistance to campaign authoring.
+
+- Add player-character and NPC creation to the appropriate GM authoring/runtime workflows, using verified Fourth Edition procedures wherever applicable.
+- Build on the current manual template slice: global GM-owned player templates can record final attributes, skills, CUF, and structured life-path outcomes, but full rules-driven generation and source-checked validation remain outstanding.
+- Cite the relevant book and page or section in original, concise language; distinguish optional, house-ruled, and GM-managed fields.
+- Add AI-assisted campaign setup as a draft workflow: review, edit, accept, or discard generated material before it enters a setup package.
+- Provide a manual campaign-creation path so this workflow remains usable without an AI service.
+- Decide how AI requests are handled without exposing provider secrets in a browser client; keep the provider replaceable.
+
+**Exit checks:** Character/NPC outputs pass source-checked examples; generated campaign material cannot enter a package without GM confirmation; user data is not sent to an AI service without an explicit configured path.
+
+## Phase 3: GM Runtime and Player Situation Report
+
+Integration check (01 Nov 2026): combined recovery, cross-host runtime import with explicit account mapping, and all five browser views verified. Fixed a seed-only browser submit guard and late character-response display. Client regressions complement API permission/recovery checks; covered GM mutations now have audit metadata. Rules automation, wider audit coverage/content snapshots, and scheduled backups remain incomplete.
+
+**Goal:** Make the imported campaign operable and give the GM explicit control over the player-facing report.
+
+- Turn the existing dashboard, clock, journal, roster, route, and resource counters into views over imported campaign state rather than separate sample state.
+- Implemented clock slice: revision-protected +6h with date/day rollover at midnight. A GM-defined one-ration-day schedule processes each date's midday once; fuel/items remain manual. Time, daily usage, and audit/journal are atomic and recover together. New COMMS/audit stamps retain HH:MM; older stamps are not backfilled. General scheduling and verified consumption remain planned.
+- Complete runtime save/load, autosave, backup, and recovery workflows for the running campaign.
+- Implemented slice: GM-only runtime-v1 export and atomic same-campaign restore preserve supported record IDs, seats, requests, and source revision provenance, with replacement/older-backup confirmations and a monotonic active revision. Cross-host import creates a new campaign, maps the source GM to the signed-in GM, and requires each source player to map to a distinct enabled, unassigned local player account owned by that GM; credentials and sessions are not transferred. Scheduled backups remain planned.
+- Add a Player Interface situation report backed only by a deliberately constructed player-visible projection.
+- Implemented text-only slice: owning GM draft, preview, publish, and withdraw; active assigned players receive only title, body, game time, and publication timestamp. Draft edits do not affect the current player copy. Visible handset reports refresh every 15 seconds and on explicit refresh; push delivery remains planned. Runtime backup restores the draft and withdraws publication, never silently resurrecting withdrawn content.
+- Let the GM publish the Setup Tool map with GM-managed markings, route, and player position. Give players scroll access and zoom up to 200%, with map open/reset centered on their position, without allowing them to change campaign map state.
+- Implemented map slice: GM selection of locations, labeled point markings, bounded LineString/single-ring Polygon geometry, ordered selected-location waypoints, and bounded player position. Geometry vertices are checked against Setup bounds. Explicit publication can reveal selected source GM-only locations; unselected records remain excluded. Read-only assigned-player output uses an allow-list and no raw annotations or setup export. Optional raster PMTiles assets are served with byte ranges through authorized routes. Map drafts participate in runtime backup, but archive files remain sidecars and must be transferred separately. Vector PMTiles styles, fog masking, history, and push delivery remain planned.
+- Allow players to send a single-line COMMS message to the GM and all player seats; record player identity, campaign game time, and message content.
+- Implemented single-line slice: player/GM broadcasts retain server sender and date/day/time snapshots. Historical date-only stamps stay unchanged. Archives recover atomically; visible views poll every 15 seconds. Push delivery, receipts, and moderation remain planned.
+- Support 1-4 authenticated player seats, each assigned one character and an independent browser session.
+- Show each player only their own character and inventory, alongside GM-published situation information.
+- Implemented manual-condition slice: owning GM complete-record saves/clear, distinct public/private notes, and own-seat GET-only projection. Null values remain unknown and no rules effects are derived. Condition revisions advance during restore with empty markers for omitted older records. GM condition changes now have atomic audit metadata; rules automation and wider action coverage remain planned.
+- From the GM Tool, let the GM add, remove, edit, preview, publish, and withdraw report information; show whether changes are drafts or published.
+- Keep GM notes, hidden threats, unrevealed state, and other players' private data out of player-facing output by default.
+- Allow players to submit change requests only for their own assigned character and inventory. Keep requests pending until the GM reviews and applies them; route dice-governed actions through the rules-verified item-action workflow planned in Phase 4.
+- Implemented slice: finalized character edits and inventory add/update/remove proposals require owning-GM review. Inventory item revisions prevent stale approvals, and accepted source data is independently confirmed by the GM. Broader rules-governed character/item actions remain in progress.
+- Implemented audit metadata slice: conditions, inventories/reviews, report/map mutations, and restores record server actor, target IDs/labels, revisions, time, and recovery origin. Broader mutation coverage and full past-publication content snapshots remain planned; no pre-upgrade actions are backfilled.
+- Add missions and a campaign event ledger as GM-managed runtime records.
+
+**Exit checks:** Verify one-player and four-player campaigns, independent browser sessions, and blocked cross-player/GM-only access. Players can scroll/zoom the full published map but cannot modify map, markings, route, or position state. Character and inventory requests never change accepted state before GM approval. COMMS messages preserve sender and game time and reach the GM and all player seats. GM changes appear in the player report only after publishing; withdrawn information disappears. Runtime recovery does not unexpectedly alter published content or player ownership.
+
+## Phase 4: Environment, Routes, and Logistics
+
+**Goal:** Replace fixed demonstration values with campaign-managed travel and supply records.
+
+- Implemented slice: edit runtime route stop order/details/distances and location coordinates within imported bounds. Updates are owner/revision checked, audited, and backed up; they do not alter setup source geometry or automatically update player publication. Setup bounds editing and GM publication geometry are implemented; editor polish and offline asset migration remain open, alongside new locations, travel conditions, and weather automation.
+- Implemented weather slice: GM-selected Fair, Cloudy, Rain/Snow, or GM-defined condition plus optional note persists in the revision-checked runtime dashboard and backup. The GM records the physical d6 result and matching source-aid symbol; no numeric face mapping is assumed. Rolls are limited to once per shift, logged in journal/audit, and checked by the API. Rain/Snow automatically returns to Cloudy after one Fieldbook shift, followed by one full Cloudy shift before rolling resumes. Weather effects remain GM-adjudicated and do not modify character rolls.
+- Implement route modifiers only after Fourth Edition procedures are verified; otherwise label them as GM-entered campaign conditions.
+- Add convoy operations, cargo manifests, inventories, stockpiles, consumption, and resource distribution.
+- Add player-owned character inventories and item actions. Implement dice-governed procedures only after verification against authoritative Fourth Edition sources; record inputs, roll, and outcome, and send ambiguous cases to the GM.
+- Implemented bookkeeping slice: owned accepted items, manual carry locations/quantities, RB/GM/UF claims and citations, direct GM stocking/corrections, and pending player changes. Inventories/proposals participate in atomic backups; item revisions advance during restore and valid saved pending proposals are rebased. No weights, carrying penalties, weapon statistics, transfer rules, or dice-governed actions are computed. These remain separate source-verified work.
+- Allow players to adjust quantities in their assigned inventories. Compute carrying load and apply any rules penalties only after the Fourth Edition procedure, relevant character inputs, and item weights are verified; otherwise display missing data and leave the effect GM-managed.
+- Use source-referenced Fourth Edition item data wherever applicable. Categorize sources as RB (rule book), GM (GM-defined), or UF (unverified). Let players submit new items and item-data edits as pending proposals; treat the player's category as a claim until GM verification and acceptance.
+- Add resource contracts and automated resupply as configurable, previewable GM actions.
+- Show a logistics dashboard that summarizes the underlying records.
+
+**Exit checks:** Route and inventory changes persist and appear consistently across views; resource costs, item weights, and carrying effects are source-verified or explicitly GM-managed; unverified player proposals cannot alter accepted inventory; GM acceptance is recorded; automated actions can be previewed and reversed.
+
+## Phase 5: Settlements and Economy
+
+**Goal:** Model settlement-level production and trade using transparent campaign data.
+
+- Add settlement management, workforce, production, and prosperity records.
+- Add market goods, supply and demand, and price management.
+- Add economic event creation and its effects on settlements, markets, and trade.
+- Keep simulation assumptions configurable; distinguish campaign simulation from official game rules.
+
+**Exit checks:** The GM can inspect inputs and outcomes, override them, and see an auditable history of economic changes.
+
+## Phase 6: Factions, Diplomacy, and Territory
+
+**Goal:** Make political relationships and control visible and manageable.
+
+- Add faction relationships and settlement affiliations.
+- Manage alliances, trade agreements, embargoes, transit rights, influence, and territorial control.
+- Add diplomacy views, territory views, and GM-created diplomatic events.
+- Ensure changes to access, trade, or control are explicit campaign state changes with a history.
+
+**Exit checks:** Relationship and territory changes are traceable, editable, and reflected in route and market views without inventing rule effects.
+
+## Phase 7: Conflict, Threats, and Combat Tools
+
+**Goal:** Support conflict preparation and verified tactical calculations without overclaiming automation.
+
+- Track conflict escalation, border incidents, trade disruption, convoy attacks, and active threats.
+- Generate threat intelligence, missions, ambushes, raids, roadblocks, sabotage encounters, and opposing forces as GM-reviewed scenario material.
+- Implement tactical encounter tools and the battle calculator using verified Fourth Edition procedures.
+- Keep encounter generation separate from rules resolution; label assumptions and homebrew.
+- Initial implementation slice: a GM-only, manually authored conflict/incident ledger. It records descriptive categories and status without calculating escalation, resolving encounters, or publishing to players.
+
+**Exit checks:** Rules-backed calculations match source-checked examples; generated threats and encounters remain editable proposals; reports identify their sources and uncertainty.
+
+## Phase 8: Scheduled Events and Persistent World Simulation
+
+**Goal:** Connect the systems into a controllable campaign simulation.
+
+- Add campaign clock scheduling and event resolution across logistics, economy, diplomacy, territory, and conflict.
+- Provide pause, step, preview, and history controls; require GM approval for consequential state changes.
+- Make simulation deterministic or replayable where practical, and support undo or restore from a prior campaign state.
+- Add AI diplomacy and intelligence generation as GM-reviewed proposals, not autonomous campaign authority.
+
+**Exit checks:** The GM can preview a simulation step, inspect affected records, approve or reject it, and restore the prior state. No scheduled or AI-generated action resolves invisibly.
+
+## Cross-Phase Quality Gates
+
+- Feature status in `FEATURES.md` matches the implemented behavior; planned features are not presented as available.
+- Rule-bearing behavior has an authoritative Fourth Edition source and regression examples, or remains clearly GM-managed.
+- Save/load/import/export remains compatible and data changes are validated before commit.
+- Setup package import/export is distinct from runtime save/load; player output is filtered through explicit publication state and tested against GM-only data.
+- Player authorization is checked at the shared-data boundary; tests cover 1-4 seats, character ownership, inventory changes, and dice-action records.
+- Common workflows have focused automated checks; critical changes receive a browser smoke test.
+- The interface keeps common GM tasks easy to reach without sacrificing readability or accessibility.
+
 Update all three when a milestone is completed or status changes.

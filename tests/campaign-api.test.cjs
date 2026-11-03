@@ -7,7 +7,7 @@ const { once } = require("node:events");
 const test = require("node:test");
 const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
-const { openRuntimeDatabase, createPlayerSeed } = require("../server/runtime-store.cjs");
+const { openRuntimeDatabase, createPlayerSeed, exportRuntimeSave, restoreRuntimeSave, updateRuntimeDashboard } = require("../server/runtime-store.cjs");
 const { validateMapDraft } = require("../server/map-publications.cjs");
 const { emptyConditions } = require("../server/conditions.cjs");
 const { seedSampleRuntime } = require("../server/sample-data.cjs");
@@ -686,6 +686,86 @@ test("faction layer API persists and clears campaign-scoped edits with revision 
   const outsiderCookie = login.headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(path, { headers: { Cookie: outsiderCookie } })).status, 404);
   assert.equal((await put({ expectedRevision: 3, factionId: "faction-1", cells: [] }, { Cookie: outsiderCookie })).status, 404);
+});
+
+test("conflict incident ledger is GM-only, manually managed, revision checked, audited, and recoverable", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const gmCookie = await bootstrapGM(origin);
+  const gm = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  const { campaignId } = seedSampleRuntime(database, gm.id);
+  const insertAccount = database.prepare(`INSERT INTO accounts
+    (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  insertAccount.run("conflict-player", "conflict-player", gm.password_hash, "player", gm.id, gm.created_at, gm.updated_at);
+  insertAccount.run("conflict-outsider-gm", "conflict-outsider-gm", gm.password_hash, "gm", null, gm.created_at, gm.updated_at);
+  createPlayerSeed(database, gm.id, campaignId, {
+    username: "conflict-player", displayLabel: "Conflict test player",
+    fields: [{ key: "characterName", label: "Character name", value: "Player character", required: true }]
+  });
+  async function login(username) {
+    const response = await fetch(`${origin}/api/auth/login`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password })
+    });
+    assert.equal(response.status, 200);
+    return response.headers.get("set-cookie").split(";")[0];
+  }
+  const playerCookie = await login("conflict-player");
+  const outsiderGMCookie = await login("conflict-outsider-gm");
+  const runtimePath = `${origin}/api/campaigns/${campaignId}/runtime`;
+  const getRuntime = async (cookie = gmCookie) => (await fetch(runtimePath, { headers: { Cookie: cookie } })).json();
+  const putRuntime = (body, cookie = gmCookie) => fetch(runtimePath, {
+    method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(body)
+  });
+
+  const initial = await getRuntime();
+  assert.deepEqual(initial.runtime.conflicts, []);
+  const incident = {
+    id: "incident-1", type: "convoy-attack", status: "open", title: "North road ambush report",
+    notes: "Source: radio report. Details unverified; investigate before acting.", incidentDate: "2000-05-11"
+  };
+  const created = await putRuntime({ expectedRevision: initial.runtime.campaign.revision, conflicts: [incident] });
+  assert.equal(created.status, 200);
+  const createdRuntime = (await created.json()).runtime;
+  assert.deepEqual(createdRuntime.conflicts.map(({ id, type, status, title, notes, incidentDate }) => ({ id, type, status, title, notes, incidentDate })), [incident]);
+  const secondIncident = { ...incident, id: "incident-2", type: "border-incident", title: "Checkpoint report" };
+  const firstTimes = database.prepare("SELECT created_at, updated_at FROM conflict_incidents WHERE campaign_id = ? AND id = ?").get(campaignId, incident.id);
+  const addedSecond = updateRuntimeDashboard(database, gm.id, campaignId, {
+    expectedRevision: createdRuntime.campaign.revision,
+    conflicts: [incident, secondIncident]
+  }, { now: () => Date.parse("2026-11-02T15:30:00.000Z") });
+  assert.deepEqual(database.prepare("SELECT created_at, updated_at FROM conflict_incidents WHERE campaign_id = ? AND id = ?").get(campaignId, incident.id), firstTimes);
+  const secondTimes = database.prepare("SELECT created_at, updated_at FROM conflict_incidents WHERE campaign_id = ? AND id = ?").get(campaignId, secondIncident.id);
+  assert.equal(addedSecond.conflicts.length, 2);
+  assert.equal((await putRuntime({ expectedRevision: initial.runtime.campaign.revision, conflicts: [] })).status, 409);
+  assert.equal((await putRuntime({ expectedRevision: addedSecond.campaign.revision, conflicts: [{ ...incident, incidentDate: "2000-02-31" }] })).status, 422);
+  assert.equal((await putRuntime({ expectedRevision: addedSecond.campaign.revision, conflicts: [{ ...incident, escalation: 4 }] })).status, 422);
+  assert.equal((await fetch(runtimePath, { headers: { Cookie: playerCookie } })).status, 403);
+  assert.equal((await fetch(runtimePath, { headers: { Cookie: outsiderGMCookie } })).status, 404);
+  const playerCharacter = await fetch(`${origin}/api/player/campaigns/${campaignId}/character`, { headers: { Cookie: playerCookie } });
+  assert.equal(playerCharacter.status, 200);
+  assert.doesNotMatch(await playerCharacter.text(), /conflict incidents|North road ambush report|unverified/);
+
+  const audit = await (await fetch(`${origin}/api/campaigns/${campaignId}/audit`, { headers: { Cookie: gmCookie } })).json();
+  assert.deepEqual(audit.events.slice(0, 2).map(({ action }) => action), ["conflict.create", "conflict.create"]);
+  assert.equal(audit.events.find(({ target }) => target.id === incident.id).target.label, incident.title);
+  const backup = exportRuntimeSave(database, gm.id, campaignId);
+  const resolved = updateRuntimeDashboard(database, gm.id, campaignId, {
+    expectedRevision: addedSecond.campaign.revision,
+    conflicts: [{ ...incident, status: "resolved" }, secondIncident]
+  }, { now: () => Date.parse("2026-11-02T16:00:00.000Z") });
+  const incidentTimesAfterResolve = database.prepare("SELECT created_at, updated_at FROM conflict_incidents WHERE campaign_id = ? AND id = ?").get(campaignId, incident.id);
+  const secondTimesAfterResolve = database.prepare("SELECT created_at, updated_at FROM conflict_incidents WHERE campaign_id = ? AND id = ?").get(campaignId, secondIncident.id);
+  assert.equal(incidentTimesAfterResolve.created_at, firstTimes.created_at);
+  assert.equal(incidentTimesAfterResolve.updated_at, "2026-11-02T16:00:00.000Z");
+  assert.deepEqual(secondTimesAfterResolve, secondTimes);
+  assert.equal(database.prepare("SELECT action FROM audit_events WHERE campaign_id = ? AND action = 'conflict.resolve'").get(campaignId).action, "conflict.resolve");
+  const restored = restoreRuntimeSave(database, gm.id, campaignId, backup, {
+    confirmReplace: true, confirmOlderBackup: true, expectedRevision: resolved.campaign.revision
+  });
+  assert.ok(restored.revision > resolved.campaign.revision);
+  assert.equal((await getRuntime()).runtime.conflicts.length, 2);
+  assert.equal((await getRuntime()).runtime.conflicts.find(({ id }) => id === incident.id).status, "open");
+  assert.equal((await getRuntime()).runtime.conflicts.find(({ id }) => id === incident.id).id, incident.id);
 });
 
 test("map publication normalizes legacy point-only drafts and validates line/polygon geometry", () => {
