@@ -91,6 +91,30 @@ test("persists the runtime campaign and source snapshot across database reopen",
   }
 });
 
+test("upgrades either version 21 database layout to the merged schema", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-runtime-migration-test-"));
+  const databasePath = join(directory, "campaign.sqlite");
+  let database;
+  try {
+    database = openRuntimeDatabase(databasePath);
+    database.exec("DROP TABLE conflict_incidents; PRAGMA user_version = 21");
+    database.close();
+    database = openRuntimeDatabase(databasePath);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 22);
+    assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get());
+    assert.ok(database.prepare("PRAGMA table_info(accounts)").all().some(({ name }) => name === "must_change_password"));
+    database.exec("ALTER TABLE accounts DROP COLUMN must_change_password; PRAGMA user_version = 21");
+    database.close();
+    database = openRuntimeDatabase(databasePath);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 22);
+    assert.ok(database.prepare("PRAGMA table_info(accounts)").all().some(({ name }) => name === "must_change_password"));
+    assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get());
+  } finally {
+    if (database) database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("rolls back all rows when a database constraint fails during import", () => {
   const database = openRuntimeDatabase();
   try {

@@ -125,8 +125,8 @@
     .check-row input { margin: 1px 0 0; accent-color: var(--forest); }
     .assignment-note { min-height: 18px; margin: 0; color: var(--muted); font: 9px/1.5 var(--mono); }
     .assignment-note.error { color: var(--signal); }
-    .activation-token { overflow-wrap: anywhere; margin: 0; padding: 11px 13px; border: 1px solid #9aaf82; color: #344a40; background: #e4eadc; font: 9px/1.5 var(--mono); white-space: pre-wrap; }
-    .activation-token[hidden] { display: none; }
+    .temporary-password { overflow-wrap: anywhere; margin: 0; padding: 11px 13px; border: 1px solid #9aaf82; color: #344a40; background: #e4eadc; font: 9px/1.5 var(--mono); white-space: pre-wrap; }
+    .temporary-password[hidden] { display: none; }
     .toast { position: fixed; right: 20px; bottom: 20px; z-index: 3; max-width: calc(100vw - 40px); padding: 12px 15px; border: 1px solid #718c73; color: #f4f6ef; background: var(--forest); font: 10px var(--mono); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
     footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); color: #758178; font: 9px var(--mono); text-transform: uppercase; }
@@ -199,7 +199,7 @@
               </header>
               <div class="editor-body">
                 <p class="assignment-note" id="assignment-note" role="status"></p>
-                <pre class="activation-token" id="activation-token" hidden></pre>
+                <pre class="temporary-password" id="temporary-password" hidden></pre>
                 <div class="form-section">
                   <div class="section-heading"><h3>Player and character</h3><span>Identity / service</span></div>
                   <div class="fields">

@@ -1,8 +1,8 @@
 # Twilight: 2000 Fourth Edition GM Tool
 ## Installation and Setup Guide
 
-**Version:** 1.0.0  
-**Date:** November 2026  
+**Version:** 1.1.0
+**Date:** November 2026
 **System Requirements:** Windows 10/11, Node.js 24+, Modern Web Browser
 
 ---
@@ -32,24 +32,23 @@
    ```
    Double-click: INSTALL_SERVER.bat
    Follow prompts and wait for completion
+   Open a new terminal after the batch installer finishes
    ```
 
 3. **Start the Server**
    ```
-   Double-click: run.cmd
-   Or: npm start
+   npm start
    ```
 
 4. **Access in Browser**
    ```
-   Open: http://localhost:3000
-   Username: admin
-   Password: admin
+   Open: http://localhost:8080
+   Read the bootstrap token from token.txt
    ```
 
-5. **Change Your Password**
-   - Click "Settings" (top right)
-   - Update admin password immediately
+5. **Create the GM Account**
+   - Enter the token from token.txt on the first-run setup page
+   - Choose a GM username and password
 
 That's it! You're ready to manage campaigns.
 
@@ -70,7 +69,7 @@ That's it! You're ready to manage campaigns.
 
 - **Operating System:** Windows 10/11 (64-bit) or macOS 10.15+
 - **Node.js:** 24.0.0 or later (https://nodejs.org/)
-- **Web Browser:** 
+- **Web Browser:**
   - Chrome 90+
   - Edge 90+
   - Firefox 88+
@@ -111,7 +110,6 @@ That's it! You're ready to manage campaigns.
    ├── package.json     (dependencies configuration)
    ├── INSTALL_SERVER.bat
    ├── INSTALL_CLIENT.bat
-   ├── run.cmd
    └── (other files)
    ```
 
@@ -173,20 +171,8 @@ If you see **ERROR** messages:
 # Navigate to the tool directory
 cd C:\path\to\t2k-gm-tool
 
-# Start the server
+# Start the server (after running the installer)
 npm start
-```
-
-Or simply **double-click** `run.cmd` in the folder.
-
-### Option 2: PowerShell with Output
-
-```bash
-# Navigate to the tool directory
-cd C:\path\to\t2k-gm-tool
-
-# Start with PowerShell (shows more detail)
-.\run.ps1
 ```
 
 ### Server Startup Output
@@ -194,8 +180,8 @@ cd C:\path\to\t2k-gm-tool
 When the server starts, you'll see:
 
 ```
-Server listening on http://localhost:3000
-Database: Connected (schema version 20)
+Fieldbook LAN API listening on http://0.0.0.0:8080
+Database: Connected (schema version 21)
 Sessions: Ready
 ```
 
@@ -228,7 +214,7 @@ To stop: Use Task Manager to end the node.exe process.
 After starting the server, open your web browser and go to:
 
 ```
-http://localhost:3000
+http://localhost:8080
 ```
 
 ### Network Access (Local Area Network)
@@ -245,7 +231,7 @@ To access from other computers on your network:
 
 2. On other computers, use:
    ```
-   http://192.168.1.100:3000
+   http://192.168.1.100:8080
    (Replace 192.168.1.100 with your actual IP)
    ```
 
@@ -254,37 +240,24 @@ To access from other computers on your network:
 After login, you can access:
 
 - **GM Tool** — Main campaign management interface
-  - URL: http://localhost:3000
+  - URL: http://localhost:8080
   - Full access to all GM features
 
 - **Player Interface** — Player-facing view
-  - URL: http://localhost:3000/player-interface.html
+  - URL: http://localhost:8080/player-interface.html
   - Characters, inventory, situation reports
 
 - **Campaign Setup Tool** — Campaign creation and management
-  - URL: http://localhost:3000/campaign-setup.html
+  - URL: http://localhost:8080/campaign-setup.html
   - Design campaigns, create maps, set up factions
 
 ---
 
 ## 🔐 First-Time Setup
 
-### Default Credentials
+### First-Run GM Account
 
-When you first access the tool:
-
-```
-Username: admin
-Password: admin
-```
-
-### ⚠️ IMPORTANT: Change Your Password
-
-1. Log in with default credentials
-2. Click **Settings** (⚙️ icon, top right)
-3. Select **User Settings**
-4. Change your password immediately
-5. Write it down in a secure place (not in a file on your computer!)
+There are no default GM credentials. Enter the bootstrap token saved in `token.txt`, then choose the GM username and password. GM-created player accounts receive temporary passwords and must change them at first sign-in.
 
 ### Creating Additional Users
 
@@ -330,16 +303,16 @@ Same solution as above.
 1. Close all windows
 2. Right-click INSTALL_SERVER.bat
 3. Select "Run as Administrator"
-4. If still stuck: 
+4. If still stuck:
    - Open PowerShell (as Admin)
    - Run: `npm install` from the tool folder
    - This takes 2-5 minutes
 
-### Issue: Server won't start ("Port 3000 already in use")
+### Issue: Server won't start ("Port 8080 already in use")
 
 **Solution 1:** Stop other applications
 - Close any other Node.js instances
-- Close TeamViewer, Skype, etc. (these can use port 3000)
+- Close conflicting apps or change `FIELDBOOK_PORT` (default: 8080)
 
 **Solution 2:** Use a different port
 ```bash
@@ -352,7 +325,7 @@ npm start
 **Solution 3:** Kill the existing process
 ```bash
 # In Command Prompt (as Administrator)
-netstat -ano | findstr :3000
+netstat -ano | findstr :8080
 taskkill /PID <PID> /F
 # Then retry: npm start
 ```
@@ -360,10 +333,10 @@ taskkill /PID <PID> /F
 ### Issue: Browser shows "Connection refused"
 
 **Checklist:**
-1. Is the server running? (do you see "listening on http://localhost:3000"?)
+1. Is the server running? (do you see "listening on http://localhost:8080"?)
 2. Are you using the correct address?
-   - Localhost: `http://localhost:3000`
-   - Local IP: `http://192.168.x.x:3000`
+   - Localhost: `http://localhost:8080`
+   - Local IP: `http://192.168.x.x:8080`
 3. Is Windows Firewall blocking Node.js?
    - Allow Node.js through Windows Firewall
 
@@ -423,7 +396,7 @@ If issues persist:
    - Server logs — Detailed error traces
 
 3. **Common issues database:**
-   - Port 3000 conflicts
+   - Port 8080 conflicts
    - Node.js version mismatch
    - Firewall/antivirus blocking
    - Insufficient disk space
@@ -597,9 +570,9 @@ If response times exceed 500ms, consider:
 - [ ] Node.js 24+ installed
 - [ ] INSTALL_SERVER.bat ran successfully
 - [ ] Server starts without errors
-- [ ] Browser can access http://localhost:3000
-- [ ] Can log in with admin/admin
-- [ ] Changed admin password
+- [ ] Browser can access http://localhost:8080
+- [ ] First-run GM account created with the token in token.txt
+- [ ] Player temporary-password change is required at first sign-in
 - [ ] Data folder created with backups
 - [ ] Can create a new campaign
 - [ ] Can navigate all main menus
@@ -609,7 +582,7 @@ If response times exceed 500ms, consider:
 
 ## 🎯 You're Ready!
 
-Your Twilight: 2000 Fourth Edition GM Tool is now ready to use. 
+Your Twilight: 2000 Fourth Edition GM Tool is now ready to use.
 
 **Start by:**
 1. Creating a new campaign
@@ -621,6 +594,6 @@ Happy gaming!
 
 ---
 
-**Last Updated:** November 2026  
-**Version:** 1.0.0  
+**Last Updated:** November 2026
+**Version:** 1.1.0
 **Support:** See FEATURES.md and ROADMAP.md for detailed documentation

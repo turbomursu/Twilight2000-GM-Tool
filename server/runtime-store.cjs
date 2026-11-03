@@ -299,7 +299,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-  if (version > 21) {
+  if (version > 22) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -727,6 +727,15 @@ function openRuntimeDatabase(path = ":memory:") {
   if (version < 21) {
     database.exec("BEGIN IMMEDIATE");
     try {
+      database.exec(`ALTER TABLE accounts ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1));
+      DELETE FROM account_invites;
+      PRAGMA user_version = 21;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 22) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
       const personnelColumns = new Set(database.prepare("PRAGMA table_info(personnel)").all().map(({ name }) => name));
       if (!personnelColumns.has("attribute_strength")) {
         database.exec(`CREATE TABLE npc_archetypes (
@@ -761,6 +770,11 @@ function openRuntimeDatabase(path = ":memory:") {
         ALTER TABLE personnel ADD COLUMN created_at TEXT;
         ALTER TABLE personnel ADD COLUMN updated_at TEXT;`);
       }
+      const accountColumns = new Set(database.prepare("PRAGMA table_info(accounts)").all().map(({ name }) => name));
+      if (!accountColumns.has("must_change_password")) {
+        database.exec("ALTER TABLE accounts ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1))");
+      }
+      database.exec("DELETE FROM account_invites");
       const conflictTableExists = database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get();
       if (!conflictTableExists) {
         database.exec(`CREATE TABLE conflict_incidents (
@@ -779,7 +793,7 @@ function openRuntimeDatabase(path = ":memory:") {
         ) STRICT;
         CREATE INDEX conflict_incidents_by_campaign ON conflict_incidents(campaign_id, incident_date DESC, sort_order);`);
       }
-      database.exec("PRAGMA user_version = 21");
+      database.exec("PRAGMA user_version = 22");
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
@@ -2099,22 +2113,20 @@ function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
   const nowValue = (options.now || (() => Date.now()))();
   const timestamp = new Date(nowValue).toISOString();
   const templateId = randomUUID();
-  let activationToken = null;
+  let temporaryPassword = null;
   database.exec("BEGIN IMMEDIATE");
   try {
     if (!database.prepare("SELECT 1 AS allowed FROM accounts WHERE id = ? AND global_role = 'gm' AND disabled = 0").get(gmAccountId)) throw new Error("GM account required.");
     let account = database.prepare("SELECT id, global_role, created_by_account_id FROM accounts WHERE login_identifier = ?").get(username);
     if (account && (account.global_role !== "player" || account.created_by_account_id !== gmAccountId)) throw new Error("Choose a player username created by this GM.");
     if (!account) {
+      if (typeof options.passwordHash !== "string") throw new Error("Temporary password credentials are required to create a player account.");
       const accountId = randomUUID();
-      activationToken = randomBytes(32).toString("base64url");
-      const placeholderHash = `disabled$${randomBytes(32).toString("hex")}`;
       database.prepare(`INSERT INTO accounts
-        (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role, created_by_account_id)
-        VALUES (?, ?, ?, 1, ?, ?, 'player', ?)`)
-        .run(accountId, username, placeholderHash, timestamp, timestamp, gmAccountId);
-      database.prepare(`INSERT INTO account_invites (account_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)`)
-        .run(accountId, createHash("sha256").update(activationToken).digest("hex"), new Date(nowValue + 7 * 24 * 60 * 60 * 1000).toISOString(), timestamp);
+        (id, login_identifier, password_hash, disabled, must_change_password, created_at, updated_at, global_role, created_by_account_id)
+        VALUES (?, ?, ?, 0, 1, ?, ?, 'player', ?)`)
+        .run(accountId, username, options.passwordHash, timestamp, timestamp, gmAccountId);
+      temporaryPassword = options.temporaryPassword;
       account = { id: accountId, global_role: "player", created_by_account_id: gmAccountId };
     }
     if (database.prepare("SELECT 1 AS present FROM player_seed_templates WHERE account_id = ?").get(account.id)) throw new Error("This player already has a character template.");
@@ -2123,7 +2135,7 @@ function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(templateId, gmAccountId, account.id, displayLabel, JSON.stringify(character), timestamp, timestamp);
     database.exec("COMMIT");
-    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp, activationToken };
+    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp, temporaryPassword };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -2175,21 +2187,17 @@ function createAssignedUser(database, gmAccountId, username, options = {}) {
   const timestampValue = (options.now || (() => Date.now()))();
   const timestamp = new Date(timestampValue).toISOString();
   const accountId = randomUUID();
-  const activationToken = randomBytes(32).toString("base64url");
-  const placeholderHash = `disabled$${randomBytes(32).toString("hex")}`;
+  const disabled = typeof options.passwordHash !== "string";
+  const passwordHash = disabled ? `disabled$${randomBytes(32).toString("hex")}` : options.passwordHash;
 
   database.exec("BEGIN IMMEDIATE");
   try {
     database.prepare(`INSERT INTO accounts
-      (id, login_identifier, password_hash, disabled, created_at, updated_at, global_role, created_by_account_id)
-      VALUES (?, ?, ?, 1, ?, ?, 'player', ?)`)
-      .run(accountId, normalizedUsername, placeholderHash, timestamp, timestamp, gmAccountId);
-    database.prepare(`INSERT INTO account_invites (account_id, token_hash, expires_at, created_at)
-      VALUES (?, ?, ?, ?)`)
-      .run(accountId, createHash("sha256").update(activationToken).digest("hex"),
-        new Date(timestampValue + 7 * 24 * 60 * 60 * 1000).toISOString(), timestamp);
+      (id, login_identifier, password_hash, disabled, must_change_password, created_at, updated_at, global_role, created_by_account_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'player', ?)`)
+      .run(accountId, normalizedUsername, passwordHash, Number(disabled), Number(!disabled), timestamp, timestamp, gmAccountId);
     database.exec("COMMIT");
-    return { id: accountId, username: normalizedUsername, disabled: true, activationToken };
+    return { id: accountId, username: normalizedUsername, disabled, mustChangePassword: !disabled };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -2199,15 +2207,40 @@ function createAssignedUser(database, gmAccountId, username, options = {}) {
 function listAssignedUsers(database, gmAccountId) {
   const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
   if (gm?.global_role !== "gm") return null;
-  return database.prepare(`SELECT accounts.id, accounts.login_identifier AS username, accounts.disabled,
-      EXISTS (SELECT 1 FROM account_invites WHERE account_invites.account_id = accounts.id) AS activationPending,
+    return database.prepare(`SELECT accounts.id, accounts.login_identifier AS username, accounts.disabled,
+      accounts.must_change_password AS mustChangePassword,
       (SELECT COUNT(*) FROM player_seats WHERE player_seats.account_id = accounts.id AND player_seats.active = 1) AS campaignAssignments
     FROM accounts WHERE accounts.global_role = 'player' AND accounts.created_by_account_id = ?
     ORDER BY accounts.login_identifier`).all(gmAccountId).map((user) => ({
       ...user,
       disabled: Boolean(user.disabled),
-      activationPending: Boolean(user.activationPending)
+      mustChangePassword: Boolean(user.mustChangePassword)
     }));
+}
+
+function resetAssignedUserPassword(database, gmAccountId, userId, passwordHash) {
+  const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
+  if (gm?.global_role !== "gm") throw new Error("GM account required.");
+  const timestamp = new Date().toISOString();
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const result = database.prepare(`UPDATE accounts SET password_hash = ?, disabled = 0,
+      must_change_password = 1, updated_at = ?
+      WHERE id = ? AND global_role = 'player' AND created_by_account_id = ?`)
+      .run(passwordHash, timestamp, userId, gmAccountId);
+    if (!result.changes) {
+      database.exec("COMMIT");
+      return null;
+    }
+    database.prepare("DELETE FROM sessions WHERE account_id = ?").run(userId);
+    database.prepare("DELETE FROM account_invites WHERE account_id = ?").run(userId);
+    const user = database.prepare("SELECT id, login_identifier AS username FROM accounts WHERE id = ?").get(userId);
+    database.exec("COMMIT");
+    return user;
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}) {
@@ -2643,17 +2676,17 @@ function loadDefaultNPCArchetypes(database) {
       console.error(`Failed to read archetypes file at ${archetypesPath}:`, fileError.message);
       throw fileError;
     }
-    
+
     if (!archetypesData.archetypes || !Array.isArray(archetypesData.archetypes)) {
       throw new Error("Invalid archetype data format: missing 'archetypes' array");
     }
-    
+
     const timestamp = new Date().toISOString();
     const insert = database.prepare(`INSERT INTO npc_archetypes
       (campaign_id, id, name, category, description, attribute_strength, attribute_agility,
        attribute_intelligence, attribute_empathy, hit_cap, cuf_rating, skills_json, equipment_json, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    
+
     for (const archetype of archetypesData.archetypes) {
       try {
         insert.run(
@@ -2686,18 +2719,18 @@ function loadDefaultNPCArchetypes(database) {
 }
 
 function listNPCArchetypes(database, campaignId) {
-  const query = campaignId 
+  const query = campaignId
     ? `SELECT * FROM npc_archetypes
        WHERE campaign_id IS NULL OR campaign_id = ?
        ORDER BY category, name`
     : `SELECT * FROM npc_archetypes
        WHERE campaign_id IS NULL
        ORDER BY category, name`;
-  
+
   const rows = campaignId
     ? database.prepare(query).all(campaignId)
     : database.prepare(query).all();
-    
+
   return rows.map(row => ({
     id: row.id,
     name: row.name,
@@ -2745,10 +2778,10 @@ function listLocationsForCampaign(database, accountId, campaignId) {
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const locations = database.prepare(`SELECT * FROM locations WHERE runtime_campaign_id = ? ORDER BY name`)
       .all(campaignId);
-    
+
     database.exec("COMMIT");
     return locations.map(loc => ({
       id: loc.id,
@@ -2768,27 +2801,27 @@ function listLocationsForCampaign(database, accountId, campaignId) {
 
 function createLocation(database, accountId, campaignId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Location input is required.");
-  
+
   const name = requireText(input.name, "Location name", 160);
   const kind = requireText(input.kind || "", "Location kind", 80);
   const description = (input.description || "").trim();
   if (description.length > 500) throw new Error("Description exceeds its allowed length.");
   const visibilityEligibility = requireText(input.visibilityEligibility || "gm-only", "Visibility", 20);
-  
+
   if (!["gm-only", "players"].includes(visibilityEligibility)) {
     throw new Error("Visibility must be 'gm-only' or 'players'.");
   }
-  
+
   if (!input.mapPosition || typeof input.mapPosition !== "object") {
     throw new Error("Map position is required.");
   }
-  
+
   const lat = input.mapPosition.lat;
   const lng = input.mapPosition.lng;
   if (typeof lat !== "number" || typeof lng !== "number") {
     throw new Error("Map position must have lat and lng numbers.");
   }
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -2796,7 +2829,7 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
       .get(campaignId);
     if (mapData) {
@@ -2805,10 +2838,10 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
         throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
       }
     }
-    
+
     const locationId = randomUUID();
     const timestamp = (options.now || (() => new Date().toISOString()))();
-    
+
     database.prepare(`INSERT INTO locations
       (runtime_campaign_id, id, name, kind, description, grid_ref, coordinates_json, map_position_json, visibility_eligibility, is_starting_location)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -2824,12 +2857,12 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
         visibilityEligibility,
         input.isStartingLocation ? 1 : 0
       );
-    
+
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     return database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .get(campaignId, locationId);
   } catch (error) {
@@ -2840,7 +2873,7 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
 
 function updateLocation(database, accountId, campaignId, locationId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Location update input is required.");
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -2848,21 +2881,21 @@ function updateLocation(database, accountId, campaignId, locationId, input, opti
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .get(campaignId, locationId);
     if (!location) throw new Error("Location not found.");
-    
+
     const name = input.name !== undefined ? requireText(input.name, "Location name", 160) : location.name;
     const kind = input.kind !== undefined ? requireText(input.kind, "Location kind", 80) : location.kind;
     const description = input.description !== undefined ? ((input.description || "").trim()) : location.description;
     if (description && description.length > 500) throw new Error("Description exceeds its allowed length.");
     const visibilityEligibility = input.visibilityEligibility !== undefined ? requireText(input.visibilityEligibility, "Visibility", 20) : location.visibility_eligibility;
-    
+
     if (!["gm-only", "players"].includes(visibilityEligibility)) {
       throw new Error("Visibility must be 'gm-only' or 'players'.");
     }
-    
+
     let mapPosition = location.map_position_json ? JSON.parse(location.map_position_json) : { lat: 0, lng: 0 };
     if (input.mapPosition && typeof input.mapPosition === "object") {
       const lat = input.mapPosition.lat;
@@ -2870,7 +2903,7 @@ function updateLocation(database, accountId, campaignId, locationId, input, opti
       if (typeof lat !== "number" || typeof lng !== "number") {
         throw new Error("Map position must have lat and lng numbers.");
       }
-      
+
       const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
         .get(campaignId);
       if (mapData) {
@@ -2879,27 +2912,27 @@ function updateLocation(database, accountId, campaignId, locationId, input, opti
           throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
         }
       }
-      
+
       mapPosition = { lat, lng };
     }
-    
+
     const gridRef = input.gridRef !== undefined ? input.gridRef : location.grid_ref;
     const timestamp = (options.now || (() => new Date().toISOString()))();
-    
-    database.prepare(`UPDATE locations SET 
-      name = ?, kind = ?, description = ?, grid_ref = ?, map_position_json = ?, 
-      visibility_eligibility = ? 
+
+    database.prepare(`UPDATE locations SET
+      name = ?, kind = ?, description = ?, grid_ref = ?, map_position_json = ?,
+      visibility_eligibility = ?
       WHERE runtime_campaign_id = ? AND id = ?`)
       .run(
         name, kind, description, gridRef, JSON.stringify(mapPosition),
         visibilityEligibility, campaignId, locationId
       );
-    
+
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     return database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .get(campaignId, locationId);
   } catch (error) {
@@ -2916,26 +2949,26 @@ function deleteLocation(database, accountId, campaignId, locationId, options = {
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .get(campaignId, locationId);
     if (!location) throw new Error("Location not found.");
-    
+
     const inRoute = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND location_id = ?")
       .get(campaignId, locationId);
     if (inRoute && inRoute.count > 0) {
       throw new Error("Cannot delete location while it is used in the campaign route.");
     }
-    
+
     database.prepare("DELETE FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .run(campaignId, locationId);
-    
+
     const timestamp = (options.now || (() => new Date().toISOString()))();
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     return { success: true };
   } catch (error) {
     database.exec("ROLLBACK");
@@ -2946,7 +2979,7 @@ function deleteLocation(database, accountId, campaignId, locationId, options = {
 function createPersonnelFromArchetype(database, accountId, campaignId, archetypeId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Personnel creation input is required.");
   const name = requireText(input.name, "Personnel name", 100);
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -2954,17 +2987,17 @@ function createPersonnelFromArchetype(database, accountId, campaignId, archetype
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const archetype = getNPCArchetype(database, archetypeId);
     if (!archetype) throw new Error("NPC archetype not found.");
-    
+
     const maxRow = database.prepare("SELECT MAX(sort_order) AS max_order FROM personnel WHERE campaign_id = ?")
       .get(campaignId);
     const maxOrder = maxRow?.max_order ?? -1;
     const newSortOrder = maxOrder + 1;
     const personId = randomUUID();
     const timestamp = (options.now || (() => new Date().toISOString()))();
-    
+
     database.prepare(`INSERT INTO personnel
       (campaign_id, id, name, role, condition, readiness, sort_order,
        attribute_strength, attribute_agility, attribute_intelligence, attribute_empathy,
@@ -2993,12 +3026,12 @@ function createPersonnelFromArchetype(database, accountId, campaignId, archetype
         timestamp,
         timestamp
       );
-    
+
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     return database.prepare(`SELECT * FROM personnel WHERE campaign_id = ? AND id = ?`)
       .get(campaignId, personId);
   } catch (error) {
@@ -3015,9 +3048,9 @@ function listRouteStopsForCampaign(database, accountId, campaignId) {
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const stops = database.prepare(`
-      SELECT 
+      SELECT
         rs.ordinal,
         rs.location_id,
         rs.detail,
@@ -3030,9 +3063,9 @@ function listRouteStopsForCampaign(database, accountId, campaignId) {
       WHERE rs.campaign_id = ?
       ORDER BY rs.ordinal
     `).all(campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     const result = stops.map(row => ({
       ordinal: row.ordinal,
       locationId: row.location_id,
@@ -3042,7 +3075,7 @@ function listRouteStopsForCampaign(database, accountId, campaignId) {
       gridRef: row.grid_ref,
       mapPosition: row.map_position_json ? JSON.parse(row.map_position_json) : { lat: 0, lng: 0 }
     }));
-    
+
     const totalKm = result.reduce((sum, stop) => sum + stop.kmFromPrevious, 0);
     return { stops: result, totalKm, stopCount: result.length };
   } catch (error) {
@@ -3056,7 +3089,7 @@ function createRouteStop(database, accountId, campaignId, locationId, detail, km
   const validDetail = requireText(detail, "Stop detail", 160);
   if (!Number.isInteger(kmFromPrevious) || kmFromPrevious < 0) throw new Error("Distance must be a non-negative integer.");
   if (!Number.isInteger(ordinal) || ordinal < 0) throw new Error("Ordinal must be a non-negative integer.");
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3064,46 +3097,46 @@ function createRouteStop(database, accountId, campaignId, locationId, detail, km
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .get(campaignId, locationId);
     if (!location) throw new Error("Location not found.");
-    
+
     const bounds = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
     if (!bounds) throw new Error("Campaign map not found.");
     const boundObj = JSON.parse(bounds.bounds_json);
     const mapPos = JSON.parse(location.map_position_json);
     if (!isWithinBounds(mapPos, boundObj)) throw new Error("Location is outside campaign bounds.");
-    
+
     const existingAtOrdinal = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
       .get(campaignId, ordinal);
     if (existingAtOrdinal && existingAtOrdinal.count > 0) {
       throw new Error("A stop already exists at this ordinal. Use reordering to adjust.");
     }
-    
+
     const duplicate = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND location_id = ?")
       .get(campaignId, locationId);
     if (duplicate && duplicate.count > 0) {
       throw new Error("This location is already in the route.");
     }
-    
+
     const maxOrdinal = database.prepare("SELECT COALESCE(MAX(ordinal), -1) as max FROM route_stops WHERE campaign_id = ?")
       .get(campaignId).max;
     if (ordinal > maxOrdinal + 1) {
       throw new Error("Ordinal must be sequential (no gaps).");
     }
-    
-    database.prepare(`INSERT INTO route_stops 
+
+    database.prepare(`INSERT INTO route_stops
       (campaign_id, ordinal, location_id, detail, km_from_previous)
       VALUES (?, ?, ?, ?, ?)`)
       .run(campaignId, ordinal, locationId, validDetail, kmFromPrevious);
-    
+
     const timestamp = (options.now || (() => new Date().toISOString()))();
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     return {
       ordinal,
       locationId,
@@ -3123,7 +3156,7 @@ function updateRouteStop(database, accountId, campaignId, ordinal, detail, kmFro
   const validDetail = requireText(detail, "Stop detail", 160);
   if (!Number.isInteger(kmFromPrevious) || kmFromPrevious < 0) throw new Error("Distance must be a non-negative integer.");
   if (!Number.isInteger(ordinal) || ordinal < 0) throw new Error("Ordinal must be a non-negative integer.");
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3131,25 +3164,25 @@ function updateRouteStop(database, accountId, campaignId, ordinal, detail, kmFro
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const stop = database.prepare("SELECT * FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
       .get(campaignId, ordinal);
     if (!stop) throw new Error("Route stop not found.");
-    
-    database.prepare(`UPDATE route_stops 
+
+    database.prepare(`UPDATE route_stops
       SET detail = ?, km_from_previous = ?
       WHERE campaign_id = ? AND ordinal = ?`)
       .run(validDetail, kmFromPrevious, campaignId, ordinal);
-    
+
     const timestamp = (options.now || (() => new Date().toISOString()))();
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     const location = database.prepare("SELECT * FROM locations WHERE runtime_campaign_id = ? AND id = ?")
       .get(campaignId, stop.location_id);
-    
+
     return {
       ordinal,
       locationId: stop.location_id,
@@ -3167,7 +3200,7 @@ function updateRouteStop(database, accountId, campaignId, ordinal, detail, kmFro
 
 function deleteRouteStop(database, accountId, campaignId, ordinal, options = {}) {
   if (!Number.isInteger(ordinal) || ordinal < 0) throw new Error("Ordinal must be a non-negative integer.");
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3175,23 +3208,23 @@ function deleteRouteStop(database, accountId, campaignId, ordinal, options = {})
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const stop = database.prepare("SELECT * FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
       .get(campaignId, ordinal);
     if (!stop) throw new Error("Route stop not found.");
-    
+
     database.prepare("DELETE FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
       .run(campaignId, ordinal);
-    
-    database.prepare(`UPDATE route_stops 
+
+    database.prepare(`UPDATE route_stops
       SET ordinal = ordinal - 1
       WHERE campaign_id = ? AND ordinal > ?`)
       .run(campaignId, ordinal);
-    
+
     const timestamp = (options.now || (() => new Date().toISOString()))();
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
     return { success: true };
   } catch (error) {
@@ -3202,7 +3235,7 @@ function deleteRouteStop(database, accountId, campaignId, ordinal, options = {})
 
 function reorderRouteStops(database, accountId, campaignId, orderedLocationIds, options = {}) {
   if (!Array.isArray(orderedLocationIds)) throw new Error("Ordered location IDs must be an array.");
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3210,41 +3243,41 @@ function reorderRouteStops(database, accountId, campaignId, orderedLocationIds, 
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     const current = database.prepare("SELECT location_id FROM route_stops WHERE campaign_id = ? ORDER BY ordinal")
       .all(campaignId);
     const currentIds = current.map(r => r.location_id);
-    
+
     if (orderedLocationIds.length !== currentIds.length) {
       throw new Error("Reordering must include all current route stops.");
     }
-    
+
     const missingIds = currentIds.filter(id => !orderedLocationIds.includes(id));
     const extraIds = orderedLocationIds.filter(id => !currentIds.includes(id));
     if (missingIds.length > 0 || extraIds.length > 0) {
       throw new Error("Reordering locations do not match current route.");
     }
-    
+
     // Save current stops before deleting
     const stops = database.prepare("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal").all(campaignId);
     const stopsByLocationId = {};
     stops.forEach(stop => { stopsByLocationId[stop.location_id] = stop; });
-    
+
     database.prepare("DELETE FROM route_stops WHERE campaign_id = ?").run(campaignId);
-    
+
     for (let i = 0; i < orderedLocationIds.length; i++) {
       const locationId = orderedLocationIds[i];
       const oldStop = stopsByLocationId[locationId];
-      database.prepare(`INSERT INTO route_stops 
+      database.prepare(`INSERT INTO route_stops
         (campaign_id, ordinal, location_id, detail, km_from_previous)
         VALUES (?, ?, ?, ?, ?)`)
         .run(campaignId, i, locationId, oldStop.detail, i === 0 ? 0 : oldStop.km_from_previous);
     }
-    
+
     const timestamp = (options.now || (() => new Date().toISOString()))();
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     database.exec("COMMIT");
     return { success: true };
   } catch (error) {
@@ -3259,18 +3292,18 @@ function getMapPublicationState(database, accountId, campaignId) {
     WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
     .get(campaignId, accountId);
   if (!campaign) throw new Error("Campaign not found or access denied.");
-  
+
   // Initialize if not exists
   const exists = database.prepare("SELECT 1 FROM map_publication_state WHERE campaign_id = ?")
     .get(campaignId);
   if (!exists) {
-    database.prepare(`INSERT INTO map_publication_state 
+    database.prepare(`INSERT INTO map_publication_state
       (campaign_id, route_published, locations_published, position_published, factions_published)
       VALUES (?, 0, 0, 0, 0)`)
       .run(campaignId);
   }
-  
-  const state = database.prepare(`SELECT 
+
+  const state = database.prepare(`SELECT
     route_published, route_revision,
     locations_published, locations_revision,
     position_published, position_revision,
@@ -3278,7 +3311,7 @@ function getMapPublicationState(database, accountId, campaignId) {
     last_modified_by, last_modified_at
     FROM map_publication_state WHERE campaign_id = ?`)
     .get(campaignId);
-  
+
   return {
     route: {published: Boolean(state.route_published), revision: state.route_revision},
     locations: {published: Boolean(state.locations_published), revision: state.locations_revision},
@@ -3291,7 +3324,7 @@ function getMapPublicationState(database, accountId, campaignId) {
 
 function updateMapPublicationState(database, accountId, campaignId, state, options = {}) {
   if (typeof state !== 'object' || state === null) throw new Error("Publication state must be an object.");
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3299,73 +3332,73 @@ function updateMapPublicationState(database, accountId, campaignId, state, optio
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     // Ensure publication state exists
     const exists = database.prepare("SELECT 1 FROM map_publication_state WHERE campaign_id = ?")
       .get(campaignId);
     if (!exists) {
-      database.prepare(`INSERT INTO map_publication_state 
+      database.prepare(`INSERT INTO map_publication_state
         (campaign_id, route_published, locations_published, position_published, factions_published)
         VALUES (?, 0, 0, 0, 0)`)
         .run(campaignId);
     }
-    
+
     const timestamp = (options.now || (() => new Date().toISOString()))();
     const userId = accountId;
-    
+
     // Update each publication state if provided
     const updates = [];
     if (typeof state.route === 'boolean') {
       const current = database.prepare("SELECT route_published, route_revision FROM map_publication_state WHERE campaign_id = ?")
         .get(campaignId);
-      database.prepare(`UPDATE map_publication_state 
-        SET route_published = ?, route_revision = route_revision + 1 
+      database.prepare(`UPDATE map_publication_state
+        SET route_published = ?, route_revision = route_revision + 1
         WHERE campaign_id = ?`)
         .run(state.route ? 1 : 0, campaignId);
       updates.push({target: 'route', old: current.route_published, new: state.route ? 1 : 0});
     }
-    
+
     if (typeof state.locations === 'boolean') {
       const current = database.prepare("SELECT locations_published, locations_revision FROM map_publication_state WHERE campaign_id = ?")
         .get(campaignId);
-      database.prepare(`UPDATE map_publication_state 
-        SET locations_published = ?, locations_revision = locations_revision + 1 
+      database.prepare(`UPDATE map_publication_state
+        SET locations_published = ?, locations_revision = locations_revision + 1
         WHERE campaign_id = ?`)
         .run(state.locations ? 1 : 0, campaignId);
       updates.push({target: 'locations', old: current.locations_published, new: state.locations ? 1 : 0});
     }
-    
+
     if (typeof state.position === 'boolean') {
       const current = database.prepare("SELECT position_published, position_revision FROM map_publication_state WHERE campaign_id = ?")
         .get(campaignId);
-      database.prepare(`UPDATE map_publication_state 
-        SET position_published = ?, position_revision = position_revision + 1 
+      database.prepare(`UPDATE map_publication_state
+        SET position_published = ?, position_revision = position_revision + 1
         WHERE campaign_id = ?`)
         .run(state.position ? 1 : 0, campaignId);
       updates.push({target: 'position', old: current.position_published, new: state.position ? 1 : 0});
     }
-    
+
     if (typeof state.factions === 'boolean') {
       const current = database.prepare("SELECT factions_published, factions_revision FROM map_publication_state WHERE campaign_id = ?")
         .get(campaignId);
-      database.prepare(`UPDATE map_publication_state 
-        SET factions_published = ?, factions_revision = factions_revision + 1 
+      database.prepare(`UPDATE map_publication_state
+        SET factions_published = ?, factions_revision = factions_revision + 1
         WHERE campaign_id = ?`)
         .run(state.factions ? 1 : 0, campaignId);
       updates.push({target: 'factions', old: current.factions_published, new: state.factions ? 1 : 0});
     }
-    
-    database.prepare(`UPDATE map_publication_state 
-      SET last_modified_by = ?, last_modified_at = ? 
+
+    database.prepare(`UPDATE map_publication_state
+      SET last_modified_by = ?, last_modified_at = ?
       WHERE campaign_id = ?`)
       .run(userId, timestamp, campaignId);
-    
+
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(timestamp, campaignId);
-    
+
     // Record in audit trail
     updates.forEach(update => {
-      database.prepare(`INSERT INTO publication_history 
+      database.prepare(`INSERT INTO publication_history
         (id, campaign_id, actor, action, target, old_value, new_value, campaign_revision, recorded_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(
@@ -3380,9 +3413,9 @@ function updateMapPublicationState(database, accountId, campaignId, state, optio
           timestamp
         );
     });
-    
+
     database.exec("COMMIT");
-    
+
     return getMapPublicationState(database, accountId, campaignId);
   } catch (error) {
     database.exec("ROLLBACK");
@@ -3396,21 +3429,21 @@ function getPublicationHistory(database, accountId, campaignId, limit = 50, offs
     WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
     .get(campaignId, accountId);
   if (!campaign) throw new Error("Campaign not found or access denied.");
-  
+
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) limit = 50;
   if (!Number.isInteger(offset) || offset < 0) offset = 0;
-  
-  const history = database.prepare(`SELECT 
+
+  const history = database.prepare(`SELECT
     id, actor, action, target, old_value, new_value, campaign_revision, recorded_at
-    FROM publication_history 
-    WHERE campaign_id = ? 
-    ORDER BY recorded_at DESC 
+    FROM publication_history
+    WHERE campaign_id = ?
+    ORDER BY recorded_at DESC
     LIMIT ? OFFSET ?`)
     .all(campaignId, limit, offset);
-  
+
   const total = database.prepare("SELECT COUNT(*) as count FROM publication_history WHERE campaign_id = ?")
     .get(campaignId);
-  
+
   return {
     history: history.map(h => ({
       id: h.id,
@@ -3434,7 +3467,7 @@ function getPartyPosition(database, accountId, campaignId) {
     WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
     .get(campaignId, accountId);
   if (!campaign) throw new Error("Campaign not found or access denied.");
-  
+
   // Initialize if not exists
   const exists = database.prepare("SELECT 1 FROM party_position WHERE campaign_id = ?")
     .get(campaignId);
@@ -3449,17 +3482,17 @@ function getPartyPosition(database, accountId, campaignId) {
       centerLat = (bounds.north + bounds.south) / 2;
       centerLng = (bounds.east + bounds.west) / 2;
     }
-    
-    database.prepare(`INSERT INTO party_position 
+
+    database.prepare(`INSERT INTO party_position
       (campaign_id, lat, lng, revision, published, updated_at)
       VALUES (?, ?, ?, 0, 0, ?)`)
       .run(campaignId, centerLat, centerLng, timestamp);
   }
-  
-  const pos = database.prepare(`SELECT lat, lng, revision, published, published_at, updated_at 
+
+  const pos = database.prepare(`SELECT lat, lng, revision, published, published_at, updated_at
     FROM party_position WHERE campaign_id = ?`)
     .get(campaignId);
-  
+
   return {
     lat: pos.lat,
     lng: pos.lng,
@@ -3474,7 +3507,7 @@ function updatePartyPosition(database, accountId, campaignId, lat, lng, options 
   if (typeof lat !== 'number' || typeof lng !== 'number') {
     throw new Error("Position must have numeric lat/lng.");
   }
-  
+
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3482,7 +3515,7 @@ function updatePartyPosition(database, accountId, campaignId, lat, lng, options 
       WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'`)
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
-    
+
     // Validate bounds
     const map = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
       .get(campaignId);
@@ -3492,29 +3525,29 @@ function updatePartyPosition(database, accountId, campaignId, lat, lng, options 
         throw new Error("Position outside campaign bounds.");
       }
     }
-    
+
     // Ensure position exists
     const exists = database.prepare("SELECT 1 FROM party_position WHERE campaign_id = ?")
       .get(campaignId);
     if (!exists) {
       const timestamp = new Date().toISOString();
-      database.prepare(`INSERT INTO party_position 
+      database.prepare(`INSERT INTO party_position
         (campaign_id, lat, lng, revision, published, updated_at)
         VALUES (?, ?, ?, 0, 0, ?)`)
         .run(campaignId, lat, lng, timestamp);
     } else {
       const timestamp = (options.now || (() => new Date().toISOString()))();
-      database.prepare(`UPDATE party_position 
-        SET lat = ?, lng = ?, revision = revision + 1, updated_at = ? 
+      database.prepare(`UPDATE party_position
+        SET lat = ?, lng = ?, revision = revision + 1, updated_at = ?
         WHERE campaign_id = ?`)
         .run(lat, lng, timestamp, campaignId);
     }
-    
+
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
       .run(new Date().toISOString(), campaignId);
-    
+
     database.exec("COMMIT");
-    
+
     return getPartyPosition(database, accountId, campaignId);
   } catch (error) {
     database.exec("ROLLBACK");
@@ -3538,6 +3571,7 @@ module.exports = {
   importRuntimeBackup,
   updateRuntimeDashboard,
   createAssignedUser,
+  resetAssignedUserPassword,
   listAssignedUsers,
   createPlayerSeedTemplate,
   listPlayerSeedTemplates,

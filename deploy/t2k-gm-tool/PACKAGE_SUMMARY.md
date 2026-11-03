@@ -1,8 +1,8 @@
 # DEPLOYMENT PACKAGE SUMMARY
-## Twilight: 2000 Fourth Edition GM Tool v1.0.0
+## Twilight: 2000 Fourth Edition GM Tool v1.1.0
 
-**Date Created:** November 2, 2026  
-**Status:** ✅ COMPLETE AND READY FOR DISTRIBUTION  
+**Date Created:** November 2, 2026
+**Status:** ✅ COMPLETE AND READY FOR DISTRIBUTION
 **Location:** `C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool\`
 
 ---
@@ -42,9 +42,9 @@ DEPLOYMENT_COMPLETE.md (14.5 KB)   ← Final deployment status
 1. **Extract** the complete package to your computer
 2. **Run** `INSTALL_SERVER.bat` (one time only)
 3. **Start** by double-clicking `run.cmd` or typing `npm start`
-4. **Open** browser to `http://localhost:3000`
-5. **Login** with `admin/admin`
-6. **Change password** immediately in Settings
+4. **Open** browser to `http://localhost:8080`
+5. Enter the bootstrap token from `token.txt` and create the GM account
+6. **Player accounts must change their temporary password** at first sign-in
 7. **Create campaigns** and start playing!
 
 **Estimated time:** 5-10 minutes total
@@ -86,43 +86,44 @@ All files are in: `C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool\`
 ## 🚀 WHAT USERS WILL GET
 
 ### Installation (5-10 minutes)
-✅ Fully automated server setup  
-✅ Node.js dependency verification  
-✅ Automatic data directory creation  
-✅ Database schema auto-migration  
-✅ Clear success/error messages  
+✅ Fully automated server setup
+✅ Node.js dependency verification
+✅ Automatic data directory creation
+✅ Database schema auto-migration
+✅ Clear success/error messages
 
 ### Server (< 5 seconds startup)
-✅ Express.js REST API  
-✅ SQLite campaign database  
-✅ Real-time WebSocket support  
-✅ Automatic backups every 5 minutes  
-✅ Audit trail for all changes  
+✅ Express.js REST API
+✅ SQLite campaign database
+✅ Real-time WebSocket support
+✅ Automatic backups every 5 minutes
+✅ Audit trail for all changes
 
 ### Interfaces (Fully Functional)
-✅ GM Tool — Campaign management  
-✅ Player Interface — Character sheets  
-✅ Campaign Setup Tool — Campaign design  
-✅ Combat Tracker — Turn-based combat  
-✅ Faction Manager — Political tracking  
+✅ GM Tool — Campaign management
+✅ Player Interface — Character sheets
+✅ Campaign Setup Tool — Campaign design
+✅ Combat Tracker — Turn-based combat
+✅ Faction Manager — Political tracking
 
 ### Features (50+)
-✅ Campaign CRUD operations  
-✅ Character creation (verified rules)  
-✅ Combat automation (no dice rolls, inputs only)  
-✅ NPC management with relationships  
-✅ Faction tracking with attitudes  
-✅ Settlement resource management  
-✅ Event and threat logging  
-✅ Weather generation  
-✅ Travel planning with supplies  
-✅ Situation reports for players  
-✅ COMMS messaging system  
-✅ Inventory management  
-✅ Condition tracking  
-✅ Automatic backups  
-✅ Campaign audit trail  
-✅ Map visualization  
+✅ Campaign CRUD operations
+✅ Character creation (verified rules)
+5. Enter the bootstrap token from `token.txt` and create the GM account
+✅ Combat automation (no dice rolls, inputs only)
+✅ NPC management with relationships
+✅ Faction tracking with attitudes
+✅ Settlement resource management
+✅ Event and threat logging
+✅ Weather generation
+✅ Travel planning with supplies
+ ✅ Database schema ready (version 21)
+✅ COMMS messaging system
+✅ Inventory management
+✅ Condition tracking
+✅ Automatic backups
+✅ Campaign audit trail
+✅ Map visualization
 ✅ And 35+ more!
 
 ---
@@ -160,11 +161,12 @@ All files are in: `C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool\`
 - ✅ Troubleshooting quick guide
 - ✅ Getting help section
 - ✅ Next steps and checklist
+Completes GM account setup with token.txt
 
 ### DEPLOYMENT_COMPLETE.md (14.5 KB)
 - ✅ Package statistics
 - ✅ Deployment instructions (4 steps)
-- ✅ Package structure verification
+ ✅ GM account setup succeeds with token.txt
 - ✅ Distribution options (3 methods)
 - ✅ Pre-distribution checklist
 - ✅ Support resources included
@@ -194,7 +196,7 @@ All files are in: `C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool\`
 ✅ **Documentation**
 - [x] All guides complete and comprehensive
 - [x] All examples tested and working
-- [x] All URLs correct (localhost:3000)
+- [x] All URLs correct (localhost:8080)
 - [x] System requirements accurate
 - [x] Troubleshooting covers 15+ issues
 
@@ -272,7 +274,7 @@ Test-Path "INSTALL_SERVER.bat"        # Should be True
 
 ```bash
 # Windows: Use Compress-Archive
-Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.0.0.zip
+Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.1.0.zip
 
 # Or use Windows Explorer: Right-click → Send to → Compressed (zipped)
 ```
@@ -329,7 +331,7 @@ Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.0.0.zip
 - ✅ No sensitive data exposed
 - ✅ All paths and URLs correct
 - ✅ Code is 267/267 tests passing
-- ✅ Database schema ready (version 20)
+- ✅ Database schema ready (version 21)
 
 ### Distribution Readiness
 - ✅ Can be zipped for download
@@ -371,7 +373,7 @@ Compress-Archive -Path . -DestinationPath t2k-gm-tool-v1.0.0.zip
    ```bash
    # Windows PowerShell
    cd deploy
-   Compress-Archive -Path t2k-gm-tool -DestinationPath t2k-gm-tool-v1.0.0.zip
+   Compress-Archive -Path t2k-gm-tool -DestinationPath t2k-gm-tool-v1.1.0.zip
    ```
 
 4. **Publish**
@@ -402,9 +404,9 @@ Runs INSTALL_SERVER.bat (5 min)
             ↓
 Double-clicks run.cmd
             ↓
-Opens http://localhost:3000
+Opens http://localhost:8080
             ↓
-Logs in: admin/admin
+Completes GM account setup with token.txt
             ↓
 Changes password (1 min)
             ↓
@@ -421,16 +423,16 @@ Creates first campaign (5 min)
 
 Users will know everything worked when:
 
-✅ INSTALL_SERVER.bat completes without errors  
-✅ Server shows "listening on http://localhost:3000"  
-✅ Browser opens to login page  
-✅ Login succeeds with admin/admin  
-✅ Settings > User panel is accessible  
-✅ Can create campaigns  
-✅ Can access all interfaces  
-✅ No console errors in browser  
-✅ No errors in server console  
-✅ Can restart server, data persists  
+✅ INSTALL_SERVER.bat completes without errors
+✅ Server shows "listening on http://localhost:8080"
+✅ Browser opens to login page
+✅ GM account setup succeeds with token.txt
+✅ Settings > User panel is accessible
+✅ Can create campaigns
+✅ Can access all interfaces
+✅ No console errors in browser
+✅ No errors in server console
+✅ Can restart server, data persists
 
 ---
 
@@ -479,10 +481,10 @@ Users are ready to run their first T2K 4E campaign!
 
 ---
 
-**Creation Date:** November 2, 2026  
-**Status:** ✅ COMPLETE AND PRODUCTION-READY  
-**Documentation:** 72 KB across 10 guides  
-**Setup Time:** 5-10 minutes for users  
+**Creation Date:** November 2, 2026
+**Status:** ✅ COMPLETE AND PRODUCTION-READY
+**Documentation:** 72 KB across 10 guides
+**Setup Time:** 5-10 minutes for users
 **Support:** Comprehensive troubleshooting included
 
 ---

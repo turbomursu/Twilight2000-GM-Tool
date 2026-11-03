@@ -40,7 +40,6 @@ if (require.main === module) {
     process.stdout.write(`Seeded development campaign: ${result.campaignName} (${result.campaignId})\n`);
     process.stdout.write(`GM database: ${result.databasePath}\n`);
     process.stdout.write(`Player username: ${result.username} / seed status: ${result.seedStatus}\n`);
-    if (result.activationToken) process.stdout.write(`One-time player activation token: ${result.activationToken}\n`);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

@@ -42,7 +42,7 @@ test("seeds an idempotent runtime dashboard and player seed without resetting ed
     const firstSeed = seedSampleDatabase(["--db", databasePath, "--gm", "gm-user"]);
     assert.equal(firstSeed.campaignName, "The Long Road");
     assert.equal(firstSeed.seedStatus, "seed");
-    assert.equal(typeof firstSeed.activationToken, "string");
+    assert.equal(Object.hasOwn(firstSeed, "activationToken"), false);
 
     database = openRuntimeDatabase(databasePath);
     const initialData = getRuntimeDashboard(database, "gm-account-1", firstSeed.campaignId);
@@ -61,7 +61,7 @@ test("seeds an idempotent runtime dashboard and player seed without resetting ed
 
     const secondSeed = seedSampleDatabase(["--db", databasePath, "--gm", "gm-user"]);
     assert.equal(secondSeed.campaignId, firstSeed.campaignId);
-    assert.equal(secondSeed.activationToken, null);
+    assert.equal(Object.hasOwn(secondSeed, "activationToken"), false);
     database = openRuntimeDatabase(databasePath);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM campaigns").get().count, 1);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM player_seats WHERE campaign_id = ?").get(firstSeed.campaignId).count, 1);

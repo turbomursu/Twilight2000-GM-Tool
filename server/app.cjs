@@ -39,9 +39,9 @@ const PROTECTED_FILES = new Map([
 ]);
 const AUTH_PATHS = new Set([
   "/api/auth/status",
-  "/api/auth/activate",
   "/api/auth/bootstrap",
   "/api/auth/login",
+  "/api/auth/change-password",
   "/api/auth/session",
   "/api/auth/logout"
 ]);
@@ -64,6 +64,17 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);
+    const cookieToken = parseCookies(request.headers.cookie)["fieldbook_session"];
+    const account = getAuthenticatedAccount(database, cookieToken);
+    if (account?.mustChangePassword) {
+      if (url.pathname.startsWith("/api/")) {
+        return sendText(response, 428, "application/json; charset=utf-8", JSON.stringify({ error: "Change your password before continuing.", mustChangePassword: true }));
+      }
+      if (request.method === "GET" || request.method === "HEAD") {
+        response.writeHead(302, { Location: "/login.html?passwordChange=1", "Cache-Control": "no-store" });
+        return response.end();
+      }
+    }
     if (CAMPAIGN_PATH.test(url.pathname)) return campaignHandler(request, response);
     const playerBasemapMatch = url.pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map-basemap$/);
     if (playerBasemapMatch) {
@@ -109,8 +120,6 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
       return sendText(response, 405, "application/json; charset=utf-8", JSON.stringify({ error: "Method not allowed." }));
     }
     const headOnly = request.method === "HEAD";
-    const cookieToken = parseCookies(request.headers.cookie)["fieldbook_session"];
-    const account = getAuthenticatedAccount(database, cookieToken);
     const homePath = account ? getAccountHomePath(database, account.id) : "/index.html";
 
     const basemapMatch = url.pathname.match(/^\/offline-basemaps\/([0-9a-f-]{36})\.pmtiles$/i);
@@ -124,11 +133,11 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
     }
 
     if (url.pathname === "/" || url.pathname === "/login") {
-      const location = account ? homePath : "/login.html";
+      const location = account?.mustChangePassword ? "/login.html?passwordChange=1" : account ? homePath : "/login.html";
       response.writeHead(302, { Location: location, "Cache-Control": "no-store" });
       return response.end();
     }
-    if (url.pathname === "/login.html" && account) {
+    if (url.pathname === "/login.html" && account && !account.mustChangePassword) {
       response.writeHead(302, { Location: homePath, "Cache-Control": "no-store" });
       return response.end();
     }

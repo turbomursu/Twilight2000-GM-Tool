@@ -1,3 +1,4 @@
 node_modules/
 data/offline-basemaps/*.pmtiles
 data/offline-basemaps/*.json
+token.txt

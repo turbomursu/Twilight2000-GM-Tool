@@ -2,7 +2,7 @@
 
 A complete, local-first game master tool for Twilight: 2000 Fourth Edition campaigns.
 
-**Status:** Production Ready | **License:** GPL v3 | **Version:** 1.0.0
+**Status:** Production Ready | **License:** GPL v3 | **Version:** 1.1.0
 
 ---
 
@@ -14,7 +14,7 @@ This project is licensed under the **GNU General Public License v3 (GPL v3)**.
 - **You must:** Share any modifications if you distribute them
 - **You get:** No warranty, but complete source code freedom
 
-**Full Details:** See [LICENSE](./LICENSE) and [LICENSE_INFO.md](./LICENSE_INFO.md)
+**Full Details:** See [LICENSE](../LICENSE) and [LICENSE_INFO.md](LICENSE_INFO.md)
 
 **Copyrighted Material Notice:** This tool implements Twilight: 2000 Fourth Edition rules. The game is copyright Fria Ligan/Free League. This tool is an independent fan utility for running campaigns, not an official product.
 
@@ -47,7 +47,7 @@ $env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGu
 node server/main.cjs
 ```
 
-The first successful account bootstrap removes the stored bootstrap-token hash. Authentication routes include `POST /api/auth/bootstrap`, `POST /api/auth/activate`, `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`; sessions use HttpOnly, SameSite=Strict cookies. GM user routes are `GET /api/users` and `POST /api/users`. GM player templates use `GET|POST /api/player-seeds` and `PUT|DELETE /api/player-seeds/:seedId`; creating a template can create a disabled player login and one-time activation token without assigning a campaign. Campaign routes include `POST /api/campaigns/import-setup`, `GET /api/campaigns`, `GET /api/campaigns/:id`, `GET /api/campaigns/:id/runtime`, `GET /api/campaigns/:id/character-changes`, and `POST /api/campaigns/:id/character-changes/:requestId/review`. GM seed assignment uses `POST /api/campaigns/:id/player-seeds` with a template ID; the server copies it into the campaign and enforces ownership and the four-seat limit. Player routes are `GET /api/player/campaigns`, `GET|PUT /api/player/campaigns/:id/character`, and `POST /api/player/campaigns/:id/character/finalize`. Set `FIELDBOOK_HOST`, `FIELDBOOK_PORT`, and `FIELDBOOK_DB_PATH` to override the listener and SQLite location.
+The first successful account bootstrap removes the stored bootstrap-token hash. Authentication routes include `POST /api/auth/bootstrap`, `POST /api/auth/login`, `POST /api/auth/change-password`, `GET /api/auth/session`, and `POST /api/auth/logout`; sessions use HttpOnly, SameSite=Strict cookies. GM user routes are `GET|POST /api/users` and `POST /api/users/:id/temporary-password`. New player accounts receive a temporary password that is shown once to the GM, and campaign pages/APIs remain blocked until the player changes it. GM player templates use `GET|POST /api/player-seeds` and `PUT|DELETE /api/player-seeds/:seedId`; creating a template can create a player login without assigning a campaign. Campaign routes include `POST /api/campaigns/import-setup`, `GET /api/campaigns`, `GET /api/campaigns/:id`, `GET /api/campaigns/:id/runtime`, `GET /api/campaigns/:id/character-changes`, and `POST /api/campaigns/:id/character-changes/:requestId/review`. GM seed assignment uses `POST /api/campaigns/:id/player-seeds` with a template ID; the server copies it into the campaign and enforces ownership and the four-seat limit. Player routes are `GET /api/player/campaigns`, `GET|PUT /api/player/campaigns/:id/character`, and `POST /api/player/campaigns/:id/character/finalize`. Set `FIELDBOOK_HOST`, `FIELDBOOK_PORT`, and `FIELDBOOK_DB_PATH` to override the listener and SQLite location.
 
 ## Runtime Sample Data
 
@@ -66,7 +66,7 @@ $env:FIELDBOOK_DB_PATH = "$env:TEMP\fieldbook-dev.sqlite"
 node server/main.cjs
 ```
 
-The command prints the runtime campaign ID and, when it creates the `sample-player` account, its one-time activation token. The GM dashboard snapshot is available to that campaign's owner at `GET /api/campaigns/:id/runtime`.
+The command prints the runtime campaign ID and player username. The sample account is a development fixture; use the GM user-management flow to issue a temporary password before signing in. The GM dashboard snapshot is available to that campaign's owner at `GET /api/campaigns/:id/runtime`.
 
 ### Runtime Snapshot API
 Runtime `PUT` updates require `expectedRevision` from the current `runtime.campaign.revision`; stale writes return `409` and should be reloaded before retrying. Weather uses the existing `dashboard.weather` and `dashboard.weatherNote` fields; the UI derives cited effects for GM adjudication without applying modifiers to rolls.
@@ -228,9 +228,9 @@ Integration verification: run `node --test` for API, persistence/recovery, and p
 - Travel day, waypoint, distance, food, fuel, and weather tracking
 - Field journal entries
 - Browser-local autosave and JSON campaign export
-- Standalone [Campaign Setup Tool prototype](campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
+- Standalone [Campaign Setup Tool prototype](../campaign-setup.html) with atlas import, batch terrain, visibility eligibility, settlement descriptors, faction influence, and schema-v2 export/reopen. The GM Tool imports immutable source packages and independently publishes text reports and explicitly selected point-layer maps.
 - Optional development fixture seeds a separate SQLite `The Long Road` runtime with clock/resources, route stops, personnel, journal, and a sample player seed for testing the runtime read API.
-- Authenticated [Player Interface](player-interface.html) with Character, Inventory, published Sitrep/Map, and COMMS. Accepted inventory and own proposals are server-backed; legacy samples remain hidden prototype data.
+- Authenticated [Player Interface](../player-interface.html) with Character, Inventory, published Sitrep/Map, and COMMS. Accepted inventory and own proposals are server-backed; legacy samples remain hidden prototype data.
 
 ## Ruleset Fidelity
 

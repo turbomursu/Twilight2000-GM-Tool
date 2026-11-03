@@ -1,8 +1,8 @@
 # Development Roadmap — Plan B Edition
 
-**Last updated:** 02 Nov 2026  
-**Strategy:** Session management first. Complete existing session workflows before expanding interconnected simulation systems.  
-**Reference:** [Plan B — Scope Assessment](gmpack/plan-b.html)
+**Last updated:** 02 Nov 2026
+**Strategy:** Session management first. Complete existing session workflows before expanding interconnected simulation systems.
+**Reference:** [Plan B — Scope Assessment](../gmpack/plan-b.html)
 
 ## Product Scope
 
@@ -100,7 +100,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 ## Plan B Priority Framework
 
-Based on [gmpack/plan-b.html](gmpack/plan-b.html), development priorities are organized by strategic value:
+Based on [gmpack/plan-b.html](../gmpack/plan-b.html), development priorities are organized by strategic value:
 
 | Priority | Features | Strategic Value |
 |----------|----------|-----------------|

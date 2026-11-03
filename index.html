@@ -261,7 +261,7 @@
     .character-change-field { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; padding-top: 6px; border-top: 1px solid #d5ddd3; font-size: 10px; }
     .character-change-field small { display: block; color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
     .character-change-actions { display: flex; justify-content: end; gap: 8px; }
-    #user-activation-token { max-height: 120px; overflow: auto; margin: 0; padding: 10px; border: 1px solid #aab5aa; background: #f1f3ed; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+    #user-temporary-password { max-height: 120px; overflow: auto; margin: 0; padding: 10px; border: 1px solid #aab5aa; background: #f1f3ed; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
     #user-list { display: grid; gap: 6px; }
     .user-list-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px; border-bottom: 1px solid #d5ddd3; font-size: 10px; }
     .user-list-row small { color: var(--muted); font: 8px var(--mono); }
@@ -1319,7 +1319,7 @@ Nationality || optional
 Branch || optional
 Military rank || optional</textarea><span class="row-description">One field per line: label | preset value | required or optional. Leave the preset value empty for the player to complete it. These are character fields, not rules calculations.</span></label>
       <p class="feedback" id="player-seed-assignment-status" role="status" aria-live="polite"></p>
-      <pre id="player-seed-invite-token" hidden></pre>
+      <pre id="player-seed-temporary-password" hidden></pre>
       <section class="player-seed-roster" aria-labelledby="player-seed-roster-title"><h3 id="player-seed-roster-title">Assigned players</h3><div id="player-seed-roster-list">Select a runtime campaign to view assigned seeds.</div></section>
       <div class="dialog-actions"><button class="button" type="button" id="cancel-player-seed-dialog">Cancel</button><button class="button button-primary" type="submit" id="create-player-seed-button">Assign seed</button></div>
     </form>
@@ -1331,8 +1331,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
         <label class="field"><span class="eyebrow">New username</span><input id="new-user-username" name="username" type="text" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" required></label>
         <div class="dialog-actions"><button class="button button-primary" type="submit" id="create-user-button">Create username</button></div>
       </form>
-      <p class="feedback" id="user-create-status" role="status" aria-live="polite">Only usernames created here can sign in. Share the one-time activation token with the user through a secure channel.</p>
-      <pre id="user-activation-token" hidden></pre>
+      <p class="feedback" id="user-create-status" role="status" aria-live="polite">New accounts receive a temporary password and must change it at first login.</p>
+      <pre id="user-temporary-password" hidden></pre>
       <section class="player-seed-roster" aria-labelledby="user-list-title"><h3 id="user-list-title">User accounts</h3><div id="user-list">Loading accounts…</div></section>
       <div class="dialog-actions"><button class="button" type="button" id="done-users-dialog">Done</button></div>
     </div>
@@ -1595,13 +1595,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
           </label>
           <label>
             <span>Stop Detail</span>
-            <input type="text" id="stop-detail-input" 
-              placeholder="e.g., Refuel and resupply" 
+            <input type="text" id="stop-detail-input"
+              placeholder="e.g., Refuel and resupply"
               maxlength="160" required>
           </label>
           <label>
             <span>Distance from previous (km)</span>
-            <input type="number" id="stop-km-input" 
+            <input type="number" id="stop-km-input"
               min="0" step="0.1" value="0" required>
           </label>
           <div id="stop-editor-status" class="form-feedback"></div>
@@ -1858,10 +1858,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
         try {
           const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/map-publication`);
           if (!response.ok) throw new Error("Failed to load publication state");
-          
+
           const { state } = await response.json();
           updatePublicationUI(state);
-          
+
           // Also enable history controls and load initial history
           document.getElementById('history-refresh').disabled = false;
           document.getElementById('history-status').textContent = 'Loading history...';
@@ -1877,12 +1877,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById('pub-locations').checked = state.locations.published;
         document.getElementById('pub-position').checked = state.position.published;
         document.getElementById('pub-factions').checked = state.factions.published;
-        
+
         document.getElementById('pub-route-revision').textContent = `(rev ${state.route.revision})`;
         document.getElementById('pub-locations-revision').textContent = `(rev ${state.locations.revision})`;
         document.getElementById('pub-position-revision').textContent = `(rev ${state.position.revision})`;
         document.getElementById('pub-factions-revision').textContent = `(rev ${state.factions.revision})`;
-        
+
         const lastMod = new Date(state.lastModifiedAt).toLocaleString();
         document.getElementById('pub-last-modified').textContent = lastMod;
       }
@@ -1909,13 +1909,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
 
           const target = evt.target.dataset.target;
           const campaignId = state.runtimeCampaignId;
-          
+
           try {
             clearPublicationError();
-            
+
             const pubState = {};
             pubState[target] = evt.target.checked;
-            
+
             const response = await fetch(
               `/api/campaigns/${encodeURIComponent(campaignId)}/map-publication`,
               {
@@ -1924,16 +1924,16 @@ Military rank || optional</textarea><span class="row-description">One field per 
                 body: JSON.stringify({state: pubState})
               }
             );
-            
+
             if (!response.ok) {
               const error = await response.json();
               throw new Error(error.error || 'Publication update failed');
             }
-            
+
             const result = await response.json();
             updatePublicationUI(result.state);
             showToast(`${target} ${evt.target.checked ? 'published' : 'unpublished'}`);
-            
+
           } catch (error) {
             console.error("Publication update error:", error);
             showPublicationError(error.message);
@@ -1946,10 +1946,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
       // Setup party position drag handler
       document.addEventListener('mapviz:partyPositionDragged', async (evt) => {
         if (!runtimeDataLoaded || !state.runtimeCampaignId) return;
-        
+
         const { lat, lng } = evt.detail;
         const campaignId = state.runtimeCampaignId;
-        
+
         try {
           const response = await fetch(
             `/api/campaigns/${encodeURIComponent(campaignId)}/party-position`,
@@ -1959,7 +1959,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
               body: JSON.stringify({ position: { lat, lng } })
             }
           );
-          
+
           if (!response.ok) {
             const error = await response.json();
             console.error("Party position update failed:", error.error);
@@ -1984,7 +1984,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
             `/api/campaigns/${encodeURIComponent(campaignId)}/map-publication/history?offset=${offset}&limit=${historyPageSize}`
           );
           if (!response.ok) throw new Error("Failed to load history");
-          
+
           const result = await response.json();
           renderPublicationHistory(result.history, result.total);
           historyOffset = offset;
@@ -1997,18 +1997,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
       function renderPublicationHistory(entries, total) {
         const tbody = document.getElementById('history-rows');
         tbody.replaceChildren();
-        
+
         if (!entries.length) {
           tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">No publication history yet</td></tr>';
           return;
         }
-        
+
         entries.forEach(entry => {
           const row = document.createElement('tr');
           const recordedAt = new Date(entry.recordedAt).toLocaleString();
           const oldVal = entry.oldValue !== null ? String(entry.oldValue) : '—';
           const newVal = entry.newValue !== null ? String(entry.newValue) : '—';
-          
+
           row.innerHTML = `
             <td>${escapeHtml(recordedAt)}</td>
             <td>${escapeHtml(entry.actor || 'System')}</td>
@@ -2019,7 +2019,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           `;
           tbody.appendChild(row);
         });
-        
+
         // Update pagination buttons
         const hasOlder = historyOffset + historyPageSize < total;
         const hasNewer = historyOffset > 0;
@@ -2284,7 +2284,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
           }).addTo(runtimeRouteMap);
           runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
-          
+
           // Initialize map visualization client
           if (window.mapVisualization) {
             window.mapVisualization.initializeVisualization(runtimeRouteMap);
@@ -2312,7 +2312,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeRouteSignature = signature;
         }
         requestAnimationFrame(() => runtimeRouteMap?.invalidateSize({ pan: false }));
-        
+
         // Refresh publication-aware visualization layers
         if (window.mapVisualization && state.runtimeCampaignId) {
           window.mapVisualization.refreshVisualizations(state.runtimeCampaignId, route, state.runtimeLocations);
@@ -3569,12 +3569,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const playerSeedDialog = document.getElementById("player-seed-dialog");
       const playerSeedAssignmentForm = document.getElementById("player-seed-assignment-form");
       const playerSeedAssignmentStatus = document.getElementById("player-seed-assignment-status");
-      const playerSeedInviteToken = document.getElementById("player-seed-invite-token");
+      const playerSeedTemporaryPassword = document.getElementById("player-seed-temporary-password");
       const playerSeedRosterList = document.getElementById("player-seed-roster-list");
       const usersDialog = document.getElementById("users-dialog");
       const userList = document.getElementById("user-list");
       const userCreateStatus = document.getElementById("user-create-status");
-      const userActivationToken = document.getElementById("user-activation-token");
+      const userTemporaryPassword = document.getElementById("user-temporary-password");
       const playerUsernameSelect = document.getElementById("player-seed-username");
       let assignedUsers = [];
 
@@ -3597,8 +3597,28 @@ Military rank || optional</textarea><span class="row-description">One field per 
           const username = document.createElement("span");
           username.textContent = user.username;
           const state = document.createElement("small");
-          state.textContent = user.activationPending ? "AWAITING ACTIVATION" : `${user.campaignAssignments} CAMPAIGN(S)`;
-          row.append(username, state);
+          state.textContent = user.disabled ? "DISABLED" : user.mustChangePassword ? "PASSWORD CHANGE REQUIRED" : `${user.campaignAssignments} CAMPAIGN(S)`;
+          const reset = document.createElement("button");
+          reset.type = "button";
+          reset.className = "button";
+          reset.textContent = user.disabled ? "Issue temporary password" : "Reset password";
+          reset.addEventListener("click", async () => {
+            reset.disabled = true;
+            try {
+              const { temporaryPassword } = await campaignApiRequest(`/api/users/${encodeURIComponent(user.id)}/temporary-password`, { method: "POST" });
+              userCreateStatus.className = "feedback success";
+              userCreateStatus.textContent = `Temporary password issued for ${user.username}. The player must change it at first login.`;
+              userTemporaryPassword.textContent = `Username: ${user.username}\nTemporary password: ${temporaryPassword}\nShare through a secure channel. This password is shown only once.`;
+              userTemporaryPassword.hidden = false;
+              await refreshAssignedUsers();
+            } catch (error) {
+              userCreateStatus.className = "feedback error";
+              userCreateStatus.textContent = error.message;
+            } finally {
+              reset.disabled = false;
+            }
+          });
+          row.append(username, state, reset);
           userList.append(row);
         });
         if (!assignedUsers.length) userList.textContent = "No users created yet.";
@@ -3619,9 +3639,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
 
       document.getElementById("open-users-dialog").addEventListener("click", () => {
         userCreateStatus.className = "feedback";
-        userCreateStatus.textContent = "Only usernames created here can sign in. Share the one-time activation token through a secure channel.";
-        userActivationToken.hidden = true;
-        userActivationToken.textContent = "";
+        userCreateStatus.textContent = "New accounts receive a temporary password and must change it at first login.";
+        userTemporaryPassword.hidden = true;
+        userTemporaryPassword.textContent = "";
         usersDialog.showModal();
         refreshAssignedUsers();
       });
@@ -3635,18 +3655,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
         button.disabled = true;
         userCreateStatus.className = "feedback";
         userCreateStatus.textContent = "Creating username…";
-        userActivationToken.hidden = true;
-        userActivationToken.textContent = "";
+        userTemporaryPassword.hidden = true;
+        userTemporaryPassword.textContent = "";
         try {
-          const { user } = await campaignApiRequest("/api/users", {
+          const { user, temporaryPassword } = await campaignApiRequest("/api/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username })
           });
           userCreateStatus.className = "feedback success";
-          userCreateStatus.textContent = `Username ${user.username} created. Give its one-time activation token to the player securely.`;
-          userActivationToken.textContent = `Activation page: ${location.origin}/login.html?activate=1\nUsername: ${user.username}\nOne-time activation token: ${user.activationToken}\nExpires in 7 days.`;
-          userActivationToken.hidden = false;
+          userCreateStatus.textContent = `Username ${user.username} created. The player must change this temporary password at first login.`;
+          userTemporaryPassword.textContent = `Username: ${user.username}\nTemporary password: ${temporaryPassword}\nShare through a secure channel. This password is shown only once.`;
+          userTemporaryPassword.hidden = false;
           event.currentTarget.reset();
           await refreshAssignedUsers();
         } catch (error) {
@@ -4204,7 +4224,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const detailForm = detailModal?.querySelector(".dialog-form");
       const detailCancel = document.getElementById("detail-cancel");
       const detailSave = document.getElementById("detail-save");
-      
+
       if (detailCancel) detailCancel.addEventListener("click", () => detailModal?.close());
       if (detailSave) detailSave.addEventListener("click", async () => {
         // Handler for saving personnel details - will be connected by personnel-client
@@ -4220,7 +4240,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const creationModal = document.getElementById("archetype-creation-modal");
       const creationCancel = document.getElementById("creation-cancel");
       const creationCreate = document.getElementById("creation-create");
-      
+
       if (creationCancel) creationCancel.addEventListener("click", () => creationModal?.close());
       if (creationCreate) creationCreate.addEventListener("click", async () => {
         // Handler for creating personnel - will be connected by personnel-client

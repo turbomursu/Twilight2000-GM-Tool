@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-## 30-Second Installation
+## Quick Installation
 
 ### Prerequisites
 - Windows 10/11
@@ -9,17 +9,16 @@
 
 ### Install and Run
 
-1. **Double-click** `INSTALL_SERVER.bat`
-2. Wait for installation (2-5 minutes)
-3. **Double-click** `run.cmd` (or `npm start`)
-4. Open browser: http://localhost:3000
-5. Login: admin / admin
-6. **Change password in Settings immediately!**
+1. Run `INSTALL_SERVER.bat` or `INSTALL_SERVER.ps1`.
+2. If you used the batch installer, open a new terminal.
+3. From this folder, run `npm start`.
+4. Open `http://localhost:8080`.
+5. Enter the bootstrap token from `token.txt`, then create the GM account.
 
 ## Done!
 
 You now have:
-- ✅ GM Tool running on http://localhost:3000
+- GM Tool running on http://localhost:8080
 - ✅ Player Interface at /player-interface.html
 - ✅ Campaign Setup Tool at /campaign-setup.html
 - ✅ Local database for campaigns
@@ -37,7 +36,7 @@ You now have:
 
 ## For Players
 
-Share: `http://YOUR-IP:3000/player-interface.html`
+Share: `http://YOUR-IP:8080/player-interface.html`
 
 Players can:
 - View their character
@@ -56,10 +55,10 @@ Players can:
 
 | Use | URL |
 |-----|-----|
-| GM Tool | http://localhost:3000 |
-| Player Interface | http://localhost:3000/player-interface.html |
-| Campaign Setup | http://localhost:3000/campaign-setup.html |
-| On network | http://YOUR-IP:3000 |
+| GM Tool | http://localhost:8080 |
+| Player Interface | http://localhost:8080/player-interface.html |
+| Campaign Setup | http://localhost:8080/campaign-setup.html |
+| On network | http://YOUR-IP:8080 |
 
 ## Common Commands
 
@@ -76,15 +75,11 @@ Ctrl+C (in command prompt)
 
 ## Password Security
 
-⚠️ **Important:** Change the admin password in Settings as soon as you log in!
-
-Default credentials are for setup only. Use a strong password for security.
+The GM chooses a password during first-run setup. GM-created player accounts receive temporary passwords and must replace them at first sign-in.
 
 ## Backup Your Data
 
-Your data is in the `data/` folder:
-- `campaigns.db` — All your campaigns
-- `backups/` — Automatic backups
+Your database and local assets are stored in the `data/` folder. Back up this folder and any offline-basemap sidecars regularly.
 
 Back it up regularly to a safe location!
 

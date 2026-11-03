@@ -1,5 +1,5 @@
 # Twilight: 2000 Fourth Edition GM Tool
-## Deployment Package v1.0.0
+## Deployment Package v1.1.0
 
 **A complete game master's tool for Twilight: 2000 Fourth Edition tabletop RPG campaigns**
 
@@ -41,22 +41,19 @@ INSTALL_SERVER.bat
 
 ### 3. Start the Server
 ```bash
-# Option A: Double-click
-run.cmd
-
-# Option B: Manual start
+# Start from this folder
 npm start
 ```
 
 ### 4. Open in Browser
 ```
-http://localhost:3000
-Username: admin
-Password: admin
+http://localhost:8080
 ```
 
-### 5. Change Password
-Click Settings (⚙️) → Change Password **immediately**
+Enter the bootstrap token from `token.txt` and create the GM account.
+
+### 5. Player Passwords
+GM-created player accounts receive a temporary password. Players must replace it at first sign-in before accessing campaign pages or APIs.
 
 ---
 
@@ -183,8 +180,7 @@ C:\Program Files\Twilight2000-GM\
 | File | Purpose | When to Use |
 |------|---------|-----------|
 | **INSTALL_SERVER.bat** | One-time setup | First installation (required) |
-| **run.cmd** | Start server | Every time you play (Windows) |
-| **run.ps1** | Start with PowerShell | Alternative Windows startup |
+| **npm start** | Start server | From the package folder |
 | **INSTALLATION.md** | Detailed setup guide | Full setup instructions |
 | **QUICKSTART.md** | 30-second guide | Quick reference |
 | **DEPLOYMENT_MANIFEST.txt** | File listing | What's included |
@@ -260,7 +256,7 @@ C:\Program Files\Twilight2000-GM\
 If players can't connect:
 1. Windows Defender Firewall > "Allow app through firewall"
 2. Add "Node.js" to allowed applications
-3. Or add port 3000 specifically
+3. Or add port 8080 specifically
 
 ---
 
@@ -349,7 +345,7 @@ data/
 | Problem | Solution |
 |---------|----------|
 | **"Node.js not found"** | Install Node.js 24+ from nodejs.org |
-| **"Port 3000 in use"** | Close other apps or use different port |
+| **"Port 8080 in use"** | Close other apps or set `FIELDBOOK_PORT` to another port |
 | **"npm install fails"** | Run as Administrator, check internet |
 | **"Server won't start"** | Check console error, see INSTALLATION.md |
 | **"Browser won't connect"** | Verify server is running, try http not https |
@@ -367,7 +363,7 @@ data/
 - [ ] Install Node.js 24+ (if needed)
 - [ ] Run INSTALL_SERVER.bat
 - [ ] Double-click run.cmd
-- [ ] Open http://localhost:3000
+- [ ] Open http://localhost:8080
 - [ ] Change admin password
 
 ### First Session (Today)
@@ -442,8 +438,8 @@ Make sure you have:
 ## 🎮 Ready to Play?
 
 1. **Install:** Run INSTALL_SERVER.bat
-2. **Start:** Double-click run.cmd
-3. **Open:** http://localhost:3000
+2. **Start:** Run `npm start` from this folder
+3. **Open:** http://localhost:8080
 4. **Create:** Your first campaign
 5. **Play:** Invite players and start the adventure!
 
@@ -494,10 +490,10 @@ Total installed: ~250 MB (mostly node_modules dependencies)
 After installation, you should see:
 
 ✅ INSTALL_SERVER.bat completes without errors
-✅ Server starts with "listening on http://localhost:3000"
-✅ Browser connects to http://localhost:3000
-✅ Login page appears with "admin" field
-✅ Can log in with admin/admin
+✅ Server starts with "listening on http://localhost:8080"
+✅ Browser connects to http://localhost:8080
+✅ Login page accepts the first-run bootstrap token
+✅ GM account setup succeeds
 ✅ Can access GM Tool dashboard
 ✅ Can see Campaigns menu
 ✅ Can create a new campaign
@@ -510,10 +506,10 @@ If all above are ✅, you're ready to start!
 
 ## 🚀 Version Information
 
-- **Release:** v1.0.0 - Production Ready
+- **Release:** v1.1.0 - Production Ready
 - **Release Date:** November 2026
 - **Node.js:** 24.0.0 or later
-- **Database Schema:** Version 20
+- **Database Schema:** Version 21
 - **Total Features:** 50+
 - **Test Coverage:** 267/267 tests passing
 
@@ -530,9 +526,9 @@ See gmpack/ for official game references and materials.
 
 ---
 
-**Last Updated:** November 2026  
-**Package Size:** ~650 KB (uncompressed)  
-**Estimated Setup Time:** 5-10 minutes  
+**Last Updated:** November 2026
+**Package Size:** ~650 KB (uncompressed)
+**Estimated Setup Time:** 5-10 minutes
 **Status:** ✅ Production Ready
 
 ---

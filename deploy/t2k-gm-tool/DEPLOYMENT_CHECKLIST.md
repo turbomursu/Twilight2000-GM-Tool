@@ -1,5 +1,5 @@
 # Deployment Checklist
-# T2K-4E GM Tool v1.0.0
+# T2K-4E GM Tool v1.1.0
 
 ## Pre-Deployment Verification
 
@@ -8,7 +8,7 @@
 - [ ] All HTML files present (index.html, login.html, campaign-setup.html, player-interface.html)
 - [ ] All client JavaScript files present (13 files)
 - [ ] package.json and package-lock.json included
-- [ ] Installation scripts present (INSTALL_SERVER.bat, INSTALL_CLIENT.bat, run.cmd, run.ps1)
+- [ ] Installation scripts present (INSTALL_SERVER.bat, INSTALL_SERVER.ps1, INSTALL_CLIENT.bat)
 - [ ] Documentation files complete (INSTALLATION.md, QUICKSTART.md, README_DEPLOYMENT.md)
 - [ ] DEPLOYMENT_MANIFEST.txt included
 - [ ] No node_modules/ folder (will be created during install)
@@ -22,7 +22,7 @@
 - [ ] No console errors in browser DevTools
 - [ ] No Node.js/npm warnings
 - [ ] All server modules load without errors
-- [ ] Database schema migration is up to date (version 20)
+- [ ] Database schema migration is up to date (version 21)
 - [ ] No hardcoded credentials or secrets
 - [ ] No external API dependencies (all local)
 
@@ -31,7 +31,7 @@
 - [ ] QUICKSTART.md is clear and concise (2+ KB)
 - [ ] README_DEPLOYMENT.md covers all topics (14+ KB)
 - [ ] All code examples are tested and working
-- [ ] All URLs are correct (localhost:3000)
+- [ ] All URLs are correct (localhost:8080)
 - [ ] All file paths use correct separators
 - [ ] Troubleshooting section covers common issues
 - [ ] System requirements are accurate
@@ -73,9 +73,9 @@ t2k-gm-tool/
 - [ ] Extract package to clean folder
 - [ ] Run INSTALL_SERVER.bat as Administrator
 - [ ] Verify all steps complete without errors
-- [ ] Confirm "listening on http://localhost:3000"
-- [ ] Open http://localhost:3000 in browser
-- [ ] Login with admin/admin
+- [ ] Confirm "listening on http://localhost:8080"
+- [ ] Open http://localhost:8080 in browser
+- [ ] Create the GM account using the token from token.txt
 - [ ] Navigate to Campaigns
 - [ ] Create test campaign
 - [ ] Verify no database errors
@@ -90,7 +90,7 @@ t2k-gm-tool/
 - [ ] Extract package
 - [ ] Run: `npm install`
 - [ ] Run: `npm start`
-- [ ] Verify server starts on http://localhost:3000
+- [ ] Verify server starts on http://localhost:8080
 - [ ] Test login and campaign creation
 
 ### Test Environment 3: Linux (Optional)
@@ -114,7 +114,7 @@ t2k-gm-tool/
 
 ## Security Verification
 
-- [ ] No hardcoded passwords in code (except admin/admin default)
+- [ ] No hardcoded default credentials
 - [ ] No API keys or tokens in files
 - [ ] No database credentials exposed
 - [ ] Package.json has no malicious dependencies
@@ -140,7 +140,7 @@ t2k-gm-tool/
 ## Deployment Package Size
 
 - [ ] Uncompressed: ~650 KB
-- [ ] Compressed (.zip): ~200 KB
+- [ ] Compressed (.zip): approximately 1.82 MB
 - [ ] npm install adds: ~250 MB (node_modules)
 - [ ] Total installed: ~250 MB
 - [ ] With sample data: ~300 MB
@@ -158,7 +158,7 @@ t2k-gm-tool/
 - [ ] Troubleshooting section covers:
   - [ ] Node.js not found
   - [ ] npm errors
-  - [ ] Port 3000 conflicts
+  - [ ] Port 8080 conflicts
   - [ ] Server won't start
   - [ ] Browser connection issues
   - [ ] Database errors
@@ -273,9 +273,9 @@ t2k-gm-tool/
 
 ✅ **Installation is successful if:**
 - User can run INSTALL_SERVER.bat without errors
-- Server starts and listens on http://localhost:3000
+- Server starts and listens on http://localhost:8080
 - Browser can connect and see login page
-- User can log in with admin/admin
+- User can create the GM account with token.txt
 - User can create a campaign
 - Data persists across server restart
 - No errors in browser console
@@ -301,14 +301,14 @@ t2k-gm-tool/
 ## Deployment Sign-Off
 
 **Date:** ________________
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Release Manager:** ________________
 **Technical Lead:** ________________
 **QA Lead:** ________________
 
 All items checked and verified. Ready for deployment.
 
-**Distribution:** 
+**Distribution:**
 - [ ] GitHub Release
 - [ ] Direct Download Link
 - [ ] Package Repository
