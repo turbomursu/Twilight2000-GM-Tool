@@ -1,0 +1,411 @@
+{
+  "$schema": "NPC Archetype Templates for Twilight: 2000 Fourth Edition",
+  "source": "Referee's Manual — Typical NPCs Table",
+  "archetypes": [
+    {
+      "id": "civilian-refugee",
+      "name": "Refugee",
+      "category": "civilian",
+      "description": "Displaced person, minimal survival skills",
+      "attributes": {
+        "strength": "C",
+        "agility": "C",
+        "intelligence": "C",
+        "empathy": "C"
+      },
+      "hitCap": 4,
+      "cuf": "D",
+      "skills": [
+        { "name": "Recon", "rating": "D" },
+        { "name": "Survival", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "Club or knife", "category": "weapon", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "civilian-noncombatant",
+      "name": "Civilian",
+      "category": "civilian",
+      "description": "Ordinary person with basic skills",
+      "attributes": {
+        "strength": "C",
+        "agility": "C",
+        "intelligence": "C",
+        "empathy": "D"
+      },
+      "hitCap": 4,
+      "cuf": "D",
+      "skills": [
+        { "name": "Close Combat", "rating": "D" },
+        { "name": "Driving", "rating": "D" },
+        { "name": "Ranged Combat", "rating": "D" },
+        { "name": "Recon", "rating": "D" }
+      ],
+      "equipment": [
+        { "name": "Pistol or shotgun with one reload", "category": "weapon", "weight": "2.5" }
+      ]
+    },
+    {
+      "id": "civilian-hunter",
+      "name": "Hunter",
+      "category": "civilian",
+      "description": "Skilled outdoorsman with hunting experience",
+      "attributes": {
+        "strength": "C",
+        "agility": "B",
+        "intelligence": "C",
+        "empathy": "D"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Close Combat", "rating": "D" },
+        { "name": "Driving", "rating": "D" },
+        { "name": "Ranged Combat", "rating": "D" }
+      ],
+      "equipment": [
+        { "name": "Hunting rifle with one reload or hunting bow with 36 arrows", "category": "weapon", "weight": "4.5" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "civilian-marauder",
+      "name": "Marauder",
+      "category": "civilian",
+      "description": "Armed scavenger or raider",
+      "attributes": {
+        "strength": "B",
+        "agility": "C",
+        "intelligence": "C",
+        "empathy": "D"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Close Combat", "rating": "B" },
+        { "name": "Driving", "rating": "D" },
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "Assault rifle", "category": "weapon", "weight": "3.9" },
+        { "name": "Hunting knife", "category": "weapon", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "us-soldier",
+      "name": "US Soldier",
+      "category": "us-military",
+      "description": "Standard US Army enlisted soldier",
+      "attributes": {
+        "strength": "B",
+        "agility": "B",
+        "intelligence": "C",
+        "empathy": "C"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Close Combat", "rating": "C" },
+        { "name": "Driving", "rating": "C" },
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "M16A1 with one reload", "category": "weapon", "weight": "4.3" },
+        { "name": "Bayonet", "category": "weapon", "weight": "0.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "us-officer",
+      "name": "US Officer",
+      "category": "us-military",
+      "description": "US Army officer (Lieutenant, Captain, or above)",
+      "attributes": {
+        "strength": "C",
+        "agility": "B",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" },
+        { "name": "Command", "rating": "C" },
+        { "name": "Persuasion", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "M9 pistol with one reload", "category": "weapon", "weight": "1.2" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "us-special-forces",
+      "name": "US Special Forces",
+      "category": "us-military",
+      "description": "Highly trained US special operations soldier",
+      "attributes": {
+        "strength": "B",
+        "agility": "A",
+        "intelligence": "B",
+        "empathy": "C"
+      },
+      "hitCap": 6,
+      "cuf": "B",
+      "skills": [
+        { "name": "Close Combat", "rating": "B" },
+        { "name": "Ranged Combat", "rating": "B" },
+        { "name": "Recon", "rating": "B" }
+      ],
+      "equipment": [
+        { "name": "M4A1 with two reloads", "category": "weapon", "weight": "3.8" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "us-intelligence",
+      "name": "US Intelligence",
+      "category": "us-military",
+      "description": "US military intelligence officer or specialist",
+      "attributes": {
+        "strength": "C",
+        "agility": "B",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 5,
+      "cuf": "B",
+      "skills": [
+        { "name": "Close Combat", "rating": "C" },
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "B" },
+        { "name": "Persuasion", "rating": "B" }
+      ],
+      "equipment": [
+        { "name": "M9 pistol with one reload", "category": "weapon", "weight": "1.2" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "soviet-soldier",
+      "name": "Soviet Soldier",
+      "category": "soviet-military",
+      "description": "Standard Soviet Red Army enlisted soldier",
+      "attributes": {
+        "strength": "C",
+        "agility": "C",
+        "intelligence": "C",
+        "empathy": "C"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Close Combat", "rating": "D" },
+        { "name": "Driving", "rating": "C" },
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "AK-74 with one reload", "category": "weapon", "weight": "3.3" },
+        { "name": "Bayonet", "category": "weapon", "weight": "0.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" },
+        { "name": "Steel helmet", "category": "armor", "weight": "1.5" }
+      ]
+    },
+    {
+      "id": "soviet-officer",
+      "name": "Soviet Officer",
+      "category": "soviet-military",
+      "description": "Soviet Red Army officer (Lieutenant, Captain, or above)",
+      "attributes": {
+        "strength": "B",
+        "agility": "B",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" },
+        { "name": "Command", "rating": "C" },
+        { "name": "Persuasion", "rating": "D" }
+      ],
+      "equipment": [
+        { "name": "PM pistol with one reload", "category": "weapon", "weight": "0.8" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "soviet-elite",
+      "name": "Soviet Elite",
+      "category": "soviet-military",
+      "description": "Highly trained Soviet soldier or Spetsnaz operator",
+      "attributes": {
+        "strength": "B",
+        "agility": "A",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 6,
+      "cuf": "B",
+      "skills": [
+        { "name": "Close Combat", "rating": "B" },
+        { "name": "Ranged Combat", "rating": "B" },
+        { "name": "Recon", "rating": "B" }
+      ],
+      "equipment": [
+        { "name": "AK-74 with two reloads", "category": "weapon", "weight": "3.3" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "soviet-spetsnaz",
+      "name": "Soviet Spetsnaz",
+      "category": "soviet-military",
+      "description": "Elite Soviet special operations trooper",
+      "attributes": {
+        "strength": "B",
+        "agility": "A",
+        "intelligence": "A",
+        "empathy": "B"
+      },
+      "hitCap": 6,
+      "cuf": "B",
+      "skills": [
+        { "name": "Close Combat", "rating": "B" },
+        { "name": "Ranged Combat", "rating": "B" },
+        { "name": "Recon", "rating": "B" }
+      ],
+      "equipment": [
+        { "name": "AK-74 with two reloads", "category": "weapon", "weight": "3.3" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "israeli-soldier",
+      "name": "Israeli Soldier",
+      "category": "other-military",
+      "description": "Israeli Defense Force enlisted soldier",
+      "attributes": {
+        "strength": "B",
+        "agility": "B",
+        "intelligence": "C",
+        "empathy": "C"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Close Combat", "rating": "C" },
+        { "name": "Driving", "rating": "C" },
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "Uzi with one reload", "category": "weapon", "weight": "3.5" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "israeli-officer",
+      "name": "Israeli Officer",
+      "category": "other-military",
+      "description": "Israeli Defense Force officer",
+      "attributes": {
+        "strength": "C",
+        "agility": "B",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Ranged Combat", "rating": "D" },
+        { "name": "Driving", "rating": "D" },
+        { "name": "Command", "rating": "C" },
+        { "name": "Persuasion", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "Uzi or .38 Special pistol with one reload", "category": "weapon", "weight": "1.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "israeli-elite",
+      "name": "Israeli Elite",
+      "category": "other-military",
+      "description": "Israeli special forces operator",
+      "attributes": {
+        "strength": "B",
+        "agility": "A",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 6,
+      "cuf": "B",
+      "skills": [
+        { "name": "Close Combat", "rating": "B" },
+        { "name": "Ranged Combat", "rating": "B" },
+        { "name": "Recon", "rating": "B" }
+      ],
+      "equipment": [
+        { "name": "AK-74 with two reloads", "category": "weapon", "weight": "3.3" },
+        { "name": "Knife", "category": "weapon", "weight": "0.5" },
+        { "name": "Frag grenades", "category": "weapon", "quantity": "2", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "british-soldier",
+      "name": "British Soldier",
+      "category": "other-military",
+      "description": "British Army enlisted soldier",
+      "attributes": {
+        "strength": "B",
+        "agility": "B",
+        "intelligence": "C",
+        "empathy": "C"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Close Combat", "rating": "D" },
+        { "name": "Driving", "rating": "C" },
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "SA80 with one reload", "category": "weapon", "weight": "4.1" },
+        { "name": "Bayonet", "category": "weapon", "weight": "0.5" }
+      ]
+    },
+    {
+      "id": "british-officer",
+      "name": "British Officer",
+      "category": "other-military",
+      "description": "British Army officer",
+      "attributes": {
+        "strength": "C",
+        "agility": "B",
+        "intelligence": "B",
+        "empathy": "B"
+      },
+      "hitCap": 5,
+      "cuf": "C",
+      "skills": [
+        { "name": "Ranged Combat", "rating": "C" },
+        { "name": "Recon", "rating": "C" },
+        { "name": "Command", "rating": "C" },
+        { "name": "Persuasion", "rating": "C" }
+      ],
+      "equipment": [
+        { "name": "P-88 pistol with one reload", "category": "weapon", "weight": "1.0" }
+      ]
+    }
+  ]
+}
