@@ -94,8 +94,11 @@ if (-not (Test-Path "data")) {
 if (-not (Test-Path "data\maps")) {
     New-Item -ItemType Directory -Path "data\maps" | Out-Null
 }
+if (-not (Test-Path "data\maps\atlas")) {
+    New-Item -ItemType Directory -Path "data\maps\atlas" | Out-Null
+}
 Write-Host "       ✓ Created /data directory for campaigns"
-Write-Host "       ✓ Created /data/maps for PMTiles basemaps"
+Write-Host "       ✓ Created /data/maps/atlas for PMTiles atlases"
 
 # Step 6: Create the first-run GM bootstrap token
 Write-Host ""

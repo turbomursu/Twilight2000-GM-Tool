@@ -412,9 +412,9 @@ All campaign data is stored in the `data/` folder:
 
 ```
 data/
-├── campaigns.db          (SQLite database - all campaigns)
-├── maps/                 (PMTiles basemaps)
-└── backups/              (automatic backups)
+├── maps/atlas/            (PMTiles archives and matching JSON sidecars)
+├── backups/               (automatic backups)
+└── fieldbook.sqlite       (SQLite database - all campaigns)
 ```
 
 ### Automatic Backups
@@ -449,16 +449,11 @@ If your data is corrupted:
    ```
 3. **Restart the server**
 
-### PMTiles Basemaps
+### PMTiles Atlases
 
-To use custom offline maps:
+Use only a GM-provided archive whose license permits local server and player use. Check the source's terms and enter its exact required attribution and HTTPS license URL in Campaign Setup; the tool records and displays these details but does not verify rights.
 
-1. Obtain PMTiles archive from GM
-   - Format: `.pmtiles`
-   - Typical size: 50-500 MB
-2. **Place in:** `data/maps/`
-3. **Restart the server**
-4. Maps are automatically detected and served with byte-range support
+Campaign Setup accepts PMTiles v3 MVT vector archives and PNG, JPEG, WebP, or AVIF raster archives (50 MiB upload limit). Archives and their matching JSON sidecars are stored in `data/maps/atlas/`; the server serves them with byte-range support. Keep the `.pmtiles` and `.json` files together when backing up or migrating. Editable campaign GeoJSON and setup packages remain separate.
 
 ### Exporting Campaign Data
 

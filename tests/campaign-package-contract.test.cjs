@@ -35,11 +35,19 @@ test("accepts optional offline raster PMTiles metadata with attribution", () => 
   assert.equal(assertCampaignSetupPackage(input), true);
 });
 
+test("accepts vector PMTiles metadata with an HTTPS license URL", () => {
+  const input = validPackage();
+  input.map.offlineBasemap = { format: "vector-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000",
+    attribution: "Required map credit", licenseUrl: "https://maps.example.test/license" };
+  assert.equal(assertCampaignSetupPackage(input), true);
+});
+
 test("rejects unsafe or incomplete offline basemap metadata", () => {
   for (const offlineBasemap of [
     { format: "raster-pmtiles", assetId: "../private", attribution: "Map" },
     { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: " " },
     { format: "vector-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Map" },
+    { format: "vector-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Map", licenseUrl: "http://maps.example.test/license" },
     { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Map", url: "https://example.test/tiles.pmtiles" }
   ]) {
     const input = validPackage();

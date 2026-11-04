@@ -1,4 +1,6 @@
 node_modules/
 data/offline-basemaps/*.pmtiles
 data/offline-basemaps/*.json
+data/maps/atlas/*.pmtiles
+data/maps/atlas/*.json
 token.txt

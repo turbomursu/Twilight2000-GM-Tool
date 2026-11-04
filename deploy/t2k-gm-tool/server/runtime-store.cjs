@@ -1343,7 +1343,8 @@ function importSetupPackage(database, sourceJson, options = {}) {
         Number.isFinite(input.map.zoom) ? input.map.zoom : 10,
         input.map.fieldPapersAtlas ? JSON.stringify(input.map.fieldPapersAtlas) : null,
         JSON.stringify(input.map.offlineAnnotations),
-        input.map.offlineBasemap ? JSON.stringify({ assetId: input.map.offlineBasemap.assetId, format: input.map.offlineBasemap.format, attribution: input.map.offlineBasemap.attribution }) : null,
+        input.map.offlineBasemap ? JSON.stringify({ assetId: input.map.offlineBasemap.assetId, format: input.map.offlineBasemap.format,
+          attribution: input.map.offlineBasemap.attribution, ...(input.map.offlineBasemap.licenseUrl ? { licenseUrl: input.map.offlineBasemap.licenseUrl } : {}) }) : null,
         typeof input.map.attribution === "string" ? input.map.attribution : "");
 
     const insertTerrain = database.prepare(`INSERT INTO terrain_cells

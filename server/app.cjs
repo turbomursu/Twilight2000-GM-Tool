@@ -22,8 +22,14 @@ const PROTECTED_FILES = new Map([
   ["/player-interface-concepts.html", ["player-interface-concepts.html", "text/html; charset=utf-8"]],
   ["/vendor/leaflet.js", ["node_modules/leaflet/dist/leaflet.js", "text/javascript; charset=utf-8"]],
   ["/vendor/leaflet.css", ["node_modules/leaflet/dist/leaflet.css", "text/css; charset=utf-8"]],
+  ["/vendor/maplibre-gl.mjs", ["node_modules/maplibre-gl/dist/maplibre-gl.mjs", "text/javascript; charset=utf-8"]],
+  ["/vendor/maplibre-gl-shared.mjs", ["node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs", "text/javascript; charset=utf-8"]],
+  ["/vendor/maplibre-gl-worker.mjs", ["node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs", "text/javascript; charset=utf-8"]],
+  ["/vendor/maplibre-gl.css", ["node_modules/maplibre-gl/dist/maplibre-gl.css", "text/css; charset=utf-8"]],
+  ["/vendor/leaflet-maplibre-gl.js", ["node_modules/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js", "text/javascript; charset=utf-8"]],
   ["/vendor/pmtiles.js", ["node_modules/pmtiles/dist/pmtiles.js", "text/javascript; charset=utf-8"]],
   ["/campaign-package-contract.js", ["campaign-package-contract.js", "text/javascript; charset=utf-8"]],
+  ["/vector-atlas-client.js", ["vector-atlas-client.js", "text/javascript; charset=utf-8"]],
   ["/auth-client.js", ["auth-client.js", "text/javascript; charset=utf-8"]],
   ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]],
   ["/situation-report-client.js", ["situation-report-client.js", "text/javascript; charset=utf-8"]],
@@ -60,7 +66,14 @@ function sendText(response, status, contentType, body, headOnly = false) {
   response.end(headOnly ? undefined : body);
 }
 
-function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort }) {
+function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort }) {
+  const offlineBasemapDirectories = [...new Set([offlineBasemapDir, legacyOfflineBasemapDir])];
+  function findOfflineBasemapDirectory(assetId, ownerAccountId = null) {
+    return offlineBasemapDirectories.find((directory) => {
+      const metadata = getOfflineBasemapMetadata(directory, assetId);
+      return metadata && (!ownerAccountId || metadata.ownerAccountId === ownerAccountId);
+    }) || null;
+  }
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);
@@ -104,7 +117,8 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
       const publication = getPlayerMap(database, account.id, campaignId);
       const assetId = publication?.map?.offlineBasemap?.assetId;
       if (!assetId) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", request.method === "HEAD");
-      if (sendOfflineBasemap(request, response, offlineBasemapDir, assetId, request.method === "HEAD")) return;
+      const directory = findOfflineBasemapDirectory(assetId);
+      if (directory && sendOfflineBasemap(request, response, directory, assetId)) return;
       return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", request.method === "HEAD");
     }
     if (PLAYER_API_PATH.test(url.pathname)) return playerHandler(request, response);
@@ -143,9 +157,9 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
     if (basemapMatch) {
       if (!account) return sendText(response, 401, "text/plain; charset=utf-8", "Authentication required.", headOnly);
       if (!ASSET_ID_PATTERN.test(basemapMatch[1])) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
-      const metadata = getOfflineBasemapMetadata(offlineBasemapDir, basemapMatch[1]);
-      if (!metadata || metadata.ownerAccountId !== account.id) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
-      if (sendOfflineBasemap(request, response, offlineBasemapDir, basemapMatch[1])) return;
+      const directory = findOfflineBasemapDirectory(basemapMatch[1], account.id);
+      if (!directory) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+      if (sendOfflineBasemap(request, response, directory, basemapMatch[1])) return;
       return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
     }
 

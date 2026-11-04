@@ -275,7 +275,7 @@ Each milestone is a **self-contained system** that can be developed and tested i
 
 ### 🔧 Milestone 5: Operational Reliability — Backup & Asset Management
 
-**Status:** ✅ **COMPLETE** (Backup/restore + scheduled automation + PMTiles asset serving all complete — 02 Nov 2026)
+**Status:** ✅ **COMPLETE** (Backup/restore + scheduled automation + PMTiles asset serving all complete — 04 Nov 2026)
 
 #### **5a: Scheduled Backup Automation** ✅ **COMPLETE (Phase 1-3)**
 
@@ -337,7 +337,7 @@ Each milestone is a **self-contained system** that can be developed and tested i
 - [ ] Restore controls and version browser in GM interface
 - [ ] Backup size metrics and storage management UI
 
-#### **5b: PMTiles Asset Serving** (✅ Complete — 02 Nov 2026)
+#### **5b: PMTiles Asset Serving** (✅ Complete — 04 Nov 2026)
 
 **Scope:**
 - [x] PMTiles asset serving with byte-range support
@@ -364,6 +364,8 @@ Each milestone is a **self-contained system** that can be developed and tested i
 7. Basemap lifecycle verified end-to-end: setup package → import → storage → retrieval → restore
 
 **Parallel Development:** Complete. Ready for next milestone.
+
+**Atlas import update (04 Nov 2026):** Uploads now detect raster versus MVT vector PMTiles v3 and store archives plus JSON sidecars in `data/maps/atlas/`. Vector tiles render through local MapLibre libraries with a basic default style. New uploads require GM-entered required attribution and an HTTPS license URL; both are carried through setup import and shown on published maps. This records the GM's license review but does not independently verify rights. No real licensed archive has yet been used for end-to-end rendering verification.
 
 ---
 
@@ -703,7 +705,7 @@ Integration check (01 Nov 2026): combined recovery, cross-host runtime import wi
 - Add a Player Interface situation report backed only by a deliberately constructed player-visible projection.
 - Implemented text-only slice: owning GM draft, preview, publish, and withdraw; active assigned players receive only title, body, game time, and publication timestamp. Draft edits do not affect the current player copy. Visible handset reports refresh every 15 seconds and on explicit refresh; push delivery remains planned. Runtime backup restores the draft and withdraws publication, never silently resurrecting withdrawn content.
 - Let the GM publish the Setup Tool map with GM-managed markings, route, and player position. Give players scroll access and zoom up to 200%, with map open/reset centered on their position, without allowing them to change campaign map state.
-- Implemented map slice: GM selection of locations, labeled point markings, bounded LineString/single-ring Polygon geometry, ordered selected-location waypoints, and bounded player position. Geometry vertices are checked against Setup bounds. Explicit publication can reveal selected source GM-only locations; unselected records remain excluded. Read-only assigned-player output uses an allow-list and no raw annotations or setup export. Optional raster PMTiles assets are served with byte ranges through authorized routes. Map drafts participate in runtime backup, but archive files remain sidecars and must be transferred separately. Vector PMTiles styles, fog masking, history, and push delivery remain planned.
+- Implemented map slice: GM selection of locations, labeled point markings, bounded LineString/single-ring Polygon geometry, ordered selected-location waypoints, and bounded player position. Geometry vertices are checked against Setup bounds. Explicit publication can reveal selected source GM-only locations; unselected records remain excluded. Read-only assigned-player output uses an allow-list and no raw annotations or setup export. Optional raster or MVT vector PMTiles assets are served with byte ranges through authorized routes; vector archives use a basic local style. Attribution and HTTPS license URL travel with setup/runtime metadata and appear on published maps. The GM must confirm permitted use; license rights are not machine-verified. Map drafts participate in runtime backup, but archive files and JSON sidecars remain separate and must be transferred together. Rich vector styles, fog masking, history, and push delivery remain planned.
 - Allow players to send a single-line COMMS message to the GM and all player seats; record player identity, campaign game time, and message content.
 - Implemented single-line slice: player/GM broadcasts retain server sender and date/day/time snapshots. Historical date-only stamps stay unchanged. Archives recover atomically; visible views poll every 15 seconds. Push delivery, receipts, and moderation remain planned.
 - Support 1-4 authenticated player seats, each assigned one character and an independent browser session.

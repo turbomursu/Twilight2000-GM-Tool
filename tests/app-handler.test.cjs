@@ -105,7 +105,10 @@ test("serves protected pages only for an active session and gates them again aft
   assert.equal(weatherRules.status, 200);
   assert.match(weatherRules.headers.get("content-type"), /text\/javascript/);
   assert.match(await weatherRules.text(), /Rain\/Snow/);
-  for (const [path, contentType] of [["/vendor/leaflet.js", /text\/javascript/], ["/vendor/leaflet.css", /text\/css/], ["/vendor/pmtiles.js", /text\/javascript/]]) {
+  for (const [path, contentType] of [["/vendor/leaflet.js", /text\/javascript/], ["/vendor/leaflet.css", /text\/css/],
+    ["/vendor/pmtiles.js", /text\/javascript/], ["/vendor/maplibre-gl.mjs", /text\/javascript/],
+    ["/vendor/maplibre-gl-worker.mjs", /text\/javascript/], ["/vendor/leaflet-maplibre-gl.js", /text\/javascript/],
+    ["/vendor/maplibre-gl.css", /text\/css/], ["/vector-atlas-client.js", /text\/javascript/]]) {
     const asset = await fetch(`${origin}${path}`, { headers: { Cookie: cookie } });
     assert.equal(asset.status, 200);
     assert.match(asset.headers.get("content-type"), contentType);
@@ -186,6 +189,7 @@ test("offline PMTiles upload is GM-only and serves authenticated byte ranges", a
   const archive = Buffer.alloc(256);
   archive.write("PMTiles", 0, "ascii");
   archive[7] = 3;
+  archive[99] = 2;
   for (let index = 127; index < archive.length; index += 1) archive[index] = index % 251;
   const uploaded = await fetch(`${origin}/api/offline-basemaps`, {
     method: "POST", headers: { "Content-Type": "application/vnd.pmtiles", Cookie: gmCookie }, body: archive
@@ -193,6 +197,8 @@ test("offline PMTiles upload is GM-only and serves authenticated byte ranges", a
   assert.equal(uploaded.status, 201);
   const { asset } = await uploaded.json();
   assert.equal(asset.byteLength, archive.length);
+  assert.equal(asset.format, "raster-pmtiles");
+  assert.equal(JSON.parse(readFileSync(join(offlineBasemapDir, `${asset.assetId}.json`), "utf8")).format, "raster-pmtiles");
   const path = `${origin}/offline-basemaps/${asset.assetId}.pmtiles`;
   assert.equal((await fetch(path)).status, 401);
   assert.equal((await fetch(path, { headers: { Cookie: playerCookie, Range: "bytes=7-15" } })).status, 404);
@@ -204,4 +210,12 @@ test("offline PMTiles upload is GM-only and serves authenticated byte ranges", a
   assert.equal(whole.status, 200);
   assert.deepEqual(Buffer.from(await whole.arrayBuffer()), archive);
   assert.equal((await fetch(`${origin}/offline-basemaps/..%2f..%2fpackage.json.pmtiles`, { headers: { Cookie: gmCookie } })).status, 404);
+
+  const vectorArchive = Buffer.from(archive);
+  vectorArchive[99] = 1;
+  const vectorUpload = await fetch(`${origin}/api/offline-basemaps`, {
+    method: "POST", headers: { "Content-Type": "application/vnd.pmtiles", Cookie: gmCookie }, body: vectorArchive
+  });
+  assert.equal(vectorUpload.status, 201);
+  assert.equal((await vectorUpload.json()).asset.format, "vector-pmtiles");
 });
