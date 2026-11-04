@@ -15,7 +15,13 @@ const password = "A-correct-horse-battery-41";
 async function startApp(t, options = {}) {
   const database = openRuntimeDatabase();
   const authHandler = createAuthHandler({ database, bootstrapToken });
-  const server = http.createServer(createAppHandler({ database, authHandler, offlineBasemapDir: options.offlineBasemapDir }));
+  const server = http.createServer(createAppHandler({
+    database,
+    authHandler,
+    offlineBasemapDir: options.offlineBasemapDir,
+    surfaceRole: options.surfaceRole,
+    otherPort: options.otherPort
+  }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => new Promise((resolve) => server.close(() => {
@@ -124,6 +130,34 @@ test("serves protected pages only for an active session and gates them again aft
   const blockedAgain = await fetch(`${origin}/index.html`, { headers: { Cookie: cookie }, redirect: "manual" });
   assert.equal(blockedAgain.status, 302);
   assert.equal(blockedAgain.headers.get("location"), "/login.html?next=%2Findex.html");
+});
+
+test("keeps authenticated GM pages and APIs on the GM server port", async (t) => {
+  const { origin, database } = await startApp(t, { surfaceRole: "player", otherPort: 8081, includeDatabase: true });
+  const bootstrapResponse = await bootstrap(origin);
+  const gmCookie = bootstrapResponse.headers.get("set-cookie").split(";")[0];
+  const gmAccount = database.prepare("SELECT * FROM accounts WHERE login_identifier = 'gm-user'").get();
+  database.prepare(`INSERT INTO accounts
+    (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at)
+    VALUES (?, ?, ?, 'player', ?, ?, ?)`).run("port-player", "port-player", gmAccount.password_hash, gmAccount.id, gmAccount.created_at, gmAccount.updated_at);
+  const playerLogin = await fetch(`${origin}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "port-player", password })
+  });
+  const playerCookie = playerLogin.headers.get("set-cookie").split(";")[0];
+
+  const playerPage = await fetch(`${origin}/player-interface.html`, { headers: { Cookie: playerCookie } });
+  assert.equal(playerPage.status, 200);
+
+  const page = await fetch(`${origin}/index.html`, { headers: { Cookie: gmCookie }, redirect: "manual" });
+  assert.equal(page.status, 302);
+  const destination = new URL(page.headers.get("location"));
+  assert.equal(destination.port, "8081");
+  assert.equal(destination.pathname, "/index.html");
+
+  const api = await fetch(`${origin}/api/campaigns`, { headers: { Cookie: gmCookie } });
+  assert.equal(api.status, 403);
 });
 
 test("offline PMTiles upload is GM-only and serves authenticated byte ranges", async (t) => {

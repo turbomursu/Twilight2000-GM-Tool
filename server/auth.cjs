@@ -146,8 +146,8 @@ function normalizeUsername(value) {
 }
 
 function validatePassword(value) {
-  if (typeof value !== "string" || Buffer.byteLength(value, "utf8") < 14 || Buffer.byteLength(value, "utf8") > 128) {
-    throw new HttpError(400, "Password must be between 14 and 128 bytes.");
+  if (typeof value !== "string" || value.length < 8 || Buffer.byteLength(value, "utf8") > 128) {
+    throw new HttpError(400, "Password must be at least 8 characters and at most 128 bytes.");
   }
   return value;
 }

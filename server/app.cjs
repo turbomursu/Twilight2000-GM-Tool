@@ -66,7 +66,7 @@ function sendText(response, status, contentType, body, headOnly = false) {
   response.end(headOnly ? undefined : body);
 }
 
-function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps") }) {
+function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort }) {
   const offlineBasemapDirectories = [...new Set([offlineBasemapDir, legacyOfflineBasemapDir])];
   function findOfflineBasemapDirectory(assetId, ownerAccountId = null) {
     return offlineBasemapDirectories.find((directory) => {
@@ -87,6 +87,23 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
         response.writeHead(302, { Location: "/login.html?passwordChange=1", "Cache-Control": "no-store" });
         return response.end();
       }
+    }
+    if (account && surfaceRole && account.role !== surfaceRole) {
+      if (url.pathname.startsWith("/api/")) {
+        return sendText(response, 403, "application/json; charset=utf-8", JSON.stringify({ error: `Use the ${account.role === "player" ? "player" : "GM"} server port.` }));
+      }
+      let destination;
+      try {
+        const requestOrigin = new URL(`http://${request.headers.host}`);
+        const targetPort = typeof otherPort === "function" ? otherPort() : otherPort;
+        if (!targetPort) throw new Error();
+        destination = new URL(`${url.pathname}${url.search}`, requestOrigin);
+        destination.port = String(targetPort);
+      } catch {
+        return sendText(response, 421, "text/plain; charset=utf-8", "Use the server port assigned to your account.", request.method === "HEAD");
+      }
+      response.writeHead(302, { Location: destination.href, "Cache-Control": "no-store" });
+      return response.end();
     }
     if (CAMPAIGN_PATH.test(url.pathname)) return campaignHandler(request, response);
     const playerBasemapMatch = url.pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map-basemap$/);
