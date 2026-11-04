@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#18251e">
   <title>Campaign Setup | Fieldbook</title>
   <link rel="stylesheet" href="/vendor/leaflet.css">
+  <link rel="stylesheet" href="/vendor/maplibre-gl.css">
   <style>
     :root {
       color-scheme: light;
@@ -134,7 +135,7 @@
     .offline-basemap-tools { display: grid; gap: 10px; margin-top: 12px; padding: 13px; border: 1px solid #96a394; background: #e5eae2; }
     .offline-basemap-tools h3 { margin: 0; font: 700 12px var(--mono); text-transform: uppercase; }
     .offline-basemap-tools p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
-    .offline-basemap-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.3fr) auto; align-items: end; gap: 9px; }
+    .offline-basemap-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 9px; }
     .fieldpapers-preview[hidden] { display: none; }
     .map-workspace[hidden] { display: none; }
     #fieldpapers-file { display: none; }
@@ -300,10 +301,10 @@
         </section>
 
         <section class="setup-panel" data-panel="map" aria-labelledby="map-title" hidden>
-          <div class="panel-heading"><div><span class="eyebrow">02 / Base map</span><h2 id="map-title">Import atlas</h2></div><span class="eyebrow">Field Papers GeoJSON</span></div>
+          <div class="panel-heading"><div><span class="eyebrow">02 / Base map</span><h2 id="map-title">Import atlas</h2></div><span class="eyebrow">Field Papers + PMTiles</span></div>
           <div class="panel-body">
             <section class="fieldpapers-tools" aria-label="Field Papers atlas import"><div><strong>Import the base atlas</strong><p>Choose the atlas GeoJSON downloaded from Field Papers. It supplies the geographic bounds and page layout; the printable PDF is the offline map image.</p></div><div class="fieldpapers-actions"><button class="button button-primary" type="button" id="choose-fieldpapers-file">Import atlas GeoJSON</button><input id="fieldpapers-file" type="file" accept=".json,.geojson,application/json,application/geo+json"></div><p class="fieldpapers-status" id="fieldpapers-status" role="status">Import a Field Papers atlas GeoJSON to continue.</p><div class="fieldpapers-atlas-meta" id="fieldpapers-atlas-meta" hidden></div><div class="fieldpapers-preview" id="fieldpapers-import-preview" hidden><span class="fieldpapers-status" id="fieldpapers-import-summary"></span><button class="button button-primary" type="button" id="apply-fieldpapers-import" disabled>Apply imported atlas</button></div></section>
-            <section class="offline-basemap-tools" aria-label="Offline basemap asset"><div><h3>Offline interactive basemap / raster PMTiles</h3><p>Upload a licensed raster PMTiles archive. It is stored locally on this GM server and can be used without public map tiles. Keep the provider attribution with the archive.</p></div><div class="offline-basemap-fields"><label class="field"><span class="field-label">Required attribution</span><input id="offline-basemap-attribution" maxlength="300" placeholder="Map provider / license"></label><label class="field"><span class="field-label">PMTiles archive / max 50 MiB</span><input id="offline-basemap-file" type="file" accept=".pmtiles,application/vnd.pmtiles,application/octet-stream"></label><button class="button button-primary" type="button" id="upload-offline-basemap" disabled>Upload and use</button></div><div class="button-group"><button class="button" type="button" id="use-online-basemap">Use online OSM reference</button></div><p class="fieldpapers-status" id="offline-basemap-status" role="status">No offline basemap selected. Online OSM remains the reference layer.</p></section>
+            <section class="offline-basemap-tools" aria-label="Offline PMTiles atlas"><div><h3>Offline vector atlas / PMTiles</h3><p>Upload a GM-provided raster or MVT vector PMTiles v3 archive (50 MiB limit). Confirm its license permits local and player use; enter the required credit exactly and link the license terms. Rights are not automatically verified. Keep both archive and sidecar together in <code>data/maps/atlas/</code>.</p></div><div class="offline-basemap-fields"><label class="field"><span class="field-label">Required attribution / displayed on maps</span><input id="offline-basemap-attribution" maxlength="300" placeholder="Exact required map credit"></label><label class="field"><span class="field-label">License terms URL / HTTPS</span><input id="offline-basemap-license-url" type="url" maxlength="2048" placeholder="https://…"></label><label class="field"><span class="field-label">PMTiles archive / max 50 MiB</span><input id="offline-basemap-file" type="file" accept=".pmtiles,application/vnd.pmtiles,application/octet-stream"></label><button class="button button-primary" type="button" id="upload-offline-basemap" disabled>Upload and use</button></div><div class="fieldpapers-atlas-meta" id="offline-basemap-license-details" hidden></div><div class="button-group"><button class="button" type="button" id="use-online-basemap">Use online OSM reference</button></div><p class="fieldpapers-status" id="offline-basemap-status" role="status">No offline basemap selected. Online OSM remains the reference layer.</p></section>
             <div class="step-footer"><p class="feedback">Import the atlas before terrain assignment or location entry. The imported map stays in campaign data.</p><div class="button-group"><button class="button" type="button" data-go-step="brief">← Brief</button><button class="button button-primary" type="button" id="continue-to-terrain" data-go-step="terrain" disabled>Terrain →</button></div></div>
           </div>
         </section>
@@ -434,6 +435,7 @@
   <script src="/vendor/leaflet.js"></script>
   <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
+  <script src="vector-atlas-client.js"></script>
   <script src="/auth-client.js" defer></script>
   <script>
     (() => {
@@ -484,10 +486,12 @@
       const chooseFieldPapersFileButton = document.querySelector("#choose-fieldpapers-file");
       const fieldPapersFileInput = document.querySelector("#fieldpapers-file");
       const offlineBasemapAttributionInput = document.querySelector("#offline-basemap-attribution");
+      const offlineBasemapLicenseUrlInput = document.querySelector("#offline-basemap-license-url");
       const offlineBasemapFileInput = document.querySelector("#offline-basemap-file");
       const uploadOfflineBasemapButton = document.querySelector("#upload-offline-basemap");
       const useOnlineBasemapButton = document.querySelector("#use-online-basemap");
       const offlineBasemapStatus = document.querySelector("#offline-basemap-status");
+      const offlineBasemapLicenseDetails = document.querySelector("#offline-basemap-license-details");
       const fieldPapersStatus = document.querySelector("#fieldpapers-status");
       const fieldPapersAtlasMeta = document.querySelector("#fieldpapers-atlas-meta");
       const fieldPapersImportPreview = document.querySelector("#fieldpapers-import-preview");
@@ -717,11 +721,15 @@
 
       function normalizeOfflineBasemap(basemap) {
         if (basemap === null || basemap === undefined) return null;
-        if (!isRecord(basemap) || Object.keys(basemap).length !== 3
-          || !Object.hasOwn(basemap, "format") || basemap.format !== "raster-pmtiles"
+        const hasLicenseUrl = isRecord(basemap) && Object.hasOwn(basemap, "licenseUrl");
+        if (!isRecord(basemap) || Object.keys(basemap).length !== (hasLicenseUrl ? 4 : 3)
+          || !Object.hasOwn(basemap, "format") || !["raster-pmtiles", "vector-pmtiles"].includes(basemap.format)
+          || (basemap.format === "vector-pmtiles" && !hasLicenseUrl)
           || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
-          || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) return null;
-        return { format: "raster-pmtiles", assetId: basemap.assetId, attribution: basemap.attribution.trim() };
+          || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300
+          || (hasLicenseUrl && !FieldbookVectorAtlas.validLicenseUrl(basemap.licenseUrl))) return null;
+        return { format: basemap.format, assetId: basemap.assetId, attribution: basemap.attribution.trim(),
+          ...(hasLicenseUrl ? { licenseUrl: FieldbookVectorAtlas.validLicenseUrl(basemap.licenseUrl) } : {}) };
       }
 
       function renderFieldPapersAtlas() {
@@ -752,13 +760,25 @@
 
       function renderOfflineBasemapControls() {
         const basemap = state.map.offlineBasemap;
+        offlineBasemapLicenseDetails.replaceChildren();
+        offlineBasemapLicenseDetails.hidden = !basemap?.licenseUrl;
         if (basemap) {
           offlineBasemapAttributionInput.value = basemap.attribution;
-          offlineBasemapStatus.textContent = `Offline raster archive selected / ${basemap.assetId}.pmtiles / ${basemap.attribution}`;
+          if (basemap.licenseUrl) {
+            offlineBasemapLicenseUrlInput.value = basemap.licenseUrl;
+            const licenseLink = document.createElement("a");
+            licenseLink.href = basemap.licenseUrl;
+            licenseLink.target = "_blank";
+            licenseLink.rel = "noopener noreferrer";
+            licenseLink.textContent = "Review license terms";
+            offlineBasemapLicenseDetails.append(licenseLink);
+          }
+          offlineBasemapStatus.textContent = `Offline ${basemap.format === "vector-pmtiles" ? "vector" : "raster"} archive selected / ${basemap.assetId}.pmtiles / ${basemap.attribution}`;
         } else {
           offlineBasemapStatus.textContent = "No offline basemap selected. Online OSM remains the reference layer.";
         }
-        uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim();
+        uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim()
+          || !FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim());
       }
 
       function renderMapBaseLayer() {
@@ -771,9 +791,26 @@
             return;
           }
           const archiveUrl = `/offline-basemaps/${encodeURIComponent(state.map.offlineBasemap.assetId)}.pmtiles`;
-          const archive = new window.pmtiles.PMTiles(archiveUrl);
-          baseMapLayer = window.pmtiles.leafletRasterLayer(archive, { attribution: escapeHtml(state.map.offlineBasemap.attribution) }).addTo(leafletMap);
-          baseMapLayer.on("tileerror", () => setMapStatus("Offline PMTiles archive is unavailable on this server.", "error"));
+          if (state.map.offlineBasemap.format === "vector-pmtiles") {
+            const selectedBasemap = state.map.offlineBasemap;
+            FieldbookVectorAtlas.createLayer(leafletMap, { ...selectedBasemap, assetUrl: archiveUrl },
+              (message) => setMapStatus(message, "error")).then((layer) => {
+                if (state.map.offlineBasemap !== selectedBasemap) leafletMap.removeLayer(layer);
+                else baseMapLayer = layer;
+              })
+              .catch((error) => setMapStatus(`Vector atlas unavailable: ${error.message}`, "error"));
+          } else {
+            const archive = new window.pmtiles.PMTiles(archiveUrl);
+            baseMapLayer = window.pmtiles.leafletRasterLayer(archive, {}).addTo(leafletMap);
+            baseMapLayer.on("tileerror", () => setMapStatus("Offline PMTiles archive is unavailable on this server.", "error"));
+          }
+          basemapAttribution = escapeHtml(state.map.offlineBasemap.attribution);
+          leafletMap.attributionControl.addAttribution(basemapAttribution);
+          const licenseUrl = FieldbookVectorAtlas.validLicenseUrl(state.map.offlineBasemap.licenseUrl);
+          if (licenseUrl) {
+            basemapLicenseAttribution = `<a href="${escapeHtml(licenseUrl)}" target="_blank" rel="noopener noreferrer">License terms</a>`;
+            leafletMap.attributionControl.addAttribution(basemapLicenseAttribution);
+          }
           return;
         }
         baseMapLayer = L.tileLayer(MAP_TILE_URL, {
@@ -2569,30 +2606,33 @@
       chooseFieldPapersFileButton.addEventListener("click", () => fieldPapersFileInput.click());
       applyFieldPapersImportButton.addEventListener("click", applyFieldPapersFeatures);
       offlineBasemapAttributionInput.addEventListener("input", renderOfflineBasemapControls);
+      offlineBasemapLicenseUrlInput.addEventListener("input", renderOfflineBasemapControls);
       offlineBasemapFileInput.addEventListener("change", renderOfflineBasemapControls);
       uploadOfflineBasemapButton.addEventListener("click", async () => {
         const file = offlineBasemapFileInput.files[0];
         const attribution = offlineBasemapAttributionInput.value.trim();
-        if (!file || !attribution) {
-          offlineBasemapStatus.textContent = "Choose an archive and enter its required attribution first.";
+        const licenseUrl = FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim());
+        if (!file || !attribution || !licenseUrl) {
+          offlineBasemapStatus.textContent = "Choose an archive, enter its required attribution, and provide an HTTPS license URL.";
           return;
         }
         uploadOfflineBasemapButton.disabled = true;
-        offlineBasemapStatus.textContent = "Uploading and validating raster PMTiles archive...";
+        offlineBasemapStatus.textContent = "Uploading and validating the PMTiles archive...";
         try {
           const response = await fetch("/api/offline-basemaps", { method: "POST",
             headers: { "Content-Type": "application/vnd.pmtiles" }, body: file });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || "Basemap upload failed.");
-          state.map.offlineBasemap = { format: "raster-pmtiles", assetId: result.asset.assetId, attribution };
+          state.map.offlineBasemap = { format: result.asset.format, assetId: result.asset.assetId, attribution, licenseUrl };
           saveDraft();
           renderOfflineBasemapControls();
           renderMapBaseLayer();
-          offlineBasemapStatus.textContent = `Offline basemap ready / ${result.asset.byteLength} bytes / ${attribution}`;
+          offlineBasemapStatus.textContent = `Offline ${result.asset.format === "vector-pmtiles" ? "vector" : "raster"} basemap ready / ${result.asset.byteLength} bytes / ${attribution}`;
         } catch (error) {
           offlineBasemapStatus.textContent = `Basemap not installed: ${error.message}`;
         } finally {
-          uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim();
+          uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim()
+            || !FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim());
         }
       });
       useOnlineBasemapButton.addEventListener("click", () => {

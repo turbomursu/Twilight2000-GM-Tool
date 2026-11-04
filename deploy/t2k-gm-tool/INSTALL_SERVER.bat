@@ -85,8 +85,9 @@ echo.
 echo [5/6] Setting up data directories...
 if not exist "data" mkdir data
 if not exist "data\maps" mkdir data\maps
+if not exist "data\maps\atlas" mkdir data\maps\atlas
 echo       ✓ Created /data directory for campaigns
-echo       ✓ Created /data/maps for PMTiles basemaps
+echo       ✓ Created /data/maps/atlas for PMTiles atlases
 
 REM Create a cryptographically random bootstrap token and persist it for future terminals.
 echo.

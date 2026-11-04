@@ -21,12 +21,24 @@
     }
     const basemap = input.map.offlineBasemap;
     if (basemap !== undefined && basemap !== null) {
-      if (!isRecord(basemap) || Object.keys(basemap).length !== 3
+      const hasLegacyFields = isRecord(basemap) && Object.keys(basemap).length === 3 && !Object.hasOwn(basemap, "licenseUrl");
+      const hasLicenseFields = isRecord(basemap) && Object.keys(basemap).length === 4 && Object.hasOwn(basemap, "licenseUrl");
+      const licenseUrl = hasLicenseFields ? basemap.licenseUrl : null;
+      let validLicenseUrl = licenseUrl === null;
+      if (typeof licenseUrl === "string") {
+        try {
+          const parsed = new URL(licenseUrl);
+          validLicenseUrl = parsed.protocol === "https:" && !parsed.username && !parsed.password && licenseUrl.length <= 2048;
+        } catch { validLicenseUrl = false; }
+      }
+      if (!isRecord(basemap) || (!hasLegacyFields && !hasLicenseFields)
         || !Object.hasOwn(basemap, "assetId") || !Object.hasOwn(basemap, "attribution") || !Object.hasOwn(basemap, "format")
-        || basemap.format !== "raster-pmtiles"
+        || !["raster-pmtiles", "vector-pmtiles"].includes(basemap.format)
+        || (basemap.format === "vector-pmtiles" && !hasLicenseFields)
+        || (hasLicenseFields && (!validLicenseUrl || typeof licenseUrl !== "string" || !licenseUrl.trim()))
         || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
         || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) {
-        fail("The offline basemap must reference a raster PMTiles asset and include attribution.");
+        fail("The offline basemap must reference a supported PMTiles asset, include attribution, and provide an HTTPS license URL for vector tiles.");
       }
     }
     const grid = input.map.grid;

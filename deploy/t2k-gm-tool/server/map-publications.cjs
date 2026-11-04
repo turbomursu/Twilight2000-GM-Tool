@@ -94,8 +94,9 @@ function validateMapDraft(draft, bounds, locations) {
 function projectMap(map, offlineBasemapUrl = null) {
   return {
     schemaVersion: 2, name: map.name, bounds: mapBounds(map.bounds),
-    offlineBasemap: map.offlineBasemap ? { format: "raster-pmtiles", assetId: map.offlineBasemap.assetId,
-      attribution: map.offlineBasemap.attribution, assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.pmtiles` } : null,
+    offlineBasemap: map.offlineBasemap ? { format: map.offlineBasemap.format || "raster-pmtiles", assetId: map.offlineBasemap.assetId,
+      attribution: map.offlineBasemap.attribution, ...(map.offlineBasemap.licenseUrl ? { licenseUrl: map.offlineBasemap.licenseUrl } : {}),
+      assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.pmtiles` } : null,
     locations: map.locations.map((location) => ({ id: location.id, name: location.name, kind: location.kind, position: point(location.position) })),
     markings: map.markings.map((marking) => ({ id: marking.id, label: marking.label, position: point(marking.position) })),
     geometries: (map.geometries || []).map((entry) => ({ id: entry.id, label: entry.label, geometry: entry.geometry })),

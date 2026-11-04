@@ -5,6 +5,13 @@ const { randomUUID } = require("node:crypto");
 const MAX_BASEMAP_BYTES = 50 * 1024 * 1024;
 const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function getArchiveFormat(data) {
+  const tileType = data[99];
+  if (tileType === 1) return "vector-pmtiles";
+  if ([2, 3, 4, 5].includes(tileType)) return "raster-pmtiles";
+  throw new Error("Choose a PMTiles v3 archive containing MVT vector tiles or PNG, JPEG, WebP, or AVIF raster tiles.");
+}
+
 async function uploadOfflineBasemap(request, directory, ownerAccountId) {
   const contentType = request.headers["content-type"] || "";
   if (!/^application\/(?:vnd\.pmtiles|octet-stream)(?:\s*;|$)/i.test(contentType)) {
@@ -21,11 +28,12 @@ async function uploadOfflineBasemap(request, directory, ownerAccountId) {
   if (data.length < 127 || data.subarray(0, 7).toString("ascii") !== "PMTiles" || data[7] !== 3) {
     throw new Error("Choose a valid PMTiles v3 archive.");
   }
+  const format = getArchiveFormat(data);
   mkdirSync(directory, { recursive: true });
   const assetId = randomUUID();
   writeFileSync(join(directory, `${assetId}.pmtiles`), data, { flag: "wx" });
-  writeFileSync(join(directory, `${assetId}.json`), JSON.stringify({ assetId, ownerAccountId, byteLength: data.length }), { flag: "wx" });
-  return { assetId, byteLength: data.length };
+  writeFileSync(join(directory, `${assetId}.json`), JSON.stringify({ assetId, ownerAccountId, byteLength: data.length, format }), { flag: "wx" });
+  return { assetId, byteLength: data.length, format };
 }
 
 function getOfflineBasemapMetadata(directory, assetId) {
@@ -94,4 +102,4 @@ function sendOfflineBasemap(request, response, directory, assetId) {
   return true;
 }
 
-module.exports = { MAX_BASEMAP_BYTES, ASSET_ID_PATTERN, uploadOfflineBasemap, getOfflineBasemapMetadata, sendOfflineBasemap };
+module.exports = { MAX_BASEMAP_BYTES, ASSET_ID_PATTERN, getArchiveFormat, uploadOfflineBasemap, getOfflineBasemapMetadata, sendOfflineBasemap };

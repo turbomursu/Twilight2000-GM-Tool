@@ -24,7 +24,8 @@ function validSetupPackage() {
     map: {
       id: "map-1", name: "Vansbro sector",
       bounds: { south: 59, west: 13, north: 61, east: 15 }, center: { lat: 60, lng: 14 }, zoom: 8,
-      offlineBasemap: { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000", attribution: "Local map provider / license" },
+      offlineBasemap: { format: "raster-pmtiles", assetId: "123e4567-e89b-42d3-a456-426614174000",
+        attribution: "Local map provider / license", licenseUrl: "https://maps.example.test/license" },
       fieldPapersAtlas: { id: "atlas-1" }, attribution: "© OpenStreetMap contributors", offlineAnnotations: [],
       grid: { coordinateSystem: "axial-q-r", cellKm: 10, terrainCells: [{ q: 1, r: -2, terrainType: "forest" }] },
       locations: [{ id: "location-1", name: "Vansbro", kind: "Settlement", description: "Starting town", gridRef: "1,-2", coordinates: { q: 1, r: -2 }, mapPosition: { lat: 60, lng: 14 }, visibility: "gm-only", isStartingLocation: true }]

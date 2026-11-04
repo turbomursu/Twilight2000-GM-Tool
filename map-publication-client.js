@@ -23,21 +23,30 @@
       element.style.cssText = "display:block;max-width:240px;white-space:normal;overflow-wrap:anywhere";
       return element;
     }
-    function render(snapshot) {
+    async function render(snapshot) {
       if (!globalThis.L) throw new Error("Map library unavailable. Reload when connected.");
       clear(); current = snapshot;
       map = L.map(container, { zoomControl: false, zoomSnap: .25, zoomDelta: .25 });
       if (snapshot.offlineBasemap) {
         if (!globalThis.pmtiles?.PMTiles || !globalThis.pmtiles?.leafletRasterLayer) throw new Error("Local PMTiles renderer is unavailable.");
-        const attributionText = document.createElement("span");
-        attributionText.textContent = snapshot.offlineBasemap.attribution;
         const archiveUrl = snapshot.offlineBasemap.assetUrl || `/offline-basemaps/${encodeURIComponent(snapshot.offlineBasemap.assetId)}.pmtiles`;
-        const archive = new globalThis.pmtiles.PMTiles(archiveUrl);
-        const basemapLayer = globalThis.pmtiles.leafletRasterLayer(archive, { attribution: attributionText.innerHTML }).addTo(map);
-        basemapLayer.on("tileerror", () => {
-          const status = document.querySelector("#player-map-status");
-          if (status) status.textContent = "Offline PMTiles archive is unavailable on this server.";
-        });
+        if (snapshot.offlineBasemap.format === "vector-pmtiles") {
+          if (!globalThis.FieldbookVectorAtlas) throw new Error("Vector atlas renderer is unavailable.");
+          const currentMap = map;
+          const basemapLayer = await globalThis.FieldbookVectorAtlas.createLayer(map, { ...snapshot.offlineBasemap, assetUrl: archiveUrl }, (message) => {
+            const status = document.querySelector("#player-map-status");
+            if (status) status.textContent = message;
+          });
+          if (map !== currentMap) { currentMap.removeLayer(basemapLayer); return; }
+        } else {
+          const archive = new globalThis.pmtiles.PMTiles(archiveUrl);
+          const basemapLayer = globalThis.pmtiles.leafletRasterLayer(archive, {}).addTo(map);
+          basemapLayer.on("tileerror", () => {
+            const status = document.querySelector("#player-map-status");
+            if (status) status.textContent = "Offline PMTiles archive is unavailable on this server.";
+          });
+        }
+        globalThis.FieldbookVectorAtlas?.addAttribution(map, snapshot.offlineBasemap);
       } else {
         L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
@@ -230,11 +239,11 @@
         }
         if (action === "preview") {
           const result = await send("preview", {}, campaignId, token); if (!result) return;
-          previewPanel.hidden = false; viewer.render(result.preview); previewRevision = result.revision;
+          previewPanel.hidden = false; await viewer.render(result.preview); previewRevision = result.revision;
           document.querySelector("#gm-map-preview-label").textContent = "Draft preview / unpublished";
         } else if (action !== "draft") {
           const result = await send(action, {}, campaignId, token); if (!result) return;
-          if (action === "publish") { previewPanel.hidden = false; viewer.render(publication.published);
+          if (action === "publish") { previewPanel.hidden = false; await viewer.render(publication.published);
             document.querySelector("#gm-map-preview-label").textContent = `Published / ${publication.publishedAt}`; }
         }
         if (token === generation) status.textContent = ({ draft: "Map draft saved / player map unchanged.", preview: "Saved map preview ready / not published.", publish: "Map published to assigned players.", withdraw: "Map withdrawn / draft retained." })[action];
@@ -290,7 +299,7 @@
         if (token !== generation || select.value !== id) return;
         if (!result.map) { clear(); status.textContent = "No map published."; return; }
         const serialized = JSON.stringify(result); content.hidden = false;
-        if (serialized !== previous) { viewer.render(result.map); previous = serialized; }
+        if (serialized !== previous) { await viewer.render(result.map); previous = serialized; }
         document.querySelector("#player-map-name").textContent = result.map.name;
         document.querySelector("#published-player-position").textContent = `Position / ${result.map.playerPosition.lat.toFixed(4)}, ${result.map.playerPosition.lng.toFixed(4)}`;
         document.querySelector("#player-map-published-at").textContent = `Published / ${result.publishedAt}`; status.textContent = "";
