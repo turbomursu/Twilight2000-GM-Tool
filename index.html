@@ -1333,7 +1333,22 @@ Military rank || optional</textarea><span class="row-description">One field per 
         <div class="dialog-actions"><button class="button button-primary" type="submit" id="create-user-button">Create username</button></div>
       </form>
       <p class="feedback" id="user-create-status" role="status" aria-live="polite">New accounts receive a temporary password and must change it at first login.</p>
-      <pre id="user-temporary-password" hidden></pre>
+      <div id="user-temporary-password-container" hidden style="display: grid; gap: 12px; margin: 16px 0; padding: 14px; border: 1px solid var(--line); background: var(--surface); border-radius: 2px;">
+        <div>
+          <div style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Username</div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <code id="user-temp-username" style="flex: 1; padding: 9px 11px; border: 1px solid var(--line); background: white; color: var(--ink); font-family: var(--mono); font-size: 12px; word-break: break-all;"></code>
+            <button type="button" id="copy-temp-username" title="Copy username" style="padding: 6px 10px; border: 1px solid var(--forest); border-radius: 2px; background: var(--forest); color: white; font-size: 9px; font-weight: 700; cursor: pointer; white-space: nowrap;">Copy</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Temporary Password</div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <code id="user-temp-password" style="flex: 1; padding: 9px 11px; border: 1px solid var(--line); background: white; color: var(--ink); font-family: var(--mono); font-size: 12px; word-break: break-all;"></code>
+            <button type="button" id="copy-temp-password" title="Copy password" style="padding: 6px 10px; border: 1px solid var(--forest); border-radius: 2px; background: var(--forest); color: white; font-size: 9px; font-weight: 700; cursor: pointer; white-space: nowrap;">Copy</button>
+          </div>
+        </div>
+      </div>
       <section class="player-seed-roster" aria-labelledby="user-list-title"><h3 id="user-list-title">User accounts</h3><div id="user-list">Loading accounts…</div></section>
       <div class="dialog-actions"><button class="button" type="button" id="done-users-dialog">Done</button></div>
     </div>
@@ -3576,7 +3591,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const usersDialog = document.getElementById("users-dialog");
       const userList = document.getElementById("user-list");
       const userCreateStatus = document.getElementById("user-create-status");
-      const userTemporaryPassword = document.getElementById("user-temporary-password");
+      const userTemporaryPasswordContainer = document.getElementById("user-temporary-password-container");
+      const userTempUsername = document.getElementById("user-temp-username");
+      const userTempPassword = document.getElementById("user-temp-password");
       const playerUsernameSelect = document.getElementById("player-seed-username");
       let assignedUsers = [];
 
@@ -3642,8 +3659,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
       document.getElementById("open-users-dialog").addEventListener("click", () => {
         userCreateStatus.className = "feedback";
         userCreateStatus.textContent = "New accounts receive a temporary password and must change it at first login.";
-        userTemporaryPassword.hidden = true;
-        userTemporaryPassword.textContent = "";
+        userTemporaryPasswordContainer.hidden = true;
+        userTempUsername.textContent = "";
+        userTempPassword.textContent = "";
         usersDialog.showModal();
         refreshAssignedUsers();
       });
@@ -3657,8 +3675,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
         button.disabled = true;
         userCreateStatus.className = "feedback";
         userCreateStatus.textContent = "Creating username…";
-        userTemporaryPassword.hidden = true;
-        userTemporaryPassword.textContent = "";
+        userTemporaryPasswordContainer.hidden = true;
+        userTempUsername.textContent = "";
+        userTempPassword.textContent = "";
         try {
           const { user, temporaryPassword } = await campaignApiRequest("/api/users", {
             method: "POST",
@@ -3667,8 +3686,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           });
           userCreateStatus.className = "feedback success";
           userCreateStatus.textContent = `Username ${user.username} created. The player must change this temporary password at first login.`;
-          userTemporaryPassword.textContent = `Username: ${user.username}\nTemporary password: ${temporaryPassword}\nShare through a secure channel. This password is shown only once.`;
-          userTemporaryPassword.hidden = false;
+          userTempUsername.textContent = user.username;
+          userTempPassword.textContent = temporaryPassword;
+          userTemporaryPasswordContainer.hidden = false;
           event.currentTarget.reset();
           await refreshAssignedUsers();
         } catch (error) {
@@ -3677,6 +3697,42 @@ Military rank || optional</textarea><span class="row-description">One field per 
         } finally {
           button.disabled = false;
         }
+      });
+
+      async function copyToClipboard(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (err) {
+          console.error("Failed to copy to clipboard:", err);
+          return false;
+        }
+      }
+
+      document.getElementById("copy-temp-username").addEventListener("click", async (event) => {
+        event.preventDefault();
+        const success = await copyToClipboard(userTempUsername.textContent);
+        const button = event.currentTarget;
+        const originalText = button.textContent;
+        button.textContent = success ? "Copied!" : "Failed";
+        button.disabled = true;
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        }, 2000);
+      });
+
+      document.getElementById("copy-temp-password").addEventListener("click", async (event) => {
+        event.preventDefault();
+        const success = await copyToClipboard(userTempPassword.textContent);
+        const button = event.currentTarget;
+        const originalText = button.textContent;
+        button.textContent = success ? "Copied!" : "Failed";
+        button.disabled = true;
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        }, 2000);
       });
 
       async function refreshPlayerSeedRoster(campaignId) {
