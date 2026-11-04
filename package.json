@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node server/main.cjs",
+    "start-stop": "echo Press Ctrl+C to stop the server. && npm start",
     "test": "node --test"
   },
   "dependencies": {
