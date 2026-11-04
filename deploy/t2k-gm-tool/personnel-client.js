@@ -406,10 +406,20 @@ function openPersonnelDetailModal(personId) {
   document.getElementById('detail-role').value = person.role || '';
   document.getElementById('detail-condition').value = person.condition || 'OK';
   document.getElementById('detail-readiness').value = person.readiness || 'ready';
-  document.getElementById('detail-str').value = person.attribute_strength || 'C';
-  document.getElementById('detail-agi').value = person.attribute_agility || 'C';
-  document.getElementById('detail-int').value = person.attribute_intelligence || 'C';
-  document.getElementById('detail-emp').value = person.attribute_empathy || 'C';
+  
+  // Set attribute radio buttons
+  const strValue = person.attribute_strength || 'C';
+  document.getElementById(`detail-str-${strValue.toLowerCase()}`).checked = true;
+  
+  const agiValue = person.attribute_agility || 'C';
+  document.getElementById(`detail-agi-${agiValue.toLowerCase()}`).checked = true;
+  
+  const intValue = person.attribute_intelligence || 'C';
+  document.getElementById(`detail-int-${intValue.toLowerCase()}`).checked = true;
+  
+  const empValue = person.attribute_empathy || 'C';
+  document.getElementById(`detail-emp-${empValue.toLowerCase()}`).checked = true;
+  
   document.getElementById('detail-cuf').value = person.cuf_rating || 'D';
   document.getElementById('detail-hit-cap').value = person.hit_cap || 4;
   document.getElementById('detail-status').textContent = '';
@@ -545,15 +555,21 @@ async function handleDetailSave() {
   const statusEl = document.getElementById('detail-status');
   statusEl.textContent = 'Saving…';
   
+  // Get radio button values
+  const getRadioValue = (name) => {
+    const checked = document.querySelector(`input[name="${name}"]:checked`);
+    return checked?.value || 'C';
+  };
+  
   const updates = {
     name: document.getElementById('detail-name').value.trim(),
     role: document.getElementById('detail-role').value.trim(),
     condition: document.getElementById('detail-condition').value,
     readiness: document.getElementById('detail-readiness').value,
-    attribute_strength: document.getElementById('detail-str').value,
-    attribute_agility: document.getElementById('detail-agi').value,
-    attribute_intelligence: document.getElementById('detail-int').value,
-    attribute_empathy: document.getElementById('detail-emp').value,
+    attribute_strength: getRadioValue('detail-str'),
+    attribute_agility: getRadioValue('detail-agi'),
+    attribute_intelligence: getRadioValue('detail-int'),
+    attribute_empathy: getRadioValue('detail-emp'),
     cuf_rating: document.getElementById('detail-cuf').value,
     hit_cap: parseInt(document.getElementById('detail-hit-cap').value, 10) || 4
   };
