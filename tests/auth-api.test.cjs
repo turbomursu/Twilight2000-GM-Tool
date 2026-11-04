@@ -104,6 +104,30 @@ test("bootstraps one GM account, authenticates sessions, and logs out", async (t
   assert.equal(expiredSession.status, 401);
 });
 
+test("accepts passwords of eight characters and rejects shorter passwords", async (t) => {
+  const { origin } = await startTestServer(t);
+  const tooShortBootstrap = await postJson(`${origin}/api/auth/bootstrap`, {
+    bootstrapToken, username: "gm-user", password: "shortpw"
+  });
+  assert.equal(tooShortBootstrap.status, 400);
+
+  const bootstrap = await postJson(`${origin}/api/auth/bootstrap`, {
+    bootstrapToken, username: "gm-user", password: "password"
+  });
+  assert.equal(bootstrap.status, 201);
+  const cookie = bootstrap.headers.get("set-cookie").split(";")[0];
+
+  const tooShortChange = await postJson(`${origin}/api/auth/change-password`, {
+    currentPassword: "password", newPassword: "shortpw"
+  }, { Cookie: cookie });
+  assert.equal(tooShortChange.status, 400);
+
+  const change = await postJson(`${origin}/api/auth/change-password`, {
+    currentPassword: "password", newPassword: "passw0rd"
+  }, { Cookie: cookie });
+  assert.equal(change.status, 200);
+});
+
 test("rejects cross-origin authentication mutations", async (t) => {
   const { origin } = await startTestServer(t);
   const sameOrigin = await postJson(`${origin}/api/auth/login`, { username: "gm-user", password }, { Origin: origin });
