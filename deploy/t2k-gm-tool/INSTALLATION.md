@@ -109,7 +109,6 @@ That's it! You're ready to manage campaigns.
    ├── server/          (backend logic and APIs)
    ├── package.json     (dependencies configuration)
    ├── INSTALL_SERVER.bat
-   ├── INSTALL_CLIENT.bat
    └── (other files)
    ```
 
@@ -129,18 +128,6 @@ That's it! You're ready to manage campaigns.
 - Verifies server files are present
 - Sets up data directories
 - Creates necessary folders for campaign data
-
-#### Client Installation (Optional but Recommended)
-
-1. Open the deployment folder
-2. **Double-click** `INSTALL_CLIENT.bat`
-3. Wait for the script to complete
-4. Note the access URLs (write them down!)
-
-**What this does:**
-- Verifies server is running
-- Provides browser access URLs
-- Confirms prerequisites for client access
 
 ### Step 4: Verify Installation
 

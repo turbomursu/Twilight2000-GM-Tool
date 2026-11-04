@@ -14,7 +14,6 @@
 |------|---------|------|-----|
 | `INSTALL_SERVER.bat` | Windows server setup (one-time) | 2.9 KB | Windows |
 | `INSTALL_SERVER.ps1` | PowerShell alternative setup | 4.2 KB | Windows |
-| `INSTALL_CLIENT.bat` | Windows client setup (optional) | 1.9 KB | Windows |
 | `run.cmd` | Quick start server (daily use) | — | Windows |
 | `run.ps1` | PowerShell server start | — | Windows |
 
@@ -85,7 +84,6 @@ t2k-gm-tool/
 ├── Installation & Setup
 │   ├── INSTALL_SERVER.bat          ✓ Required
 │   ├── INSTALL_SERVER.ps1          ✓ Required
-│   ├── INSTALL_CLIENT.bat          ✓ Required
 │   ├── run.cmd                     ✓ Required
 │   ├── run.ps1                     ✓ Required
 │

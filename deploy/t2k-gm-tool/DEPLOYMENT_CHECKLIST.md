@@ -8,7 +8,7 @@
 - [ ] All HTML files present (index.html, login.html, campaign-setup.html, player-interface.html)
 - [ ] All client JavaScript files present (13 files)
 - [ ] package.json and package-lock.json included
-- [ ] Installation scripts present (INSTALL_SERVER.bat, INSTALL_SERVER.ps1, INSTALL_CLIENT.bat)
+- [ ] Installation scripts present (INSTALL_SERVER.bat, INSTALL_SERVER.ps1)
 - [ ] Documentation files complete (INSTALLATION.md, QUICKSTART.md, README_DEPLOYMENT.md)
 - [ ] DEPLOYMENT_MANIFEST.txt included
 - [ ] No node_modules/ folder (will be created during install)
@@ -57,7 +57,6 @@ t2k-gm-tool/
 ├── package-lock.json
 ├── INSTALL_SERVER.bat
 ├── INSTALL_SERVER.ps1
-├── INSTALL_CLIENT.bat
 ├── run.cmd
 ├── run.ps1
 ├── INSTALLATION.md
@@ -83,7 +82,6 @@ t2k-gm-tool/
 - [ ] Verify automatic backup created in data/backups/
 - [ ] Stop server (Ctrl+C)
 - [ ] Restart server, verify data persists
-- [ ] Test INSTALL_CLIENT.bat
 
 ### Test Environment 2: macOS (Optional)
 - [ ] Install Node.js 24+ from nodejs.org
@@ -320,3 +318,4 @@ All items checked and verified. Ready for deployment.
 ---
 
 **Ready to deploy!** 🚀
+

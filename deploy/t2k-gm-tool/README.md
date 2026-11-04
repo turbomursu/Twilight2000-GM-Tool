@@ -78,11 +78,6 @@ INSTALL_SERVER.ps1         ← PowerShell alternative (4.1 KB)
                              • More detailed output
                              • Optional preference
 
-INSTALL_CLIENT.bat         ← Client setup (1.9 KB)
-                             • Optional helper script
-                             • Configures browser access
-                             • Verifies server is running
-
 Server start              ← Run `npm start` from this folder
 ```
 
@@ -392,8 +387,7 @@ Users know it worked when:
 | DEPLOYMENT_MANIFEST.txt | Manifest | 7.5 KB | File inventory |
 | INSTALL_SERVER.bat | Script | 2.8 KB | Windows installer |
 | INSTALL_SERVER.ps1 | Script | 4.1 KB | PowerShell installer |
-| INSTALL_CLIENT.bat | Script | 1.9 KB | Client setup |
-| **TOTAL** | **11 files** | **93.5 KB** | **Complete package** |
+| **TOTAL** | **10 files** | **91.6 KB** | **Complete package** |
 
 ---
 

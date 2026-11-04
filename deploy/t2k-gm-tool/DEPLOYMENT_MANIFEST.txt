@@ -70,10 +70,7 @@
 - ROADMAP.md                         # Development roadmap
 
 ## Installation Scripts
-- INSTALL_SERVER.bat                 # Windows server setup (run first)
-- INSTALL_CLIENT.bat                 # Windows client setup (optional)
-- run.cmd                            # Quick start (Windows batch)
-- run.ps1                            # Start with PowerShell
+- INSTALL_SERVER.bat                 # Windows server setup (run once)
 
 ## Optional Files (Reference/Documentation)
 - gmpack/                            # Reference game pack data

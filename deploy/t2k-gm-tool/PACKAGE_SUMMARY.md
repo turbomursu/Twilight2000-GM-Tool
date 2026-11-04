@@ -11,11 +11,10 @@
 
 A complete, production-ready deployment package with:
 
-### ✅ Installation & Setup (5 Scripts)
+### ✅ Installation & Setup (4 Scripts)
 ```
-INSTALL_SERVER.bat (2.9 KB)      ← Windows server installer (primary)
+INSTALL_SERVER.bat (2.9 KB)      ← Windows server installer
 INSTALL_SERVER.ps1 (4.1 KB)      ← PowerShell alternative
-INSTALL_CLIENT.bat (1.9 KB)      ← Windows client setup (optional)
 run.cmd                           ← Quick start batch file
 run.ps1                           ← Quick start PowerShell file
 ```
@@ -78,8 +77,7 @@ All files are in: `C:\Users\hemuli\Twilight2000-GM-Tool\deploy\t2k-gm-tool\`
 | DEPLOYMENT_MANIFEST.txt | 7.7 KB | File inventory |
 | INSTALL_SERVER.bat | 2.9 KB | Windows installer |
 | INSTALL_SERVER.ps1 | 4.1 KB | PowerShell installer |
-| INSTALL_CLIENT.bat | 1.9 KB | Client setup (optional) |
-| **TOTAL** | **72 KB** | **Complete guides** |
+| **TOTAL** | **70 KB** | **Complete guides** |
 
 ---
 
@@ -190,7 +188,6 @@ Completes GM account setup with token.txt
 ✅ **Installation Scripts**
 - [x] INSTALL_SERVER.bat created and tested
 - [x] INSTALL_SERVER.ps1 created and tested
-- [x] INSTALL_CLIENT.bat created
 - [x] run.cmd and run.ps1 linked properly
 
 ✅ **Documentation**
@@ -449,7 +446,6 @@ deploy/t2k-gm-tool/
 ├── DEPLOYMENT_MANIFEST.txt ............. File inventory (7 KB)
 ├── INSTALL_SERVER.bat .................. Windows installer (3 KB)
 ├── INSTALL_SERVER.ps1 .................. PowerShell installer (4 KB)
-├── INSTALL_CLIENT.bat .................. Client setup (2 KB)
 ├── run.cmd ............................. Quick start (batch)
 └── run.ps1 ............................. Quick start (PowerShell)
 
