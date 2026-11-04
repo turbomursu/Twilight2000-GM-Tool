@@ -51,6 +51,33 @@ test("starts the LAN service over HTTP without TLS configuration", async (t) => 
   assert.deepEqual(await response.json(), { setupRequired: true });
 });
 
+test("starts shared player and GM services on separate ports", async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-dual-http-test-"));
+  const servers = startServer({
+    FIELDBOOK_HOST: "127.0.0.1",
+    FIELDBOOK_PLAYER_PORT: "0",
+    FIELDBOOK_GM_PORT: "0",
+    FIELDBOOK_DB_PATH: join(directory, "runtime.sqlite"),
+    FIELDBOOK_BOOTSTRAP_TOKEN: bootstrapToken
+  });
+  t.after(() => Promise.all(Object.values(servers).map((server) => new Promise((resolve) => server.close(resolve))))
+    .then(() => rmSync(directory, { recursive: true, force: true })));
+  await Promise.all(Object.values(servers).map((server) => once(server, "listening")));
+  const playerOrigin = `http://127.0.0.1:${servers.playerServer.address().port}`;
+  const gmOrigin = `http://127.0.0.1:${servers.gmServer.address().port}`;
+
+  const bootstrap = await postJson(`${playerOrigin}/api/auth/bootstrap`, { bootstrapToken, username: "dual-gm", password });
+  assert.equal(bootstrap.status, 201);
+  const cookie = bootstrap.headers.get("set-cookie").split(";")[0];
+  const session = await fetch(`${gmOrigin}/api/auth/session`, { headers: { Cookie: cookie } });
+  assert.equal(session.status, 200);
+  assert.equal((await session.json()).account.role, "gm");
+
+  const playerPortHome = await fetch(playerOrigin, { headers: { Cookie: cookie }, redirect: "manual" });
+  assert.equal(playerPortHome.status, 302);
+  assert.equal(new URL(playerPortHome.headers.get("location")).port, new URL(gmOrigin).port);
+});
+
 test("bootstraps one GM account, authenticates sessions, and logs out", async (t) => {
   const { origin, database } = await startTestServer(t);
   const rejectedBootstrap = await postJson(`${origin}/api/auth/bootstrap`, {
