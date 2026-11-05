@@ -97,6 +97,14 @@ Runtime `PUT` updates require `expectedRevision` from the current `runtime.campa
 
 These are development/sample campaign values, not rules-derived results.
 
+### Using A Static Map Image
+
+In **Campaign Setup > Base map**, enter the image's geographic campaign bounds, select **Static map image**, add its attribution, and upload a PNG, JPEG, or WebP (maximum 50 MiB). Field Papers is not required for this workflow. Continue to Terrain and Locations as usual. The image must be north-up with edges matching the campaign bounds: it is stretched over that rectangle beneath geographic markers, routes, and grids, not automatically georeferenced.
+
+For an existing campaign, open **GM Tool > Player map > Campaign map background**, choose **Use a static map image**, upload and **Apply background**. The GM route and influence maps update immediately. Save/preview/publish the player map separately; applying a background never changes the current player publication. **Use online OSM map** switches the GM background back to map tiles. Players can only browse the explicitly published image and overlays, including zoom up to 200% and reset to the GM-set position. Anything already drawn into the image becomes visible when published; there is no fog mask.
+
+Use only images you have permission to share. Attribution is required; an HTTPS license URL is optional for your own image. Files are stored as `data/maps/atlas/<assetId>.image` with a matching `<assetId>.json` sidecar, outside version control. Setup exports and runtime backups contain the reference, not the image. For backup/migration, copy both files unchanged to the destination server's atlas directory; also retain the campaign JSON/runtime backup. A missing image is reported explicitly rather than replaced with online tiles.
+
 ### Runtime Backup And Restore
 
 For a loaded runtime campaign, use **Backup** in the GM dashboard to download GM-only JSON. **Restore** previews a selected backup's campaign, export time, checksum, and revision; replacement requires confirmation. Older backups require a second confirmation. The server validates the data and replaces campaign rows in one transaction; failed validation, ownership checks, or database writes leave existing data intact.

@@ -1,6 +1,6 @@
 # Development Roadmap — Plan B Edition
 
-**Last updated:** 02 Nov 2026
+**Last updated:** 05 Nov 2026
 **Strategy:** Session management first. Complete existing session workflows before expanding interconnected simulation systems.
 **Reference:** [Plan B — Scope Assessment](../gmpack/plan-b.html)
 
@@ -366,6 +366,8 @@ Each milestone is a **self-contained system** that can be developed and tested i
 **Parallel Development:** Complete. Ready for next milestone.
 
 **Atlas import update (04 Nov 2026):** Uploads now detect raster versus MVT vector PMTiles v3 and store archives plus JSON sidecars in `data/maps/atlas/`. Vector tiles render through local MapLibre libraries with a basic default style. New uploads require GM-entered required attribution and an HTTPS license URL; both are carried through setup import and shown on published maps. This records the GM's license review but does not independently verify rights. No real licensed archive has yet been used for end-to-end rendering verification.
+
+**Static image background slice (05 Nov 2026):** Setup supports standalone PNG/JPEG/WebP backgrounds (50 MiB) with manually entered editable campaign bounds; Field Papers is optional for this path. Images stretch to the bounds beneath existing geographic overlays, with no tile requests. Runtime Player map controls can replace the background or return to online OSM, using owner/revision checks while preserving the previous player publication until explicit preview/publish. GM route/influence maps and the read-only player view use the same image reference. Attribution is required; an HTTPS license link is optional for GM-owned images. Setup JSON and runtime backups retain the reference, not the binary: transfer each `.image` and matching JSON sidecar separately. GM review must ensure the entire image is safe to publish; fog masking is not implemented. This does not close the outstanding real-PMTiles-archive or cross-host portability acceptance checks.
 
 ---
 

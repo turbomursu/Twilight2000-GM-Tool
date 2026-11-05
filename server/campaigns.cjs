@@ -93,7 +93,7 @@ async function readRuntimeRestoreBody(request) {
   }
 }
 
-function createCampaignHandler({ database }) {
+function createCampaignHandler({ database, validateOfflineBasemap = null }) {
   return async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     const url = new URL(request.url, "http://fieldbook.invalid");
@@ -204,7 +204,7 @@ function createCampaignHandler({ database }) {
         let campaignId;
         try { campaignId = decodeURIComponent(mapMatch[1]); } catch { throw new HttpError(400, "Invalid campaign ID."); }
         const result = request.method === "GET" ? { map: getGMMap(database, account.id, campaignId) }
-          : updateGMMap(database, account.id, campaignId, await readJsonBody(request, 256 * 1024));
+          : updateGMMap(database, account.id, campaignId, await readJsonBody(request, 256 * 1024), validateOfflineBasemap);
         return result.map === null ? sendJson(response, 404, { error: "Runtime campaign not found." }) : sendJson(response, 200, result);
       } catch (error) {
         const status = error instanceof HttpError ? error.status : /Runtime campaign not found/.test(error.message) ? 404

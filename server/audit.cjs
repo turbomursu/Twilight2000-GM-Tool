@@ -3,7 +3,7 @@ const { randomUUID } = require("node:crypto");
 const actions = new Set([
   "conditions.save", "conditions.clear", "inventory.add", "inventory.update", "inventory.remove",
   "inventory.approve.add", "inventory.approve.update", "inventory.approve.remove", "inventory.reject",
-  "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "campaign.restore", "clock.advance", "supplies.midday",
+  "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "map.basemap", "campaign.restore", "clock.advance", "supplies.midday",
   "dashboard.update", "journal.create", "journal.update", "conflict.create", "conflict.update", "conflict.resolve", "conflict.delete",
   "route.update", "map.locations.update", "weather.roll", "weather.duration", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
 ]);
