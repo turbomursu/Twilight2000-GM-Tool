@@ -1,0 +1,124 @@
+{
+  "location-client.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "map-publication-client.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "personnel-client.js": {
+    "no-unused-vars": {
+      "count": 4
+    },
+    "no-useless-assignment": {
+      "count": 1
+    }
+  },
+  "player-seeds.js": {
+    "no-unused-vars": {
+      "count": 2
+    },
+    "preserve-caught-error": {
+      "count": 1
+    }
+  },
+  "server/audit.cjs": {
+    "no-empty": {
+      "count": 1
+    }
+  },
+  "server/backup-scheduler.cjs": {
+    "no-unused-vars": {
+      "count": 6
+    }
+  },
+  "server/campaigns.cjs": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "server/combat-api.cjs": {
+    "no-unused-vars": {
+      "count": 13
+    }
+  },
+  "server/combat-log.cjs": {
+    "no-unused-vars": {
+      "count": 3
+    }
+  },
+  "server/combat.cjs": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "server/comms.cjs": {
+    "no-control-regex": {
+      "count": 1
+    }
+  },
+  "server/main.cjs": {
+    "no-unused-vars": {
+      "count": 4
+    }
+  },
+  "server/runtime-store.cjs": {
+    "no-undef": {
+      "count": 1
+    },
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "server/sample-data.cjs": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "no-useless-assignment": {
+      "count": 1
+    }
+  },
+  "server/weather-travel-routes.cjs": {
+    "no-unused-vars": {
+      "count": 6
+    }
+  },
+  "tests/backup-automation.test.cjs": {
+    "no-unused-vars": {
+      "count": 5
+    }
+  },
+  "tests/backup-scheduler.test.cjs": {
+    "no-empty": {
+      "count": 19
+    }
+  },
+  "tests/milestone5b-pmtiles.test.cjs": {
+    "no-unused-vars": {
+      "count": 3
+    }
+  },
+  "tests/milestone7-campaign-depth.test.cjs": {
+    "no-unused-vars": {
+      "count": 31
+    }
+  },
+  "tests/runtime-backup.test.cjs": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "tests/weather-travel.test.cjs": {
+    "no-unused-vars": {
+      "count": 21
+    }
+  },
+  "weather-client.js": {
+    "no-unused-vars": {
+      "count": 6
+    }
+  }
+}

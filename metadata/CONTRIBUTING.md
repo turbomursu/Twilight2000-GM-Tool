@@ -62,6 +62,9 @@ git checkout -b fix/your-bug-name
 #### 4. Test Your Changes
 
 ```bash
+# Check JavaScript with ESLint
+npm run lint
+
 # Run full test suite
 npm test
 
@@ -127,6 +130,22 @@ Then create a PR with:
 ## 📝 Code Standards
 
 ### JavaScript/Node.js
+
+Run `npm run lint` before submitting changes. Use `npm run lint:fix` to apply
+available automatic fixes, then review the diff. ESLint uses its recommended
+rules with browser globals for root client scripts and Node.js globals for
+CommonJS/ES modules. Globals provided by the GM page and Leaflet are declared
+only for the clients that use them.
+
+Lint covers standalone `.js`, `.cjs`, and `.mjs` files, including tests and the
+lint configuration. Archived files, deployment copies, runtime data, and
+`node_modules` are excluded. Inline JavaScript in HTML is not linted.
+
+Existing violations are recorded in `eslint-suppressions.json` so this tooling
+change does not require unrelated cleanup. New violations still fail lint;
+the baseline counts are per file and rule, not per line. Do not regenerate
+or grow the baseline to hide new issues. After fixing an existing violation,
+run `npm run lint -- --prune-suppressions` and commit the reduced baseline.
 
 ```javascript
 // Use const by default, let if needed
@@ -296,6 +315,9 @@ cd Twilight2000-GM-Tool
 # Install dependencies
 npm install
 
+# Run lint
+npm run lint
+
 # Run tests
 npm test
 
@@ -305,11 +327,12 @@ npm start
 
 ### Development Workflow
 1. Make changes
-2. Run tests: `npm test`
-3. Test in browser: http://localhost:3000
-4. Commit changes
-5. Push to fork
-6. Create pull request
+2. Run lint: `npm run lint`
+3. Run tests: `npm test`
+4. Test in browser: http://localhost:3000
+5. Commit changes
+6. Push to fork
+7. Create pull request
 
 ## 📌 Priority Areas
 
