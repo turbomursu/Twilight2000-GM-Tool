@@ -1,6 +1,6 @@
 const { createHash, randomBytes, randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
-const { assertCampaignSetupPackage } = require("../campaign-package-contract.js");
+const { assertCampaignSetupPackage, assertOfflineBasemap } = require("../campaign-package-contract.js");
 
 const schema = `
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -1065,8 +1065,10 @@ function validateRuntimeSave(backup, targetRuntimeId) {
   parseJson(map.center_json, "map center", coordinate);
   parseJson(map.annotations_json, "map annotations", Array.isArray);
   if (map.atlas_json !== null) parseJson(map.atlas_json, "atlas", isRecord);
-  if (map.offlineBasemap_json !== null) parseJson(map.offlineBasemap_json, "offline basemap", (value) =>
-    isRecord(value) && typeof value.assetId === "string" && typeof value.format === "string" && typeof value.attribution === "string");
+  if (map.offlineBasemap_json !== null) {
+    const basemap = parseJson(map.offlineBasemap_json, "offline basemap", isRecord);
+    try { assertOfflineBasemap(basemap); } catch { fail("Invalid offline basemap metadata in runtime backup."); }
+  }
   data.locations.forEach((location) => parseJson(location.map_position_json, "location position", coordinate));
   if (data.mapPublication != null) {
     const publication = data.mapPublication;
@@ -1544,7 +1546,10 @@ function getRuntimeCampaign(database, accountId, runtimeId) {
     WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm' AND campaigns.active = 1`).get(runtimeId, accountId);
   if (!campaign) return null;
   const { sourceJson, ...summary } = campaign;
-  return { ...summary, setupPackage: JSON.parse(sourceJson) };
+  const setupPackage = JSON.parse(sourceJson);
+  const mapState = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(runtimeId);
+  if (mapState) setupPackage.map.offlineBasemap = mapState.offlineBasemap_json ? JSON.parse(mapState.offlineBasemap_json) : null;
+  return { ...summary, setupPackage };
 }
 
 function syncPartyFactionMembers(database, runtimeId) {

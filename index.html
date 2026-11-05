@@ -1057,7 +1057,7 @@
               <div class="runtime-route-map" id="runtime-route-map" aria-label="Read-only campaign route map" hidden></div>
               <p class="empty-state" id="runtime-route-map-notice" hidden></p>
               <div class="map-key" id="sample-route-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
-              <div class="map-key" id="runtime-route-map-key" hidden><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="inline-hint">Saved coordinates / OSM tiles require internet.</span></div>
+              <div class="map-key" id="runtime-route-map-key" hidden><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="inline-hint">Saved coordinates / background selected under Player map.</span></div>
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="situation-title-card">
@@ -1102,6 +1102,18 @@
           <p class="feedback" id="gm-map-publication-status" role="status">Select a runtime campaign.</p>
           <form id="gm-map-publication-form">
             <fieldset class="map-publication-fields" disabled>
+              <section class="wide">
+                <h2>Campaign map background</h2>
+                <p class="feedback" id="gm-map-background-current"></p>
+                <p class="feedback">A north-up image stretches to the campaign bounds, keeping locations and routes aligned. Any information drawn into the image will be visible to players when published. Use an image you have permission to share. Changing the background updates GM maps only; preview and publish separately to update players.</p>
+                <div class="field"><label for="gm-map-background-kind">Background</label><select id="gm-map-background-kind"><option value="current">Keep current background</option><option value="static-image">Use a static map image</option><option value="online">Use online OSM map</option></select></div>
+                <div id="gm-map-image-fields" hidden>
+                  <div class="field"><label for="gm-map-image-file">PNG, JPEG, or WebP / max 50 MiB</label><input id="gm-map-image-file" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"></div>
+                  <div class="field"><label for="gm-map-image-attribution">Required attribution</label><input id="gm-map-image-attribution" maxlength="300" placeholder="Image author / required credit"></div>
+                  <div class="field"><label for="gm-map-image-license">License terms URL / optional HTTPS</label><input id="gm-map-image-license" type="url" maxlength="2048"></div>
+                </div>
+                <button class="button" id="save-gm-map-background" type="button" disabled>Apply background</button>
+              </section>
               <section><h2>Allowed locations</h2><div class="map-edit-locations" id="map-allowed-locations"></div></section>
               <section><h2>Published route</h2><div id="map-route-entries"></div><div class="field"><label for="map-route-location">Waypoint</label><select id="map-route-location"></select></div><button class="button" id="add-map-waypoint" type="button">Add waypoint</button></section>
               <section class="wide"><div class="section-bar"><h2>Point markings</h2><button class="button" id="add-map-marking" type="button">Add marking</button></div><div id="map-marking-entries"></div></section>
@@ -1704,6 +1716,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
   <script src="/vector-atlas-client.js"></script>
+  <script src="/map-basemap-client.js"></script>
   <script src="/auth-client.js" defer></script>
   <script src="/campaign-clock.js"></script>
   <script src="weather-rules.js"></script>
@@ -1790,6 +1803,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let influenceHexLayer = null;
       let runtimeRouteMap = null;
       let runtimeRouteLayer = null;
+      let runtimeBasemap = null;
+      let runtimeBasemapSignature = "";
+      let influenceBasemap = null;
       let runtimeRouteSignature = "";
       let routeDraft = [];
       let stagedInfluenceCells = new Set();
@@ -2326,6 +2342,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const runtimeKey = document.getElementById("runtime-route-map-key");
         const notice = document.getElementById("runtime-route-map-notice");
         const caption = document.getElementById("route-map-caption");
+        const mapData = state.setupPackage?.map;
         sampleSketch.hidden = true;
         sampleKey.hidden = true;
         runtimeKey.hidden = false;
@@ -2335,7 +2352,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           .filter((stop) => stop.mapPosition && Number.isFinite(stop.mapPosition.lat) && Number.isFinite(stop.mapPosition.lng)
             && stop.mapPosition.lat >= -90 && stop.mapPosition.lat <= 90
             && stop.mapPosition.lng >= -180 && stop.mapPosition.lng <= 180);
-        if (!positionedStops.length) {
+        if (!positionedStops.length && mapData?.offlineBasemap?.format !== "static-image") {
           runtimeMapElement.hidden = true;
           notice.textContent = "This campaign route has no saved map coordinates.";
           notice.hidden = false;
@@ -2355,10 +2372,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         notice.hidden = true;
         if (!runtimeRouteMap) {
           runtimeRouteMap = L.map(runtimeMapElement, { minZoom: 2, maxZoom: 18, scrollWheelZoom: false });
-          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
-          }).addTo(runtimeRouteMap);
+          runtimeBasemap = FieldbookBasemap.controller(runtimeRouteMap, (message) => { notice.textContent = message; notice.hidden = false; });
           runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
 
           // Initialize map visualization client
@@ -2366,8 +2380,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
             window.mapVisualization.initializeVisualization(runtimeRouteMap);
           }
         }
+        const basemapSignature = JSON.stringify([state.runtimeCampaignId, mapData?.offlineBasemap, mapData?.bounds]);
+        if (runtimeBasemapSignature !== basemapSignature) {
+          runtimeBasemap.set(mapData?.offlineBasemap, mapData?.bounds);
+          runtimeBasemapSignature = basemapSignature;
+        }
 
-        const signature = `${state.runtimeCampaignId}:${positionedStops.map((stop) => `${stop.name}:${stop.mapPosition.lat},${stop.mapPosition.lng}`).join("|")}`;
+        const signature = `${basemapSignature}:${positionedStops.map((stop) => `${stop.name}:${stop.mapPosition.lat},${stop.mapPosition.lng}`).join("|")}`;
         const shouldFit = signature !== runtimeRouteSignature;
         runtimeRouteLayer.clearLayers();
         const positions = positionedStops.map((stop) => [stop.mapPosition.lat, stop.mapPosition.lng]);
@@ -2383,7 +2402,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
           }).bindTooltip(escapeHtml(stop.name), { direction: "top", offset: [0, -6] }).addTo(runtimeRouteLayer);
         });
         if (shouldFit) {
-          if (positions.length > 1) runtimeRouteMap.fitBounds(positions, { padding: [24, 24], maxZoom: 12 });
+          if (mapData?.offlineBasemap?.format === "static-image") {
+            const bounds = mapData.bounds;
+            runtimeRouteMap.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]], { padding: [12, 12] });
+          } else if (positions.length > 1) runtimeRouteMap.fitBounds(positions, { padding: [24, 24], maxZoom: 12 });
           else runtimeRouteMap.setView(positions[0], 10);
           runtimeRouteSignature = signature;
         }
@@ -2765,7 +2787,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           packageType: "fieldbook.campaign-setup",
           schemaVersion: 2,
           campaign,
-          map: { name: requireText(input.map.name || input.campaign.mapName, "Map name", 80), bounds, center, zoom, grid: { cellKm: 10, coordinateSystem: "axial-q-r", origin, terrainCells }, locations },
+          map: { name: requireText(input.map.name || input.campaign.mapName, "Map name", 80), bounds, center, zoom,
+            offlineBasemap: input.map.offlineBasemap ? { ...input.map.offlineBasemap } : null,
+            grid: { cellKm: 10, coordinateSystem: "axial-q-r", origin, terrainCells }, locations },
           factions,
           settlements
         };
@@ -2947,10 +2971,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
         const mapData = state.setupPackage.map;
         influenceMap = L.map("live-influence-map", { minZoom: 2, maxZoom: 18 }).setView([mapData.center.lat, mapData.center.lng], mapData.zoom);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
-        }).addTo(influenceMap);
+        influenceBasemap = FieldbookBasemap.controller(influenceMap, (message) => { document.getElementById("influence-map-status").textContent = message; });
+        influenceBasemap.set(mapData.offlineBasemap, mapData.bounds);
         influenceHexLayer = L.layerGroup().addTo(influenceMap);
         influenceMap.on("click", handleLiveInfluenceMapClick);
         influenceMap.on("moveend zoomend", renderLiveInfluenceGrid);
@@ -3200,6 +3222,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const runtimeCampaignId = campaign.id;
         runtimeFactionLayers = layers;
         state = { ...state, runtimeCampaignId, setupPackage };
+        influenceBasemap?.set(setupPackage.map.offlineBasemap, setupPackage.map.bounds);
         runtimeCampaignSelect.value = runtimeCampaignId;
         openPlayerSeedDialogButton.disabled = false;
         openCharacterChangesButton.disabled = false;
@@ -3213,6 +3236,20 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.dispatchEvent(new CustomEvent("fieldbook:campaign-selected", { detail: { campaignId: runtimeCampaignId } }));
         if (announce) showToast(`Runtime campaign loaded: ${setupPackage.campaign.name}.`);
       }
+
+      document.addEventListener("fieldbook:map-saved", (event) => {
+        const publication = event.detail;
+        if (state.runtimeCampaignId !== publication.campaignId || !state.setupPackage) return;
+        state.runtimeRevision = publication.campaignRevision;
+        const mapData = state.setupPackage.map;
+        const changed = JSON.stringify(mapData.offlineBasemap) !== JSON.stringify(publication.catalog.offlineBasemap);
+        mapData.offlineBasemap = publication.catalog.offlineBasemap;
+        persist();
+        if (changed) {
+          influenceBasemap?.set(mapData.offlineBasemap, mapData.bounds);
+          if (runtimeDataLoaded) renderRuntimeRouteMap();
+        }
+      });
 
       async function loadRuntimeCampaign(runtimeCampaignId, announce = true) {
         runtimeDataLoaded = false;

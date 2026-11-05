@@ -92,7 +92,7 @@ test("serves protected pages only for an active session and gates them again aft
   assert.equal(setupPage.status, 200);
   const setupHtml = await setupPage.text();
   assert.match(setupHtml, /id="export-package-top"/);
-  assert.equal([...setupHtml.matchAll(/\b(?:let|const)\s+baseMapLayer\s*=/g)].length, 1);
+  assert.equal([...setupHtml.matchAll(/\b(?:let|const)\s+basemapController\s*=/g)].length, 1);
   for (const id of ["map-bound-south", "map-bound-west", "map-bound-north", "map-bound-east", "apply-map-bounds"]) {
     assert.match(setupHtml, new RegExp(`id="${id}"`));
   }

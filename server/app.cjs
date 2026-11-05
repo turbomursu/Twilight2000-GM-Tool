@@ -1,4 +1,4 @@
-const { readFileSync } = require("node:fs");
+const { existsSync, readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { getAccountHomePath, getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
 const { createCampaignHandler } = require("./campaigns.cjs");
@@ -34,6 +34,7 @@ const PROTECTED_FILES = new Map([
   ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]],
   ["/situation-report-client.js", ["situation-report-client.js", "text/javascript; charset=utf-8"]],
   ["/map-publication-client.js", ["map-publication-client.js", "text/javascript; charset=utf-8"]],
+  ["/map-basemap-client.js", ["map-basemap-client.js", "text/javascript; charset=utf-8"]],
   ["/comms-client.js", ["comms-client.js", "text/javascript; charset=utf-8"]],
   ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]],
   ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]],
@@ -66,7 +67,7 @@ function sendText(response, status, contentType, body, headOnly = false) {
   response.end(headOnly ? undefined : body);
 }
 
-function createAppHandler({ database, authHandler, campaignHandler = createCampaignHandler({ database }), playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort }) {
+function createAppHandler({ database, authHandler, campaignHandler, playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort }) {
   const offlineBasemapDirectories = [...new Set([offlineBasemapDir, legacyOfflineBasemapDir])];
   function findOfflineBasemapDirectory(assetId, ownerAccountId = null) {
     return offlineBasemapDirectories.find((directory) => {
@@ -74,6 +75,17 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
       return metadata && (!ownerAccountId || metadata.ownerAccountId === ownerAccountId);
     }) || null;
   }
+  const validateOfflineBasemap = (ownerAccountId, reference) => {
+    const directory = findOfflineBasemapDirectory(reference.assetId, ownerAccountId);
+    const metadata = directory && getOfflineBasemapMetadata(directory, reference.assetId);
+    const file = directory && join(directory, metadata?.format === "static-image" ? `${reference.assetId}.image` : `${reference.assetId}.pmtiles`);
+    if (!metadata || metadata.format !== reference.format || !existsSync(file)
+      || (reference.format === "static-image" && !/^image\/(?:png|jpeg|webp)$/.test(metadata.contentType || ""))) {
+      throw new Error("The offline basemap asset is not owned by this GM or its stored format does not match.");
+    }
+    return true;
+  };
+  const effectiveCampaignHandler = campaignHandler || createCampaignHandler({ database, validateOfflineBasemap });
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);
@@ -105,7 +117,7 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
       response.writeHead(302, { Location: destination.href, "Cache-Control": "no-store" });
       return response.end();
     }
-    if (CAMPAIGN_PATH.test(url.pathname)) return campaignHandler(request, response);
+    if (CAMPAIGN_PATH.test(url.pathname)) return effectiveCampaignHandler(request, response);
     const playerBasemapMatch = url.pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map-basemap$/);
     if (playerBasemapMatch) {
       if (!new Set(["GET", "HEAD"]).has(request.method)) return sendText(response, 405, "application/json; charset=utf-8", JSON.stringify({ error: "Method not allowed." }));
@@ -115,10 +127,14 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
       let campaignId;
       try { campaignId = decodeURIComponent(playerBasemapMatch[1]); } catch { return sendText(response, 400, "application/json; charset=utf-8", JSON.stringify({ error: "Invalid campaign ID." })); }
       const publication = getPlayerMap(database, account.id, campaignId);
-      const assetId = publication?.map?.offlineBasemap?.assetId;
+      const basemap = publication?.map?.offlineBasemap;
+      const assetId = basemap?.assetId;
       if (!assetId) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", request.method === "HEAD");
       const directory = findOfflineBasemapDirectory(assetId);
-      if (directory && sendOfflineBasemap(request, response, directory, assetId)) return;
+      const metadata = directory && getOfflineBasemapMetadata(directory, assetId);
+      if (metadata && (metadata.format === basemap.format || (!metadata.format && basemap.format !== "static-image"))
+        && (basemap.format !== "static-image" || /^image\/(?:png|jpeg|webp)$/.test(metadata.contentType || ""))
+        && sendOfflineBasemap(request, response, directory, assetId, { noStore: true })) return;
       return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", request.method === "HEAD");
     }
     if (PLAYER_API_PATH.test(url.pathname)) return playerHandler(request, response);
@@ -154,12 +170,19 @@ function createAppHandler({ database, authHandler, campaignHandler = createCampa
     const homePath = account ? getAccountHomePath(database, account.id) : "/index.html";
 
     const basemapMatch = url.pathname.match(/^\/offline-basemaps\/([0-9a-f-]{36})\.pmtiles$/i);
-    if (basemapMatch) {
+    const imageBasemapMatch = url.pathname.match(/^\/offline-basemaps\/([0-9a-f-]{36})\.image$/i);
+    if (basemapMatch || imageBasemapMatch) {
       if (!account) return sendText(response, 401, "text/plain; charset=utf-8", "Authentication required.", headOnly);
-      if (!ASSET_ID_PATTERN.test(basemapMatch[1])) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
-      const directory = findOfflineBasemapDirectory(basemapMatch[1], account.id);
+      const assetId = (basemapMatch || imageBasemapMatch)[1];
+      if (!ASSET_ID_PATTERN.test(assetId)) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+      const directory = findOfflineBasemapDirectory(assetId, account.id);
       if (!directory) return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
-      if (sendOfflineBasemap(request, response, directory, basemapMatch[1])) return;
+      const metadata = getOfflineBasemapMetadata(directory, assetId);
+      if (imageBasemapMatch && (metadata?.format !== "static-image" || !/^image\/(?:png|jpeg|webp)$/.test(metadata.contentType || ""))) {
+        return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+      }
+      if (basemapMatch && metadata?.format === "static-image") return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
+      if (sendOfflineBasemap(request, response, directory, assetId)) return;
       return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
     }
 
