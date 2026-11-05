@@ -68,6 +68,14 @@ node server/main.cjs
 
 The command prints the runtime campaign ID and player username. The sample account is a development fixture; use the GM user-management flow to issue a temporary password before signing in. The GM dashboard snapshot is available to that campaign's owner at `GET /api/campaigns/:id/runtime`.
 
+### Campaign authoring and runtime handoff
+
+Use **Campaign setup** under **Separate authoring tools** to prepare initial campaign data in its own GM-only page. Its draft autosaves in this browser, independently of the selected runtime campaign. Review and export schema-v2 setup JSON, then return to the GM runtime and choose **Import setup package**. The preview and explicit confirmation create a new GM-owned campaign in SQLite; they do not replace an existing campaign, modify the source draft, or publish anything to players.
+
+Live personnel, route, location, faction, report, and map changes belong to the GM runtime. To continue authoring an initial package, reopen the exported setup JSON in Campaign Setup; runtime edits are not synchronized back to it. Use runtime **Backup**, **Restore**, or **Import backup** for campaigns already in play, not setup-package import. Both tools retain their existing URLs and sign-in requirements. The focused `campaign-setup-import-client.js` owns the import interaction; shared package validation and the authoritative import API remain unchanged.
+
+New setup imports initialize runtime bookkeeping and load the new campaign automatically. The route contains only the declared starting location. Because setup packages do not specify runtime clock/supply values, the GM-editable baseline is **2000-01-01 00:00, day 0**, zero logged distance/rations/fuel, and **Not recorded** weather; review these values before play. The descriptive era label is not parsed as a date. Creation, dashboard, and starting route are saved atomically. If loading fails after creation, the handoff reports that distinction and disables repeat confirmation; do not import again to address a service failure. Previously imported campaigns lacking dashboard state are not retroactively modified.
+
 ### Runtime Snapshot API
 Runtime `PUT` updates require `expectedRevision` from the current `runtime.campaign.revision`; stale writes return `409` and should be reloaded before retrying. Weather uses the existing `dashboard.weather` and `dashboard.weatherNote` fields; the UI derives cited effects for GM adjudication without applying modifiers to rolls.
 

@@ -1010,9 +1010,9 @@
         <button class="nav-item" data-view="audit"><span class="nav-icon" aria-hidden="true">10</span>Audit</button>
         <button class="nav-item" data-view="conflicts"><span class="nav-icon" aria-hidden="true">11</span>Conflicts</button>
       </nav>
-      <div class="nav-label" style="margin-top: 20px;">Authoring</div>
-      <a class="nav-link" href="campaign-setup.html"><span class="nav-icon" aria-hidden="true">06</span>Campaign setup</a>
-      <a class="nav-link" href="player-seeds.html"><span class="nav-icon" aria-hidden="true">07</span>Player seeds</a>
+      <div class="nav-label" style="margin-top: 20px;">Separate authoring tools</div>
+      <a class="nav-link" href="campaign-setup.html">Campaign setup</a>
+      <a class="nav-link" href="player-seeds.html">Player seeds</a>
       <div class="rail-bottom">
         <div class="signal-line"><span class="signal-dot"></span>Local record active</div>
         <p>CAMPAIGN FILE<br>FIELDBOOK / 04</p>
@@ -1025,7 +1025,7 @@
         <div class="top-actions">
           <label class="runtime-campaign-control"><span>Runtime campaign</span><select id="runtime-campaign-select" disabled><option value="">Loading campaigns</option></select></label>
           <div class="date-stamp"><span>Campaign date</span><strong id="top-date"></strong></div>
-          <button class="button" data-action="open-setup-import">Import setup</button>
+          <button class="button" type="button" data-action="open-setup-import">Import setup package</button>
           <button class="button" type="button" id="open-users-dialog">Users</button>
           <button class="button" type="button" id="open-character-changes" disabled>Review changes</button>
           <button class="button" type="button" id="export-runtime-backup" disabled>Backup</button>
@@ -1363,7 +1363,7 @@
   </dialog>
   <dialog id="setup-import-dialog" aria-labelledby="setup-import-title">
     <div class="dialog-head"><div><div class="eyebrow">GM-only setup handoff</div><h2 id="setup-import-title">Create runtime campaign</h2></div><button class="icon-button" id="close-setup-import" aria-label="Close setup import">×</button></div>
-    <div class="dialog-form"><p id="setup-import-status" class="feedback" role="status">Choose an exported schema-v2 setup package.</p><pre id="setup-import-summary" hidden></pre><p class="row-description">This creates an independent runtime campaign from the validated setup package. The source remains unchanged; player information is not published. The existing dashboard sample remains separate.</p><div class="dialog-actions"><button class="button" id="cancel-setup-import" type="button">Cancel</button><button class="button button-primary" id="apply-setup-import" type="button" disabled>Create runtime campaign</button></div></div>
+    <div class="dialog-form"><p id="setup-import-status" class="feedback" role="status">Choose an exported schema-v2 setup package.</p><pre id="setup-import-summary" hidden></pre><p class="row-description">This creates and loads an independent runtime campaign. Its route begins at the setup starting location. The GM-editable bookkeeping baseline is 2000-01-01 00:00, day 0, zero distance/supplies, and weather Not recorded; review these before play. The source remains unchanged and no player information is published. The existing dashboard sample remains separate.</p><div class="dialog-actions"><button class="button" id="cancel-setup-import" type="button">Cancel</button><button class="button button-primary" id="apply-setup-import" type="button" disabled>Create runtime campaign</button></div></div>
   </dialog>
   <dialog id="player-seed-dialog" aria-labelledby="player-seed-dialog-title">
     <div class="dialog-head"><div><div class="eyebrow">GM-only / campaign seat</div><h2 id="player-seed-dialog-title">Assign player seed</h2></div><button class="icon-button" id="close-player-seed-dialog" type="button" aria-label="Close player seed assignment">×</button></div>
@@ -1715,6 +1715,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="./map-visualization-client.js"></script>
   <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
+  <script src="campaign-setup-import-client.js"></script>
   <script src="/vector-atlas-client.js"></script>
   <script src="/map-basemap-client.js"></script>
   <script src="/auth-client.js" defer></script>
@@ -1773,11 +1774,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
         "A fresh tire track leaves the road and returns a kilometer later."
       ];
       const liveInfluenceColors = ["#b74435", "#487c87", "#a97832", "#687e68", "#6d7196", "#955d78"];
-      const setupPackageFile = document.getElementById("setup-package-file");
-      const setupImportDialog = document.getElementById("setup-import-dialog");
-      const setupImportStatus = document.getElementById("setup-import-status");
-      const setupImportSummary = document.getElementById("setup-import-summary");
-      const applySetupImportButton = document.getElementById("apply-setup-import");
       const runtimeCampaignSelect = document.getElementById("runtime-campaign-select");
       const weatherForm = document.getElementById("weather-form");
       const weatherStateSelect = document.getElementById("weather-state");
@@ -1796,8 +1792,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const openRuntimeImportButton = document.getElementById("open-runtime-import");
       let state = loadState();
       let toastTimer;
-      let pendingSetupPackage = null;
-      let pendingSetupSourceJson = null;
       let pendingRuntimeBackup = null;
       let influenceMap = null;
       let influenceHexLayer = null;
@@ -3936,10 +3930,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (button.dataset.view) { setView(button.dataset.view); return; }
         const action = button.dataset.action;
         if (!action) return;
-        if (action === "open-setup-import") {
-          setupPackageFile.value = "";
-          setupPackageFile.click();
-        }
         if (action === "open-note") document.getElementById("note-dialog").showModal();
         if (action === "close-note") document.getElementById("note-dialog").close();
         if (action === "open-person") {
@@ -4093,66 +4083,16 @@ Military rank || optional</textarea><span class="row-description">One field per 
           await commitRuntimeUpdate({ journal: runtimeJournal(notes) }, () => { state.notes = notes; }, "Journal entry removed.");
         }
       });
-      setupPackageFile.addEventListener("change", async () => {
-        const file = setupPackageFile.files?.[0];
-        if (!file) return;
-        pendingSetupPackage = null;
-        applySetupImportButton.disabled = true;
-        setupImportSummary.hidden = true;
-        setupImportStatus.className = "feedback";
-        setupImportStatus.textContent = "Checking setup package…";
-        setupImportDialog.showModal();
-        try {
-          if (file.size > 25 * 1024 * 1024) throw new Error("Setup packages must be smaller than 25 MB.");
-          pendingSetupSourceJson = await file.text();
-          pendingSetupPackage = normalizeSetupPackageForInfluence(JSON.parse(pendingSetupSourceJson));
-          const setup = pendingSetupPackage;
-          setupImportSummary.textContent = [
-            `Campaign: ${setup.campaign.name}`,
-            `Setting: ${setup.campaign.setting}`,
-            `Map: ${setup.map.name}`,
-            `Factions: ${setup.factions.length}`,
-            `Settlements: ${setup.settlements.length}`,
-            `Terrain cells: ${Object.keys(setup.map.grid.terrainCells).length}`,
-            `Initial influence layers: ${setup.factions.filter((faction) => faction.influenceCells.length).length}`
-          ].join("\n");
-          setupImportSummary.hidden = false;
-          setupImportStatus.className = "feedback success";
-          setupImportStatus.textContent = `Validated ${file.name}. Import it as a new GM-owned runtime campaign.`;
-          applySetupImportButton.disabled = false;
-        } catch (error) {
-          setupImportStatus.className = "feedback error";
-          setupImportStatus.textContent = error instanceof Error ? error.message : "Could not read this setup package.";
-        }
-      });
-      const closeSetupImportDialog = () => {
-        pendingSetupPackage = null;
-        pendingSetupSourceJson = null;
-        setupImportDialog.close();
-      };
-      document.getElementById("close-setup-import").addEventListener("click", closeSetupImportDialog);
-      document.getElementById("cancel-setup-import").addEventListener("click", closeSetupImportDialog);
-      applySetupImportButton.addEventListener("click", async () => {
-        if (!pendingSetupPackage || !pendingSetupSourceJson) return;
-        applySetupImportButton.disabled = true;
-        setupImportStatus.className = "feedback";
-        setupImportStatus.textContent = "Creating the runtime campaign…";
-        try {
-          const { campaign } = await campaignApiRequest("/api/campaigns/import-setup", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: pendingSetupSourceJson
-          });
-          pendingSetupPackage = null;
-          pendingSetupSourceJson = null;
-          setupImportDialog.close();
+      window.FieldbookSetupImport.initialize({
+        normalizePackage: normalizeSetupPackageForInfluence,
+        request: campaignApiRequest,
+        onImported: async (campaign) => {
           await refreshRuntimeCampaigns(campaign.id);
+          if (!runtimeDataLoaded || state.runtimeCampaignId !== campaign.id) {
+            throw new Error("The new campaign is saved, but the runtime service could not load it.");
+          }
           setView("influence");
           showToast(`Runtime campaign created: ${campaign.name}.`);
-        } catch (error) {
-          setupImportStatus.className = "feedback error";
-          setupImportStatus.textContent = error.message;
-          applySetupImportButton.disabled = false;
         }
       });
       document.getElementById("live-influence-faction").addEventListener("change", () => {
