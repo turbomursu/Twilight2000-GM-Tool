@@ -27,7 +27,23 @@
       if (!globalThis.L) throw new Error("Map library unavailable. Reload when connected.");
       clear(); current = snapshot;
       map = L.map(container, { zoomControl: false, zoomSnap: .25, zoomDelta: .25 });
-      if (snapshot.offlineBasemap) {
+      const bounds = [[snapshot.bounds.south, snapshot.bounds.west], [snapshot.bounds.north, snapshot.bounds.east]];
+      baseZoom = Math.min(18, Math.max(0, map.getBoundsZoom(bounds)));
+      map.setMinZoom(Math.max(0, baseZoom - 2)); map.setMaxZoom(baseZoom + 1);
+      map.setView(snapshot.playerPosition ? center(snapshot.playerPosition) : L.latLngBounds(bounds).getCenter(), baseZoom);
+      if (snapshot.offlineBasemap?.format === "static-image") {
+        const currentMap = map;
+        const layer = globalThis.FieldbookBasemap.imageLayer(map, snapshot.offlineBasemap, snapshot.bounds, (message) => {
+          const status = document.querySelector(form ? "#gm-map-publication-status" : "#player-map-status");
+          if (status) status.textContent = message;
+        });
+        await new Promise((resolve, reject) => {
+          layer.once("load", resolve);
+          layer.once("remove", resolve);
+          layer.once("error", () => reject(new Error("Static map image is unavailable or cannot be decoded.")));
+        });
+        if (map !== currentMap) return false;
+      } else if (snapshot.offlineBasemap) {
         if (!globalThis.pmtiles?.PMTiles || !globalThis.pmtiles?.leafletRasterLayer) throw new Error("Local PMTiles renderer is unavailable.");
         const archiveUrl = snapshot.offlineBasemap.assetUrl || `/offline-basemaps/${encodeURIComponent(snapshot.offlineBasemap.assetId)}.pmtiles`;
         if (snapshot.offlineBasemap.format === "vector-pmtiles") {
@@ -37,7 +53,7 @@
             const status = document.querySelector("#player-map-status");
             if (status) status.textContent = message;
           });
-          if (map !== currentMap) { currentMap.removeLayer(basemapLayer); return; }
+          if (map !== currentMap) { currentMap.removeLayer(basemapLayer); return false; }
         } else {
           const archive = new globalThis.pmtiles.PMTiles(archiveUrl);
           const basemapLayer = globalThis.pmtiles.leafletRasterLayer(archive, {}).addTo(map);
@@ -51,10 +67,6 @@
         L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
       }
-      const bounds = [[snapshot.bounds.south, snapshot.bounds.west], [snapshot.bounds.north, snapshot.bounds.east]];
-      baseZoom = Math.min(18, Math.max(0, map.getBoundsZoom(bounds)));
-      map.setMinZoom(Math.max(0, baseZoom - 2)); map.setMaxZoom(baseZoom + 1);
-      map.setView(snapshot.playerPosition ? center(snapshot.playerPosition) : L.latLngBounds(bounds).getCenter(), baseZoom);
       snapshot.locations.forEach((location) => L.circleMarker(center(location.position), { radius: 6, color: "#315a48", fillColor: "#edf3eb", fillOpacity: 1 })
         .bindTooltip(label(location.name)).addTo(map));
       snapshot.markings.forEach((marking) => L.circleMarker(center(marking.position), { radius: 7, color: "#a16822", fillColor: "#f0d6a0", fillOpacity: 1 })
@@ -73,6 +85,7 @@
         .bindTooltip(label("Player position"), { permanent: true }).addTo(map);
       map.on("zoomend", updateZoom); updateZoom();
       requestAnimationFrame(() => map?.invalidateSize());
+      return true;
     }
     return { render, clear, zoom: (delta) => { if (map) map.setZoom(map.getZoom() + delta); },
       reset: () => { if (map && current?.playerPosition) map.setView(center(current.playerPosition), baseZoom); } };
@@ -98,6 +111,12 @@
     const geometryCoordinates = document.querySelector("#map-geometry-coordinates");
     const geometryEntries = document.querySelector("#map-geometry-entries");
     const addGeometryButton = document.querySelector("#add-map-geometry");
+    const backgroundKind = document.querySelector("#gm-map-background-kind");
+    const imageFields = document.querySelector("#gm-map-image-fields");
+    const imageFile = document.querySelector("#gm-map-image-file");
+    const imageAttribution = document.querySelector("#gm-map-image-attribution");
+    const imageLicense = document.querySelector("#gm-map-image-license");
+    const applyBackground = document.querySelector("#save-gm-map-background");
     let publication = null;
     let draft = null;
     let id = "";
@@ -110,6 +129,15 @@
       fields.disabled = busy || !publication; reload.disabled = busy || !id;
       publish.disabled = !publication || previewRevision !== publication.revision;
       withdraw.disabled = !publication?.published;
+      applyBackground.disabled = busy || !publication || backgroundKind.value === "current";
+    }
+    function backgroundControls() {
+      imageFields.hidden = backgroundKind.value !== "static-image";
+      const basemap = publication?.catalog.offlineBasemap;
+      document.querySelector("#gm-map-background-current").textContent = publication
+        ? `Current: ${basemap ? `${basemap.format === "static-image" ? "Static map image" : "Offline PMTiles"} / ${basemap.attribution}` : "Online OSM map"}. Bounds: ${publication.catalog.bounds.south}, ${publication.catalog.bounds.west} to ${publication.catalog.bounds.north}, ${publication.catalog.bounds.east}.`
+        : "";
+      controls();
     }
     function invalidate() { previewRevision = null; previewPanel.hidden = true; viewer.clear(); controls(); }
     function icon(text, title, action) {
@@ -209,11 +237,13 @@
       });
       latitude.value = draft.playerPosition?.lat ?? ""; longitude.value = draft.playerPosition?.lng ?? "";
       routes(); markings(); renderGeometries(); choices(); controls();
+      backgroundControls();
     }
     async function load(campaignId) {
       const token = ++generation; id = campaignId; publication = null; draft = null; invalidate(); form.reset();
       ["map-allowed-locations", "map-route-entries", "map-marking-entries", "map-geometry-entries"].forEach((key) => document.getElementById(key).replaceChildren());
       status.textContent = id ? "Loading map draft..." : "Select a runtime campaign.";
+      backgroundControls();
       if (!id) return;
       try { const result = await request(`/api/campaigns/${encodeURIComponent(id)}/map-publication`);
         if (token !== generation) return; publication = result.map; renderDraft();
@@ -239,11 +269,11 @@
         }
         if (action === "preview") {
           const result = await send("preview", {}, campaignId, token); if (!result) return;
-          previewPanel.hidden = false; await viewer.render(result.preview); previewRevision = result.revision;
+          previewPanel.hidden = false; if (!await viewer.render(result.preview) || token !== generation) return; previewRevision = result.revision;
           document.querySelector("#gm-map-preview-label").textContent = "Draft preview / unpublished";
         } else if (action !== "draft") {
           const result = await send(action, {}, campaignId, token); if (!result) return;
-          if (action === "publish") { previewPanel.hidden = false; await viewer.render(publication.published);
+          if (action === "publish") { previewPanel.hidden = false; if (!await viewer.render(publication.published) || token !== generation) return;
             document.querySelector("#gm-map-preview-label").textContent = `Published / ${publication.publishedAt}`; }
         }
         if (token === generation) status.textContent = ({ draft: "Map draft saved / player map unchanged.", preview: "Saved map preview ready / not published.", publish: "Map published to assigned players.", withdraw: "Map withdrawn / draft retained." })[action];
@@ -251,6 +281,40 @@
         if (error.status === 409) { publication = null; invalidate(); } } }
       finally { busy = false; controls(); }
     }
+    backgroundKind.addEventListener("change", backgroundControls);
+    applyBackground.addEventListener("click", async () => {
+      if (busy || !publication || backgroundKind.value === "current") return;
+      const imageMode = backgroundKind.value === "static-image";
+      const file = imageFile.files[0];
+      const attribution = imageAttribution.value.trim();
+      const licenseUrl = globalThis.FieldbookVectorAtlas.validLicenseUrl(imageLicense.value.trim());
+      if (imageMode && (!file || !attribution || (imageLicense.value.trim() && !licenseUrl))) {
+        status.textContent = "Choose a PNG, JPEG, or WebP image and enter its attribution. Any license URL must use HTTPS.";
+        return;
+      }
+      if (imageMode && file.size > 50 * 1024 * 1024) { status.textContent = "Static images must be no larger than 50 MiB."; return; }
+      const campaignId = id; const token = generation; const pendingDraft = readDraft();
+      busy = true; controls(); status.textContent = "Applying campaign background...";
+      try {
+        let basemap = null;
+        if (imageMode) {
+          const result = await request("/api/offline-basemaps", { method: "POST",
+            headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+          if (token !== generation) return;
+          if (result.asset.format !== "static-image") throw new Error("Choose a PNG, JPEG, or WebP image, not a PMTiles archive.");
+          basemap = { format: "static-image", assetId: result.asset.assetId, attribution, ...(licenseUrl ? { licenseUrl } : {}) };
+        }
+        if (!await send("basemap", { basemap }, campaignId, token)) return;
+        draft = pendingDraft;
+        backgroundKind.value = "current"; imageFile.value = ""; backgroundControls();
+        status.textContent = "Campaign background saved / player map unchanged. Preview and publish to share it.";
+      } catch (error) {
+        if (token === generation) {
+          status.textContent = `Background not saved: ${error.message}`;
+          if (error.status === 409) { publication = null; invalidate(); }
+        }
+      } finally { busy = false; controls(); }
+    });
     form.addEventListener("submit", (event) => { event.preventDefault(); act("draft"); }); form.addEventListener("input", invalidate);
     previewButton.addEventListener("click", () => act("preview")); publish.addEventListener("click", () => act("publish")); withdraw.addEventListener("click", () => act("withdraw"));
     reload.addEventListener("click", () => { if (!publication || JSON.stringify(readDraft()) === JSON.stringify(publication.draft)
@@ -299,7 +363,7 @@
         if (token !== generation || select.value !== id) return;
         if (!result.map) { clear(); status.textContent = "No map published."; return; }
         const serialized = JSON.stringify(result); content.hidden = false;
-        if (serialized !== previous) { await viewer.render(result.map); previous = serialized; }
+        if (serialized !== previous) { if (!await viewer.render(result.map) || token !== generation) return; previous = serialized; }
         document.querySelector("#player-map-name").textContent = result.map.name;
         document.querySelector("#published-player-position").textContent = `Position / ${result.map.playerPosition.lat.toFixed(4)}, ${result.map.playerPosition.lng.toFixed(4)}`;
         document.querySelector("#player-map-published-at").textContent = `Published / ${result.publishedAt}`; status.textContent = "";

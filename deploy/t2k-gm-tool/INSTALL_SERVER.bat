@@ -36,7 +36,9 @@ for /f "tokens=1 delims=." %%a in ('node --version') do (
     echo MAJOR=[!MAJOR!]
 
     if !MAJOR! lss 24 (
-        echo ERROR: Version too old
+        echo ERROR: Node.js 24.x or later required
+        pause
+        exit /b 1
     ) else (
         echo Version OK
     )
@@ -45,7 +47,7 @@ for /f "tokens=1 delims=." %%a in ('node --version') do (
 REM Install dependencies
 echo.
 echo [2/6] Installing Node.js dependencies...
-call npm install
+call npm ci
 if errorlevel 1 (
     echo.
     echo ERROR: Failed to install dependencies
@@ -87,7 +89,7 @@ if not exist "data" mkdir data
 if not exist "data\maps" mkdir data\maps
 if not exist "data\maps\atlas" mkdir data\maps\atlas
 echo       ✓ Created /data directory for campaigns
-echo       ✓ Created /data/maps/atlas for PMTiles atlases
+echo       ✓ Created /data/maps/atlas for image and PMTiles assets
 
 REM Create a cryptographically random bootstrap token and persist it for future terminals.
 echo.
@@ -109,7 +111,7 @@ echo.
 echo Next steps:
 echo   1. Open a new terminal, then run: npm start
 echo      (A new terminal loads the saved bootstrap-token environment variable)
-echo   2. Open browser to http://localhost:8080
+echo   2. Open GM browser to http://localhost:8081 ^(players use port 8080^)
 echo   3. Enter the token saved in token.txt and create the GM account
 echo.
 echo For detailed setup instructions, see:

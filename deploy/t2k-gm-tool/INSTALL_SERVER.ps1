@@ -36,9 +36,9 @@ Write-Host "       Found Node.js $nodeVersion"
 
 # Extract major version number
 $majorVersion = [int]($nodeVersion -replace 'v', '' -split '\.' | Select-Object -First 1)
-if ($majorVersion -lt 18) {
+if ($majorVersion -lt 24) {
     Write-Host ""
-    Write-Host "ERROR: Node.js 18.x or later required (found $nodeVersion)"
+    Write-Host "ERROR: Node.js 24.x or later required (found $nodeVersion)"
     Write-Host "Please upgrade from https://nodejs.org/"
     Write-Host ""
     Read-Host "Press Enter to exit"
@@ -48,7 +48,7 @@ if ($majorVersion -lt 18) {
 # Step 2: Install dependencies
 Write-Host ""
 Write-Host "[2/6] Installing Node.js dependencies..."
-npm install
+npm ci
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "ERROR: Failed to install dependencies"
@@ -98,7 +98,7 @@ if (-not (Test-Path "data\maps\atlas")) {
     New-Item -ItemType Directory -Path "data\maps\atlas" | Out-Null
 }
 Write-Host "       ✓ Created /data directory for campaigns"
-Write-Host "       ✓ Created /data/maps/atlas for PMTiles atlases"
+Write-Host "       ✓ Created /data/maps/atlas for image and PMTiles assets"
 
 # Step 6: Create the first-run GM bootstrap token
 Write-Host ""
@@ -132,7 +132,7 @@ Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Run: npm start"
 Write-Host "     (Open a new terminal first if this installer was run from an existing terminal)"
-Write-Host "  2. Open browser to http://localhost:8080"
+Write-Host "  2. Open GM browser to http://localhost:8081 (players use port 8080)"
 Write-Host "  3. Enter the token saved in token.txt and create the GM account"
 Write-Host ""
 Write-Host "For detailed setup instructions, see:"

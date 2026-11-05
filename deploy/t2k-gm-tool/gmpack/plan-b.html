@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Plan B | Fieldbook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 760px; min-height: 100vh; }
+    a:focus-visible { outline: 3px solid #82a9ad; outline-offset: 2px; }
+    .shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
+    .rail { display: flex; flex-direction: column; padding: 23px 15px 18px; color: #e8eee7; background: var(--forest-deep); border-right: 1px solid #526158; box-shadow: inset -4px 0 #111b17; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 26px; }
+    .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid #839783; border-radius: 3px; color: #d4dfcb; background: #293d33; font: 700 11px var(--mono); }
+    .brand-copy strong { display: block; font: 700 15px var(--serif); }
+    .brand-copy small { display: block; margin-top: 3px; color: #a7b5a8; font: 8px var(--mono); text-transform: uppercase; }
+    .rail-label { padding: 0 10px 8px; color: #899a8d; font: 9px var(--mono); text-transform: uppercase; }
+    .rail-link { display: block; padding: 10px; border: 1px solid transparent; color: #c5d0c4; font-size: 11px; text-decoration: none; }
+    .rail-link:hover { color: white; background: #263b30; }
+    .rail-link[aria-current="page"] { border-color: #506354; color: white; background: #344b3d; box-shadow: inset 3px 0 #c2cc91; }
+    .rail-bottom { margin-top: auto; padding: 16px 9px 2px; color: #aab8a9; font: 8px/1.6 var(--mono); text-transform: uppercase; }
+    main { min-width: 0; }
+    .topbar { display: flex; align-items: center; min-height: 62px; padding: 0 30px; border-bottom: 1px solid var(--line); background: #e2e7df; box-shadow: 0 2px 0 #aeb8ac; }
+    .crumb, .eyebrow { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .content { width: min(1120px,100%); margin: 0 auto; padding: 27px 30px 46px; background-image: linear-gradient(90deg,#344a4008 1px,transparent 1px),linear-gradient(#344a4008 1px,transparent 1px); background-size: 24px 24px; }
+    .heading { padding-bottom: 18px; border-bottom: 2px solid var(--forest); }
+    h1 { margin: 5px 0 12px; font: 700 29px/1.05 var(--serif); text-transform: uppercase; }
+    h2 { margin: 25px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font: 700 17px var(--serif); text-transform: uppercase; }
+    p, li { font-size: 12px; line-height: 1.6; }
+    .heading p { max-width: 760px; margin: 0; }
+    .notice { margin-top: 18px; padding: 12px 16px; border-left: 3px solid #a97832; background: #f0e9d8; }
+    .notice p { margin: 0; }
+    table { width: 100%; border-collapse: collapse; background: #e8ece5; font-size: 12px; line-height: 1.5; }
+    caption { padding: 0 0 10px; color: var(--muted); text-align: left; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    thead th { background: #dfe5dc; }
+    tbody th { width: 22%; }
+    ul { padding-left: 21px; }
+    li { margin-bottom: 9px; }
+    .decision { margin-top: 25px; padding: 14px 16px; border-left: 3px solid var(--forest); background: #e2e7df; }
+    .decision p { margin: 0; }
+    .footnote { margin-top: 17px; color: var(--muted); font: 9px/1.6 var(--mono); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Project navigation">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">T2K</div><div class="brand-copy"><strong>Fieldbook</strong><small>Standalone status</small></div></div>
+      <div class="rail-label">Status pages</div>
+      <a class="rail-link" href="../project-status.html">Roadmap status</a>
+      <a class="rail-link" href="../project-features.html">Feature status</a>
+      <a class="rail-link" href="plan-b.html" aria-current="page">Plan B</a>
+      <div class="rail-bottom">Local status server<br>127.0.0.1</div>
+    </aside>
+    <main>
+      <header class="topbar"><div class="crumb">Project control / alternative scope</div></header>
+      <div class="content">
+        <header class="heading">
+          <div class="eyebrow">Scope assessment / 02 Nov 2026</div>
+          <h1>Plan B: Session management first</h1>
+          <p>Fieldbook's highest-value purpose is a reliable GM desk with a controlled player companion, not a world simulator. Complete existing session workflows before expanding interconnected simulation systems.</p>
+        </header>
+        <aside class="notice" aria-label="Proposal status">
+          <p><strong>Alternative proposal, not an adopted roadmap.</strong> These priorities are recommendations based on the feature assessment. They do not remove existing requirements or change implementation status.</p>
+        </aside>
+        <section aria-labelledby="priorities-title">
+          <h2 id="priorities-title">Priority order</h2>
+          <table>
+            <caption>Eight priorities, from essential campaign reliability to optional simulation.</caption>
+            <thead><tr><th scope="col">Priority</th><th scope="col">Features</th><th scope="col">Assessment</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">1 - Essential</th><td>Setup-to-runtime handoff, persistence, recovery, authorization, player-data isolation.</td><td>Fix the documented imported-campaign dashboard initialization gap first. Everything depends on trustworthy state.</td></tr>
+              <tr><th scope="row">2 - Core session tools</th><td>Characters, inventory, conditions, journal, campaign clock, personnel.</td><td>Support common session tasks with fast, complete manual workflows before adding automated mechanics.</td></tr>
+              <tr><th scope="row">3 - Shared awareness</th><td>Map, locations, route, party position, explicit report and map publication.</td><td>Make shared information reliable and keep private campaign data behind deliberate GM publication.</td></tr>
+              <tr><th scope="row">4 - Rules assistance</th><td>Combat calculators, weather, travel, ammunition and supply bookkeeping.</td><td>Favor source-checked correctness and usable integration over increasing the number of mechanics.</td></tr>
+              <tr><th scope="row">5 - Operational reliability</th><td>Scheduled backups, portable map assets, actionable errors, conflict handling.</td><td>Complete before relying on long campaigns. Real PMTiles rendering and recovery still need verification.</td></tr>
+              <tr><th scope="row">6 - Session preparation</th><td>NPC and character creation, missions, encounters, opposing forces, settlement drafts.</td><td>Useful time-savers, but editable templates and manual entry can deliver much of the initial value.</td></tr>
+              <tr><th scope="row">7 - Campaign depth</th><td>Faction relationships, settlement needs, threats, territorial annotations.</td><td>Start with simple records and explicit GM-entered changes; expand for demonstrated campaign needs.</td></tr>
+              <tr><th scope="row">8 - Advanced simulation</th><td>Economy, production, workforce, diplomacy automation, persistent world simulation.</td><td>Highest complexity and least universal benefit. Defer until actual play demonstrates demand.</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <section aria-labelledby="reduce-title">
+          <h2 id="reduce-title">Candidates to remove, reduce, or defer</h2>
+          <ul>
+            <li><strong>Full economic simulation:</strong> Workforce, prosperity, production, dynamic pricing, and supply/demand can become a separate strategy game. Settlement needs, available goods, and GM-set prices may be enough.</li>
+            <li><strong>Autonomous or AI-driven diplomacy:</strong> Use relationship notes and GM-authored events rather than autonomous political outcomes.</li>
+            <li><strong>Integrated world simulation:</strong> Prefer a dated event queue with GM approval to scheduling every economic, political, and military interaction.</li>
+            <li><strong>Separate dashboards for every subsystem:</strong> Start with contextual panels over shared records instead of major logistics, market, diplomacy, conflict, territory, and intelligence surfaces.</li>
+            <li><strong>Advanced messaging:</strong> Defer read receipts, inbox deletion, and push delivery; dependable shared COMMS with polling may suffice for LAN play.</li>
+            <li><strong>Advanced mapping:</strong> Defer vector styling, fog masking, geometry history, and elaborate editing. Reliable markers, routes, and publication cover the primary need.</li>
+            <li><strong>AI-assisted setup:</strong> Keep it optional and outside the critical path. Manual campaign authoring must remain fully usable.</li>
+            <li><strong>Broad battle simulation:</strong> Keep it separate from existing attack calculators and build only if campaign play requires it.</li>
+          </ul>
+        </section>
+        <section aria-labelledby="evidence-title">
+          <h2 id="evidence-title">Documentation and evidence</h2>
+          <p>Consolidate duplicated combat and status descriptions that disagree about planned, implemented, and production-ready behavior. Implemented calculations alone do not establish complete rules coverage or production readiness.</p>
+        </section>
+        <aside class="decision" aria-label="Recommended scope decision">
+          <p><strong>Recommended decision:</strong> Finish the session-management product before expanding the simulation product. Retain manual factions, settlements, resources, and events; postpone their automated interactions.</p>
+        </aside>
+        <p class="footnote">Reference proposal only. No campaign behavior, feature commitments, or official rules are changed by this page.</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

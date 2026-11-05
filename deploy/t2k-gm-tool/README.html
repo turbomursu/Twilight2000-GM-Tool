@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Twilight: 2000 Fourth Edition GM Tool | README</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --fern: #687e68;
+      --signal: #b74435;
+      --signal-pale: #efdfd8;
+      --sky: #487c87;
+      --sky-pale: #dae7e7;
+      --gold: #a97832;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      background: var(--paper);
+      background-image: linear-gradient(90deg, #344a4008 1px, transparent 1px), linear-gradient(#344a4008 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .readme-shell {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .rail {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 25px 16px 18px;
+      color: #e8eee7;
+      background: var(--forest-deep);
+      border-right: 1px solid #526158;
+      box-shadow: inset -4px 0 #111b17;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 9px 28px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 35px;
+      height: 35px;
+      place-items: center;
+      border: 1px solid #839783;
+      border-radius: 3px;
+      color: #d4dfcb;
+      font: 700 11px var(--mono);
+      letter-spacing: 0;
+      background: linear-gradient(145deg, #293d33, #1d2b24);
+      box-shadow: inset 0 1px #ffffff18, 0 2px 0 #0e1713;
+    }
+
+    .brand-copy {
+      display: grid;
+      gap: 2px;
+    }
+
+    .brand-copy strong {
+      font: 700 15px var(--serif);
+      letter-spacing: 0;
+    }
+
+    .brand-copy span {
+      color: #a7b5a8;
+      font: 9px var(--mono);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .nav-label {
+      padding: 0 11px 9px;
+      color: #899a8d;
+      font: 9px var(--mono);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 32px;
+      padding: 0 11px;
+      border-radius: 2px;
+      color: #c5d1ca;
+      text-decoration: none;
+      transition: background 0.2s;
+      font: 11px var(--mono);
+    }
+
+    .nav-item:hover {
+      background: #284035;
+    }
+
+    .main-content {
+      padding: 40px 50px;
+      overflow-y: auto;
+    }
+
+    .header-section {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      margin-bottom: 50px;
+    }
+
+    .header-text h1 {
+      margin: 0 0 10px 0;
+      font: 700 48px var(--serif);
+      text-transform: uppercase;
+      letter-spacing: -1px;
+    }
+
+    .header-text .tagline {
+      color: var(--muted);
+      font: 14px var(--sans);
+      margin: 0 0 20px 0;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: var(--surface);
+      font: 10px var(--mono);
+      text-transform: uppercase;
+    }
+
+    .badge-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #74966c;
+      box-shadow: 0 0 0 2px #d4e0ce;
+    }
+
+    .brand-image {
+      flex-shrink: 0;
+    }
+
+    .brand-image img {
+      width: 200px;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: white;
+      box-shadow: 0 4px 8px #0000001a;
+    }
+
+    h2 {
+      margin: 40px 0 20px 0;
+      font: 700 28px var(--serif);
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+      color: var(--forest);
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 10px;
+    }
+
+    h3 {
+      margin: 25px 0 12px 0;
+      font: 700 18px var(--serif);
+      color: var(--forest);
+    }
+
+    p {
+      margin: 0 0 14px 0;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+
+    .feature-card {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--surface);
+      box-shadow: inset 0 1px #ffffffb8;
+    }
+
+    .feature-card h4 {
+      margin: 0 0 10px 0;
+      font: 700 14px var(--serif);
+      color: var(--forest);
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .feature-card ul {
+      margin: 10px 0 0 0;
+      padding-left: 20px;
+      font-size: 12px;
+    }
+
+    .feature-card li {
+      margin: 5px 0;
+      color: var(--ink);
+    }
+
+    ul {
+      margin: 10px 0 20px 0;
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+
+    .cta-section {
+      display: flex;
+      gap: 15px;
+      margin: 30px 0;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 20px;
+      border: 1px solid #263a30;
+      border-radius: 2px;
+      color: #fff;
+      background: linear-gradient(180deg, #40594b, #2d4338);
+      font: 11px var(--mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .button:hover {
+      background: linear-gradient(180deg, #4a6654, #344c3e);
+    }
+
+    .button-secondary {
+      color: var(--ink);
+      background: linear-gradient(180deg, #e8ece5, #dfe4dd);
+      border-color: #aab5aa;
+    }
+
+    .button-secondary:hover {
+      background: linear-gradient(180deg, #dfe4dd, #d6dbd2);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: var(--surface);
+      text-align: center;
+    }
+
+    .stat-number {
+      font: 700 24px var(--serif);
+      color: var(--forest);;
+      margin: 0;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font: 10px var(--mono);
+      text-transform: uppercase;
+      margin: 5px 0 0 0;
+    }
+
+    .code-block {
+      background: #f6f7f2;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--forest);
+      border-radius: 2px;
+      padding: 15px;
+      margin: 15px 0;
+      overflow-x: auto;
+      font: 12px var(--mono);
+      line-height: 1.5;
+    }
+
+    .section-divider {
+      margin: 50px 0;
+      padding-top: 30px;
+      border-top: 2px solid var(--line);
+    }
+
+    footer {
+      margin-top: 60px;
+      padding: 30px 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font: 10px var(--mono);
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      .readme-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .rail {
+        display: none;
+      }
+
+      .main-content {
+        padding: 30px 25px;
+      }
+
+      .header-section {
+        flex-direction: column;
+      }
+
+      h1 {
+        font-size: 36px;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="readme-shell">
+    <!-- Left Sidebar -->
+    <div class="rail">
+      <div class="brand">
+        <div class="brand-mark">FB</div>
+        <div class="brand-copy">
+          <strong>Fieldbook</strong>
+          <span>T2K 4E GM Tool</span>
+        </div>
+      </div>
+
+      <div style="flex: 1;">
+        <div class="nav-label">Quick Links</div>
+        <div class="nav-list">
+          <a href="#features" class="nav-item">Features</a>
+          <a href="#install" class="nav-item">Installation</a>
+          <a href="#license" class="nav-item">License</a>
+          <a href="#contribute" class="nav-item">Contribute</a>
+        </div>
+
+        <div class="nav-label" style="margin-top: 24px;">Resources</div>
+        <div class="nav-list">
+          <a href="metadata/FEATURES.md" class="nav-item">Feature List</a>
+          <a href="metadata/ROADMAP.md" class="nav-item">Roadmap</a>
+          <a href="metadata/LICENSE_INFO.md" class="nav-item">License Info</a>
+          <a href="metadata/CONTRIBUTING.md" class="nav-item">Guidelines</a>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #526158; padding-top: 16px; color: #a7b5a8; font-size: 9px;">
+        <div style="margin-bottom: 8px;">Twilight: 2000</div>
+        <div style="margin-bottom: 8px;">Fourth Edition</div>
+        <div>GM Tool v1.0.0</div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Header Section -->
+      <div class="header-section">
+        <div class="header-text">
+          <h1>Twilight: 2000<br/>GM Tool</h1>
+          <p class="tagline">A complete, production-ready game master's tool for Twilight: 2000 Fourth Edition campaigns</p>
+
+          <div class="status-row">
+            <div class="status-badge">
+              <div class="badge-icon"></div>
+              Production Ready
+            </div>
+            <div class="status-badge">
+              <div class="badge-icon" style="background: #5b7c8a;"></div>
+              267 Tests Passing
+            </div>
+            <div class="status-badge">
+              <div class="badge-icon" style="background: #7a8f6f;"></div>
+              GPL v3 Licensed
+            </div>
+          </div>
+
+          <div class="cta-section">
+            <a href="deploy/t2k-gm-tool/START_HERE.md" class="button">Get Started</a>
+            <a href="metadata/LICENSE_INFO.md" class="button button-secondary">About License</a>
+          </div>
+        </div>
+
+        <div class="brand-image">
+          <img src="deploy/t2k-gm-tool/Mursusoft.png" alt="MursuSoft - Twilight 2000 GM Tool">
+        </div>
+      </div>
+
+      <!-- Features Section -->
+      <section id="features">
+        <h2>What You Get</h2>
+        <p>A complete toolkit for running Twilight: 2000 Fourth Edition campaigns with everything GMs and players need:</p>
+
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h4>Campaign Management</h4>
+            <ul>
+              <li>Create and manage campaigns</li>
+              <li>Track factions and settlements</li>
+              <li>Document events and threats</li>
+              <li>Manage NPCs and relationships</li>
+            </ul>
+          </div>
+
+          <div class="feature-card">
+            <h4>Combat System</h4>
+            <ul>
+              <li>Turn-based combat tracker</li>
+              <li>Infantry & vehicle combat</li>
+              <li>Fourth Edition rule-verified</li>
+              <li>Damage calculation & wounds</li>
+            </ul>
+          </div>
+
+          <div class="feature-card">
+            <h4>Player Interface</h4>
+            <ul>
+              <li>Character sheets</li>
+              <li>Inventory management</li>
+              <li>Situation reports</li>
+              <li>COMMS messaging</li>
+            </ul>
+          </div>
+
+          <div class="feature-card">
+            <h4>Game Master Tools</h4>
+            <ul>
+              <li>Weather generation</li>
+              <li>Travel planning</li>
+              <li>Scenario templates</li>
+              <li>Campaign audit trail</li>
+            </ul>
+          </div>
+
+          <div class="feature-card">
+            <h4>Data Management</h4>
+            <ul>
+              <li>Local SQLite database</li>
+              <li>Automatic backups every 5 min</li>
+              <li>Campaign import/export</li>
+              <li>Complete audit history</li>
+            </ul>
+          </div>
+
+          <div class="feature-card">
+            <h4>Open Source</h4>
+            <ul>
+              <li>GPL v3 licensed</li>
+              <li>Source code available</li>
+              <li>Community contributions</li>
+              <li>Transparent development</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Statistics Section -->
+      <section>
+        <h2>By The Numbers</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <p class="stat-number">50+</p>
+            <p class="stat-label">Features</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-number">267/267</p>
+            <p class="stat-label">Tests Passing</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-number">21</p>
+            <p class="stat-label">Service Functions</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-number">5-10 min</p>
+            <p class="stat-label">Installation Time</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Installation Section -->
+      <section id="install" class="section-divider">
+        <h2>Quick Start</h2>
+
+        <h3>Prerequisites</h3>
+        <ul>
+          <li><strong>Windows 10+</strong>, macOS 10.15+, or Linux</li>
+          <li><strong>Node.js 24+</strong> from <a href="https://nodejs.org/">nodejs.org</a></li>
+          <li><strong>4 GB RAM</strong> (8 GB recommended)</li>
+          <li><strong>2 GB free disk space</strong></li>
+        </ul>
+
+        <h3>Installation (3 Steps)</h3>
+        <ol>
+          <li>
+            <strong>Run installer:</strong>
+            <div class="code-block">INSTALL_SERVER.bat</div>
+          </li>
+          <li>
+            <strong>Start server:</strong>
+            <div class="code-block">npm start</div>
+          </li>
+          <li>
+            <strong>Open the GM and player interfaces:</strong>
+            <div class="code-block">GM: http://localhost:8081<br>Player: http://localhost:8080</div>
+          </li>
+        </ol>
+
+        <p><strong>Default login:</strong> admin / admin (change immediately!)</p>
+
+        <p><a href="deploy/t2k-gm-tool/INSTALLATION.md" class="button">Full Installation Guide</a></p>
+      </section>
+
+      <!-- License Section -->
+      <section id="license" class="section-divider">
+        <h2>Open Source License</h2>
+        <p>This project is licensed under the <strong>GNU General Public License v3 (GPL v3)</strong>.</p>
+
+        <h3>What This Means</h3>
+        <p><strong>You can:</strong></p>
+        <ul>
+          <li>Use the tool free, forever</li>
+          <li>Study the source code</li>
+          <li>Modify for your campaigns</li>
+          <li>Share improvements with the community</li>
+        </ul>
+
+        <p><strong>You must (if distributing modifications):</strong></p>
+        <ul>
+          <li>Share source code modifications</li>
+          <li>Include GPL v3 license</li>
+          <li>Keep copyright notices</li>
+        </ul>
+
+        <p><a href="metadata/LICENSE_INFO.md" class="button">Read License Explanation</a> <a href="LICENSE" class="button button-secondary">Full License Text</a></p>
+      </section>
+
+      <!-- Contribution Section -->
+      <section id="contribute" class="section-divider">
+        <h2>Contribute</h2>
+        <p>The Twilight: 2000 GM Tool is an open source project that welcomes contributions from the community.</p>
+
+        <h3>How to Contribute</h3>
+        <ol>
+          <li><strong>Fork the repository</strong> on GitHub</li>
+          <li><strong>Create a feature branch:</strong> <code>git checkout -b feature/your-feature</code></li>
+          <li><strong>Make your changes</strong> and write tests</li>
+          <li><strong>Run tests:</strong> <code>npm test</code></li>
+          <li><strong>Commit with clear messages</strong></li>
+          <li><strong>Submit a pull request</strong></li>
+        </ol>
+
+        <h3>Contribution Areas</h3>
+        <ul>
+          <li><strong>Bug fixes</strong> — Found an issue? Help us fix it!</li>
+          <li><strong>Features</strong> — Implement items from the ROADMAP.md</li>
+          <li><strong>Documentation</strong> — Help us document features</li>
+          <li><strong>Testing</strong> — Improve test coverage</li>
+        </ul>
+
+        <p><a href="metadata/CONTRIBUTING.md" class="button">Read Contribution Guidelines</a></p>
+      </section>
+
+      <!-- Links Section -->
+      <section class="section-divider">
+        <h2>Documentation & Resources</h2>
+
+        <h3>Getting Started</h3>
+        <ul>
+          <li><a href="deploy/t2k-gm-tool/START_HERE.md">START_HERE.md</a> — Where to begin</li>
+          <li><a href="deploy/t2k-gm-tool/QUICKSTART.md">QUICKSTART.md</a> — 30-second setup</li>
+          <li><a href="metadata/README.md">README.md</a> — Project overview</li>
+        </ul>
+
+        <h3>Setup & Usage</h3>
+        <ul>
+          <li><a href="deploy/t2k-gm-tool/INSTALLATION.md">INSTALLATION.md</a> — Complete setup guide</li>
+          <li><a href="metadata/FEATURES.md">FEATURES.md</a> — All features and status</li>
+          <li><a href="metadata/ROADMAP.md">ROADMAP.md</a> — Development roadmap</li>
+        </ul>
+
+        <h3>Open Source</h3>
+        <ul>
+          <li><a href="LICENSE">LICENSE</a> — GPL v3 full text</li>
+          <li><a href="metadata/LICENSE_INFO.md">LICENSE_INFO.md</a> — Understanding GPL v3</li>
+          <li><a href="metadata/CONTRIBUTING.md">CONTRIBUTING.md</a> — How to contribute</li>
+        </ul>
+      </section>
+
+      <!-- Footer -->
+      <footer>
+        <p>Twilight: 2000 Fourth Edition GM Tool v1.0.0</p>
+        <p>Licensed under GNU General Public License v3 (GPL v3)</p>
+        <p>© 2026 Contributors | Independent fan utility for Twilight: 2000 Fourth Edition</p>
+        <p style="margin-top: 20px;">All source code is free software, forever.</p>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

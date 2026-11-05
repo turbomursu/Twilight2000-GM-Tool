@@ -1,4 +1,3 @@
 @echo off
-cd /d "%~dp0"
-if not defined FIELDBOOK_BOOTSTRAP_TOKEN if exist token.txt set /p FIELDBOOK_BOOTSTRAP_TOKEN=<token.txt
-call npm start
+REM Twilight 2000 GM Tool - Node.js wrapper with SQLite experimental flag
+"C:\Program Files\nodejs\node.exe" --experimental-sqlite %*

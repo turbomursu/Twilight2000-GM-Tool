@@ -3,10 +3,11 @@ const { randomUUID } = require("node:crypto");
 const actions = new Set([
   "conditions.save", "conditions.clear", "inventory.add", "inventory.update", "inventory.remove",
   "inventory.approve.add", "inventory.approve.update", "inventory.approve.remove", "inventory.reject",
-  "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "campaign.restore", "clock.advance", "supplies.midday",
-  "dashboard.update", "journal.create", "journal.update", "route.update", "map.locations.update", "weather.roll", "weather.duration", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
+  "report.draft", "report.publish", "report.withdraw", "map.draft", "map.publish", "map.withdraw", "map.basemap", "campaign.restore", "clock.advance", "supplies.midday",
+  "dashboard.update", "journal.create", "journal.update", "conflict.create", "conflict.update", "conflict.resolve", "conflict.delete",
+  "route.update", "map.locations.update", "weather.roll", "weather.duration", "faction.influence.update", "faction.prominence.update", "character.review.approve", "character.review.reject", "seat.assign"
 ]);
-const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "map_catalog", "route", "campaign", "dashboard", "journal_entry", "faction_influence", "faction_prominence", "character_review", "player_seat"]);
+const targetTypes = new Set(["conditions", "inventory_item", "inventory_proposal", "situation_report", "map_publication", "map_catalog", "route", "campaign", "dashboard", "journal_entry", "conflict_incident", "faction_influence", "faction_prominence", "character_review", "player_seat"]);
 const auditColumns = ["id", "campaign_id", "actor_account_id", "actor_label", "action", "target_type", "target_id", "target_label", "character_id", "related_id",
   "before_revision", "after_revision", "campaign_revision_before", "campaign_revision_after", "created_at", "game_date", "day_number", "game_time"];
 
@@ -20,6 +21,7 @@ function expectedTarget(action) {
   if (action === "dashboard.update") return "dashboard";
   if (action.startsWith("weather.")) return "dashboard";
   if (action.startsWith("journal.")) return "journal_entry";
+  if (action.startsWith("conflict.")) return "conflict_incident";
   if (action === "route.update") return "route";
   if (action.startsWith("faction.influence.")) return "faction_influence";
   if (action.startsWith("faction.prominence.")) return "faction_prominence";
@@ -37,6 +39,11 @@ function targetLabel(database, campaignId, input) {
     const row = database.prepare("SELECT title FROM journal_entries WHERE id = ? AND campaign_id = ?").get(input.targetId, campaignId);
     if (row) return row.title;
     return `Journal entry ${input.targetId}`;
+  }
+  if (input.targetType === "conflict_incident") {
+    const row = database.prepare("SELECT title FROM conflict_incidents WHERE id = ? AND campaign_id = ?").get(input.targetId, campaignId);
+    if (row) return row.title;
+    return input.targetLabel || `Conflict incident ${input.targetId}`;
   }
   if (input.targetType === "faction_influence") {
     const row = database.prepare("SELECT name FROM factions WHERE id = ? AND runtime_campaign_id = ?").get(input.targetId, campaignId);

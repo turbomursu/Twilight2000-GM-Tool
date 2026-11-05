@@ -1,5 +1,6 @@
 const { getRuntimeCampaign, getPlayerCharacter } = require("./runtime-store.cjs");
 const { appendAuditEvent } = require("./audit.cjs");
+const { assertOfflineBasemap } = require("../campaign-package-contract.js");
 
 function record(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -92,11 +93,12 @@ function validateMapDraft(draft, bounds, locations) {
 }
 
 function projectMap(map, offlineBasemapUrl = null) {
+  const basemapExtension = map.offlineBasemap?.format === "static-image" ? "image" : "pmtiles";
   return {
     schemaVersion: 2, name: map.name, bounds: mapBounds(map.bounds),
     offlineBasemap: map.offlineBasemap ? { format: map.offlineBasemap.format || "raster-pmtiles", assetId: map.offlineBasemap.assetId,
       attribution: map.offlineBasemap.attribution, ...(map.offlineBasemap.licenseUrl ? { licenseUrl: map.offlineBasemap.licenseUrl } : {}),
-      assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.pmtiles` } : null,
+      assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.${basemapExtension}` } : null,
     locations: map.locations.map((location) => ({ id: location.id, name: location.name, kind: location.kind, position: point(location.position) })),
     markings: map.markings.map((marking) => ({ id: marking.id, label: marking.label, position: point(marking.position) })),
     geometries: (map.geometries || []).map((entry) => ({ id: entry.id, label: entry.label, geometry: entry.geometry })),
@@ -134,17 +136,28 @@ function buildMapPreview(map) {
     route: draft.routeLocationIds.map((id) => locations.get(id)), playerPosition: draft.playerPosition });
 }
 
-function updateGMMap(database, accountId, campaignId, input) {
+function updateGMMap(database, accountId, campaignId, input, validateOfflineBasemap = null) {
   if (!input || typeof input !== "object" || Array.isArray(input)
-    || Object.keys(input).some((key) => !["action", "expectedRevision", "draft"].includes(key))
-    || !["draft", "preview", "publish", "withdraw"].includes(input.action)
+    || Object.keys(input).some((key) => !["action", "expectedRevision", "draft", "basemap"].includes(key))
+    || !["draft", "preview", "publish", "withdraw", "basemap"].includes(input.action)
     || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0
-    || (input.action !== "draft" && Object.hasOwn(input, "draft"))) throw new Error("Invalid map action or revision.");
+    || (input.action !== "draft" && Object.hasOwn(input, "draft"))
+    || (input.action !== "basemap" && Object.hasOwn(input, "basemap"))
+    || (input.action === "basemap" && !Object.hasOwn(input, "basemap"))) throw new Error("Invalid map action or revision.");
+  if (input.action === "basemap" && input.basemap !== null) assertOfflineBasemap(input.basemap);
   database.exec("BEGIN IMMEDIATE");
   try {
     const map = getGMMap(database, accountId, campaignId);
     if (!map) throw new Error("Runtime campaign not found.");
     if (map.revision !== input.expectedRevision) throw new Error("Map revision changed; reload before retrying.");
+    if (input.action === "basemap" && input.basemap !== null) {
+      if (typeof validateOfflineBasemap !== "function") throw new Error("The offline basemap asset could not be verified.");
+      validateOfflineBasemap(accountId, input.basemap);
+      database.prepare("UPDATE maps SET offlineBasemap_json = ?, attribution = ? WHERE runtime_campaign_id = ?")
+        .run(JSON.stringify(input.basemap), input.basemap.attribution, campaignId);
+    } else if (input.action === "basemap") {
+      database.prepare("UPDATE maps SET offlineBasemap_json = NULL, attribution = '' WHERE runtime_campaign_id = ?").run(campaignId);
+    }
     if (input.action === "draft") map.draft = validateMapDraft(input.draft, map.catalog.bounds, map.catalog.locations);
     if (input.action === "preview") {
       const preview = buildMapPreview(map);

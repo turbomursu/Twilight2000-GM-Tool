@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18251e">
+  <title>Feature Status | Fieldbook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b27;
+      --muted: #59665f;
+      --paper: #cbd2c9;
+      --surface: #e8ece5;
+      --line: #aab5aa;
+      --forest: #344a40;
+      --forest-deep: #17231f;
+      --signal: #b74435;
+      --gold: #a97832;
+      --mono: "Cascadia Mono", "Courier New", monospace;
+      --sans: "Bahnschrift", "Segoe UI", sans-serif;
+      --serif: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 760px; min-height: 100vh; background: var(--paper); }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #82a9ad; outline-offset: 2px; }
+    .shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
+    .rail { display: flex; flex-direction: column; min-height: 100vh; padding: 23px 15px 18px; color: #e8eee7; background: var(--forest-deep); border-right: 1px solid #526158; box-shadow: inset -4px 0 #111b17; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 26px; }
+    .brand-mark { display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid #839783; border-radius: 3px; color: #d4dfcb; background: linear-gradient(145deg,#293d33,#1d2b24); font: 700 11px var(--mono); }
+    .brand-copy strong { display: block; font: 700 15px var(--serif); }
+    .brand-copy small { display: block; margin-top: 3px; color: #a7b5a8; font: 8px var(--mono); text-transform: uppercase; }
+    .rail-label { padding: 0 10px 8px; color: #899a8d; font: 9px var(--mono); text-transform: uppercase; }
+    .rail-link { display: block; padding: 10px; border: 1px solid transparent; color: #c5d0c4; font-size: 11px; text-decoration: none; }
+    .rail-link:hover { color: white; background: #263b30; }
+    .rail-link[aria-current="page"] { border-color: #506354; color: white; background: #344b3d; box-shadow: inset 3px 0 #c2cc91; }
+    .rail-bottom { margin-top: auto; padding: 16px 9px 2px; color: #aab8a9; font: 8px/1.6 var(--mono); text-transform: uppercase; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 62px; gap: 15px; padding: 0 30px; border-bottom: 1px solid var(--line); background: #e2e7df; box-shadow: 0 2px 0 #aeb8ac; }
+    .crumb { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .top-actions { display: flex; gap: 8px; }
+    .button { display: inline-flex; align-items: center; min-height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: linear-gradient(180deg,#f0f2ec,#dfe5dc); font-size: 9px; font-weight: 700; text-decoration: none; text-transform: uppercase; }
+    main { min-width: 0; }
+    .content { width: min(1120px,100%); margin: 0 auto; padding: 27px 30px 46px; background-image: linear-gradient(90deg,#344a4008 1px,transparent 1px),linear-gradient(#344a4008 1px,transparent 1px); background-size: 24px 24px; }
+    .heading { display: flex; align-items: end; justify-content: space-between; gap: 25px; padding-bottom: 18px; border-bottom: 2px solid var(--forest); }
+    .eyebrow { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .heading h1 { margin: 5px 0 0; font: 700 29px/1.05 var(--serif); text-transform: uppercase; }
+    .heading p { max-width: 440px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 17px 0 25px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #e2e7df; }
+    .summary-item { min-height: 81px; padding: 13px 15px; border-right: 1px solid var(--line); }
+    .summary-item:last-child { border-right: 0; }
+    .summary-item strong { display: block; margin-top: 7px; font: 700 14px var(--serif); text-transform: uppercase; }
+    .summary-item p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .section { margin-top: 24px; }
+    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .section-head h2 { margin: 0; font: 700 17px var(--serif); text-transform: uppercase; }
+    .section-head span { color: var(--muted); font: 8px var(--mono); text-transform: uppercase; }
+    .checklist { display: grid; }
+    .check-row { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: start; gap: 10px; padding: 10px 8px; border-bottom: 1px solid #b9c3b8; background: #e8ece5bd; }
+    .check-row input { appearance: none; position: relative; width: 14px; height: 14px; margin: 1px 0 0; border: 2px solid var(--signal); border-radius: 2px; background: #fff; }
+    .check-row input:checked { border-color: #356044; background: #356044; }
+    .check-row input:checked::after { position: absolute; top: 0; left: 3px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; content: ""; transform: rotate(45deg); }
+    .check-row input:indeterminate { border-color: var(--signal); background: var(--signal); }
+    .check-row input:indeterminate::after { position: absolute; top: 4px; left: 2px; width: 6px; border-top: 2px solid #fff; content: ""; }
+    .check-copy strong { display: block; font-size: 11px; line-height: 1.4; }
+    .check-copy p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .state { padding-top: 2px; color: var(--muted); font: 8px var(--mono); text-align: right; text-transform: uppercase; white-space: nowrap; }
+    .state.done { color: #356044; }
+    .state.partial { color: #806126; }
+    .notice { margin-top: 23px; padding: 13px 15px; border-left: 3px solid var(--gold); background: #f0e9d8; }
+    .notice strong { display: block; font: 700 10px var(--mono); text-transform: uppercase; }
+    .notice p { margin: 6px 0 0; color: #655538; font-size: 10px; line-height: 1.5; }
+    .footnote { margin-top: 17px; color: var(--muted); font: 8px/1.5 var(--mono); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Project navigation">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">T2K</div><div class="brand-copy"><strong>Fieldbook</strong><small>Standalone status</small></div></div>
+      <div class="rail-label">Status pages</div>
+      <a class="rail-link" href="project-status.html">Roadmap status</a>
+      <a class="rail-link" href="project-features.html" aria-current="page">Feature status</a>
+      <a class="rail-link" href="gmpack/plan-b.html">Plan B</a>
+      <a class="rail-link" href="ROADMAP.md">Full roadmap</a>
+      <a class="rail-link" href="FEATURES.md">Feature overview</a>
+      <div class="rail-bottom">Local status server<br>127.0.0.1</div>
+    </aside>
+    <main>
+      <header class="topbar"><div class="crumb">Project control / feature inventory</div><div class="top-actions"><a class="button" href="FEATURES.md">Open full feature overview</a><a class="button" href="ROADMAP.md">Open roadmap</a></div></header>
+      <div class="content">
+        <header class="heading"><div><div class="eyebrow">Feature snapshot / 05 Nov 2026</div><h1>Feature status</h1></div><p>Green means a verified slice is ready. Red means unfinished or partial; it is not a complete system. T2K 4E workflows verified against official Referee Aids. Comprehensive combat automation implemented and integrated.</p></header>
+        <section class="summary" aria-label="Feature status summary">
+          <div class="summary-item"><span class="eyebrow">Ready slices</span><strong>Identity, publishing, and combat</strong><p>Accounts, seats, reports, map projection, COMMS, review workflows, rules verification, complete combat automation.</p></div>
+          <div class="summary-item"><span class="eyebrow">Partial</span><strong>GM runtime and setup</strong><p>Static PNG/JPEG/WebP backgrounds and raster/vector PMTiles are supported. Images align to campaign bounds and retain overlays; cross-host asset migration and real licensed PMTiles rendering remain unverified.</p></div>
+          <div class="summary-item"><span class="eyebrow">Unfinished</span><strong>Advanced systems</strong><p>Escalation rules, encounter generation, world systems, scheduled backups, simulation, character creation automation.</p></div>
+        </section>
+
+        <section class="section" aria-labelledby="surfaces-title">
+          <div class="section-head"><h2>Product surfaces</h2><span>Current status</span></div>
+          <div class="checklist">
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign Setup Tool</strong><p>Authors and imports schema-v2 packages. A standalone static image with editable bounds can replace the Field Papers/PMTiles workflow. Images require attribution; an HTTPS license link is optional for GM-owned images and required for new PMTiles uploads. Rights remain GM-verified.</p></span><span class="state partial">Prototype</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>GM runtime</strong><p>Supported fields use owner-scoped, revision-checked SQLite; the GM-only conflict ledger is audited and backed up. Campaign era/premise are shown in Situation. Browser geometry preview/publication and Player Interface rendering pass with OSM fallback. Setup imports still need runtime dashboard initialization; scheduled backups and offline asset migration remain open.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Player Interface</strong><p>Reports, map projection, COMMS, character/inventory bookkeeping; rules-governed actions remain planned.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player seed lifecycle</strong><p>Campaign assignment/review and the four-seat limit are verified. GM-issued temporary passwords require a first-login change; protected pages and APIs stay blocked until completion.</p></span><span class="state done">Ready slice</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Runtime route and map editing</strong><p>GM route order/legs and location coordinates are editable, audited, and backed up. Setup source and current player publication remain unchanged.</p></span><span class="state done">Ready slice</span></label>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="gm-tools-title">
+          <div class="section-head"><h2>GM tools and campaign systems</h2><span>Prototype work is not full simulation</span></div>
+          <div class="checklist">
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Personnel add/edit/remove</strong><p>Revision conflicts refresh authoritative records and preserve the open draft.</p></span><span class="state done">Ready</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Conflict incident ledger</strong><p>GM can manually record, edit, monitor, and resolve campaign incidents. Owner/revision checks, audit, and backup recovery are in place; no escalation rules, encounter generation, or player publication.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Weather control</strong><p>GM records the physical d6 and matching source-aid symbol; numeric face mappings are not assumed. Rolls are audited, once per shift, with automatic Rain/Snow reversion and one required Cloudy shift.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" data-progress="partial" disabled><span class="check-copy"><strong>Campaign package recovery</strong><p>Same-host restore and cross-host account-mapped import are available; scheduled backups remain open.</p></span><span class="state partial">Partial</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Verified T2K 4E workflows and complete combat automation</strong><p>Campaign setup, session loop, strategic play (6-hour shifts), close combat, ranged/heavy weapons, and vehicle combat procedures verified against official Referee Aids. Core combat calculator (ranged/close/grenades), heavy weapons system (grenades/mines with 7-hex blast), vehicle combat (armor/penetration), GM combat interface form, and result logging fully implemented and tested. The full suite now has 120 passing tests (local Node 22.23.4; project specifies Node 24+).</p></span><span class="state done">Implemented</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Combat calculator and heavy weapons/vehicle combat</strong><p>Ranged attack, close combat, grenade resolution, heavy weapons (grenades/mines with blast mechanics), and vehicle combat (armor penetration/damage effects). All verified against T2K 4E Referee Aids. GM UI form with 5 combat type tabs, combat result logging with audit trail integration. API endpoints fully functional.</p></span><span class="state done">Implemented</span></label>
+            <label class="check-row"><input type="checkbox" disabled><span class="check-copy"><strong>Conflict escalation and encounter generation</strong><p>The incident ledger is manual bookkeeping. Rule-backed escalation and editable GM-reviewed encounter proposals remain planned.</p></span><span class="state">Open</span></label>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="player-features-title">
+          <div class="section-head"><h2>Player-facing features</h2><span>Separate from the seed workflow</span></div>
+          <div class="checklist">
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Player reports, map projection, and COMMS</strong><p>Published data is allow-listed; private GM state stays hidden. Map API includes bounded geometry and optional static images or raster/vector PMTiles with attribution and any license link. GM background changes need explicit preview/publication before players see them; the full image is revealed, with no fog masking.</p></span><span class="state done">Ready</span></label>
+            <label class="check-row"><input type="checkbox" checked disabled><span class="check-copy"><strong>Owned inventory and manual conditions</strong><p>Player proposals require GM review; condition data is read-only to players.</p></span><span class="state done">Ready slice</span></label>
+          </div>
+        </section>
+
+        <aside class="notice"><strong>Verification</strong><p>Project test status from 03 Nov 2026: 267 passed, 0 failed. Authentication, weather recovery, T2K 4E workflows, and combat status are unchanged. This atlas update adds synthetic coverage for PMTiles tile-type detection, vector style generation, license metadata, import persistence, and authenticated byte ranges. Real licensed archive decoding/rendering and cross-host asset migration remain unverified; the tool records license details but does not check the grant of rights. Setup import still needs an initialized runtime dashboard row. The GM-only descriptive conflict ledger passes API and backup recovery tests; escalation and encounter generation remain planned.</p></aside>
+        <p class="footnote">Checkboxes indicate documented implementation status and are read-only. See FEATURES.md for the full inventory and ROADMAP.md for phase dependencies and exit checks.</p>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.querySelectorAll('input[data-progress="partial"]').forEach((checkbox) => { checkbox.indeterminate = true; });
+  </script>
+</body>
+</html>

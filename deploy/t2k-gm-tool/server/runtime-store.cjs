@@ -1,6 +1,6 @@
 const { createHash, randomBytes, randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
-const { assertCampaignSetupPackage } = require("../campaign-package-contract.js");
+const { assertCampaignSetupPackage, assertOfflineBasemap } = require("../campaign-package-contract.js");
 
 const schema = `
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -299,7 +299,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-    if (version > 21) {
+  if (version > 22) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -733,6 +733,70 @@ function openRuntimeDatabase(path = ":memory:") {
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
+  if (version < 22) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const personnelColumns = new Set(database.prepare("PRAGMA table_info(personnel)").all().map(({ name }) => name));
+      if (!personnelColumns.has("attribute_strength")) {
+        database.exec(`CREATE TABLE npc_archetypes (
+          campaign_id TEXT,
+          id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT,
+          attribute_strength TEXT NOT NULL CHECK (attribute_strength IN ('A', 'B', 'C', 'D')),
+          attribute_agility TEXT NOT NULL CHECK (attribute_agility IN ('A', 'B', 'C', 'D')),
+          attribute_intelligence TEXT NOT NULL CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D')),
+          attribute_empathy TEXT NOT NULL CHECK (attribute_empathy IN ('A', 'B', 'C', 'D')),
+          hit_cap INTEGER NOT NULL CHECK (hit_cap >= 3),
+          cuf_rating TEXT NOT NULL CHECK (cuf_rating IN ('A', 'B', 'C', 'D')),
+          skills_json TEXT NOT NULL,
+          equipment_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          UNIQUE (campaign_id, id)
+        ) STRICT;
+        CREATE INDEX npc_archetypes_by_category ON npc_archetypes(campaign_id, category);
+        ALTER TABLE personnel ADD COLUMN attribute_strength TEXT CHECK (attribute_strength IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN attribute_agility TEXT CHECK (attribute_agility IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN attribute_intelligence TEXT CHECK (attribute_intelligence IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN attribute_empathy TEXT CHECK (attribute_empathy IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN hit_cap INTEGER CHECK (hit_cap >= 3);
+        ALTER TABLE personnel ADD COLUMN cuf_rating TEXT CHECK (cuf_rating IN ('A', 'B', 'C', 'D'));
+        ALTER TABLE personnel ADD COLUMN skills_json TEXT DEFAULT '[]';
+        ALTER TABLE personnel ADD COLUMN equipment_json TEXT DEFAULT '[]';
+        ALTER TABLE personnel ADD COLUMN morale_state TEXT DEFAULT 'normal' CHECK (morale_state IN ('high', 'normal', 'low', 'broken'));
+        ALTER TABLE personnel ADD COLUMN stress_damage INTEGER NOT NULL DEFAULT 0 CHECK (stress_damage >= 0);
+        ALTER TABLE personnel ADD COLUMN archetype_id TEXT;
+        ALTER TABLE personnel ADD COLUMN created_at TEXT;
+        ALTER TABLE personnel ADD COLUMN updated_at TEXT;`);
+      }
+      const accountColumns = new Set(database.prepare("PRAGMA table_info(accounts)").all().map(({ name }) => name));
+      if (!accountColumns.has("must_change_password")) {
+        database.exec("ALTER TABLE accounts ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1))");
+      }
+      database.exec("DELETE FROM account_invites");
+      const conflictTableExists = database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get();
+      if (!conflictTableExists) {
+        database.exec(`CREATE TABLE conflict_incidents (
+          campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+          id TEXT NOT NULL,
+          incident_type TEXT NOT NULL CHECK (incident_type IN ('border-incident', 'trade-disruption', 'convoy-attack', 'active-threat', 'other')),
+          status TEXT NOT NULL CHECK (status IN ('open', 'monitoring', 'resolved')),
+          title TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          incident_date TEXT NOT NULL,
+          sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (campaign_id, id),
+          UNIQUE (campaign_id, sort_order)
+        ) STRICT;
+        CREATE INDEX conflict_incidents_by_campaign ON conflict_incidents(campaign_id, incident_date DESC, sort_order);`);
+      }
+      database.exec("PRAGMA user_version = 22");
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
   database.exec("BEGIN");
   try {
     loadDefaultNPCArchetypes(database);
@@ -748,6 +812,12 @@ function requireText(value, label, maximumLength) {
     throw new Error(`${label} is missing or exceeds its allowed length.`);
   }
   return value.trim();
+}
+
+function isValidIncidentDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function parseInfluenceCell(value, factionName) {
@@ -818,6 +888,7 @@ function collectRuntimeSave(database, gmAccountId, runtimeId, options = {}) {
     characterConditions: queryRows("SELECT * FROM character_conditions WHERE campaign_id = ? ORDER BY character_id", runtimeId),
     auditEvents: queryRows("SELECT * FROM audit_events WHERE campaign_id = ? ORDER BY sequence", runtimeId),
     dailySupplyUsage: queryRows("SELECT * FROM daily_supply_usage WHERE campaign_id = ? ORDER BY game_date", runtimeId),
+    conflictIncidents: queryRows("SELECT * FROM conflict_incidents WHERE campaign_id = ? ORDER BY incident_date DESC, sort_order, id", runtimeId),
     routeStops: queryRows("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal", runtimeId),
     personnel: queryRows("SELECT * FROM personnel WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
     journalEntries: queryRows("SELECT * FROM journal_entries WHERE campaign_id = ? ORDER BY id", runtimeId),
@@ -859,6 +930,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     characterConditions: Object.hasOwn(backup.data, "characterConditions") ? backup.data.characterConditions : [],
     auditEvents: Object.hasOwn(backup.data, "auditEvents") ? backup.data.auditEvents.map((row) => ({ ...row, game_time: Object.hasOwn(row, "game_time") ? row.game_time : null })) : [],
     dailySupplyUsage: Object.hasOwn(backup.data, "dailySupplyUsage") ? backup.data.dailySupplyUsage : [],
+    conflictIncidents: Object.hasOwn(backup.data, "conflictIncidents") ? backup.data.conflictIncidents : [],
     dashboardState: backup.data.dashboardState ? { ...backup.data.dashboardState,
       game_time: Object.hasOwn(backup.data.dashboardState, "game_time") ? backup.data.dashboardState.game_time : "00:00",
       weather_last_roll_shift: Object.hasOwn(backup.data.dashboardState, "weather_last_roll_shift") ? backup.data.dashboardState.weather_last_roll_shift : "",
@@ -891,7 +963,8 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     inventoryProposals: 10000,
     characterConditions: 1000,
     auditEvents: 100000,
-    dailySupplyUsage: 100000
+    dailySupplyUsage: 100000,
+    conflictIncidents: 500
   };
   for (const [key, maximum] of Object.entries(limits)) {
     if (!Array.isArray(data[key]) || data[key].length > maximum) fail(`The runtime backup has an invalid ${key} list.`);
@@ -937,10 +1010,25 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     inventoryProposals: "campaign_id",
     characterConditions: "campaign_id",
     auditEvents: "campaign_id",
-    dailySupplyUsage: "campaign_id"
+    dailySupplyUsage: "campaign_id",
+    conflictIncidents: "campaign_id"
   };
   for (const [tableKey, campaignKey] of Object.entries(campaignKeys)) {
     if (data[tableKey].some((row) => row[campaignKey] !== targetRuntimeId)) fail(`The runtime backup contains a ${tableKey} row for another campaign.`);
+  }
+  if (data.conflictIncidents.some((incident) => typeof incident.id !== "string" || !incident.id.trim() || incident.id.length > 120
+    || !["border-incident", "trade-disruption", "convoy-attack", "active-threat", "other"].includes(incident.incident_type)
+    || !["open", "monitoring", "resolved"].includes(incident.status)
+    || typeof incident.title !== "string" || !incident.title.trim() || incident.title.length > 120
+    || typeof incident.notes !== "string" || incident.notes.length > 4000
+    || typeof incident.incident_date !== "string" || !isValidIncidentDate(incident.incident_date)
+    || !Number.isSafeInteger(incident.sort_order) || incident.sort_order < 0
+    || typeof incident.created_at !== "string" || typeof incident.updated_at !== "string")) {
+    fail("The runtime backup contains an invalid conflict incident.");
+  }
+  if (new Set(data.conflictIncidents.map((incident) => incident.id)).size !== data.conflictIncidents.length
+    || new Set(data.conflictIncidents.map((incident) => incident.sort_order)).size !== data.conflictIncidents.length) {
+    fail("The runtime backup contains duplicate conflict incident identifiers or ordering.");
   }
   if (data.dashboardState.campaign_id !== targetRuntimeId || data.routeStops.some((stop, index) => stop.ordinal !== index)) {
     fail("The runtime backup has invalid dashboard or route ordering data.");
@@ -977,8 +1065,10 @@ function validateRuntimeSave(backup, targetRuntimeId) {
   parseJson(map.center_json, "map center", coordinate);
   parseJson(map.annotations_json, "map annotations", Array.isArray);
   if (map.atlas_json !== null) parseJson(map.atlas_json, "atlas", isRecord);
-  if (map.offlineBasemap_json !== null) parseJson(map.offlineBasemap_json, "offline basemap", (value) =>
-    isRecord(value) && typeof value.assetId === "string" && typeof value.format === "string" && typeof value.attribution === "string");
+  if (map.offlineBasemap_json !== null) {
+    const basemap = parseJson(map.offlineBasemap_json, "offline basemap", isRecord);
+    try { assertOfflineBasemap(basemap); } catch { fail("Invalid offline basemap metadata in runtime backup."); }
+  }
   data.locations.forEach((location) => parseJson(location.map_position_json, "location position", coordinate));
   if (data.mapPublication != null) {
     const publication = data.mapPublication;
@@ -1092,7 +1182,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
       ["inventory_proposals", "campaign_id"], ["inventory_items", "campaign_id"],
       ["comms_messages", "campaign_id"],
       ["character_change_requests", "campaign_id"], ["player_seats", "campaign_id"], ["characters", "campaign_id"],
-      ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
+      ["conflict_incidents", "campaign_id"], ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
       ["runtime_dashboard_state", "campaign_id"], ["settlement_factions", "runtime_campaign_id"],
       ["faction_influence_cells", "runtime_campaign_id"], ["settlements", "runtime_campaign_id"],
       ["factions", "runtime_campaign_id"], ["terrain_cells", "runtime_campaign_id"], ["gm_notes", "runtime_campaign_id"],
@@ -1148,6 +1238,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("daily_supply_usage", ["campaign_id", "game_date", "ration_days_used", "recorded_at"], data.dailySupplyUsage);
     insertRows("route_stops", ["campaign_id", "ordinal", "location_id", "detail", "km_from_previous"], data.routeStops);
     insertRows("personnel", ["campaign_id", "id", "name", "role", "condition", "readiness", "sort_order"], data.personnel);
+    insertRows("conflict_incidents", ["campaign_id", "id", "incident_type", "status", "title", "notes", "incident_date", "sort_order", "created_at", "updated_at"], data.conflictIncidents);
     insertRows("journal_entries", ["campaign_id", "id", "title", "body", "entry_date", "kind", "created_at"], data.journalEntries);
     insertRows("comms_messages", ["id", "campaign_id", "sender_account_id", "sender_role", "sender_label", "message_text", "game_date", "game_time", "day_number", "created_at", "sort_order"], data.commsMessages.map((row) => ({ ...row, game_time: row.game_time ?? null })));
     insertRows("characters", ["id", "campaign_id", "status", "fields_json", "created_at", "updated_at"], data.characters);
@@ -1249,7 +1340,7 @@ function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, op
 
     const runtimeCampaignRows = ["terrainCells", "locations", "settlements", "factions", "factionInfluenceCells", "settlementFactions", "gmNotes"];
     runtimeCampaignRows.forEach((key) => data[key].forEach((row) => { row.runtime_campaign_id = targetRuntimeId; }));
-    const campaignRows = ["routeStops", "personnel", "journalEntries", "characters", "playerSeats", "characterChangeRequests",
+    const campaignRows = ["routeStops", "personnel", "journalEntries", "conflictIncidents", "characters", "playerSeats", "characterChangeRequests",
       "commsMessages", "inventoryItems", "inventoryProposals", "characterConditions", "auditEvents", "dailySupplyUsage"];
     campaignRows.forEach((key) => data[key].forEach((row) => { row.campaign_id = targetRuntimeId; }));
     data.setupImport.runtime_campaign_id = targetRuntimeId;
@@ -1455,7 +1546,10 @@ function getRuntimeCampaign(database, accountId, runtimeId) {
     WHERE campaigns.runtime_id = ? AND campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm' AND campaigns.active = 1`).get(runtimeId, accountId);
   if (!campaign) return null;
   const { sourceJson, ...summary } = campaign;
-  return { ...summary, setupPackage: JSON.parse(sourceJson) };
+  const setupPackage = JSON.parse(sourceJson);
+  const mapState = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(runtimeId);
+  if (mapState) setupPackage.map.offlineBasemap = mapState.offlineBasemap_json ? JSON.parse(mapState.offlineBasemap_json) : null;
+  return { ...summary, setupPackage };
 }
 
 function syncPartyFactionMembers(database, runtimeId) {
@@ -1606,12 +1700,15 @@ function getRuntimeDashboard(database, accountId, runtimeId) {
     FROM personnel WHERE campaign_id = ? ORDER BY sort_order`).all(runtimeId);
   const journal = database.prepare(`SELECT id, title, body, entry_date AS entryDate, kind, created_at AS createdAt
     FROM journal_entries WHERE campaign_id = ? ORDER BY entry_date DESC, created_at DESC, id`).all(runtimeId);
-  return { campaign, dashboard, route, locations, personnel, journal };
+  const conflicts = database.prepare(`SELECT id, incident_type AS type, status, title, notes, incident_date AS incidentDate,
+      sort_order AS sortOrder, created_at AS createdAt, updated_at AS updatedAt
+    FROM conflict_incidents WHERE campaign_id = ? ORDER BY incident_date DESC, sort_order, id`).all(runtimeId);
+  return { campaign, dashboard, route, locations, personnel, journal, conflicts };
 }
 
 function updateRuntimeDashboard(database, accountId, runtimeId, input, options = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Runtime changes must be an object.");
-  const allowedSections = new Set(["expectedRevision", "dashboard", "personnel", "journal", "route", "locations"]);
+  const allowedSections = new Set(["expectedRevision", "dashboard", "personnel", "journal", "conflicts", "route", "locations"]);
   if (Object.keys(input).some((key) => !allowedSections.has(key))) throw new Error("The runtime update contains an unsupported section.");
   if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new Error("Expected campaign revision is required.");
   database.exec("BEGIN IMMEDIATE");
@@ -1766,6 +1863,58 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
         const action = existingJournal.has(row.id) ? "journal.update" : "journal.create";
         require("./audit.cjs").appendAuditEvent(database, accountId, runtimeId, {
           action, targetType: "journal_entry", targetId: row.id
+        });
+      }
+    }
+
+    if (Object.hasOwn(input, "conflicts")) {
+      if (!Array.isArray(input.conflicts) || input.conflicts.length > 500) throw new Error("Conflict incidents must be a list of at most 500 records.");
+      const rows = input.conflicts.map((incident, sortOrder) => {
+        if (!incident || typeof incident !== "object" || Array.isArray(incident)
+          || Object.keys(incident).some((key) => !["id", "type", "status", "title", "notes", "incidentDate"].includes(key))
+          || typeof incident.id !== "string" && typeof incident.id !== "number"
+          || !String(incident.id).trim() || String(incident.id).length > 120
+          || !["border-incident", "trade-disruption", "convoy-attack", "active-threat", "other"].includes(incident.type)
+          || !["open", "monitoring", "resolved"].includes(incident.status)
+          || typeof incident.title !== "string" || !incident.title.trim() || incident.title.length > 120
+          || typeof incident.notes !== "string" || incident.notes.length > 4000
+          || !isValidIncidentDate(incident.incidentDate)) {
+          throw new Error("A conflict incident is invalid.");
+        }
+        return { id: String(incident.id), type: incident.type, status: incident.status,
+          title: incident.title.trim(), notes: incident.notes.trim(), incidentDate: incident.incidentDate, sortOrder };
+      });
+      if (new Set(rows.map((incident) => incident.id)).size !== rows.length) throw new Error("Conflict incident IDs must be unique within the campaign.");
+      const existing = new Map(current.conflicts.map((incident) => [incident.id, incident]));
+      const next = new Map(rows.map((incident) => [incident.id, incident]));
+      const changes = [];
+      for (const [id, incident] of existing) {
+        const updated = next.get(id);
+        if (!updated) changes.push({ action: "conflict.delete", id, label: incident.title });
+        else if (incident.type !== updated.type || incident.status !== updated.status || incident.title !== updated.title
+          || incident.notes !== updated.notes || incident.incidentDate !== updated.incidentDate || incident.sortOrder !== updated.sortOrder) {
+          changes.push({ action: incident.status !== "resolved" && updated.status === "resolved" ? "conflict.resolve" : "conflict.update", id, label: updated.title });
+        }
+      }
+      for (const [id, incident] of next) {
+        if (!existing.has(id)) changes.push({ action: "conflict.create", id, label: incident.title });
+      }
+      const changedIds = new Set(changes.filter((change) => change.action !== "conflict.delete").map((change) => change.id));
+      database.prepare("DELETE FROM conflict_incidents WHERE campaign_id = ?").run(runtimeId);
+      const insert = database.prepare(`INSERT INTO conflict_incidents
+        (campaign_id, id, incident_type, status, title, notes, incident_date, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      rows.forEach((incident) => {
+        const previous = existing.get(incident.id);
+        insert.run(runtimeId, incident.id, incident.type, incident.status, incident.title, incident.notes,
+          incident.incidentDate, incident.sortOrder, previous?.createdAt ?? timestamp,
+          previous && !changedIds.has(incident.id) ? previous.updatedAt : timestamp);
+      });
+      database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")
+        .run(timestamp, runtimeId);
+      for (const change of changes) {
+        require("./audit.cjs").appendAuditEvent(database, accountId, runtimeId, {
+          action: change.action, targetType: "conflict_incident", targetId: change.id, targetLabel: change.label
         });
       }
     }
