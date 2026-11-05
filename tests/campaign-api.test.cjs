@@ -362,6 +362,7 @@ test("COMMS broadcasts single-line messages with server-owned identity and game 
     assert.equal((await post(playerPath, cookies[0], { text: "Spoof", ...extra })).status, 422);
   }
   assert.deepEqual(await read(playerPath, cookies[0]), { messages: [], hasEarlier: false });
+  database.prepare("DELETE FROM runtime_dashboard_state WHERE campaign_id = ?").run(campaign.id);
   const unstamped = await post(playerPath, cookies[0], { text: "Clock not configured" });
   assert.equal(unstamped.status, 201); assert.equal((await unstamped.json()).message.gameTime, null);
   database.prepare(`INSERT INTO runtime_dashboard_state
@@ -604,6 +605,18 @@ test("imports a setup package for its GM and returns only owned campaigns", asyn
   const detail = await fetch(`${origin}/api/campaigns/${encodeURIComponent(campaign.id)}`, { headers: { Cookie: cookie } });
   assert.equal(detail.status, 200);
   assert.equal((await detail.json()).campaign.setupPackage.map.id, "map-1");
+
+  const runtimeResponse = await fetch(`${origin}/api/campaigns/${encodeURIComponent(campaign.id)}/runtime`, { headers: { Cookie: cookie } });
+  assert.equal(runtimeResponse.status, 200);
+  const { runtime } = await runtimeResponse.json();
+  assert.equal(runtime.campaign.id, campaign.id);
+  assert.equal(runtime.dashboard.gameDate, "2000-01-01");
+  assert.equal(runtime.dashboard.gameTime, "00:00");
+  assert.equal(runtime.dashboard.dayNumber, 0);
+  assert.equal(runtime.dashboard.weather, "Not recorded");
+  assert.equal(runtime.route[0].locationId, "location-1");
+  assert.equal(runtime.route.length, 1);
+  assert.equal(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaign.id).source_json, sourceJson);
 
   const outsiderId = "unrelated-account";
   const ownerPasswordHash = database.prepare("SELECT password_hash FROM accounts WHERE login_identifier = 'gm-user'").get().password_hash;

@@ -43,9 +43,13 @@ function sampleSetupPackage() {
   };
 }
 
-function seedRuntimeDashboardRows(database, campaignId, timestamp) {
+function seedRuntimeDashboardRows(database, campaignId, timestamp, createdCampaign) {
   database.exec("BEGIN IMMEDIATE");
   try {
+    if (createdCampaign) {
+      database.prepare("DELETE FROM route_stops WHERE campaign_id = ?").run(campaignId);
+      database.prepare("DELETE FROM runtime_dashboard_state WHERE campaign_id = ?").run(campaignId);
+    }
     database.prepare(`INSERT OR IGNORE INTO runtime_dashboard_state
       (campaign_id, game_date, day_number, distance_km, rations_days, fuel_units, weather, weather_note, active_stop_index, updated_at)
       VALUES (?, '2000-05-11', 14, 86, 6, 3, 'Cold rain', ?, 1, ?)`)
@@ -135,7 +139,7 @@ function seedSampleRuntime(database, gmAccountId, options = {}) {
     seed = { ...seed, fields: listCampaignPlayerSeeds(database, gmAccountId, campaign.runtime_id).find((row) => row.username.toLowerCase() === username.toLowerCase()).fields };
   }
 
-  seedRuntimeDashboardRows(database, campaign.runtime_id, timestamp);
+  seedRuntimeDashboardRows(database, campaign.runtime_id, timestamp, createdCampaign);
   return {
     campaignId: campaign.runtime_id,
     campaignName: "The Long Road",

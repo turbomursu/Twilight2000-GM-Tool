@@ -29,6 +29,7 @@ const PROTECTED_FILES = new Map([
   ["/vendor/leaflet-maplibre-gl.js", ["node_modules/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js", "text/javascript; charset=utf-8"]],
   ["/vendor/pmtiles.js", ["node_modules/pmtiles/dist/pmtiles.js", "text/javascript; charset=utf-8"]],
   ["/campaign-package-contract.js", ["campaign-package-contract.js", "text/javascript; charset=utf-8"]],
+  ["/campaign-setup-import-client.js", ["campaign-setup-import-client.js", "text/javascript; charset=utf-8"]],
   ["/vector-atlas-client.js", ["vector-atlas-client.js", "text/javascript; charset=utf-8"]],
   ["/auth-client.js", ["auth-client.js", "text/javascript; charset=utf-8"]],
   ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]],

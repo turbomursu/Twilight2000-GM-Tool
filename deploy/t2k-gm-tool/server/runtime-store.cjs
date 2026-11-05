@@ -1519,6 +1519,16 @@ function importSetupPackage(database, sourceJson, options = {}) {
       VALUES (?, ?, 'Player Party', 'The player character group', '#4A90E2', 'player-party', 1, ?, 'C')`)
       .run(runtimeId, partyId, firstLocation);
 
+    // Setup has no runtime clock or supplies; use a labeled bookkeeping baseline.
+    database.prepare(`INSERT INTO runtime_dashboard_state
+      (campaign_id, game_date, game_time, day_number, distance_km, rations_days, fuel_units,
+       weather, weather_note, active_stop_index, updated_at)
+      VALUES (?, '2000-01-01', '00:00', 0, 0, 0, 0, 'Not recorded', ?, 0, ?)`)
+      .run(runtimeId, "Initial bookkeeping baseline: set the campaign date, weather, and supplies before play. Setup era is a descriptive label, not a runtime date.", timestamp);
+    database.prepare(`INSERT INTO route_stops
+      (campaign_id, ordinal, location_id, detail, km_from_previous)
+      VALUES (?, 0, ?, 'Starting location', 0)`).run(runtimeId, firstLocation);
+
     database.exec("COMMIT");
     return { runtimeCampaignId: runtimeId, sourceCampaignId: campaignId, schemaVersion: 1, checksum };
   } catch (error) {

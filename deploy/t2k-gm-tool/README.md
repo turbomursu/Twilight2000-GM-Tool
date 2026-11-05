@@ -9,6 +9,19 @@ Current feature status is in `metadata/FEATURES.md`.
 The older package description below is historical; the release notes take
 precedence for version, installation, ports, contents, and feature availability.
 
+## Campaign setup and runtime
+
+Campaign Setup remains a separate GM-only authoring page, linked under
+**Separate authoring tools** in the GM runtime. Review and export setup JSON,
+then use **Import setup package** in the runtime to preview and confirm creation
+of an independent campaign. Runtime edits never update the browser-local setup
+draft and importing does not publish player data. Use runtime backups for
+campaigns already in play. New setup imports initialize and automatically load
+the runtime dashboard at the declared starting location. Review the GM-editable
+baseline before play: 2000-01-01 00:00, day 0, zero distance/supplies, and weather
+Not recorded. If creation succeeds but loading fails, do not import again.
+Previously imported campaigns lacking dashboard state are not changed.
+
 # 📦 TWILIGHT: 2000 FOURTH EDITION GM TOOL
 ## Complete Deployment Package v1.1.0
 

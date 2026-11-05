@@ -55,6 +55,9 @@ test("redirects anonymous requests to login and serves only public auth assets",
   const weatherRules = await fetch(`${origin}/weather-rules.js`, { redirect: "manual" });
   assert.equal(weatherRules.status, 302);
   assert.equal(weatherRules.headers.get("location"), "/login.html?next=%2Fweather-rules.js");
+  const setupImportClient = await fetch(`${origin}/campaign-setup-import-client.js`, { redirect: "manual" });
+  assert.equal(setupImportClient.status, 302);
+  assert.equal(setupImportClient.headers.get("location"), "/login.html?next=%2Fcampaign-setup-import-client.js");
 
   const login = await fetch(`${origin}/login.html`);
   assert.equal(login.status, 200);
@@ -75,6 +78,10 @@ test("serves protected pages only for an active session and gates them again aft
 
   const protectedPage = await fetch(`${origin}/index.html`, { headers: { Cookie: cookie } });
   assert.equal(protectedPage.status, 200);
+  const setupImportClient = await fetch(`${origin}/campaign-setup-import-client.js`, { headers: { Cookie: cookie } });
+  assert.equal(setupImportClient.status, 200);
+  assert.match(setupImportClient.headers.get("content-type"), /text\/javascript/);
+  assert.match(await setupImportClient.text(), /window.FieldbookSetupImport/);
   const runtimeHtml = await protectedPage.text();
   assert.match(runtimeHtml, /data-auth-logout/);
   assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
