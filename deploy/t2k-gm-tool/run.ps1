@@ -1,10 +1,2 @@
-Set-Location $PSScriptRoot
-
-if (-not $env:FIELDBOOK_BOOTSTRAP_TOKEN) {
-    $tokenPath = Join-Path $PSScriptRoot "token.txt"
-    if (Test-Path -LiteralPath $tokenPath) {
-        $env:FIELDBOOK_BOOTSTRAP_TOKEN = [System.IO.File]::ReadAllText($tokenPath).Trim()
-    }
-}
-
-npm start
+# Twilight 2000 GM Tool - Node.js wrapper with SQLite experimental flag
+& "C:\Program Files\nodejs\node.exe" --experimental-sqlite @args

@@ -1,4 +1,4 @@
-# Quick Start Guide
+# Quick Start Guide / v1.2.1
 
 ## Quick Installation
 
@@ -12,27 +12,29 @@
 1. Run `INSTALL_SERVER.bat` or `INSTALL_SERVER.ps1`.
 2. If you used the batch installer, open a new terminal.
 3. From this folder, run `npm start`.
-4. Open `http://localhost:8080`.
+4. Open the GM Tool at `http://localhost:8081`.
 5. Enter the bootstrap token from `token.txt`, then create the GM account.
 
 ## Done!
 
 You now have:
-- GM Tool running on http://localhost:8080
+- GM Tool running on http://localhost:8081
 - ✅ Player Interface at /player-interface.html
 - ✅ Campaign Setup Tool at /campaign-setup.html
 - ✅ Local database for campaigns
-- ✅ Automatic backups every 5 minutes
+- Backup scheduling is GM-configured, not automatically enabled every five minutes.
 
 ## First Campaign
 
-1. Click **Campaigns** → **+ New Campaign**
-2. Enter name and description
-3. Use **Campaign Setup Tool** to design:
-   - Factions (who controls what)
-   - Settlements (where people live)
-   - Threats (what endangers them)
-   - Map (upload PMTiles if you have one)
+Use **Campaign Setup Tool** to create a schema-v2 campaign package with bounds,
+terrain, locations, settlements, factions, and GM notes. In **Base map**, choose
+a static PNG/JPEG/WebP image or an atlas/PMTiles background. Static images need
+editable geographic bounds and attribution; a Field Papers atlas is optional.
+See `metadata/FEATURES.md` for current prototype limitations, including dashboard
+initialization for freshly imported packages.
+
+For an existing campaign, open **Player map > Campaign map background** to apply
+an image or return to online OSM. Preview and publish separately for players.
 
 ## For Players
 
@@ -55,19 +57,17 @@ Players can:
 
 | Use | URL |
 |-----|-----|
-| GM Tool | http://localhost:8080 |
+| GM Tool | http://localhost:8081 |
 | Player Interface | http://localhost:8080/player-interface.html |
-| Campaign Setup | http://localhost:8080/campaign-setup.html |
-| On network | http://YOUR-IP:8080 |
+| Campaign Setup | http://localhost:8081/campaign-setup.html |
+| GM on network | http://YOUR-IP:8081 |
+| Players on network | http://YOUR-IP:8080 |
 
 ## Common Commands
 
 ```bash
 # Start server
 npm start
-
-# Run tests
-npm test
 
 # Stop server
 Ctrl+C (in command prompt)
@@ -80,6 +80,9 @@ The GM chooses a password during first-run setup. GM-created player accounts rec
 ## Backup Your Data
 
 Your database and local assets are stored in the `data/` folder. Back up this folder and any offline-basemap sidecars regularly.
+
+See `RELEASE_NOTES.md` before upgrading. Keep `.image`/`.pmtiles` assets with their
+matching JSON sidecars: campaign JSON and runtime backups do not embed them.
 
 Back it up regularly to a safe location!
 

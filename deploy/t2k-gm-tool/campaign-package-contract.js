@@ -5,6 +5,30 @@
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
 
+  function assertOfflineBasemap(basemap) {
+    const fail = () => { throw new Error("The offline basemap must reference a supported asset, include attribution, and provide an HTTPS license URL for vector tiles."); };
+    const hasLegacyFields = isRecord(basemap) && Object.keys(basemap).length === 3 && !Object.hasOwn(basemap, "licenseUrl");
+    const hasLicenseFields = isRecord(basemap) && Object.keys(basemap).length === 4 && Object.hasOwn(basemap, "licenseUrl");
+    const licenseUrl = hasLicenseFields ? basemap.licenseUrl : null;
+    let validLicenseUrl = licenseUrl === null;
+    if (typeof licenseUrl === "string") {
+      try {
+        const parsed = new URL(licenseUrl);
+        validLicenseUrl = parsed.protocol === "https:" && !parsed.username && !parsed.password && licenseUrl.length <= 2048;
+      } catch { validLicenseUrl = false; }
+    }
+    if (!isRecord(basemap) || (!hasLegacyFields && !hasLicenseFields)
+      || !Object.hasOwn(basemap, "assetId") || !Object.hasOwn(basemap, "attribution") || !Object.hasOwn(basemap, "format")
+      || !["raster-pmtiles", "vector-pmtiles", "static-image"].includes(basemap.format)
+      || (basemap.format === "vector-pmtiles" && !hasLicenseFields)
+      || (hasLicenseFields && (!validLicenseUrl || typeof licenseUrl !== "string" || !licenseUrl.trim()))
+      || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
+      || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) {
+      fail();
+    }
+    return true;
+  }
+
   function assertCampaignSetupPackage(input) {
     const fail = (message) => { throw new Error(message); };
     if (!isRecord(input) || input.packageType !== "fieldbook.campaign-setup" || input.schemaVersion !== 2) {
@@ -20,27 +44,7 @@
       fail("The setup package needs valid campaign-area bounds.");
     }
     const basemap = input.map.offlineBasemap;
-    if (basemap !== undefined && basemap !== null) {
-      const hasLegacyFields = isRecord(basemap) && Object.keys(basemap).length === 3 && !Object.hasOwn(basemap, "licenseUrl");
-      const hasLicenseFields = isRecord(basemap) && Object.keys(basemap).length === 4 && Object.hasOwn(basemap, "licenseUrl");
-      const licenseUrl = hasLicenseFields ? basemap.licenseUrl : null;
-      let validLicenseUrl = licenseUrl === null;
-      if (typeof licenseUrl === "string") {
-        try {
-          const parsed = new URL(licenseUrl);
-          validLicenseUrl = parsed.protocol === "https:" && !parsed.username && !parsed.password && licenseUrl.length <= 2048;
-        } catch { validLicenseUrl = false; }
-      }
-      if (!isRecord(basemap) || (!hasLegacyFields && !hasLicenseFields)
-        || !Object.hasOwn(basemap, "assetId") || !Object.hasOwn(basemap, "attribution") || !Object.hasOwn(basemap, "format")
-        || !["raster-pmtiles", "vector-pmtiles"].includes(basemap.format)
-        || (basemap.format === "vector-pmtiles" && !hasLicenseFields)
-        || (hasLicenseFields && (!validLicenseUrl || typeof licenseUrl !== "string" || !licenseUrl.trim()))
-        || typeof basemap.assetId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(basemap.assetId)
-        || typeof basemap.attribution !== "string" || !basemap.attribution.trim() || basemap.attribution.length > 300) {
-        fail("The offline basemap must reference a supported PMTiles asset, include attribution, and provide an HTTPS license URL for vector tiles.");
-      }
-    }
+    if (basemap !== undefined && basemap !== null) assertOfflineBasemap(basemap);
     const grid = input.map.grid;
     if (grid.coordinateSystem !== "axial-q-r" || grid.cellKm !== 10 || !Array.isArray(grid.terrainCells) || grid.terrainCells.length > 10000) {
       fail("The setup package contains an unsupported travel grid.");
@@ -110,7 +114,7 @@
     return true;
   }
 
-  const contract = Object.freeze({ assertCampaignSetupPackage });
+  const contract = Object.freeze({ assertCampaignSetupPackage, assertOfflineBasemap });
   root.FieldbookCampaignPackageContract = contract;
   if (typeof module !== "undefined" && module.exports) module.exports = contract;
 })(globalThis);

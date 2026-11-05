@@ -1,3 +1,14 @@
+# Fieldbook v1.2.1 / current distribution
+
+**Start with [RELEASE_NOTES.md](RELEASE_NOTES.md) and [QUICKSTART.md](QUICKSTART.md).**
+This release includes static image campaign maps. Node.js 24+ is required;
+the default GM port is **8081**, and the player port is **8080**.
+Dependencies are installed locally with `npm ci`, not bundled in the ZIP.
+Current feature status is in `metadata/FEATURES.md`.
+
+The older package description below is historical; the release notes take
+precedence for version, installation, ports, contents, and feature availability.
+
 # 📦 TWILIGHT: 2000 FOURTH EDITION GM TOOL
 ## Complete Deployment Package v1.1.0
 

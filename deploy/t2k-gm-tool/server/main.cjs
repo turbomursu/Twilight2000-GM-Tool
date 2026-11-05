@@ -28,14 +28,31 @@ function startServer(environment = process.env) {
   }
 
   const host = environment.FIELDBOOK_HOST || "0.0.0.0";
-  const port = Number(environment.FIELDBOOK_PORT || 8080);
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+  const useLegacySinglePort = environment.FIELDBOOK_PORT
+    && !environment.FIELDBOOK_PLAYER_PORT
+    && !environment.FIELDBOOK_GM_PORT;
+  const listenerConfigs = useLegacySinglePort
+    ? [{ role: undefined, port: Number(environment.FIELDBOOK_PORT) }]
+    : [
+        { role: "player", port: Number(environment.FIELDBOOK_PLAYER_PORT || 8080) },
+        { role: "gm", port: Number(environment.FIELDBOOK_GM_PORT || 8081) }
+      ];
+  if (listenerConfigs.some(({ port }) => !Number.isInteger(port) || port < 0 || port > 65535)
+      || (listenerConfigs.length > 1 && listenerConfigs[0].port === listenerConfigs[1].port && listenerConfigs[0].port !== 0)) {
     database.close();
-    throw new Error("FIELDBOOK_PORT must be an integer between 0 and 65535.");
+    throw new Error("Server ports must be different integers between 0 and 65535.");
   }
 
-  const appHandler = createAppHandler({ database, authHandler: handler });
-  const server = http.createServer(appHandler);
+  const servers = [];
+  listenerConfigs.forEach((config, index) => {
+    const appHandler = createAppHandler({
+      database,
+      authHandler: handler,
+      surfaceRole: config.role,
+      otherPort: () => servers[1 - index]?.address()?.port
+    });
+    servers.push(http.createServer(appHandler));
+  });
   
   // Start background backup runner
   // Get list of all campaigns across all GMs
@@ -118,17 +135,29 @@ function startServer(environment = process.env) {
   }, 300000);
 
   backupRunner.start();
-  server.on("close", () => {
-    backupRunner.stop();
-    clearInterval(updateInterval);
-    database.close();
-  });
+  let openServers = servers.length;
+  for (const server of servers) {
+    server.on("close", () => {
+      openServers -= 1;
+      if (openServers === 0) {
+        backupRunner.stop();
+        clearInterval(updateInterval);
+        database.close();
+      }
+    });
+  }
 
-  server.listen(port, host, () => {
-    process.stdout.write(`Fieldbook LAN API listening on http://${host}:${server.address().port}\n`);
-    process.stdout.write(`Backup scheduler active (1-minute check interval)\n`);
+  servers.forEach((server, index) => {
+    const config = listenerConfigs[index];
+    server.listen(config.port, host, () => {
+      const label = config.role ? `${config.role} server` : "LAN API";
+      process.stdout.write(`Fieldbook ${label} listening on http://${host}:${server.address().port}\n`);
+    });
   });
-  return server;
+  process.stdout.write("Backup scheduler active (1-minute check interval)\n");
+  return listenerConfigs.length === 1
+    ? servers[0]
+    : { playerServer: servers[0], gmServer: servers[1] };
 }
 
 if (require.main === module) {

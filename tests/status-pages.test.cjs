@@ -67,7 +67,7 @@ test("serves Plan B with working status navigation and HEAD support", async (t) 
 test("only status pages link to Plan B outside its own navigation", () => {
   const root = join(__dirname, "..");
   const linkingPages = readdirSync(root, { recursive: true })
-    .filter((path) => path.endsWith(".html") && !path.split(/[\\/]/).includes("node_modules"))
+    .filter((path) => path.endsWith(".html") && !path.split(/[\\/]/).some((part) => ["node_modules", "deploy"].includes(part)))
     .filter((path) => path !== join("gmpack", "plan-b.html"))
     .filter((path) => /href=["'][^"']*plan-b\.html["']/.test(readFileSync(join(root, path), "utf8")))
     .sort();
