@@ -1,405 +1,104 @@
-# T2K 4E GM Tool - Fresh Session Startup Guide
+# Twilight: 2000 Fourth Edition - Fresh Session Startup
 
-**Prepared For**: Next Development Session  
-**Date Prepared**: 02 November 2026, 15:44 UTC  
-**Status**: Production Ready (116/116 tests passing)
+Updated: 06 November 2026. This is active development guidance, not a production-readiness certification.
+The original 02 November session figures are historical; see the [session archive](../archive/session-2026-11-02/SESSION_ARCHIVE_INDEX.md).
 
----
+## Start With Current Context
 
-## Quick Start (< 5 minutes)
+- Work in the assigned checkout/worktree, not a hardcoded personal path or another session's checkout.
+- Read [project instructions](../.github/copilot-instructions.md), [FEATURES.md](FEATURES.md), [ROADMAP.md](ROADMAP.md), [DATA_MODEL.md](DATA_MODEL.md), and [README.md](README.md).
+- Consult dated completion reports and archives only for historical evidence. Current source and verified current feature status supersede earlier snapshots.
+- Setup is a prototype; GM runtime and Player Interface remain partial. Passing tests do not establish complete rules coverage, licensed-archive acceptance, cross-host asset portability, or safe internet deployment.
+- Confirm the requested scope and inspect `git status` before editing. Preserve unrelated user changes.
 
-### 1. Verify Environment
-```bash
-cd C:\Users\hemuli\Twilight2000-GM-Tool
+## Environment And Service
+
+Use the Node version required by [package.json](../package.json) (currently Node 24 or newer).
+Run commands from the assigned repository/worktree root. Install dependencies only when needed.
+
+```powershell
+node --version
+git status --short
+npm ci
+```
+
+For a new local database, configure the one-time GM bootstrap token before starting:
+
+```powershell
+$env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
+node server\main.cjs
+```
+
+Default listeners:
+
+- GM: `http://localhost:8081/`; setup: `http://localhost:8081/campaign-setup.html`.
+- Player: `http://localhost:8080/player-interface.html`.
+- Combat: `http://localhost:8081/combat.html?campaign=<id>`.
+- Status documentation: run `node server\status-pages.cjs`, then open `http://127.0.0.1:8091/`.
+
+The service binds to `0.0.0.0` by default. HTTP is for a trusted LAN only, not the internet or untrusted networks.
+`FIELDBOOK_HOST`, `FIELDBOOK_GM_PORT`, and `FIELDBOOK_PLAYER_PORT` override listeners. Explicit `FIELDBOOK_PORT` enables the legacy single-port mode only when neither role-specific port is set.
+`FIELDBOOK_DB_PATH` selects the database; the default is `data/fieldbook.sqlite`. Do not use a shared live database for tests.
+Authentication remains required; use disposable isolated fixtures for review rather than production bypasses.
+
+## Current Architecture And Handoff
+
+Discover module and test inventories from source instead of relying on fixed counts.
+
+- `server/main.cjs`: service startup, role-specific listeners, backup scheduler and automation.
+- `server/app.cjs`: protected pages, routing, owned offline assets, setup-save integration.
+- `server/runtime-store.cjs`: SQLite model, migrations, setup import, runtime state and recovery.
+- `server/setup-packages.cjs`: validated, versioned GM-owned setup JSON and copied image storage.
+- `campaign-setup.html`: browser-local initial campaign authoring, separate from runtime.
+- `index.html`: GM runtime; `player-interface.html`: explicitly published player projection.
+- `map-coordinates.js` and `campaign-package-contract.js`: shared coordinate and package validation.
+- `tests/`: Node built-in runner regressions; inspect nearby tests for the owning surface.
+
+Setup selects Static image or Map extract. Images require a GM-entered width in kilometres and validated pixel dimensions; x/y kilometres originate at bottom-left, with the 10 km grid anchored at top-left. Geographic extracts retain latitude/longitude. Manual bounds selection is deferred; never invent geography or image scale.
+
+**Save setup to server** creates JSON in `gmpack/campsetups/` and copies static images with ownership/dimension sidecars to `data/maps/<normalized-campaign>/`. Each save creates a new version. Upload staging and PMTiles remain in `data/maps/atlas/`; legacy `data/offline-basemaps/` reads remain supported. Reopen requires validation and explicit local-draft replacement; downloaded JSON can be imported into the runtime. Saving does not import or publish anything.
+
+Runtime mutations do not update setup drafts or previously published player snapshots. Scheduled and event-triggered backup infrastructure is implemented; broader recovery and cross-host asset portability remain partial. Transfer package/backup JSON, required assets, and ownership sidecars together, with destination-account ownership handled explicitly.
+
+## Working Method
+
+1. Identify the UI, API, data boundary and nearby tests before editing.
+2. Verify applicable Fourth Edition procedures and required inputs **before** implementing rules logic. Check `gmpack/ocr/` and referenced analysis, retaining source citations. If insufficient or ambiguous, request an authoritative book/page reference and keep effects GM-managed; do not infer official rules from existing code.
+3. Implement the smallest complete change within the user's scope. Keep setup, runtime, and player publication distinct.
+4. Validate relevant behavior, authorization, persistence and error paths. Report failures and unverified dependencies explicitly.
+5. Update current feature/roadmap status and existing deployment copies when applicable. Preserve dated historical reports; add superseded pointers where old behavior could be mistaken for current guidance.
+6. Inspect the final diff. Do not revert unrelated changes or automatically commit, push, merge, tag, or build a deployment ZIP.
+7. Commit only with explicit user authorization; stage only intended files, include the required co-author trailer, and follow normal review/merge protections when authorized.
+
+## Verification Commands
+
+Use the smallest relevant selector; run the full suite when the scope warrants it. Documentation-only edits need no build, but run existing documentation/path/synchronization tests that cover changed files.
+
+```powershell
+node --test tests\campaign-desk-ui.test.cjs tests\status-pages.test.cjs
+node --test --test-name-pattern="pattern" tests\campaign-setup-import-client.test.cjs
 npm test
-# Expected: 116 pass, 0 fail ✅
+npm run lint -- --quiet
+git diff --check
 ```
 
-### 2. Start Server
-```bash
-npm run start
-# Listen on http://0.0.0.0:8080
+Record actual results with the revision/date and environment. Do not require an obsolete fixed test total or equate a test count with coverage.
+For the merged image workflow on 06 November 2026 (`9daa3ec`), the recorded run was 331 passed, zero failed/skipped on Node 26.13.0; that is a dated baseline, not a permanent expected count.
+
+## Invariants And Troubleshooting
+
+- Enforce GM ownership, 1-4 separate player seats, and assigned-character permissions at the server boundary.
+- Player responses expose only authorized public data; setup eligibility is not publication.
+- Verify all positions and supported geometry vertices in the campaign's declared coordinate space.
+- Rules-dependent inventory/character proposals remain pending until GM review; unverified mechanics remain GM-managed.
+- Preserve revision checks, transactional mutations/recovery, and audit history. Restore withdraws report/map publication for explicit re-review.
+- Keep credentials, runtime data, generated exports and binary assets out of source control.
+- For failures, reproduce and inspect logs/source before changing anything. Do not blindly revert another session's work or replace a live database.
+
+The default database contains `audit_events`, not `audit_log`:
+
+```sql
+SELECT * FROM audit_events ORDER BY sequence DESC LIMIT 10;
 ```
 
-### 3. Access Application
-- GM Dashboard: http://localhost:8080
-- Combat Interface: http://localhost:8080/combat.html?campaign=<id>
-- Setup Tool: http://localhost:8080/campaign-setup.html
-
----
-
-## Session Preparation Checklist
-
-### Before Starting Work
-- [ ] Review ROADMAP.md for planned phases
-- [ ] Check FEATURES.md for current feature status
-- [ ] Read archive/session-2026-11-02/SESSION_ARCHIVE_INDEX.md
-- [ ] Review prior session commits (git log)
-- [ ] Run full test suite (npm test)
-
-### Key Files to Know
-| File | Purpose |
-|------|---------|
-| FEATURES.md | Complete feature inventory & status |
-| ROADMAP.md | Phase sequence & dependencies |
-| DATA_MODEL.md | Campaign schema design |
-| gmpack/ | T2K 4E rules reference (OCR Referee Aids) |
-| archive/session-2026-11-02/ | Prior session archive |
-
-### Understanding the Architecture
-
-**Backend** (Node.js, 20 modules):
-- `server/main.cjs` → HTTP server startup
-- `server/app.cjs` → Request routing
-- `server/campaigns.cjs` → Campaign CRUD
-- `server/combat*.cjs` → Combat system (3 files)
-- `server/audit.cjs` → Audit trail
-- `server/runtime-store.cjs` → SQLite wrapper
-
-**Frontend** (5 HTML applications):
-- `index.html` — GM dashboard
-- `campaign-setup.html` — Setup authoring
-- `player-interface.html` — Player handset
-- `combat.html` — Combat form
-- `login.html` — Authentication
-
-**Tests** (16 test files, 116 tests):
-- `tests/combat*.test.cjs` → Combat system (47 tests)
-- `tests/audit.test.cjs` → Audit trail (8 tests)
-- `tests/campaign*.test.cjs` → Campaign system (18 tests)
-- [Others] → Infrastructure, validation, API (43 tests)
-
----
-
-## Current Implementation Status
-
-### What's Done ✅
-| System | Status | Tests |
-|--------|--------|-------|
-| Authentication | Complete | 2 ✅ |
-| Campaign Management | Complete | 18 ✅ |
-| Player Interface | Complete | 4+ ✅ |
-| Combat System | Complete | 47 ✅ |
-| Audit Trail | Complete | 8 ✅ |
-| Inventory/Conditions | Complete | 3+ ✅ |
-| Weather/Clock | Complete | 3+ ✅ |
-| Player Permissions | Complete | 6+ ✅ |
-| Map Publication | Complete | 9+ ✅ |
-| Backup/Recovery | Complete | 12 ✅ |
-| **TOTAL** | **✅ 116/116** | **✅ Passing** |
-
-### What's Not Done (Planned)
-| System | Status | Notes |
-|--------|--------|-------|
-| Encounter Generation | Planned | Ambush, roadblock, opposing force |
-| Character Creation | Planned | Automate T2K 4E life path system |
-| Tactical Map | Planned | Hex-based combat positions |
-| World Simulation | Planned | Logistics, economy, diplomacy |
-| Scheduled Backups | Planned | Currently manual only |
-
----
-
-## Common Tasks
-
-### Adding a New Feature
-1. **Design**: Update FEATURES.md (mark as "Partial")
-2. **Write Tests**: Create new test file with 100% coverage
-3. **Implement**: Add to appropriate module
-4. **Verify Rules**: Check against gmpack/ocr/ if gameplay-affecting
-5. **Document**: Add to README or create quick-ref
-6. **Update Status**: Mark FEATURES.md as "Implemented"
-7. **Commit**: `git add . && git commit -m "..."`
-
-### Fixing a Bug
-1. **Reproduce**: Write failing test
-2. **Debug**: Check audit log & database state
-3. **Fix**: Modify code to pass test
-4. **Verify**: All 116 tests still pass
-5. **Test**: Manual browser testing
-6. **Commit**: `git add . && git commit -m "Fix: ..."`
-
-### Deploying to Production
-1. **Verify Tests**: `npm test` (must be 116/116)
-2. **Review Changes**: `git log -p origin/main..`
-3. **Performance Check**: Spot-check key operations
-4. **Security Check**: Review any auth/permission changes
-5. **Tag Release**: `git tag v1.0.X`
-6. **Document**: Update project-status.html snapshot
-7. **Deploy**: Copy to production host
-
-### Testing Combat System
-1. Start server: `npm run start`
-2. Create test campaign via setup tool
-3. Access combat form: `/combat.html?campaign=<id>`
-4. Test each tab: Ranged, Close, Grenade, Heavy, Vehicle
-5. Verify calculations match manual T2K 4E procedure
-6. Check results logged in audit trail
-
----
-
-## Important Invariants
-
-### Don't Break These
-- ✅ All dice calculations must match T2K 4E rules (verify vs gmpack/ocr/)
-- ✅ Audit trail is append-only (never delete/modify entries)
-- ✅ Player can only see their own character & inventory
-- ✅ Setup packages can only be imported once per campaign
-- ✅ Campaign revision must increment on every mutation
-- ✅ All mutations must be auditable (user, timestamp, action, delta)
-- ✅ Backup/restore must be atomic (all-or-nothing)
-
-### Key Assumptions
-- ✅ Single-host LAN deployment (HTTP, no encryption)
-- ✅ GM is trusted (no malicious GM in threat model)
-- ✅ SQLite for persistence (no distributed database)
-- ✅ Session tokens for authentication (no OAuth/LDAP)
-- ✅ 1-4 players max per campaign
-- ✅ Sequential turns (no true real-time multiplayer)
-
----
-
-## Useful Commands
-
-### Development
-```bash
-npm test                    # Run all 116 tests
-npm run start              # Start server (http://0.0.0.0:8080)
-npm install                # Install dependencies
-node -e "..."              # Run Node.js snippet
-```
-
-### Git
-```bash
-git log --oneline -10      # Recent commits
-git status                 # Current changes
-git diff <file>           # Diff specific file
-git add . && git commit -m "Message"  # Commit
-git push origin main      # Push to GitHub
-```
-
-### Database
-```bash
-sqlite3 data/fieldbook.sqlite  # Open database
-SELECT * FROM campaigns;       # List campaigns
-SELECT * FROM audit_log LIMIT 10;  # Recent audit entries
-```
-
-### Debugging
-- Browser Console (F12): JavaScript errors
-- Network Tab (F12): API requests/responses
-- VSCode Debugger: Node.js code stepping
-- Server logs: Console output from `npm run start`
-
----
-
-## Decision Points for Next Session
-
-### High Priority (Recommend First)
-- [ ] **Encounter Generation** — Implement ambush/roadblock/opposing force generator
-  - Needs: T2K 4E unit composition rules (in gmpack/)
-  - Estimated effort: 3-5 sessions
-  - Value: Essential for dynamic campaigns
-
-- [ ] **Character Creation Automation** — Automate T2K 4E life path
-  - Needs: Verify all life path tables (in gmpack/ocr/)
-  - Estimated effort: 2-3 sessions
-  - Value: Streamlines character generation
-
-### Medium Priority (After Priority Items)
-- [ ] **Tactical Map** — Hex-based combat visualization
-  - Needs: Leaflet integration for hex rendering
-  - Estimated effort: 3-4 sessions
-  - Value: Better combat visualization
-
-- [ ] **World Simulation** — Logistics, economy, faction conflict
-  - Needs: Game system design & balance testing
-  - Estimated effort: 5+ sessions
-  - Value: Campaign depth & dynamism
-
-### Low Priority (Polish Later)
-- [ ] **Scheduled Backups** — Automated backup system
-- [ ] **Real-Archive Rendering** — Actual PMTiles with raster mapping
-- [ ] **Dice Integration** — Real dice roller or online integration
-- [ ] **Media Attachments** — Support images/maps in reports
-
----
-
-## Reference Materials
-
-### Game Rules (in gmpack/)
-- `gmpack/ocr/` — Official T2K 4E Referee Aids (OCR transcriptions)
-  - Close Combat
-  - Ranged Combat
-  - Heavy Weapons & Explosives
-  - Vehicle Combat
-  - Strategic Play (6-hour shifts, movement, weather)
-  - Life Path Character Generation
-
-### Analysis Documents (in gmpack/)
-- `GAME_LOOP.md` — Session loop procedures
-- `SESSION_LOOP_COMPARISON.md` — Official vs implemented
-- `CHARACTER_AND_NPC_CREATION.md` — Character generation rules
-- `ITEM_AND_WEAPON_STATS.md` — Equipment reference
-- `STRATEGIC_PLAY_AUTOMATION_ACTIONS.md` — Strategic play automation ideas
-
-### Project Documentation
-- `FEATURES.md` — Feature inventory with status
-- `ROADMAP.md` — Phase sequence with exit checks
-- `DATA_MODEL.md` — Campaign schema design
-- `archive/session-2026-11-02/` — Prior session archive (4 documents)
-
----
-
-## Testing Strategy
-
-### Before Committing Any Change
-```bash
-npm test  # Must be: 116 pass, 0 fail
-```
-
-### When Adding Features
-1. Write test first (TDD)
-2. Implement until test passes
-3. Verify no regressions (all 116 still pass)
-4. Add documentation
-5. Commit with clear message
-
-### When Fixing Bugs
-1. Write test that reproduces bug
-2. Fix code to pass test
-3. Verify no regressions
-4. Verify fix is correct (manual testing)
-5. Commit with reference to issue
-
-### Performance Testing
-- Combat calculations should be <1ms
-- API responses should be <50ms
-- Database queries should be <100ms
-- If slower, profile and optimize
-
----
-
-## Clean Slate Notes
-
-This session is starting fresh from the current production state. The following are stable and should not need modification:
-
-### Stable Subsystems (Don't Modify Unless Bug Found)
-- ✅ Authentication & authorization
-- ✅ Database schema & persistence
-- ✅ Audit trail system
-- ✅ Campaign package versioning
-- ✅ Player permission model
-- ✅ API routing & contracts
-- ✅ Combat calculation engine
-- ✅ Test infrastructure
-
-### Safe to Modify/Extend
-- ⚙️ Combat subsystem (add new weapon types, mechanics)
-- ⚙️ Campaign features (add new attributes)
-- ⚙️ Player interface (new views, better UX)
-- ⚙️ GM tools (new automation, utilities)
-- ⚙️ Documentation (clarifications, guides)
-
-### Testing Requirement
-- **ALL changes must maintain 116/116 test pass rate**
-- Add new tests for new features
-- Update existing tests if schemas change
-- No code should break existing tests
-
----
-
-## Getting Help
-
-### Understanding the Code
-1. Start with README.md (top-level overview)
-2. Read DATA_MODEL.md (schema design)
-3. Check ROADMAP.md (phase context)
-4. Review relevant test file (see how it's used)
-5. Check inline JSDoc comments
-6. Run `npm test -- --grep "keyword"` to find related tests
-
-### Rules Questions
-1. Check gmpack/ocr/ (official Referee Aids)
-2. Look in gmpack/*.md (analysis documents)
-3. Search combat code for similar mechanics
-4. Add rules verification comments in code
-5. Document any assumptions or ambiguities
-
-### Git/GitHub Questions
-1. Review commit history: `git log`
-2. Check branches: `git branch -a`
-3. See current status: `git status`
-4. Review changes: `git diff`
-5. Check remote: `git remote -v`
-
----
-
-## Session Startup Checklist
-
-### Initial Setup (First Time)
-- [ ] Read this file completely
-- [ ] Review archive/session-2026-11-02/SESSION_ARCHIVE_INDEX.md
-- [ ] Check ROADMAP.md for planned work
-- [ ] Run `npm test` (verify 116/116)
-- [ ] Review FEATURES.md for current status
-- [ ] Pick feature from ROADMAP.md to work on
-
-### Daily Workflow
-- [ ] Start with `npm test` (verify baseline)
-- [ ] Work on planned feature
-- [ ] Run tests frequently (`npm test`)
-- [ ] Commit regularly with clear messages
-- [ ] Update documentation as you go
-- [ ] End with full test pass and documentation update
-
-### Before Finishing Session
-- [ ] All 116 tests passing
-- [ ] Documentation updated
-- [ ] Commits pushed to GitHub
-- [ ] Status pages updated if needed
-- [ ] Clean working directory (`git status` shows clean)
-
----
-
-## Quick Reference
-
-### Architecture
-- **Frontend**: HTML forms + JS event handlers
-- **Backend**: Node.js HTTP server + SQLite database
-- **API**: RESTful POST/GET endpoints
-- **Auth**: Session tokens (server-validated)
-- **Data**: SQLite with append-only audit log
-- **Rules**: T2K 4E verified via gmpack/ reference
-
-### Test Run
-- `npm test` — All 116 tests
-- `npm test -- tests/combat.test.cjs` — Combat only
-- `npm test -- --grep "pattern"` — By name pattern
-
-### Deploy
-- Verify: `npm test` (116/116)
-- Commit: `git add . && git commit -m "..."`
-- Push: `git push origin main`
-- Tag: `git tag vX.Y.Z && git push --tags`
-
-### Emergency
-- **Tests failing**: Check git log, revert last commit, debug
-- **Database corrupt**: Restore from backup (cross-host import)
-- **Performance issue**: Profile, check database queries
-- **Security issue**: Review auth/permission changes, check audit log
-
----
-
-## Conclusion
-
-The project is in excellent state for continued development. All systems are tested, documented, and production-ready. The next session should focus on planned features in ROADMAP.md (encounter generation is highest priority).
-
-**Happy coding! 🚀**
-
----
-
-**Prepared By**: AI Assistant (Copilot)  
-**Date**: 02 November 2026, 15:44 UTC  
-**Status**: Ready for next session  
-**Test Status**: 116/116 ✅  
-**Recommendation**: Start with encounter generation per ROADMAP.md
+Use the current roadmap and the user's request to choose work; historical priority recommendations are not new authorization.

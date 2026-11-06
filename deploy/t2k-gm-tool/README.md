@@ -6,14 +6,21 @@ the default GM port is **8081**, and the player port is **8080**.
 Dependencies are installed locally with `npm ci`, not bundled in the ZIP.
 Current feature status is in `metadata/FEATURES.md`.
 
-The older package description below is historical; the release notes take
-precedence for version, installation, ports, contents, and feature availability.
+The older package description below and release notes are historical release
+records. Use `metadata/README.md` and `metadata/FEATURES.md` for current source
+behavior and limitations; the application version is recorded in `package.json`.
+Updating these tracked sources does not rebuild a ZIP or certify production readiness.
 
 ## Campaign setup and runtime
 
 Campaign Setup remains a separate GM-only authoring page, linked under
-**Separate authoring tools** in the GM runtime. Review and export setup JSON,
-then use **Import setup package** in the runtime to preview and confirm creation
+**Separate authoring tools** in the GM runtime. Select Static image or Map extract;
+images use a required GM-entered kilometre width and validated pixel dimensions,
+not geographic bounds. Manual bounds selection is deferred. **Save setup to server**
+creates versioned JSON in `gmpack/campsetups/` and copies static images/sidecars to
+`data/maps/<normalized-campaign>/`; prior versions and source uploads remain intact.
+Reopen validates the saved version before local-draft replacement. Download the
+saved JSON, then use **Import setup package** in the runtime to preview and confirm creation
 of an independent campaign. Runtime edits never update the browser-local setup
 draft and importing does not publish player data. Use runtime backups for
 campaigns already in play. New setup imports initialize and automatically load
