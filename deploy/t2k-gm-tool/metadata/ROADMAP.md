@@ -16,7 +16,7 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 **Deployment:** Run the authoritative service on a GM-controlled Raspberry Pi or laptop on the local network, with browser clients connecting over LAN using plain HTTP. Store runtime campaign state in SQLite on that host; retain versioned JSON for setup-package exchange and backups. HTTP is unencrypted, so the service must remain on a trusted LAN and must not be exposed to the internet or untrusted networks. Remote hosting is out of initial scope and requires a separate deployment and security decision if added later.
 
-**Surface separation:** Keep authoring links outside numbered runtime views. Campaign Setup remains browser-local; its exported schema-v2 package enters the runtime through a focused import preview and confirmation client. Preserve shared validation and server permissions, without separate hosting or automatic draft/runtime synchronization. Existing implementation priorities and partial-surface acceptance checks remain unchanged.
+**Surface separation:** Keep authoring links outside numbered runtime views. Campaign Setup drafts remain browser-local; server saving creates separate versioned schema-v2 files that can be reopened or downloaded for the runtime's focused import preview/confirmation. Preserve shared validation and server permissions, without automatic draft/runtime synchronization. Existing implementation priorities and partial-surface acceptance checks remain unchanged.
 
 **Base map workflow:** Setup now selects Static image or Map extract rather than requiring manual geographic bounds. A static image uses validated pixel dimensions and a required GM-entered width in kilometres, with explicit `image-km` extent and x/y kilometre positions through setup, runtime import, publication, and backup. Existing geographic schema-v2 packages remain supported. Verify upload → terrain assignment → starting location → export/reopen → runtime import → explicit player publication and backup recovery for both coordinate spaces. Source switching retains separate local drafts. Manual extent selectors and broader scale editing remain deferred; do not invent geography or a 10 km image scale. Offline asset migration and real licensed PMTiles acceptance checks remain open.
 
@@ -24,9 +24,11 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 
 New setup imports now create dashboard bookkeeping and a starting-location route in the import transaction, then select and load the new campaign. Review the explicit baseline (2000-01-01 00:00, day 0, zero distance/supplies, weather Not recorded) before play; setup era remains descriptive. This does not retroactively repair previously imported campaigns without dashboards or advance broader runtime feature status.
 
-## Current Baseline (02 Nov 2026 — Phase 3.4 Complete ✅ Milestone 3 Closed)
+## Historical Baseline (02 Nov 2026 — Phase 3.4 Complete ✅ Milestone 3 Closed)
 
-**Implemented & Production-Ready:**
+This dated milestone snapshot is retained as history, not a current production-readiness claim. Use the current workflow notes above and `FEATURES.md` for present capability/acceptance status; later changes supersede this snapshot.
+
+**Implemented slices recorded at that milestone:**
 - Owner-scoped campaign persistence via SQLite on LAN host
 - Session token authentication with server-side GM/player role verification
 - All five player handset views connected and synchronized
@@ -375,7 +377,7 @@ Each milestone is a **self-contained system** that can be developed and tested i
 
 **Atlas import update (04 Nov 2026):** Uploads now detect raster versus MVT vector PMTiles v3 and store archives plus JSON sidecars in `data/maps/atlas/`. Vector tiles render through local MapLibre libraries with a basic default style. New uploads require GM-entered required attribution and an HTTPS license URL; both are carried through setup import and shown on published maps. This records the GM's license review but does not independently verify rights. No real licensed archive has yet been used for end-to-end rendering verification.
 
-**Static image background slice (05 Nov 2026):** Setup supports standalone PNG/JPEG/WebP backgrounds (50 MiB) with manually entered editable campaign bounds; Field Papers is optional for this path. Images stretch to the bounds beneath existing geographic overlays, with no tile requests. Runtime Player map controls can replace the background or return to online OSM, using owner/revision checks while preserving the previous player publication until explicit preview/publish. GM route/influence maps and the read-only player view use the same image reference. Attribution is required; an HTTPS license link is optional for GM-owned images. Setup JSON and runtime backups retain the reference, not the binary: transfer each `.image` and matching JSON sidecar separately. GM review must ensure the entire image is safe to publish; fog masking is not implemented. This does not close the outstanding real-PMTiles-archive or cross-host portability acceptance checks.
+**Historical static image background slice (05 Nov 2026; superseded by the Base map workflow and Server setup export above on 06 Nov):** At this stage, Setup supported standalone PNG/JPEG/WebP backgrounds (50 MiB) with manually entered editable campaign bounds; Field Papers was optional. Images stretched to bounds beneath geographic overlays, with no tile requests. Runtime controls could replace the background or return to online OSM, preserving player publication until explicit preview/publish. This remains the interpretation for existing geographic image packages, not a requirement for new image-coordinate setups. Attribution, separate image/sidecar transfer, GM review of visible image contents, and the outstanding licensed-archive/portability checks remain applicable; fog masking was not implemented.
 
 ---
 
@@ -704,14 +706,14 @@ Progress is tracked in three places:
 
 ## Phase 3: GM Runtime and Player Situation Report
 
-Integration check (01 Nov 2026): combined recovery, cross-host runtime import with explicit account mapping, and all five browser views verified. Fixed a seed-only browser submit guard and late character-response display. Client regressions complement API permission/recovery checks; covered GM mutations now have audit metadata. Rules automation, wider audit coverage/content snapshots, and scheduled backups remain incomplete.
+Historical integration check (01 Nov 2026): combined recovery, cross-host runtime import with explicit account mapping, and all five browser views were verified. A seed-only browser submit guard and late character-response display were fixed. Rules automation, wider audit coverage/content snapshots, and scheduled backups were incomplete then; later Operational Reliability work implemented scheduling. This check is not the current acceptance baseline.
 
 **Goal:** Make the imported campaign operable and give the GM explicit control over the player-facing report.
 
 - Turn the existing dashboard, clock, journal, roster, route, and resource counters into views over imported campaign state rather than separate sample state.
 - Implemented clock slice: revision-protected +6h with date/day rollover at midnight. A GM-defined one-ration-day schedule processes each date's midday once; fuel/items remain manual. Time, daily usage, and audit/journal are atomic and recover together. New COMMS/audit stamps retain HH:MM; older stamps are not backfilled. General scheduling and verified consumption remain planned.
 - Complete runtime save/load, autosave, backup, and recovery workflows for the running campaign.
-- Implemented slice: GM-only runtime-v1 export and atomic same-campaign restore preserve supported record IDs, seats, requests, and source revision provenance, with replacement/older-backup confirmations and a monotonic active revision. Cross-host import creates a new campaign, maps the source GM to the signed-in GM, and requires each source player to map to a distinct enabled, unassigned local player account owned by that GM; credentials and sessions are not transferred. Scheduled backups remain planned.
+- Implemented slice: GM-only runtime-v1 export and atomic same-campaign restore preserve supported record IDs, seats, requests, and source revision provenance, with replacement/older-backup confirmations and a monotonic active revision. Cross-host import creates a new campaign, maps the source GM to the signed-in GM, and requires each source player to map to a distinct enabled, unassigned local player account owned by that GM; credentials and sessions are not transferred. Scheduled/event-triggered backup infrastructure is implemented; broader recovery and asset portability remain partial.
 - Add a Player Interface situation report backed only by a deliberately constructed player-visible projection.
 - Implemented text-only slice: owning GM draft, preview, publish, and withdraw; active assigned players receive only title, body, game time, and publication timestamp. Draft edits do not affect the current player copy. Visible handset reports refresh every 15 seconds and on explicit refresh; push delivery remains planned. Runtime backup restores the draft and withdraws publication, never silently resurrecting withdrawn content.
 - Let the GM publish the Setup Tool map with GM-managed markings, route, and player position. Give players scroll access and zoom up to 200%, with map open/reset centered on their position, without allowing them to change campaign map state.
@@ -734,7 +736,7 @@ Integration check (01 Nov 2026): combined recovery, cross-host runtime import wi
 
 **Goal:** Replace fixed demonstration values with campaign-managed travel and supply records.
 
-- Implemented slice: edit runtime route stop order/details/distances and location coordinates within imported bounds. Updates are owner/revision checked, audited, and backed up; they do not alter setup source geometry or automatically update player publication. Setup bounds editing and GM publication geometry are implemented; editor polish and offline asset migration remain open, alongside new locations, travel conditions, and weather automation.
+- Implemented slice: edit runtime route stop order/details/distances and location coordinates within the declared geographic or image-kilometre extent. Updates are owner/revision checked, audited, and backed up; they do not alter setup source geometry or automatically update player publication. GM publication geometry is implemented; manual setup bounds editing is deferred. Runtime location CRUD exists, while broader editor polish, offline asset migration, and travel-condition automation remain open.
 - Implemented weather slice: GM-selected Fair, Cloudy, Rain/Snow, or GM-defined condition plus optional note persists in the revision-checked runtime dashboard and backup. The GM records the physical d6 result and matching source-aid symbol; no numeric face mapping is assumed. Rolls are limited to once per shift, logged in journal/audit, and checked by the API. Rain/Snow automatically returns to Cloudy after one Fieldbook shift, followed by one full Cloudy shift before rolling resumes. Weather effects remain GM-adjudicated and do not modify character rolls.
 - Implement route modifiers only after Fourth Edition procedures are verified; otherwise label them as GM-entered campaign conditions.
 - Add convoy operations, cargo manifests, inventories, stockpiles, consumption, and resource distribution.

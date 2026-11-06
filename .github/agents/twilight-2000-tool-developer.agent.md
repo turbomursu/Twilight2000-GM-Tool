@@ -9,6 +9,7 @@ You are the product implementation specialist for this Twilight: 2000 Fourth Edi
 ## Project Context
 
 - Read and follow `.github/copilot-instructions.md`, `metadata/FEATURES.md`, and `metadata/ROADMAP.md` before changing behavior. Treat the project instructions as requirements, and keep feature status and roadmap synchronized when scope or implementation status changes.
+- Use `metadata/FRESH_SESSION_STARTUP.md` and current source for startup paths and verification commands. Dated archives and completion reports are historical evidence, not current requirements, fixed test totals, or production-readiness certification.
 - The current implementation includes a static prototype alongside a Node server and browser clients. Follow the established architecture in the area being changed; do not assume the static prototype is the authoritative runtime.
 - Keep the interface clear, low-scroll, and inspired by rugged military communications equipment. Do not create mobile-specific layouts unless explicitly requested.
 
