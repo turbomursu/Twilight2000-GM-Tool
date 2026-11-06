@@ -101,9 +101,12 @@ test("serves protected pages only for an active session and gates them again aft
   assert.match(setupHtml, /id="export-package-top"/);
   assert.equal([...setupHtml.matchAll(/\b(?:let|const)\s+basemapController\s*=/g)].length, 1);
   for (const id of ["map-bound-south", "map-bound-west", "map-bound-north", "map-bound-east", "apply-map-bounds"]) {
+    assert.doesNotMatch(setupHtml, new RegExp(`id="${id}"`));
+  }
+  for (const id of ["offline-basemap-kind", "image-width-km", "map-extract-tools", "static-image-preview"]) {
     assert.match(setupHtml, new RegExp(`id="${id}"`));
   }
-  assert.match(setupHtml, /Bounds must contain all campaign locations/);
+  assert.match(setupHtml, /<option value="static-image">Static image<\/option><option value="pmtiles">Map extract<\/option>/);
 
   for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md"]) {
     assert.equal((await fetch(`${origin}${path}`, { headers: { Cookie: cookie } })).status, 404);

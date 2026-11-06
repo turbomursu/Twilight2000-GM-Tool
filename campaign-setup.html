@@ -137,6 +137,7 @@
     .offline-basemap-tools p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .offline-basemap-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 9px; }
     .fieldpapers-preview[hidden] { display: none; }
+    .fieldpapers-tools[hidden], .fieldpapers-atlas-meta[hidden], .field[hidden], .map-controls[hidden], #saved-setup-actions[hidden] { display: none; }
     .map-workspace[hidden] { display: none; }
     #fieldpapers-file { display: none; }
     .map-grid-label { position: absolute; top: 12px; left: 12px; padding: 6px 8px; border: 1px solid #a3aea3; color: #344239; background: #f7f9f2d9; font: 8px var(--mono); text-transform: uppercase; }
@@ -270,14 +271,14 @@
           <a class="button" href="index.html">GM runtime</a>
           <a class="button" href="player-interface.html">Player preview</a>
           <button class="button" type="button" data-go-step="package">Review package</button>
-          <button class="button button-primary" type="button" id="export-package-top">Export setup JSON</button>
+          <button class="button button-primary" type="button" id="export-package-top">Save setup to server</button>
           <button class="button" type="button" data-auth-logout>Sign out</button>
         </div>
       </header>
       <div class="content">
         <header class="page-heading">
           <div><div class="heading-tag">GM-only authoring / starting campaign data</div><h1 id="page-title">Campaign brief</h1></div>
-          <p>Author a local draft, export setup JSON, then use Import setup package in the GM runtime. Live changes and player publication stay there; they do not update this draft.</p>
+          <p>Author a local draft, save setup JSON to the server, then use Import setup package in the GM runtime. Live changes and player publication stay there; they do not update this draft.</p>
         </header>
 
         <section class="setup-panel active" data-panel="brief" aria-labelledby="brief-title">
@@ -303,16 +304,17 @@
         <section class="setup-panel" data-panel="map" aria-labelledby="map-title" hidden>
           <div class="panel-heading"><div><span class="eyebrow">02 / Base map</span><h2 id="map-title">Choose map background</h2></div><span class="eyebrow">Static image or atlas</span></div>
           <div class="panel-body">
-            <form class="map-bounds-editor" id="map-bounds-form" aria-label="Edit campaign map bounds"><span class="eyebrow">Campaign bounds / latitude and longitude</span><div class="map-bounds-fields"><label class="field"><span class="field-label">South</span><input id="map-bound-south" type="number" step="any" min="-90" max="90" required></label><label class="field"><span class="field-label">West</span><input id="map-bound-west" type="number" step="any" min="-180" max="180" required></label><label class="field"><span class="field-label">North</span><input id="map-bound-north" type="number" step="any" min="-90" max="90" required></label><label class="field"><span class="field-label">East</span><input id="map-bound-east" type="number" step="any" min="-180" max="180" required></label><button class="button" type="submit" id="apply-map-bounds">Apply bounds</button></div><p class="feedback">Set bounds here for a standalone image, or import them from Field Papers. Bounds must contain all campaign locations. You can also drag the map corners in the Terrain step.</p><p class="map-status" data-map-status role="status">Set bounds before choosing a standalone image.</p></form>
-            <section class="fieldpapers-tools" aria-label="Field Papers atlas import"><div><strong>Optional Field Papers atlas</strong><p>Atlas GeoJSON from Field Papers supplies geographic bounds and page layout. Alternatively, enter bounds above and upload a static image below without an atlas.</p></div><div class="fieldpapers-actions"><button class="button button-primary" type="button" id="choose-fieldpapers-file">Import atlas GeoJSON</button><input id="fieldpapers-file" type="file" accept=".json,.geojson,application/json,application/geo+json"></div><p class="fieldpapers-status" id="fieldpapers-status" role="status">Choose an atlas or a static map image.</p><div class="fieldpapers-atlas-meta" id="fieldpapers-atlas-meta" hidden></div><div class="fieldpapers-preview" id="fieldpapers-import-preview" hidden><span class="fieldpapers-status" id="fieldpapers-import-summary"></span><button class="button button-primary" type="button" id="apply-fieldpapers-import" disabled>Apply imported atlas</button></div></section>
+            <label class="field"><span class="field-label">Base map source</span><select id="offline-basemap-kind"><option value="static-image">Static image</option><option value="pmtiles">Map extract</option></select></label>
+            <section class="fieldpapers-tools" id="map-extract-tools" aria-label="Map extract import" hidden><div><strong>Field Papers map extract</strong><p>Import atlas GeoJSON for geographic extent and page layout. You can optionally add a licensed offline PMTiles background below.</p></div><div class="fieldpapers-actions"><button class="button button-primary" type="button" id="choose-fieldpapers-file">Import atlas GeoJSON</button><input id="fieldpapers-file" type="file" accept=".json,.geojson,application/json,application/geo+json"></div><p class="fieldpapers-status" id="fieldpapers-status" role="status">Choose a map extract.</p><div class="fieldpapers-atlas-meta" id="fieldpapers-atlas-meta" hidden></div><div class="fieldpapers-preview" id="fieldpapers-import-preview" hidden><span class="fieldpapers-status" id="fieldpapers-import-summary"></span><button class="button button-primary" type="button" id="apply-fieldpapers-import" disabled>Apply imported atlas</button></div></section>
             <section class="offline-basemap-tools" aria-label="Map background">
-              <div><h3>Map background / image or PMTiles</h3><p>Choose a static PNG, JPEG, or WebP image instead of map tiles, or upload a PMTiles v3 archive (50 MiB limit). Use only images and maps you have permission to share with players. Attribution is displayed on every map; an HTTPS license link is required for PMTiles and optional for your own image. Rights are not automatically verified. Files and JSON sidecars stay together in <code>data/maps/atlas/</code>.</p></div>
-              <label class="field"><span class="field-label">Upload type</span><select id="offline-basemap-kind"><option value="pmtiles">Offline PMTiles atlas</option><option value="static-image">Static map image</option></select></label>
-              <p>A static image must be north-up, with its edges matching the editable campaign bounds. It stretches to those bounds; existing locations, markings, routes, and grids remain geographic overlays. Set bounds above before uploading an image. Field Papers is not required for an image. No map tiles are requested in image mode.</p>
+              <div><h3 id="map-background-title">Static image</h3><p>Use only images and maps you have permission to share with players (50 MiB limit). Attribution is displayed on every map; an HTTPS license link is required for PMTiles and optional for your own image. Rights are not automatically verified. Files and JSON sidecars stay together in <code>data/maps/atlas/</code>.</p></div>
+              <p id="map-source-help">Choose a PNG, JPEG, or WebP image. No map-extract import or manual bounds selection is needed to upload it.</p>
+              <label class="field" id="image-scale-field"><span class="field-label">Image width / kilometres</span><input id="image-width-km" type="number" min="0.001" max="10000" step="any" placeholder="Real-world width of the full image"><span class="feedback">Enter the GM-verified width. Height follows the image aspect ratio; the travel grid stays 10 km. Image coordinates are not latitude/longitude.</span></label>
+              <figure id="static-image-preview" hidden><img id="static-image-preview-image" alt="Selected campaign base map" style="max-width:100%;max-height:400px;object-fit:contain"><figcaption id="static-image-preview-caption"></figcaption></figure>
               <div class="offline-basemap-fields"><label class="field"><span class="field-label">Required attribution / displayed on maps</span><input id="offline-basemap-attribution" maxlength="300" placeholder="Exact required map credit"></label><label class="field"><span class="field-label">License terms URL / HTTPS</span><input id="offline-basemap-license-url" type="url" maxlength="2048" placeholder="https://…"></label><label class="field"><span class="field-label" id="offline-basemap-file-label">PMTiles archive / max 50 MiB</span><input id="offline-basemap-file" type="file" accept=".pmtiles,application/vnd.pmtiles,application/octet-stream"></label><button class="button button-primary" type="button" id="upload-offline-basemap" disabled>Upload and use</button></div>
               <div class="fieldpapers-atlas-meta" id="offline-basemap-license-details" hidden></div><div class="button-group"><button class="button" type="button" id="use-online-basemap">Use online OSM reference</button></div><p class="fieldpapers-status" id="offline-basemap-status" role="status">No offline basemap selected. Online OSM remains the reference layer.</p>
             </section>
-            <div class="step-footer"><p class="feedback">Set bounds and upload an image, or import a Field Papers atlas, before terrain assignment or location entry. The selected background stays in campaign data.</p><div class="button-group"><button class="button" type="button" data-go-step="brief">← Brief</button><button class="button button-primary" type="button" id="continue-to-terrain" data-go-step="terrain" disabled>Terrain →</button></div></div>
+            <div class="step-footer"><p class="feedback">Choose a source and import its map background. Your selection stays in the local setup draft.</p><div class="button-group"><button class="button" type="button" data-go-step="brief">← Brief</button><button class="button button-primary" type="button" id="continue-to-terrain" data-go-step="terrain" disabled>Terrain →</button></div></div>
           </div>
         </section>
 
@@ -336,11 +338,11 @@
         <section class="setup-panel" data-panel="terrain" aria-labelledby="terrain-title" hidden>
           <div class="panel-heading"><div><span class="eyebrow">03 / Strategic play / Referee Aid</span><h2 id="terrain-title">Assign terrain by travel hex</h2></div><span class="eyebrow">10 km per hex / campaign data only</span></div>
           <div class="panel-body">
-            <form class="map-controls" id="map-search-form"><div class="field"><label for="map-search-input">Find a real-world place</label><div class="map-search"><input id="map-search-input" type="search" maxlength="120" placeholder="City, region, or coordinates"><button class="button" type="submit" id="map-search-button">Find</button></div></div><button class="button" type="button" id="draw-area">Mark area</button><button class="button" type="button" id="clear-area" disabled>Clear area</button></form>
-            <p class="feedback">Edit numeric campaign bounds in the Base map step, or drag the two map corners here.</p>
+            <form class="map-controls" id="map-search-form"><div class="field"><label for="map-search-input">Find a real-world place</label><div class="map-search"><input id="map-search-input" type="search" maxlength="120" placeholder="City, region, or coordinates"><button class="button" type="submit" id="map-search-button">Find</button></div></div></form>
+            <p class="feedback">Image extent comes from its dimensions and GM-entered width; geographic extent comes from a map extract. Manual bounds selection is unavailable for now.</p>
             <p class="map-status" id="terrain-map-status" data-map-status role="status">Select a hex to assign a strategic terrain type.</p>
             <div class="terrain-editor-grid">
-              <section class="panel" aria-label="Terrain assignment map"><div id="terrain-map-host"><div class="map-frame" id="map-frame"><div id="leaflet-map" aria-label="Imported campaign map with 10 km hex grid"></div><span class="map-grid-label" id="map-grid-label">UNNAMED AREA / INITIAL MAP</span><span class="map-place-hint" id="map-place-hint">Select a hex to assign terrain</span></div></div><p class="map-usage-note">Grid origin is the imported atlas northwest corner. Hexes are 10 km travel-scale cells. Terrain entries are campaign labels; no tactical effects are applied.</p><div class="map-usage-note"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap licensing</a> / <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noreferrer">Tile policy</a></div></section>
+              <section class="panel" aria-label="Terrain assignment map"><div id="terrain-map-host"><div class="map-frame" id="map-frame"><div id="leaflet-map" aria-label="Imported campaign map with 10 km hex grid"></div><span class="map-grid-label" id="map-grid-label">UNNAMED AREA / INITIAL MAP</span><span class="map-place-hint" id="map-place-hint">Select a hex to assign terrain</span></div></div><p class="map-usage-note">Grid origin is the map's top-left corner. Hexes are 10 km travel-scale cells; image scale is GM-entered. Terrain entries are campaign labels; no tactical effects are applied.</p><div class="map-usage-note"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap licensing</a> / <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noreferrer">Tile policy</a></div></section>
               <aside class="terrain-side">
                 <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Selected travel hex</span><h2>Terrain assignment</h2></div></div><div class="panel-body">
                   <div class="terrain-selected-cell"><span id="terrain-selected-coordinate">Select a hex</span><strong id="terrain-selected-status">No selection</strong></div>
@@ -426,7 +428,10 @@
               <section class="panel"><div class="panel-heading"><div><span class="eyebrow">Preflight</span><h2>Validation</h2></div><div class="button-group"><button class="button" type="button" id="open-package-file">Open setup JSON</button><input id="package-file" type="file" accept=".json,application/json" hidden><button class="button" type="button" id="validate-package">Validate package</button></div></div><div class="panel-body">
                 <div class="package-checks" id="package-checks"></div>
                 <p class="feedback" id="package-feedback" role="status">Add a campaign name, setting, premise, map name, and a starting location.</p>
-                <div class="step-footer"><button class="button" type="button" data-go-step="notes">← Scenario notes</button><div class="button-group"><button class="button" type="button" id="preview-package">Preview JSON</button><button class="button button-primary" type="button" id="export-package" disabled>Export setup JSON</button></div></div>
+                <p class="feedback">Setup JSON is saved in <code>gmpack/campsetups/</code> on this server. Static images and their sidecars are saved in <code>data/maps/&lt;campaign-name&gt;/</code>. Each save creates a new version; existing files are not overwritten.</p>
+                <div class="button-group" id="saved-setup-actions" hidden><button class="button" type="button" id="open-saved-setup">Reopen last server save</button><a class="button" id="download-saved-setup">Download saved JSON</a></div>
+                <p class="feedback" id="server-save-status" role="status"></p>
+                <div class="step-footer"><button class="button" type="button" data-go-step="notes">← Scenario notes</button><div class="button-group"><button class="button" type="button" id="preview-package">Preview JSON</button><button class="button button-primary" type="button" id="export-package" disabled>Save setup to server</button></div></div>
               </div></section>
               <aside><div class="panel-heading"><div><span class="eyebrow">Portable handoff</span><h2>Package contents</h2></div></div><pre class="package-preview" id="package-summary" aria-live="polite">Validate the setup package to preview its contents.</pre></aside>
             </div>
@@ -441,6 +446,7 @@
 
   <script src="/vendor/leaflet.js"></script>
   <script src="/vendor/pmtiles.js"></script>
+  <script src="/map-coordinates.js"></script>
   <script src="campaign-package-contract.js"></script>
   <script src="vector-atlas-client.js"></script>
   <script src="/map-basemap-client.js"></script>
@@ -479,15 +485,6 @@
       const mapSearchForm = document.querySelector("#map-search-form");
       const mapSearchInput = document.querySelector("#map-search-input");
       const mapSearchButton = document.querySelector("#map-search-button");
-      const drawAreaButton = document.querySelector("#draw-area");
-      const clearAreaButton = document.querySelector("#clear-area");
-      const boundsForm = document.querySelector("#map-bounds-form");
-      const boundsInputs = {
-        south: document.querySelector("#map-bound-south"),
-        west: document.querySelector("#map-bound-west"),
-        north: document.querySelector("#map-bound-north"),
-        east: document.querySelector("#map-bound-east")
-      };
       const addLocationButton = document.querySelector("#add-location");
       const cancelLocationEditButton = document.querySelector("#cancel-location-edit");
       const chooseFieldPapersFileButton = document.querySelector("#choose-fieldpapers-file");
@@ -496,6 +493,7 @@
       const offlineBasemapLicenseUrlInput = document.querySelector("#offline-basemap-license-url");
       const offlineBasemapFileInput = document.querySelector("#offline-basemap-file");
       const offlineBasemapKind = document.querySelector("#offline-basemap-kind");
+      const imageWidthKmInput = document.querySelector("#image-width-km");
       const uploadOfflineBasemapButton = document.querySelector("#upload-offline-basemap");
       const useOnlineBasemapButton = document.querySelector("#use-online-basemap");
       const offlineBasemapStatus = document.querySelector("#offline-basemap-status");
@@ -561,8 +559,6 @@
       let areaLayer = null;
       let fieldPapersLayer = null;
       let areaRectangle = null;
-      let areaHandles = [];
-      let drawingArea = false;
       let selectedTerrainCell = null;
       const selectedTerrainCells = new Map();
       const selectedInfluenceCells = new Map();
@@ -577,6 +573,9 @@
       let pendingFieldPapersAtlas = null;
       let pendingImportedPackage = null;
       let storageAvailable = true;
+      let basemapUploadGeneration = 0;
+      let savingSetup = false;
+      let packageReadGeneration = 0;
       let state = createBlankState();
 
       function makeId(prefix) {
@@ -587,12 +586,31 @@
         return {
           schemaVersion: 2,
           campaign: { id: makeId("campaign"), name: "", setting: "", premise: "", mapName: "", era: "" },
-          map: { center: { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng }, zoom: DEFAULT_MAP_VIEW.zoom, bounds: null, grid: { cellKm: TRAVEL_HEX_KM, origin: null, terrainCells: {} }, atlas: null, offlineAnnotations: [], offlineBasemap: null },
+          map: { baseMapSource: "static-image", center: { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng }, zoom: DEFAULT_MAP_VIEW.zoom, bounds: null, grid: { cellKm: TRAVEL_HEX_KM, origin: null, terrainCells: {} }, atlas: null, offlineAnnotations: [], offlineBasemap: null },
           locations: [],
           factions: [],
           settlements: [],
           scenarioNotes: []
         };
+      }
+
+      function normalizeSavedSetup(saved) {
+        if (!isRecord(saved) || typeof saved.id !== "string"
+          || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(saved.id)
+          || saved.packageUrl !== `/api/setup-packages/${saved.id}`
+          || typeof saved.packagePath !== "string" || !saved.packagePath
+          || (saved.imagePath !== null && typeof saved.imagePath !== "string")) return null;
+        return { id: saved.id, packageUrl: saved.packageUrl, packagePath: saved.packagePath, imagePath: saved.imagePath };
+      }
+
+      function renderSavedSetup() {
+        const saved = normalizeSavedSetup(state.savedSetup);
+        document.querySelector("#saved-setup-actions").hidden = !saved;
+        if (!saved) return;
+        const download = document.querySelector("#download-saved-setup");
+        download.href = saved.packageUrl;
+        download.download = `${saved.id}-setup-v2.json`;
+        document.querySelector("#server-save-status").textContent = `Last server save: ${saved.packagePath}${saved.imagePath ? ` / image: ${saved.imagePath}` : ""}. This version does not include later draft edits.`;
       }
 
       function isRecord(value) {
@@ -608,15 +626,47 @@
       }
 
       function normalizeAreaBounds(bounds) {
-        if (!isRecord(bounds)) return null;
-        const { south, west, north, east } = bounds;
-        if (![south, west, north, east].every(Number.isFinite) || south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) return null;
-        return { south, west, north, east };
+        return FieldbookMapCoordinates.normalizeBounds(bounds);
       }
 
-      function renderBoundsFields() {
-        const bounds = state.map.bounds;
-        Object.entries(boundsInputs).forEach(([key, input]) => { input.value = bounds ? String(bounds[key]) : ""; });
+      function mapPosition(position, bounds = state.map.bounds) {
+        return FieldbookMapCoordinates.fromLatLng(position, bounds);
+      }
+
+      function mapLatLng(position, bounds = state.map.bounds) {
+        return FieldbookMapCoordinates.toLatLng(position, bounds);
+      }
+
+      function gridOriginForBounds(bounds) {
+        return FieldbookMapCoordinates.isImage(bounds) ? { x: 0, y: FieldbookMapCoordinates.heightKm(bounds) }
+          : { lat: bounds.north, lng: bounds.west };
+      }
+
+      function localMetersForPosition(position) {
+        const origin = state.map.grid?.origin;
+        if (!origin) return null;
+        return FieldbookMapCoordinates.isImage(state.map.bounds)
+          ? { x: (position.x - origin.x) * 1000, y: (position.y - origin.y) * 1000 }
+          : { x: (position.lng - origin.lng) * 111320 * Math.cos(origin.lat * Math.PI / 180), y: (position.lat - origin.lat) * 111132 };
+      }
+
+      function resetMapRenderer() {
+        window.clearTimeout(mapSaveTimer);
+        basemapController?.clear();
+        leafletMap?.remove();
+        leafletMap = null;
+        basemapController = null;
+        locationMarkerLayer = null;
+        hexGridLayer = null;
+        areaRectangle = null;
+        fieldPapersLayer = null;
+        placementMode = false;
+        pendingPosition = null;
+        selectedTerrainCells.clear();
+        selectedInfluenceCells.clear();
+        selectedTerrainCell = null;
+        terrainBatchMode = false;
+        influenceBatchMode = false;
       }
 
       function normalizeTerrainCells(cells) {
@@ -633,12 +683,12 @@
       }
 
       function ensureGridOrigin(bounds = state.map.bounds) {
-        if (state.map.grid?.origin && isValidCoordinate(state.map.grid.origin.lat, state.map.grid.origin.lng)) return;
+        if (FieldbookMapCoordinates.validPoint(state.map.grid?.origin, bounds)) return;
         if (!bounds) return;
         state.map.grid = {
           ...state.map.grid,
           cellKm: TRAVEL_HEX_KM,
-          origin: { lat: bounds.north, lng: bounds.west },
+          origin: gridOriginForBounds(bounds),
           terrainCells: normalizeTerrainCells(state.map.grid?.terrainCells)
         };
       }
@@ -667,11 +717,8 @@
       function gridCoordinatesForPosition(position) {
         ensureGridOrigin();
         const origin = state.map.grid?.origin;
-        if (!origin || !isValidCoordinate(position?.lat, position?.lng)) return null;
-        const metersPerLat = 111132;
-        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
-        const eastMeters = (position.lng - origin.lng) * metersPerLng;
-        const northMeters = (position.lat - origin.lat) * metersPerLat;
+        if (!origin || !FieldbookMapCoordinates.validPoint(position, state.map.bounds)) return null;
+        const { x: eastMeters, y: northMeters } = localMetersForPosition(position);
         const radiusMeters = TRAVEL_HEX_KM * 1000 / Math.sqrt(3);
         const q = (Math.sqrt(3) / 3 * eastMeters - northMeters / 3) / radiusMeters;
         const r = (2 / 3 * northMeters) / radiusMeters;
@@ -682,6 +729,7 @@
       function localMetersToPosition(x, y) {
         const origin = state.map.grid?.origin;
         if (!origin) return null;
+        if (FieldbookMapCoordinates.isImage(state.map.bounds)) return { x: origin.x + x / 1000, y: origin.y + y / 1000 };
         const metersPerLat = 111132;
         const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
         return { lat: origin.lat + y / metersPerLat, lng: origin.lng + x / metersPerLng };
@@ -769,11 +817,29 @@
       function renderOfflineBasemapControls(resetInputs = false) {
         const basemap = state.map.offlineBasemap;
         if (resetInputs) {
-          offlineBasemapKind.value = basemap?.format === "static-image" ? "static-image" : "pmtiles";
+          offlineBasemapKind.value = state.map.baseMapSource || (basemap?.format === "static-image" || !state.map.atlas && !basemap ? "static-image" : "pmtiles");
           offlineBasemapAttributionInput.value = basemap?.attribution || "";
           offlineBasemapLicenseUrlInput.value = basemap?.licenseUrl || "";
+          imageWidthKmInput.value = FieldbookMapCoordinates.isImage(state.map.bounds) ? String(state.map.bounds.widthKm) : "";
         }
         const imageMode = offlineBasemapKind.value === "static-image";
+        document.querySelector("#map-extract-tools").hidden = imageMode;
+        document.querySelector("#map-background-title").textContent = imageMode ? "Static image" : "Optional offline PMTiles background";
+        document.querySelector("#map-source-help").textContent = imageMode
+          ? "Choose a PNG, JPEG, or WebP image and enter its real-world width. Upload it to continue with terrain and locations; no map extract or geographic bounds are needed."
+          : "Import a Field Papers atlas above to continue. A licensed PMTiles v3 archive can replace its online reference background.";
+        useOnlineBasemapButton.hidden = imageMode;
+        document.querySelector("#image-scale-field").hidden = !imageMode;
+        const imagePreview = document.querySelector("#static-image-preview");
+        imagePreview.hidden = !imageMode || basemap?.format !== "static-image";
+        if (!imagePreview.hidden) {
+          const previewImage = document.querySelector("#static-image-preview-image");
+          const url = FieldbookBasemap.assetUrl(basemap);
+          if (previewImage.getAttribute("src") !== url) previewImage.src = url;
+          document.querySelector("#static-image-preview-caption").textContent = FieldbookMapCoordinates.isImage(state.map.bounds)
+            ? `${state.map.bounds.widthKm} km wide / ${FieldbookMapCoordinates.heightKm(state.map.bounds).toFixed(2)} km high / ${basemap.attribution}`
+            : `Geographic image from an existing package / ${basemap.attribution}`;
+        }
         offlineBasemapFileInput.accept = imageMode ? ".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" : ".pmtiles,application/vnd.pmtiles,application/octet-stream";
         document.querySelector("#offline-basemap-file-label").textContent = imageMode ? "PNG, JPEG, WebP image / max 50 MiB" : "PMTiles archive / max 50 MiB";
         offlineBasemapLicenseDetails.replaceChildren();
@@ -789,20 +855,48 @@
           }
           offlineBasemapStatus.textContent = `${basemap.format === "static-image" ? "Static map image" : "Offline PMTiles atlas"} selected / ${basemap.attribution}`;
         } else {
-          offlineBasemapStatus.textContent = "No offline basemap selected. Online OSM remains the reference layer.";
+          offlineBasemapStatus.textContent = imageMode ? "No static image selected. Upload an image with its width to continue."
+            : "No offline basemap selected. Online OSM remains the reference layer.";
         }
         uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim()
+          || (imageMode && (!Number.isFinite(Number(imageWidthKmInput.value)) || Number(imageWidthKmInput.value) <= 0 || Number(imageWidthKmInput.value) > 10000))
           || ((!imageMode || offlineBasemapLicenseUrlInput.value.trim()) && !FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim()));
       }
 
       function hasMapSource() {
-        return Boolean(state.map.atlas || (state.map.offlineBasemap?.format === "static-image" && state.map.bounds));
+        return Boolean(normalizeAreaBounds(state.map.bounds) && (offlineBasemapKind.value === "static-image"
+          ? state.map.offlineBasemap?.format === "static-image" : state.map.atlas));
       }
 
       function renderMapBaseLayer() {
         if (!leafletMap) return;
         basemapController ||= FieldbookBasemap.controller(leafletMap, (message) => setMapStatus(message, "error"));
         basemapController.set(state.map.offlineBasemap, state.map.bounds);
+      }
+
+      function switchMapSource() {
+        saveDraft();
+        const previousSource = state.map.baseMapSource || (state.map.offlineBasemap?.format === "static-image" ? "static-image" : "pmtiles");
+        const nextSource = offlineBasemapKind.value;
+        if (previousSource === nextSource) return;
+        const sourceDrafts = { ...state.sourceDrafts, [previousSource]: JSON.parse(JSON.stringify({
+          map: state.map, locations: state.locations, factions: state.factions, settlements: state.settlements
+        })) };
+        const selectedDraft = isRecord(sourceDrafts[nextSource]) ? sourceDrafts[nextSource]
+          : { map: createBlankState().map, locations: [], factions: [], settlements: [] };
+        resetMapRenderer();
+        basemapUploadGeneration += 1;
+        pendingFieldPapersFeatures = [];
+        pendingFieldPapersAtlas = null;
+        fieldPapersImportPreview.hidden = true;
+        applyFieldPapersImportButton.disabled = true;
+        fieldPapersFileInput.value = "";
+        offlineBasemapFileInput.value = "";
+        state = loadDraft({ ...state, ...selectedDraft, sourceDrafts });
+        state.map.baseMapSource = nextSource;
+        cancelLocationEdit();
+        restoreFields();
+        saveDraft();
       }
 
       function isValidCoordinateTree(coordinates) {
@@ -850,14 +944,12 @@
       }
 
       function isInsideArea(position, bounds = state.map.bounds) {
-        return Boolean(position && bounds
-          && position.lat >= bounds.south && position.lat <= bounds.north
-          && position.lng >= bounds.west && position.lng <= bounds.east);
+        return FieldbookMapCoordinates.contains(position, bounds);
       }
 
-      function loadDraft() {
+      function loadDraft(input = null) {
         try {
-          const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          const parsed = input || JSON.parse(localStorage.getItem(STORAGE_KEY));
           if (!isRecord(parsed)) return createBlankState();
           if (![1, 2].includes(parsed.schemaVersion) || !isRecord(parsed.campaign)) {
             storageAvailable = false;
@@ -865,13 +957,14 @@
           }
           const legacySchematic = parsed.schemaVersion === 1;
           const savedMap = !legacySchematic && isRecord(parsed.map) ? parsed.map : {};
-          const center = isRecord(savedMap.center) && isValidCoordinate(savedMap.center.lat, savedMap.center.lng)
-            ? { lat: savedMap.center.lat, lng: savedMap.center.lng }
+          const savedBounds = normalizeAreaBounds(savedMap.bounds);
+          const center = FieldbookMapCoordinates.validPoint(savedMap.center, savedBounds)
+            ? { ...savedMap.center } : savedBounds ? FieldbookMapCoordinates.center(savedBounds)
             : { lat: DEFAULT_MAP_VIEW.lat, lng: DEFAULT_MAP_VIEW.lng };
-          const zoom = Number.isFinite(savedMap.zoom) ? Math.min(18, Math.max(2, savedMap.zoom)) : DEFAULT_MAP_VIEW.zoom;
+          const zoom = Number.isFinite(savedMap.zoom) ? Math.min(18, Math.max(FieldbookMapCoordinates.isImage(savedBounds) ? -10 : 2, savedMap.zoom)) : DEFAULT_MAP_VIEW.zoom;
           const savedGrid = isRecord(savedMap.grid) ? savedMap.grid : {};
-          const gridOrigin = isRecord(savedGrid.origin) && isValidCoordinate(savedGrid.origin.lat, savedGrid.origin.lng)
-            ? { lat: savedGrid.origin.lat, lng: savedGrid.origin.lng }
+          const gridOrigin = FieldbookMapCoordinates.validPoint(savedGrid.origin, savedBounds)
+            ? { ...savedGrid.origin }
             : null;
           const savedFactions = Array.isArray(parsed.factions) ? parsed.factions.filter(isRecord).map((faction) => ({
             ...faction,
@@ -881,8 +974,8 @@
             const location = Array.isArray(parsed.locations)
               ? parsed.locations.find((item) => isRecord(item) && item.id === settlement.locationId)
               : null;
-            const position = isRecord(location?.position) && isValidCoordinate(location.position.lat, location.position.lng)
-              ? { lat: location.position.lat, lng: location.position.lng }
+            const position = FieldbookMapCoordinates.validPoint(location?.position, savedBounds)
+              ? { ...location.position }
               : null;
             return {
               ...settlement,
@@ -912,6 +1005,8 @@
           });
           return {
             schemaVersion: 2,
+            savedSetup: normalizeSavedSetup(parsed.savedSetup),
+            sourceDrafts: isRecord(parsed.sourceDrafts) ? parsed.sourceDrafts : {},
             campaign: {
               id: typeof parsed.campaign.id === "string" ? parsed.campaign.id : makeId("campaign"),
               name: typeof parsed.campaign.name === "string" ? parsed.campaign.name : "",
@@ -921,17 +1016,19 @@
               era: typeof parsed.campaign.era === "string" ? parsed.campaign.era : ""
             },
             map: {
+              baseMapSource: ["static-image", "pmtiles"].includes(savedMap.baseMapSource) ? savedMap.baseMapSource
+                : savedMap.offlineBasemap?.format === "static-image" || !savedMap.atlas && !savedMap.offlineBasemap ? "static-image" : "pmtiles",
               center,
               zoom,
-              bounds: normalizeAreaBounds(savedMap.bounds),
+              bounds: savedBounds,
               grid: { cellKm: TRAVEL_HEX_KM, origin: legacySchematic ? null : gridOrigin, terrainCells: legacySchematic ? {} : normalizeTerrainCells(savedGrid.terrainCells) },
               atlas: legacySchematic ? null : normalizeAtlasMetadata(savedMap.atlas),
               offlineAnnotations: legacySchematic ? [] : normalizeGeoJSONFeatures(savedMap.offlineAnnotations),
               offlineBasemap: legacySchematic ? null : normalizeOfflineBasemap(savedMap.offlineBasemap)
             },
             locations: Array.isArray(parsed.locations) ? parsed.locations.filter(isRecord).map((location) => {
-              const validPosition = isRecord(location.position) && isValidCoordinate(location.position.lat, location.position.lng)
-                ? { lat: location.position.lat, lng: location.position.lng }
+              const validPosition = FieldbookMapCoordinates.validPoint(location.position, savedBounds)
+                ? { ...location.position }
                 : null;
               return {
                 ...location,
@@ -969,7 +1066,7 @@
         });
         if (leafletMap) {
           const center = leafletMap.getCenter();
-          state.map.center = { lat: center.lat, lng: center.lng };
+          state.map.center = mapPosition(center);
           state.map.zoom = leafletMap.getZoom();
         }
         if (!storageAvailable) {
@@ -1000,11 +1097,11 @@
         campaignEraInput.value = state.campaign.era;
         renderFieldPapersAtlas();
         renderOfflineBasemapControls(true);
-        renderBoundsFields();
+        renderSavedSetup();
         document.querySelector("#continue-to-terrain").disabled = !hasMapSource();
         fieldPapersStatus.textContent = state.map.offlineBasemap?.format === "static-image" ? "Static map image restored. Field Papers import is optional." : state.map.atlas
           ? "Saved Field Papers atlas restored. Add campaign locations or import offline markup."
-          : "Import a Field Papers atlas or set bounds and upload a static map image to unlock terrain and location editing.";
+          : "Choose a static image or import a map extract.";
         renderLocations();
         renderTerrainDataTable();
         renderTerrainAssignments();
@@ -1032,8 +1129,8 @@
         document.querySelector('[data-step-state="notes"]').textContent = String(state.scenarioNotes.length);
         const valid = validatePackage(false).length === 0;
         document.querySelector('[data-step-state="package"]').textContent = valid ? "Ready" : "Check";
-        exportButton.disabled = !valid;
-        document.querySelector("#export-package-top").disabled = !valid;
+        exportButton.disabled = savingSetup || !valid;
+        document.querySelector("#export-package-top").disabled = savingSetup || !valid;
       }
 
       function showStep(step) {
@@ -1082,7 +1179,7 @@
 
       function renderLocationCoordinate() {
         document.querySelector("#location-coordinate").textContent = formatCoordinate(pendingPosition);
-        addLocationButton.disabled = !pendingPosition || !locationNameInput.value.trim();
+        addLocationButton.disabled = !isInsideArea(pendingPosition) || !locationNameInput.value.trim();
       }
 
       function initializeMap() {
@@ -1092,19 +1189,20 @@
           return;
         }
 
-        leafletMap = L.map(mapElement, { minZoom: 2, maxZoom: 18 }).setView([state.map.center.lat, state.map.center.lng], state.map.zoom);
+        const imageMode = FieldbookMapCoordinates.isImage(state.map.bounds);
+        mapSearchForm.hidden = imageMode;
+        leafletMap = L.map(mapElement, { crs: imageMode ? L.CRS.Simple : L.CRS.EPSG3857, minZoom: imageMode ? -10 : 2, maxZoom: 18 })
+          .setView(mapLatLng(state.map.center), state.map.zoom);
         renderMapBaseLayer();
-        L.control.scale({ metric: true, imperial: true, maxWidth: 140 }).addTo(leafletMap);
+        if (!imageMode) L.control.scale({ metric: true, imperial: true, maxWidth: 140 }).addTo(leafletMap);
         locationMarkerLayer = L.layerGroup().addTo(leafletMap);
         hexGridLayer = L.layerGroup().addTo(leafletMap);
-        areaHandles = [];
         renderLocations();
         renderArea();
         leafletMap.on("click", handleMapClick);
         leafletMap.on("moveend", () => { scheduleMapSave(); renderHexGrid(); });
         leafletMap.on("zoomend", () => { scheduleMapSave(); renderHexGrid(); });
-        if (state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
-        else setMapStatus("OpenStreetMap / search a place, mark the campaign area, and place locations.");
+        if (state.map.bounds) leafletMap.fitBounds(FieldbookMapCoordinates.leafletBounds(state.map.bounds), { padding: [28, 28] });
       }
 
       function scheduleMapSave() {
@@ -1126,15 +1224,11 @@
         const area = normalizeAreaBounds(state.map.bounds);
         if (!area) return;
         ensureGridOrigin(area);
-        const origin = state.map.grid.origin;
-        const metersPerLat = 111132;
-        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
         const radius = TRAVEL_HEX_KM * 1000 / Math.sqrt(3);
         const view = leafletMap.getBounds();
         const corners = [view.getSouthWest(), view.getNorthWest(), view.getNorthEast(), view.getSouthEast()];
         const axialCorners = corners.map((corner) => {
-          const x = (corner.lng - origin.lng) * metersPerLng;
-          const y = (corner.lat - origin.lat) * metersPerLat;
+          const { x, y } = localMetersForPosition(mapPosition(corner));
           return { q: (Math.sqrt(3) / 3 * x - y / 3) / radius, r: (2 / 3 * y) / radius };
         });
         const qMin = Math.floor(Math.min(...axialCorners.map((point) => point.q))) - 2;
@@ -1152,11 +1246,11 @@
             const x = radius * Math.sqrt(3) * (q + r / 2);
             const y = radius * 1.5 * r;
             const center = localMetersToPosition(x, y);
-            if (!center || !isInsideArea(center, area) || !view.contains([center.lat, center.lng])) continue;
+            if (!center || !isInsideArea(center, area) || !view.contains(mapLatLng(center))) continue;
             const vertices = Array.from({ length: 6 }, (_, index) => {
               const angle = (30 + index * 60) * Math.PI / 180;
               return localMetersToPosition(x + radius * Math.cos(angle), y + radius * Math.sin(angle));
-            }).filter(Boolean).map((point) => [point.lat, point.lng]);
+            }).filter(Boolean).map((point) => mapLatLng(point));
             if (vertices.length !== 6) continue;
             const key = `${q},${r}`;
             const terrainType = state.map.grid.terrainCells[key] || "";
@@ -1185,9 +1279,9 @@
                 className: `faction-influence-cell faction-influence-${index}`
               }).addTo(hexGridLayer);
             });
-            if (leafletMap.getZoom() >= 9) {
+            if (FieldbookMapCoordinates.isImage(area) || leafletMap.getZoom() >= 9) {
               const ref = formatAxialCoordinate(q, r);
-              const label = L.marker([center.lat, center.lng], {
+              const label = L.marker(mapLatLng(center), {
                 interactive: false,
                 keyboard: false,
                 icon: L.divIcon({ className: "leaflet-hex-label", html: ref, iconSize: [62, 12], iconAnchor: [31, 6] })
@@ -1219,7 +1313,7 @@
           const x = radius * Math.sqrt(3) * (q + r / 2);
           const y = radius * 1.5 * r;
           const position = localMetersToPosition(x, y);
-          if (position) leafletMap.panTo([position.lat, position.lng]);
+          if (position) leafletMap.panTo(mapLatLng(position));
         }
         renderHexGrid();
       }
@@ -1389,39 +1483,11 @@
         });
       }
 
-      function makeAreaHandleIcon() {
-        return L.divIcon({ className: "leaflet-area-handle", iconSize: [13, 13] });
-      }
-
       function clearAreaLayers() {
         if (areaRectangle && leafletMap) leafletMap.removeLayer(areaRectangle);
         areaRectangle = null;
-        areaHandles.forEach((handle) => leafletMap?.removeLayer(handle));
-        areaHandles = [];
         if (fieldPapersLayer && leafletMap) leafletMap.removeLayer(fieldPapersLayer);
         fieldPapersLayer = null;
-      }
-
-      function updateAreaFromHandles() {
-        if (areaHandles.length !== 2) return;
-        const first = areaHandles[0].getLatLng();
-        const second = areaHandles[1].getLatLng();
-        const south = Math.min(first.lat, second.lat);
-        const north = Math.max(first.lat, second.lat);
-        const west = Math.min(first.lng, second.lng);
-        const east = Math.max(first.lng, second.lng);
-        if (south === north || west === east) {
-          setMapStatus("Area corners must enclose a visible area.", "error");
-          return;
-        }
-        state.map.bounds = { south, west, north, east };
-        if (state.map.offlineBasemap?.format === "static-image") renderMapBaseLayer();
-        renderBoundsFields();
-        areaRectangle?.setBounds([[south, west], [north, east]]);
-        renderHexGrid();
-        scheduleMapSave();
-        clearAreaButton.disabled = false;
-        setMapStatus("Campaign area saved. Drag either corner to adjust it.", "success");
       }
 
       function renderArea() {
@@ -1429,17 +1495,9 @@
         if (state.map.offlineBasemap?.format === "static-image") renderMapBaseLayer();
         clearAreaLayers();
         const bounds = normalizeAreaBounds(state.map.bounds);
-        renderBoundsFields();
-        clearAreaButton.disabled = !bounds;
         if (bounds) {
-          const southWest = [bounds.south, bounds.west];
-          const northEast = [bounds.north, bounds.east];
+          const [southWest, northEast] = FieldbookMapCoordinates.leafletBounds(bounds);
           areaRectangle = L.rectangle([southWest, northEast], { color: "#487c87", weight: 2, fillColor: "#487c87", fillOpacity: 0.12, interactive: false }).addTo(leafletMap);
-          areaHandles = [southWest, northEast].map((corner) => {
-            const handle = L.marker(corner, { draggable: true, icon: makeAreaHandleIcon(), keyboard: true, title: "Drag to resize campaign area" }).addTo(leafletMap);
-            handle.on("dragend", updateAreaFromHandles);
-            return handle;
-          });
         }
         const annotations = state.map.offlineAnnotations.filter((feature) => feature.geometry.type !== "Point" && feature.properties.role !== "campaign-area" && feature.properties.type !== "atlas");
         if (annotations.length) {
@@ -1453,7 +1511,7 @@
 
       function handleMapClick(event) {
         if (!document.querySelector('[data-panel="terrain"]').hidden && event.originalEvent.target.closest?.(".terrain-grid-polygon")) {
-          const cell = gridCoordinatesForPosition(event.latlng);
+          const cell = gridCoordinatesForPosition(mapPosition(event.latlng));
           if (cell) {
             if (influenceBatchMode) selectInfluenceCell(cell.q, cell.r);
             else selectTerrainCell(cell.q, cell.r);
@@ -1461,7 +1519,12 @@
           return;
         }
         if (placementMode) {
-          pendingPosition = { lat: event.latlng.lat, lng: event.latlng.lng };
+          pendingPosition = mapPosition(event.latlng);
+          if (!isInsideArea(pendingPosition)) {
+            pendingPosition = null;
+            setMapStatus("Choose a position inside the campaign map.", "error");
+            return;
+          }
           placementMode = false;
           mapFrame.classList.remove("placing-location");
           document.querySelector("#place-location").textContent = editingLocationId ? "Move location" : "Place on map";
@@ -1470,30 +1533,6 @@
           setMapStatus(`Location position selected / ${formatCoordinate(pendingPosition)}. Confirm it in the location panel.`, "success");
           return;
         }
-        if (!drawingArea) return;
-        if (!areaStart) {
-          areaStart = event.latlng;
-          document.querySelector("#map-place-hint").textContent = "First corner saved / choose the opposite corner";
-          setMapStatus("First corner selected. Click the opposite corner to finish the campaign area.");
-          return;
-        }
-        const south = Math.min(areaStart.lat, event.latlng.lat);
-        const north = Math.max(areaStart.lat, event.latlng.lat);
-        const west = Math.min(areaStart.lng, event.latlng.lng);
-        const east = Math.max(areaStart.lng, event.latlng.lng);
-        drawingArea = false;
-        areaStart = null;
-        mapFrame.classList.remove("drawing-area");
-        drawAreaButton.textContent = state.map.bounds ? "Edit area" : "Mark area";
-        if (south === north || west === east) {
-          setMapStatus("Choose two distinct corners to mark the campaign area.", "error");
-          return;
-        }
-        state.map.bounds = { south, west, north, east };
-        renderArea();
-        leafletMap.fitBounds([[south, west], [north, east]], { padding: [28, 28] });
-        saveDraft();
-        setMapStatus("Campaign area saved. Drag either corner to adjust it.", "success");
       }
 
       function beginLocationEdit(location) {
@@ -1506,7 +1545,7 @@
         document.querySelector("#add-location").textContent = "Save location";
         cancelLocationEditButton.hidden = false;
         renderLocationCoordinate();
-        if (location.position && leafletMap) leafletMap.panTo([location.position.lat, location.position.lng]);
+        if (location.position && leafletMap) leafletMap.panTo(mapLatLng(location.position));
         setMapStatus(pendingPosition ? `Editing ${location.name} / drag its marker or choose a new map position.` : `Editing ${location.name} / place it on the map first.`, "success");
       }
 
@@ -1567,7 +1606,7 @@
           const grid = location.position ? gridCoordinatesForPosition(location.position) : null;
           location.gridRef = grid?.ref || null;
           location.grid = grid ? { q: grid.q, r: grid.r } : null;
-          coordinate.textContent = location.position ? `10 km travel hex / ${location.gridRef}` : "Needs real-world position";
+          coordinate.textContent = location.position ? `10 km travel hex / ${location.gridRef}` : "Needs map position";
                       const markerHtml = `<div class="leaflet-location-marker${location.isStartingLocation ? " start" : ""}"><span class="leaflet-location-dot">${location.isStartingLocation ? "S" : String(index + 1).padStart(2, "0")}</span><span class="leaflet-location-label">${escapeHtml(location.name)}</span><span class="leaflet-location-grid">${escapeHtml(location.gridRef || "")}</span></div>`;
           info.append(coordinate);
           const actions = document.createElement("div");
@@ -1614,14 +1653,20 @@
           row.append(info, actions);
           list.append(row);
 
-          if (leafletMap && locationMarkerLayer && location.position && isValidCoordinate(location.position.lat, location.position.lng)) {
+          if (leafletMap && locationMarkerLayer && FieldbookMapCoordinates.validPoint(location.position, state.map.bounds)) {
             const markerHtml = `<div class="leaflet-location-marker${location.isStartingLocation ? " start" : ""}"><span class="leaflet-location-dot">${location.isStartingLocation ? "S" : String(index + 1).padStart(2, "0")}</span><span class="leaflet-location-label">${escapeHtml(location.name)}</span><span class="leaflet-location-grid">${escapeHtml(location.gridRef || "")}</span></div>`;
             const icon = L.divIcon({ className: "location-icon", html: markerHtml, iconSize: [150, 43], iconAnchor: [75, 20] });
-            const marker = L.marker([location.position.lat, location.position.lng], { icon, draggable: true, title: location.name, bubblingMouseEvents: false }).addTo(locationMarkerLayer);
+            const marker = L.marker(mapLatLng(location.position), { icon, draggable: true, title: location.name, bubblingMouseEvents: false }).addTo(locationMarkerLayer);
             marker.on("click", () => beginLocationEdit(location));
             marker.on("dragend", () => {
               const moved = marker.getLatLng();
-              location.position = { lat: moved.lat, lng: moved.lng };
+              const nextPosition = mapPosition(moved);
+              if (!isInsideArea(nextPosition)) {
+                marker.setLatLng(mapLatLng(location.position));
+                setMapStatus("Locations must stay inside the campaign map.", "error");
+                return;
+              }
+              location.position = nextPosition;
               renderLocations();
               saveDraft();
               setMapStatus(`${location.name} moved to ${formatCoordinate(location.position)}.`, "success");
@@ -1629,9 +1674,7 @@
           }
         });
         document.querySelector("#location-count").textContent = `${state.locations.length} location${state.locations.length === 1 ? "" : "s"}`;
-        document.querySelector("#map-place-hint").textContent = drawingArea ? areaStart ? "First corner saved / choose opposite corner" : "Choose first area corner" : placementMode ? "Placement active / click map to set position" : state.locations.length ? "Initial locations / select marker to edit" : "Search, mark an area, or place a location";
-        drawAreaButton.textContent = drawingArea ? "Cancel area" : state.map.bounds ? "Edit area" : "Mark area";
-        clearAreaButton.disabled = !state.map.bounds;
+        document.querySelector("#map-place-hint").textContent = placementMode ? "Placement active / click map to set position" : state.locations.length ? "Initial locations / select marker to edit" : "Search or place a location";
         syncSettlementLocations();
         renderSettlementLocationOptions();
         renderEntities("settlement");
@@ -2012,7 +2055,7 @@
               cellKm: TRAVEL_HEX_KM,
               coordinateSystem: "axial-q-r",
               origin: state.map.grid?.origin ? { ...state.map.grid.origin } : null,
-              originDescription: "northwest corner of campaign bounds",
+              originDescription: FieldbookMapCoordinates.isImage(state.map.bounds) ? "top-left corner of scaled image / x-y kilometres" : "northwest corner of campaign bounds",
               terrainCells: Object.entries(state.map.grid.terrainCells).map(([key, terrainType]) => {
                 const [q, r] = key.split(",").map(Number);
                 return { q, r, coordinate: formatAxialCoordinate(q, r), terrainType };
@@ -2028,7 +2071,7 @@
                 ...location,
                 gridRef: grid?.ref || null,
                 coordinates: grid ? { system: "fieldbook.axial-q-r", q: grid.q, r: grid.r, cellKm: TRAVEL_HEX_KM } : null,
-                mapPosition: position ? { lat: position.lat, lng: position.lng } : null
+                mapPosition: position ? { ...position } : null
               };
             })
           },
@@ -2084,9 +2127,9 @@
         });
 
         const origin = input.map.grid.origin === null
-          ? { lat: bounds.north, lng: bounds.west }
-          : isRecord(input.map.grid.origin) && isValidCoordinate(input.map.grid.origin.lat, input.map.grid.origin.lng)
-          ? { lat: input.map.grid.origin.lat, lng: input.map.grid.origin.lng }
+          ? gridOriginForBounds(bounds)
+          : FieldbookMapCoordinates.validPoint(input.map.grid.origin, bounds)
+          ? { ...input.map.grid.origin }
           : null;
         if (!origin) throw new Error("The terrain grid has an invalid coordinate origin.");
 
@@ -2103,8 +2146,8 @@
         let startingLocations = 0;
         const locations = input.map.locations.map((location) => {
           if (!isRecord(location)) throw new Error("The setup package contains an invalid location.");
-          const position = isRecord(location.mapPosition) && isValidCoordinate(location.mapPosition.lat, location.mapPosition.lng)
-            ? { lat: location.mapPosition.lat, lng: location.mapPosition.lng }
+          const position = FieldbookMapCoordinates.validPoint(location.mapPosition, bounds)
+            ? { ...location.mapPosition }
             : null;
           if (!position || !isInsideArea(position, bounds)) throw new Error("Every imported location must have a position inside the campaign area.");
           if (typeof location.isStartingLocation !== "boolean") throw new Error("Every imported location needs an explicit starting-location value.");
@@ -2209,15 +2252,15 @@
         if (offlineAnnotations.length !== input.map.offlineAnnotations.length) {
           throw new Error("The setup package contains an invalid map annotation.");
         }
-        const center = isRecord(input.map.center) && isValidCoordinate(input.map.center.lat, input.map.center.lng)
-          ? { lat: input.map.center.lat, lng: input.map.center.lng }
-          : { lat: (bounds.south + bounds.north) / 2, lng: (bounds.west + bounds.east) / 2 };
-        const zoom = Number.isFinite(input.map.zoom) && input.map.zoom >= 2 && input.map.zoom <= 18 ? input.map.zoom : 10;
+        const center = FieldbookMapCoordinates.validPoint(input.map.center, bounds)
+          ? { ...input.map.center } : FieldbookMapCoordinates.center(bounds);
+        const zoom = Number.isFinite(input.map.zoom) && input.map.zoom >= (FieldbookMapCoordinates.isImage(bounds) ? -10 : 2) && input.map.zoom <= 18 ? input.map.zoom : 10;
 
         return {
           schemaVersion: 2,
           campaign,
           map: {
+            baseMapSource: input.map.offlineBasemap?.format === "static-image" ? "static-image" : "pmtiles",
             center,
             zoom,
             bounds,
@@ -2304,7 +2347,7 @@
         }
         renderLocations();
         renderArea();
-        if (leafletMap && state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
+        if (leafletMap && state.map.bounds) leafletMap.fitBounds(FieldbookMapCoordinates.leafletBounds(state.map.bounds), { padding: [28, 28] });
         saveDraft();
         pendingFieldPapersFeatures = [];
         pendingFieldPapersAtlas = null;
@@ -2330,9 +2373,9 @@
         if (!campaign.premise) errors.push("Premise is required.");
         if (!campaign.mapName) errors.push("Initial map name is required.");
         if (!hasMapSource()) errors.push("Import a Field Papers atlas or choose a static map image before exporting the setup package.");
-        if (!state.map.bounds) errors.push("Mark the real-world campaign area on the map.");
+        if (!normalizeAreaBounds(state.map.bounds)) errors.push("Upload a scaled image or import a map extract with a valid geographic extent.");
         if (!state.locations.some((location) => location.isStartingLocation && location.position)) errors.push("Add a positioned location and mark it as the starting location.");
-        if (state.locations.some((location) => !location.position)) errors.push("Place each listed location on the real-world map before export.");
+        if (state.locations.some((location) => !location.position)) errors.push("Place each listed location on the campaign map before export.");
         if (state.map.bounds && state.locations.some((location) => location.position && !isInsideArea(location.position))) errors.push("Move every location inside the marked campaign area before export.");
         const locationsById = new Map(state.locations.map((location) => [location.id, location]));
         const settlementLocationIds = new Set();
@@ -2376,8 +2419,8 @@
         });
         const checks = [
           { label: "Campaign identity, setting, and premise", ready: Boolean(campaignNameInput.value.trim() && campaignSettingInput.value.trim() && campaignPremiseInput.value.trim()), detail: "Required starting brief" },
-          { label: "Atlas or static image selected", ready: hasMapSource(), detail: state.map.offlineBasemap?.format === "static-image" ? "Static image aligned to campaign bounds" : state.map.atlas?.title || "Import an atlas or upload an image" },
-          { label: "Real-world campaign area", ready: Boolean(state.map.bounds), detail: state.map.bounds ? "Geographic bounds saved" : "Mark two opposite corners" },
+          { label: "Map source selected", ready: hasMapSource(), detail: state.map.offlineBasemap?.format === "static-image" ? "Static image selected" : state.map.atlas?.title || "Import a map extract or upload an image" },
+          { label: "Campaign map extent and scale", ready: Boolean(normalizeAreaBounds(state.map.bounds)), detail: FieldbookMapCoordinates.isImage(state.map.bounds) ? `${state.map.bounds.widthKm} km image width / GM-entered scale` : state.map.bounds ? "Imported geographic extent saved" : "Upload a scaled image or import a map extract" },
           { label: "Initial locations and starting point", ready: state.locations.length > 0 && state.locations.every((location) => location.position && isInsideArea(location.position)) && state.locations.some((location) => location.isStartingLocation), detail: `${state.locations.length} location${state.locations.length === 1 ? "" : "s"} positioned inside the marked area` },
           { label: "Settlements and faction links", ready: settlementsLinked && prominenceOrderValid, detail: `${linkedSettlementLocations.size} linked settlements / ${state.factions.length} factions` },
           { label: "Scenario notes", ready: true, detail: `${state.scenarioNotes.length} GM-only note${state.scenarioNotes.length === 1 ? "" : "s"}` },
@@ -2398,8 +2441,8 @@
           row.append(mark, text);
           list.append(row);
         });
-        exportButton.disabled = errors.length > 0;
-        document.querySelector("#export-package-top").disabled = errors.length > 0;
+        exportButton.disabled = savingSetup || errors.length > 0;
+        document.querySelector("#export-package-top").disabled = savingSetup || errors.length > 0;
         const feedback = document.querySelector("#package-feedback");
         feedback.className = `feedback${errors.length ? " error" : " success"}`;
         feedback.textContent = errors.length ? errors.join(" ") : "Package is valid for preview and export. It is not a running-campaign save.";
@@ -2462,23 +2505,73 @@
         previewDialog.showModal();
       }
 
-      function exportPackage() {
+      async function exportPackage() {
+        if (savingSetup) return;
         if (validatePackage().length) {
           showStep("package");
           return;
         }
         const data = JSON.stringify(collectPackage(), null, 2);
-        const blob = new Blob([data], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const filename = `${(campaignNameInput.value.trim() || "campaign-setup").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-setup-v2.json`;
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        link.click();
-        URL.revokeObjectURL(url);
-        document.querySelector("#package-feedback").className = "feedback success";
-        document.querySelector("#package-feedback").textContent = `Exported ${filename}. This file contains initial setup data only.`;
+        savingSetup = true;
+        showStep("package");
+        updateStepCounts();
+        const feedback = document.querySelector("#server-save-status");
+        feedback.className = "feedback";
+        feedback.textContent = "Saving setup JSON and its map image on the server...";
+        try {
+          const response = await fetch("/api/setup-packages", { method: "POST",
+            headers: { "Content-Type": "application/json" }, body: data });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "The server could not save this setup package.");
+          const saved = normalizeSavedSetup(result.saved);
+          if (!saved) throw new Error("The server returned an incomplete save confirmation. Check the server before saving again.");
+          state.savedSetup = saved;
+          saveDraft();
+          renderSavedSetup();
+          feedback.className = "feedback success";
+          feedback.textContent = `Saved setup JSON: ${saved.packagePath}${saved.imagePath ? ` / image: ${saved.imagePath}` : ""}. Existing versions are unchanged.`;
+        } catch (error) {
+          feedback.className = "feedback error";
+          feedback.textContent = `Setup save not confirmed: ${error.message}`;
+        } finally {
+          savingSetup = false;
+          updateStepCounts();
+        }
       }
+
+      document.querySelector("#open-saved-setup").addEventListener("click", async () => {
+        const saved = normalizeSavedSetup(state.savedSetup);
+        if (!saved) return;
+        const generation = ++packageReadGeneration;
+        const button = document.querySelector("#open-saved-setup");
+        button.disabled = true;
+        pendingImportedPackage = null;
+        applyImportedPackageButton.disabled = true;
+        importPackageSummaryElement.hidden = true;
+        importPackageStatus.className = "feedback";
+        importPackageStatus.textContent = "Checking the saved server package...";
+        importPackageDialog.showModal();
+        try {
+          const response = await fetch(saved.packageUrl);
+          const source = await response.text();
+          if (generation !== packageReadGeneration) return;
+          if (!response.ok) throw new Error("The saved setup package could not be read. Check your GM session and server files.");
+          if (source.length > 25 * 1024 * 1024) throw new Error("Saved setup packages must be no larger than 25 MB.");
+          pendingImportedPackage = normalizeImportedPackage(JSON.parse(source));
+          pendingImportedPackage.savedSetup = saved;
+          importPackageSummaryElement.textContent = formatImportPackageSummary(pendingImportedPackage);
+          importPackageSummaryElement.hidden = false;
+          importPackageStatus.className = "feedback success";
+          importPackageStatus.textContent = "Server package validated. Applying it replaces the current local setup draft.";
+          applyImportedPackageButton.disabled = false;
+        } catch (error) {
+          if (generation !== packageReadGeneration) return;
+          importPackageStatus.className = "feedback error";
+          importPackageStatus.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
 
       stepButtons.forEach((button) => button.addEventListener("click", () => showStep(button.dataset.step)));
       document.querySelectorAll("[data-go-step]").forEach((button) => button.addEventListener("click", () => {
@@ -2553,64 +2646,30 @@
         }
       });
 
-      drawAreaButton.addEventListener("click", () => {
-        drawingArea = !drawingArea;
-        areaStart = null;
-        placementMode = false;
-        mapFrame.classList.remove("placing-location");
-        mapFrame.classList.toggle("drawing-area", drawingArea);
-        drawAreaButton.textContent = drawingArea ? "Cancel area" : state.map.bounds ? "Edit area" : "Mark area";
-        document.querySelector("#map-place-hint").textContent = drawingArea ? "Choose first area corner" : state.map.bounds ? "Campaign area marked" : "Pan and zoom / mark an area";
-        setMapStatus(drawingArea ? "Click two opposite corners to mark the campaign's initial real-world area." : "Area edit cancelled.");
-      });
-
-      clearAreaButton.addEventListener("click", () => {
-        drawingArea = false;
-        areaStart = null;
-        mapFrame.classList.remove("drawing-area");
-        state.map.bounds = null;
-        renderArea();
-        saveDraft();
-        setMapStatus("Campaign area cleared. Mark an area before export.");
-      });
-      boundsForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const bounds = normalizeAreaBounds(Object.fromEntries(Object.entries(boundsInputs).map(([key, input]) => [key, Number(input.value)])));
-        if (!bounds) {
-          setMapStatus("Enter valid bounds with south below north and west below east.", "error");
-          return;
-        }
-        const outsideLocation = state.locations.find((location) => location.position && !isInsideArea(location.position, bounds));
-        if (outsideLocation) {
-          setMapStatus(`The new bounds exclude ${outsideLocation.name}. Move that location before shrinking the campaign area.`, "error");
-          return;
-        }
-        state.map.bounds = bounds;
-        renderBoundsFields();
-        ensureGridOrigin(bounds);
-        renderArea();
-        leafletMap?.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]], { padding: [28, 28] });
-        saveDraft();
-        setMapStatus("Campaign bounds updated and saved.", "success");
-      });
-
       chooseFieldPapersFileButton.addEventListener("click", () => fieldPapersFileInput.click());
       applyFieldPapersImportButton.addEventListener("click", applyFieldPapersFeatures);
       offlineBasemapAttributionInput.addEventListener("input", () => renderOfflineBasemapControls());
       offlineBasemapLicenseUrlInput.addEventListener("input", () => renderOfflineBasemapControls());
       offlineBasemapFileInput.addEventListener("change", () => renderOfflineBasemapControls());
-      offlineBasemapKind.addEventListener("change", () => { offlineBasemapFileInput.value = ""; renderOfflineBasemapControls(); });
+      imageWidthKmInput.addEventListener("input", () => renderOfflineBasemapControls());
+      document.querySelector("#static-image-preview-image").addEventListener("error", () => {
+        offlineBasemapStatus.className = "fieldpapers-status error";
+        offlineBasemapStatus.textContent = "The saved image cannot be displayed. Restore its image file and JSON sidecar, or upload a replacement.";
+      });
+      offlineBasemapKind.addEventListener("change", switchMapSource);
       uploadOfflineBasemapButton.addEventListener("click", async () => {
         const file = offlineBasemapFileInput.files[0];
         const attribution = offlineBasemapAttributionInput.value.trim();
         const licenseUrl = FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim());
         const imageMode = offlineBasemapKind.value === "static-image";
+        const widthKm = Number(imageWidthKmInput.value);
+        const generation = ++basemapUploadGeneration;
         if (!file || !attribution || ((!imageMode || offlineBasemapLicenseUrlInput.value.trim()) && !licenseUrl)) {
           offlineBasemapStatus.textContent = "Choose a file and enter attribution. PMTiles also requires an HTTPS license URL.";
           return;
         }
-        if (imageMode && !normalizeAreaBounds(state.map.bounds)) {
-          offlineBasemapStatus.textContent = "Set the campaign bounds before uploading a static map image.";
+        if (imageMode && (!Number.isFinite(widthKm) || widthKm <= 0 || widthKm > 10000)) {
+          offlineBasemapStatus.textContent = "Enter a real-world image width greater than zero and no larger than 10000 kilometres.";
           return;
         }
         if (file.size > 50 * 1024 * 1024) {
@@ -2624,17 +2683,39 @@
             headers: { "Content-Type": imageMode ? file.type || "application/octet-stream" : "application/vnd.pmtiles" }, body: file });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || "Basemap upload failed.");
+          if (generation !== basemapUploadGeneration) return;
           if (imageMode !== (result.asset.format === "static-image")) throw new Error("The file does not match the selected upload type.");
+          if (imageMode) {
+            const imageBounds = normalizeAreaBounds({ type: "image-km", widthPixels: result.asset.width, heightPixels: result.asset.height, widthKm });
+            if (!imageBounds) throw new Error("The uploaded image has invalid dimensions or scale.");
+            const previousBounds = state.map.bounds;
+            if (previousBounds && (state.locations.length || Object.keys(state.map.grid.terrainCells).length || state.factions.some((faction) => faction.influenceCells?.length))
+              && (!FieldbookMapCoordinates.isImage(previousBounds) || previousBounds.widthKm !== widthKm
+                || previousBounds.heightPixels / previousBounds.widthPixels !== imageBounds.heightPixels / imageBounds.widthPixels)) {
+              throw new Error("This replacement changes the scale or coordinate space of existing map data. Keep the same width and aspect ratio, or start a new setup draft.");
+            }
+            resetMapRenderer();
+            state.map.bounds = imageBounds;
+            state.map.center = FieldbookMapCoordinates.center(imageBounds);
+            state.map.zoom = 0;
+            state.map.atlas = null;
+            state.map.offlineAnnotations = [];
+            state.map.grid.origin = gridOriginForBounds(imageBounds);
+          }
           state.map.offlineBasemap = { format: result.asset.format, assetId: result.asset.assetId, attribution, ...(licenseUrl ? { licenseUrl } : {}) };
           saveDraft();
           renderOfflineBasemapControls();
           renderMapBaseLayer();
           offlineBasemapStatus.textContent = `${imageMode ? "Static image" : "Offline PMTiles"} ready / ${result.asset.byteLength} bytes / ${attribution}`;
         } catch (error) {
+          if (generation !== basemapUploadGeneration) return;
           offlineBasemapStatus.textContent = `Basemap not installed: ${error.message}`;
         } finally {
-          uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim()
-            || ((!imageMode || offlineBasemapLicenseUrlInput.value.trim()) && !FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim()));
+          if (generation === basemapUploadGeneration) {
+            uploadOfflineBasemapButton.disabled = !offlineBasemapFileInput.files.length || !offlineBasemapAttributionInput.value.trim()
+              || (imageMode && (!Number.isFinite(Number(imageWidthKmInput.value)) || Number(imageWidthKmInput.value) <= 0 || Number(imageWidthKmInput.value) > 10000))
+              || ((!imageMode || offlineBasemapLicenseUrlInput.value.trim()) && !FieldbookVectorAtlas.validLicenseUrl(offlineBasemapLicenseUrlInput.value.trim()));
+          }
         }
       });
       useOnlineBasemapButton.addEventListener("click", () => {
@@ -2790,14 +2871,11 @@
           locationNameInput.focus();
           return;
         }
-        drawingArea = false;
-        areaStart = null;
-        mapFrame.classList.remove("drawing-area");
         placementMode = !placementMode;
         mapFrame.classList.toggle("placing-location", placementMode);
         document.querySelector("#place-location").textContent = placementMode ? "Cancel placement" : editingLocationId ? "Move location" : "Place on map";
-        document.querySelector("#map-place-hint").textContent = placementMode ? "Placement active / click map to set position" : state.map.bounds ? "Campaign area marked" : "Pan and zoom / mark an area";
-        setMapStatus(placementMode ? "Click the map to set this location's real-world position." : "Placement cancelled.");
+        document.querySelector("#map-place-hint").textContent = placementMode ? "Placement active / click map to set position" : "Campaign map";
+        setMapStatus(placementMode ? "Click the map to set this location's position." : "Placement cancelled.");
       });
 
       locationNameInput.addEventListener("input", renderLocationCoordinate);
@@ -2806,7 +2884,7 @@
       generateSettlementDraftButton.addEventListener("click", generateSettlementDraft);
 
       addLocationButton.addEventListener("click", () => {
-        if (!pendingPosition || !locationNameInput.value.trim()) return;
+        if (!isInsideArea(pendingPosition) || !locationNameInput.value.trim()) return;
         const existing = editingLocationId ? state.locations.find((location) => location.id === editingLocationId) : null;
         if (existing) {
           if (locationKindInput.value !== "Settlement" && state.settlements.some((settlement) => settlement.locationId === existing.id)) {
@@ -2870,6 +2948,7 @@
       packageFileInput.addEventListener("change", async () => {
         const file = packageFileInput.files?.[0];
         if (!file) return;
+        const generation = ++packageReadGeneration;
         pendingImportedPackage = null;
         applyImportedPackageButton.disabled = true;
         importPackageSummaryElement.hidden = true;
@@ -2879,6 +2958,7 @@
         try {
           if (file.size > 25 * 1024 * 1024) throw new Error("Setup packages must be smaller than 25 MB.");
           const parsed = JSON.parse(await file.text());
+          if (generation !== packageReadGeneration) return;
           pendingImportedPackage = normalizeImportedPackage(parsed);
           importPackageSummaryElement.textContent = formatImportPackageSummary(pendingImportedPackage);
           importPackageSummaryElement.hidden = false;
@@ -2886,11 +2966,13 @@
           importPackageStatus.textContent = `Validated ${file.name}. Applying it will replace the current local setup draft.`;
           applyImportedPackageButton.disabled = false;
         } catch (error) {
+          if (generation !== packageReadGeneration) return;
           importPackageStatus.className = "feedback error";
           importPackageStatus.textContent = error instanceof Error ? error.message : "Could not read this setup package.";
         }
       });
       const closeImportPackageDialog = () => {
+        packageReadGeneration += 1;
         pendingImportedPackage = null;
         importPackageDialog.close();
       };
@@ -2898,16 +2980,19 @@
       document.querySelector("#cancel-import-package").addEventListener("click", closeImportPackageDialog);
       document.querySelector("#apply-import-package").addEventListener("click", () => {
         if (!pendingImportedPackage) return;
+        packageReadGeneration += 1;
+        basemapUploadGeneration += 1;
         state = pendingImportedPackage;
         pendingImportedPackage = null;
         storageAvailable = true;
         editingLocationId = null;
         placementMode = false;
         pendingPosition = null;
+        resetMapRenderer();
         restoreFields();
         if (leafletMap) {
-          leafletMap.setView([state.map.center.lat, state.map.center.lng], state.map.zoom);
-          if (state.map.bounds) leafletMap.fitBounds([[state.map.bounds.south, state.map.bounds.west], [state.map.bounds.north, state.map.bounds.east]], { padding: [28, 28] });
+          leafletMap.setView(mapLatLng(state.map.center), state.map.zoom);
+          if (state.map.bounds) leafletMap.fitBounds(FieldbookMapCoordinates.leafletBounds(state.map.bounds), { padding: [28, 28] });
           renderArea();
           renderLocations();
           renderTerrainDataTable();
@@ -2921,6 +3006,11 @@
       });
       importPackageDialog.addEventListener("click", (event) => {
         if (event.target === importPackageDialog) closeImportPackageDialog();
+      });
+      importPackageDialog.addEventListener("cancel", () => {
+        packageReadGeneration += 1;
+        pendingImportedPackage = null;
+        applyImportedPackageButton.disabled = true;
       });
       document.querySelector("#validate-package").addEventListener("click", () => renderValidation());
       document.querySelector("#preview-package").addEventListener("click", showPreview);

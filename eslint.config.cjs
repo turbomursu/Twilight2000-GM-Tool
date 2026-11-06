@@ -21,6 +21,10 @@ module.exports = defineConfig([
     }
   },
   {
+    files: ["campaign-package-contract.js"],
+    languageOptions: { globals: { require: "readonly" } }
+  },
+  {
     files: ["location-client.js", "personnel-client.js"],
     languageOptions: {
       globals: {

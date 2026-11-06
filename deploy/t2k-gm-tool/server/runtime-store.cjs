@@ -1,6 +1,7 @@
 const { createHash, randomBytes, randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 const { assertCampaignSetupPackage, assertOfflineBasemap } = require("../campaign-package-contract.js");
+const mapCoordinates = require("../map-coordinates.js");
 
 const schema = `
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -882,6 +883,7 @@ function collectRuntimeSave(database, gmAccountId, runtimeId, options = {}) {
     dashboardState: database.prepare("SELECT * FROM runtime_dashboard_state WHERE campaign_id = ?").get(runtimeId) || null,
     situationReport: database.prepare("SELECT campaign_id, revision, draft_json FROM situation_reports WHERE campaign_id = ?").get(runtimeId) || null,
     mapPublication: database.prepare("SELECT campaign_id, revision, draft_json FROM map_publications WHERE campaign_id = ?").get(runtimeId) || null,
+    partyPosition: database.prepare("SELECT campaign_id, lat, lng, revision, published, published_at, updated_at FROM party_position WHERE campaign_id = ?").get(runtimeId) || null,
     commsMessages: queryRows("SELECT * FROM comms_messages WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
     inventoryItems: queryRows("SELECT * FROM inventory_items WHERE campaign_id = ? ORDER BY id", runtimeId),
     inventoryProposals: queryRows("SELECT * FROM inventory_proposals WHERE campaign_id = ? ORDER BY id", runtimeId),
@@ -931,6 +933,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     auditEvents: Object.hasOwn(backup.data, "auditEvents") ? backup.data.auditEvents.map((row) => ({ ...row, game_time: Object.hasOwn(row, "game_time") ? row.game_time : null })) : [],
     dailySupplyUsage: Object.hasOwn(backup.data, "dailySupplyUsage") ? backup.data.dailySupplyUsage : [],
     conflictIncidents: Object.hasOwn(backup.data, "conflictIncidents") ? backup.data.conflictIncidents : [],
+    partyPosition: Object.hasOwn(backup.data, "partyPosition") ? backup.data.partyPosition : null,
     dashboardState: backup.data.dashboardState ? { ...backup.data.dashboardState,
       game_time: Object.hasOwn(backup.data.dashboardState, "game_time") ? backup.data.dashboardState.game_time : "00:00",
       weather_last_roll_shift: Object.hasOwn(backup.data.dashboardState, "weather_last_roll_shift") ? backup.data.dashboardState.weather_last_roll_shift : "",
@@ -1049,8 +1052,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
       && [["title", 160], ["body", 12000], ["gameTime", 120]].every(([key, maximum]) =>
         typeof draft[key] === "string" && draft[key].length <= maximum));
   }
-  const coordinate = (value) => isRecord(value) && Number.isFinite(value.lat) && Number.isFinite(value.lng)
-    && Math.abs(value.lat) <= 90 && Math.abs(value.lng) <= 180;
+  const coordinate = (value, bounds) => mapCoordinates.contains(value, bounds);
   const source = parseJson(data.setupImport.source_json, "setup snapshot", isRecord);
   assertCampaignSetupPackage(source);
   if (createHash("sha256").update(data.setupImport.source_json, "utf8").digest("hex") !== data.setupImport.sha256
@@ -1058,25 +1060,37 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     || data.campaign.setup_campaign_id !== source.campaign.id) fail("Invalid setup snapshot provenance in runtime backup.");
   const map = data.maps[0];
   if (map.runtime_campaign_id !== targetRuntimeId) fail("The backup map belongs to another campaign.");
-  parseJson(map.bounds_json, "map bounds", (bounds) => isRecord(bounds)
-    && [bounds.south, bounds.west, bounds.north, bounds.east].every(Number.isFinite)
-    && bounds.south >= -90 && bounds.north <= 90 && bounds.west >= -180 && bounds.east <= 180
-    && bounds.south < bounds.north && bounds.west < bounds.east);
-  parseJson(map.center_json, "map center", coordinate);
+  const bounds = parseJson(map.bounds_json, "map bounds", (value) => mapCoordinates.normalizeBounds(value) !== null);
+  if (mapCoordinates.isImage(bounds)
+    && (!map.offlineBasemap_json || JSON.parse(map.offlineBasemap_json).format !== "static-image")) {
+    fail("An image-coordinate campaign backup must retain a static image basemap.");
+  }
+  parseJson(map.center_json, "map center", (value) => coordinate(value, bounds));
   parseJson(map.annotations_json, "map annotations", Array.isArray);
   if (map.atlas_json !== null) parseJson(map.atlas_json, "atlas", isRecord);
   if (map.offlineBasemap_json !== null) {
     const basemap = parseJson(map.offlineBasemap_json, "offline basemap", isRecord);
     try { assertOfflineBasemap(basemap); } catch { fail("Invalid offline basemap metadata in runtime backup."); }
   }
-  data.locations.forEach((location) => parseJson(location.map_position_json, "location position", coordinate));
+  data.locations.forEach((location) => parseJson(location.map_position_json, "location position", (value) => coordinate(value, bounds)));
   if (data.mapPublication != null) {
     const publication = data.mapPublication;
     if (!isRecord(publication) || publication.campaign_id !== targetRuntimeId
       || !Number.isSafeInteger(publication.revision) || publication.revision < 0) fail("Invalid map publication in runtime backup.");
     const draft = parseJson(publication.draft_json, "map publication draft", isRecord);
-    require("./map-publications.cjs").validateMapDraft(draft, JSON.parse(map.bounds_json),
+    require("./map-publications.cjs").validateMapDraft(draft, bounds,
       data.locations.map((location) => ({ id: location.id, position: JSON.parse(location.map_position_json) })));
+  }
+  if (data.partyPosition !== null) {
+    const position = data.partyPosition;
+    if (!isRecord(position) || position.campaign_id !== targetRuntimeId
+      || !Number.isSafeInteger(position.revision) || position.revision < 0
+      || ![0, 1].includes(position.published)
+      || (position.published_at !== null && typeof position.published_at !== "string")
+      || typeof position.updated_at !== "string"
+      || !coordinate(mapCoordinates.isImage(bounds) ? { x: position.lat, y: position.lng } : { lat: position.lat, lng: position.lng }, bounds)) {
+      fail("Invalid party position in runtime backup.");
+    }
   }
   data.characters.forEach((character) => {
     const fields = parseJson(character.fields_json, "character fields", Array.isArray);
@@ -1149,6 +1163,14 @@ function validateRuntimeSave(backup, targetRuntimeId) {
 
 function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, options = {}) {
   const data = validateRuntimeSave(backup, targetRuntimeId);
+  const savedBounds = JSON.parse(data.maps[0].bounds_json);
+  if (mapCoordinates.isImage(savedBounds)) {
+    const basemap = data.maps[0].offlineBasemap_json ? JSON.parse(data.maps[0].offlineBasemap_json) : null;
+    if (!basemap || typeof options.validateOfflineBasemap !== "function") {
+      throw new Error("The static image asset could not be verified for this image-coordinate campaign restore.");
+    }
+    options.validateOfflineBasemap(gmAccountId, basemap, savedBounds);
+  }
   if (options.confirmReplace !== true) throw new Error("Confirm replacing the selected runtime campaign before restoring.");
   if (!Number.isSafeInteger(options.expectedRevision) || options.expectedRevision < 0) {
     throw new Error("The current campaign revision is required for restore.");
@@ -1184,6 +1206,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
       ["character_change_requests", "campaign_id"], ["player_seats", "campaign_id"], ["characters", "campaign_id"],
       ["conflict_incidents", "campaign_id"], ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
       ["runtime_dashboard_state", "campaign_id"], ["settlement_factions", "runtime_campaign_id"],
+      ["party_position", "campaign_id"],
       ["faction_influence_cells", "runtime_campaign_id"], ["settlements", "runtime_campaign_id"],
       ["factions", "runtime_campaign_id"], ["terrain_cells", "runtime_campaign_id"], ["gm_notes", "runtime_campaign_id"],
       ["locations", "runtime_campaign_id"], ["maps", "runtime_campaign_id"], ["setup_imports", "runtime_campaign_id"],
@@ -1227,6 +1250,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("campaign_memberships", ["campaign_id", "account_id", "role", "created_at"], data.campaignMemberships);
     insertRows("setup_imports", ["runtime_campaign_id", "source_campaign_id", "schema_version", "imported_at", "sha256", "source_json"], [data.setupImport]);
     insertRows("maps", ["runtime_campaign_id", "source_map_id", "name", "bounds_json", "center_json", "zoom", "atlas_json", "annotations_json", "offlineBasemap_json", "attribution"], data.maps);
+    if (data.partyPosition) insertRows("party_position", ["campaign_id", "lat", "lng", "revision", "published", "published_at", "updated_at"], [data.partyPosition]);
     insertRows("terrain_cells", ["runtime_campaign_id", "q", "r", "terrain_type"], data.terrainCells);
     insertRows("locations", ["runtime_campaign_id", "id", "name", "kind", "description", "grid_ref", "coordinates_json", "map_position_json", "visibility_eligibility", "is_starting_location"], data.locations);
     insertRows("settlements", ["runtime_campaign_id", "id", "source_location_id", "name", "scale", "population_estimate", "security", "attitude", "leadership", "situation"], data.settlements);
@@ -1281,6 +1305,14 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
 function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, options = {}) {
   const sourceRuntimeId = backup?.campaignId;
   const sourceData = validateRuntimeSave(backup, sourceRuntimeId);
+  const imageBounds = JSON.parse(sourceData.maps[0].bounds_json);
+  if (mapCoordinates.isImage(imageBounds)) {
+    const basemap = sourceData.maps[0].offlineBasemap_json ? JSON.parse(sourceData.maps[0].offlineBasemap_json) : null;
+    if (!basemap || typeof options.validateOfflineBasemap !== "function") {
+      throw new Error("The static image asset could not be verified for this image-coordinate campaign import.");
+    }
+    options.validateOfflineBasemap(gmAccountId, basemap, imageBounds);
+  }
   if (!playerAccountMap || typeof playerAccountMap !== "object" || Array.isArray(playerAccountMap)) {
     throw new Error("Map each source player account to a local GM-created player account.");
   }
@@ -1316,7 +1348,8 @@ function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, op
   const imported = importSetupPackage(database, sourceData.setupImport.source_json, {
     ownerAccountId: gmAccountId,
     idFactory: options.idFactory,
-    now: options.now
+    now: options.now,
+    validateOfflineBasemap: options.validateOfflineBasemap
   });
   const targetRuntimeId = imported.runtimeCampaignId;
   const remapAccount = (sourceId) => {
@@ -1348,6 +1381,7 @@ function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, op
     data.dashboardState.campaign_id = targetRuntimeId;
     if (data.situationReport) data.situationReport.campaign_id = targetRuntimeId;
     if (data.mapPublication) data.mapPublication.campaign_id = targetRuntimeId;
+    if (data.partyPosition) data.partyPosition.campaign_id = targetRuntimeId;
 
     data.playerSeats.forEach((row) => { row.account_id = remapAccount(row.account_id); });
     data.commsMessages.forEach((row) => { row.sender_account_id = remapAccount(row.sender_account_id); });
@@ -1373,7 +1407,8 @@ function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, op
       confirmReplace: true,
       confirmOlderBackup: true,
       expectedRevision: 0,
-      now: options.now
+      now: options.now,
+      validateOfflineBasemap: options.validateOfflineBasemap
     });
     return { campaignId: targetRuntimeId, sourceCampaignId: sourceRuntimeId, restoredFromRevision: restore.restoredFromRevision,
       revision: restore.revision };
@@ -1423,9 +1458,14 @@ function importSetupPackage(database, sourceJson, options = {}) {
       VALUES (?, ?, 2, ?, ?, ?)`)
       .run(runtimeId, campaignId, timestamp, checksum, sourceJson);
 
-    const center = input.map.center && Number.isFinite(input.map.center.lat) && Number.isFinite(input.map.center.lng)
-      ? input.map.center
-      : { lat: (input.map.bounds.south + input.map.bounds.north) / 2, lng: (input.map.bounds.west + input.map.bounds.east) / 2 };
+    const center = mapCoordinates.contains(input.map.center, input.map.bounds)
+      ? input.map.center : mapCoordinates.center(input.map.bounds);
+    if (mapCoordinates.isImage(input.map.bounds)) {
+      if (typeof options.validateOfflineBasemap !== "function") {
+        throw new Error("The static image asset could not be verified for this image-coordinate campaign.");
+      }
+      options.validateOfflineBasemap(options.ownerAccountId, input.map.offlineBasemap, input.map.bounds);
+    }
     database.prepare(`INSERT INTO maps
       (runtime_campaign_id, source_map_id, name, bounds_json, center_json, zoom, atlas_json, annotations_json, offlineBasemap_json, attribution)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -1759,11 +1799,7 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
         if (!location || typeof location !== "object" || Array.isArray(location)
           || Object.keys(location).some((key) => !["id", "mapPosition"].includes(key))
           || typeof location.id !== "string" || !locationIds.has(location.id)
-          || !location.mapPosition || typeof location.mapPosition !== "object" || Array.isArray(location.mapPosition)
-          || Object.keys(location.mapPosition).length !== 2
-          || !Number.isFinite(location.mapPosition.lat) || !Number.isFinite(location.mapPosition.lng)
-          || location.mapPosition.lat < bounds.south || location.mapPosition.lat > bounds.north
-          || location.mapPosition.lng < bounds.west || location.mapPosition.lng > bounds.east) {
+          || !mapCoordinates.contains(location.mapPosition, bounds)) {
           throw new Error("A map location is invalid or outside the campaign map bounds.");
         }
         return { id: location.id, mapPosition: location.mapPosition };
@@ -2805,7 +2841,7 @@ function listLocationsForCampaign(database, accountId, campaignId) {
       kind: loc.kind,
       description: loc.description,
       gridRef: loc.grid_ref,
-      mapPosition: loc.map_position_json ? JSON.parse(loc.map_position_json) : { lat: 0, lng: 0 },
+      mapPosition: loc.map_position_json ? JSON.parse(loc.map_position_json) : null,
       visibilityEligibility: loc.visibility_eligibility,
       isStartingLocation: loc.is_starting_location === 1
     }));
@@ -2832,12 +2868,6 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
     throw new Error("Map position is required.");
   }
 
-  const lat = input.mapPosition.lat;
-  const lng = input.mapPosition.lng;
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    throw new Error("Map position must have lat and lng numbers.");
-  }
-
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -2848,11 +2878,11 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
 
     const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
       .get(campaignId);
-    if (mapData) {
-      const bounds = JSON.parse(mapData.bounds_json);
-      if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
-        throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
-      }
+    const bounds = mapData ? JSON.parse(mapData.bounds_json) : null;
+    if (!mapData || !mapCoordinates.contains(input.mapPosition, bounds)) {
+      throw new Error(mapCoordinates.isImage(bounds)
+        ? "Map position is out of bounds or must use x/y kilometre coordinates."
+        : "Map position is out of bounds or must use latitude/longitude coordinates.");
     }
 
     const locationId = randomUUID();
@@ -2869,7 +2899,7 @@ function createLocation(database, accountId, campaignId, input, options = {}) {
         description,
         input.gridRef || null,
         null,
-        JSON.stringify({ lat, lng }),
+        JSON.stringify(input.mapPosition),
         visibilityEligibility,
         input.isStartingLocation ? 1 : 0
       );
@@ -2912,24 +2942,17 @@ function updateLocation(database, accountId, campaignId, locationId, input, opti
       throw new Error("Visibility must be 'gm-only' or 'players'.");
     }
 
-    let mapPosition = location.map_position_json ? JSON.parse(location.map_position_json) : { lat: 0, lng: 0 };
+    let mapPosition = location.map_position_json ? JSON.parse(location.map_position_json) : null;
     if (input.mapPosition && typeof input.mapPosition === "object") {
-      const lat = input.mapPosition.lat;
-      const lng = input.mapPosition.lng;
-      if (typeof lat !== "number" || typeof lng !== "number") {
-        throw new Error("Map position must have lat and lng numbers.");
-      }
-
       const mapData = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
         .get(campaignId);
-      if (mapData) {
-        const bounds = JSON.parse(mapData.bounds_json);
-        if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
-          throw new Error(`Map position out of bounds. Valid range: lat ${bounds.south}-${bounds.north}, lng ${bounds.west}-${bounds.east}`);
-        }
+      const bounds = mapData ? JSON.parse(mapData.bounds_json) : null;
+      if (!mapData || !mapCoordinates.contains(input.mapPosition, bounds)) {
+        throw new Error(mapCoordinates.isImage(bounds)
+          ? "Map position is out of bounds or must use x/y kilometre coordinates."
+          : "Map position is out of bounds or must use latitude/longitude coordinates.");
       }
-
-      mapPosition = { lat, lng };
+      mapPosition = input.mapPosition;
     }
 
     const gridRef = input.gridRef !== undefined ? input.gridRef : location.grid_ref;
@@ -3122,7 +3145,7 @@ function createRouteStop(database, accountId, campaignId, locationId, detail, km
     if (!bounds) throw new Error("Campaign map not found.");
     const boundObj = JSON.parse(bounds.bounds_json);
     const mapPos = JSON.parse(location.map_position_json);
-    if (!isWithinBounds(mapPos, boundObj)) throw new Error("Location is outside campaign bounds.");
+    if (!mapCoordinates.contains(mapPos, boundObj)) throw new Error("Location is outside campaign bounds.");
 
     const existingAtOrdinal = database.prepare("SELECT COUNT(*) as count FROM route_stops WHERE campaign_id = ? AND ordinal = ?")
       .get(campaignId, ordinal);
@@ -3492,26 +3515,26 @@ function getPartyPosition(database, accountId, campaignId) {
     // Get campaign center as default
     const map = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
       .get(campaignId);
-    let centerLat = 0, centerLng = 0;
+    let position = { lat: 0, lng: 0 };
     if (map) {
       const bounds = JSON.parse(map.bounds_json);
-      centerLat = (bounds.north + bounds.south) / 2;
-      centerLng = (bounds.east + bounds.west) / 2;
+      position = mapCoordinates.center(bounds);
     }
 
     database.prepare(`INSERT INTO party_position
       (campaign_id, lat, lng, revision, published, updated_at)
       VALUES (?, ?, ?, 0, 0, ?)`)
-      .run(campaignId, centerLat, centerLng, timestamp);
+      .run(campaignId, position.lat ?? position.x, position.lng ?? position.y, timestamp);
   }
 
+  const map = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
+  const bounds = map ? JSON.parse(map.bounds_json) : null;
   const pos = database.prepare(`SELECT lat, lng, revision, published, published_at, updated_at
     FROM party_position WHERE campaign_id = ?`)
     .get(campaignId);
 
   return {
-    lat: pos.lat,
-    lng: pos.lng,
+    ...(mapCoordinates.isImage(bounds) ? { x: pos.lat, y: pos.lng } : { lat: pos.lat, lng: pos.lng }),
     revision: pos.revision,
     published: Boolean(pos.published),
     publishedAt: pos.published_at,
@@ -3519,11 +3542,10 @@ function getPartyPosition(database, accountId, campaignId) {
   };
 }
 
-function updatePartyPosition(database, accountId, campaignId, lat, lng, options = {}) {
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
-    throw new Error("Position must have numeric lat/lng.");
-  }
-
+function updatePartyPosition(database, accountId, campaignId, positionOrLat, lngOrOptions, maybeOptions = {}) {
+  const numericCall = typeof positionOrLat === "number";
+  const positionInput = numericCall ? { lat: positionOrLat, lng: lngOrOptions } : positionOrLat;
+  const options = numericCall ? maybeOptions : (lngOrOptions || {});
   database.exec("BEGIN IMMEDIATE");
   try {
     const campaign = database.prepare(`SELECT campaigns.* FROM campaigns
@@ -3532,15 +3554,14 @@ function updatePartyPosition(database, accountId, campaignId, lat, lng, options 
       .get(campaignId, accountId);
     if (!campaign) throw new Error("Campaign not found or access denied.");
 
-    // Validate bounds
+    // Validate according to the campaign's coordinate model. The legacy SQLite
+    // lat/lng columns store x/y for image maps without a schema migration.
     const map = database.prepare("SELECT bounds_json FROM maps WHERE runtime_campaign_id = ?")
       .get(campaignId);
-    if (map) {
-      const bounds = JSON.parse(map.bounds_json);
-      if (lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) {
-        throw new Error("Position outside campaign bounds.");
-      }
-    }
+    const bounds = map ? JSON.parse(map.bounds_json) : null;
+    if (!map || !mapCoordinates.contains(positionInput, bounds)) throw new Error("Position outside campaign bounds.");
+    const xOrLat = mapCoordinates.isImage(bounds) ? positionInput.x : positionInput.lat;
+    const yOrLng = mapCoordinates.isImage(bounds) ? positionInput.y : positionInput.lng;
 
     // Ensure position exists
     const exists = database.prepare("SELECT 1 FROM party_position WHERE campaign_id = ?")
@@ -3550,13 +3571,13 @@ function updatePartyPosition(database, accountId, campaignId, lat, lng, options 
       database.prepare(`INSERT INTO party_position
         (campaign_id, lat, lng, revision, published, updated_at)
         VALUES (?, ?, ?, 0, 0, ?)`)
-        .run(campaignId, lat, lng, timestamp);
+        .run(campaignId, xOrLat, yOrLng, timestamp);
     } else {
       const timestamp = (options.now || (() => new Date().toISOString()))();
       database.prepare(`UPDATE party_position
         SET lat = ?, lng = ?, revision = revision + 1, updated_at = ?
         WHERE campaign_id = ?`)
-        .run(lat, lng, timestamp, campaignId);
+        .run(xOrLat, yOrLng, timestamp, campaignId);
     }
 
     database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ?")

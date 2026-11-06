@@ -1712,6 +1712,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/vendor/leaflet.js"></script>
+  <script src="/map-coordinates.js"></script>
   <script src="./map-visualization-client.js"></script>
   <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
@@ -2033,7 +2034,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       document.addEventListener('mapviz:partyPositionDragged', async (evt) => {
         if (!runtimeDataLoaded || !state.runtimeCampaignId) return;
 
-        const { lat, lng } = evt.detail;
+        const position = evt.detail;
         const campaignId = state.runtimeCampaignId;
 
         try {
@@ -2042,7 +2043,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
             {
               method: 'PUT',
               headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ position: { lat, lng } })
+              body: JSON.stringify(position)
             }
           );
 
@@ -2194,7 +2195,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
         // Load locations for the location client
         if (window.locationClient) {
-          window.locationClient.loadLocationsForCampaign(runtime.campaign.id);
+          window.locationClient.loadLocationsForCampaign(runtime.campaign.id, state.setupPackage?.map.bounds);
         }
         // Load route for the route client
         if (window.routeClient) {
@@ -2343,9 +2344,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         caption.textContent = "SAVED ROUTE / READ ONLY";
 
         const positionedStops = route.map((stop, index) => ({ ...stop, index }))
-          .filter((stop) => stop.mapPosition && Number.isFinite(stop.mapPosition.lat) && Number.isFinite(stop.mapPosition.lng)
-            && stop.mapPosition.lat >= -90 && stop.mapPosition.lat <= 90
-            && stop.mapPosition.lng >= -180 && stop.mapPosition.lng <= 180);
+          .filter((stop) => FieldbookMapCoordinates.validPoint(stop.mapPosition, mapData?.bounds));
         if (!positionedStops.length && mapData?.offlineBasemap?.format !== "static-image") {
           runtimeMapElement.hidden = true;
           notice.textContent = "This campaign route has no saved map coordinates.";
@@ -2364,14 +2363,22 @@ Military rank || optional</textarea><span class="row-description">One field per 
           return;
         }
         notice.hidden = true;
+        const imageCoordinates = FieldbookMapCoordinates.isImage(mapData?.bounds);
+        if (runtimeRouteMap && (runtimeRouteMap.options.crs === L.CRS.Simple) !== imageCoordinates) {
+          runtimeBasemap.clear();
+          runtimeRouteMap.remove();
+          runtimeRouteMap = null;
+          runtimeBasemapSignature = null;
+          runtimeRouteSignature = null;
+        }
         if (!runtimeRouteMap) {
-          runtimeRouteMap = L.map(runtimeMapElement, { minZoom: 2, maxZoom: 18, scrollWheelZoom: false });
+          runtimeRouteMap = L.map(runtimeMapElement, { crs: imageCoordinates ? L.CRS.Simple : L.CRS.EPSG3857, minZoom: imageCoordinates ? -10 : 2, maxZoom: 18, scrollWheelZoom: false });
           runtimeBasemap = FieldbookBasemap.controller(runtimeRouteMap, (message) => { notice.textContent = message; notice.hidden = false; });
           runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
 
           // Initialize map visualization client
           if (window.mapVisualization) {
-            window.mapVisualization.initializeVisualization(runtimeRouteMap);
+            window.mapVisualization.initializeVisualization(runtimeRouteMap, mapData?.bounds);
           }
         }
         const basemapSignature = JSON.stringify([state.runtimeCampaignId, mapData?.offlineBasemap, mapData?.bounds]);
@@ -2380,14 +2387,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeBasemapSignature = basemapSignature;
         }
 
-        const signature = `${basemapSignature}:${positionedStops.map((stop) => `${stop.name}:${stop.mapPosition.lat},${stop.mapPosition.lng}`).join("|")}`;
+        const signature = `${basemapSignature}:${positionedStops.map((stop) => `${stop.name}:${JSON.stringify(stop.mapPosition)}`).join("|")}`;
         const shouldFit = signature !== runtimeRouteSignature;
         runtimeRouteLayer.clearLayers();
-        const positions = positionedStops.map((stop) => [stop.mapPosition.lat, stop.mapPosition.lng]);
+        const positions = positionedStops.map((stop) => FieldbookMapCoordinates.toLatLng(stop.mapPosition, mapData?.bounds));
         if (positions.length > 1) L.polyline(positions, { color: "#a97832", weight: 3, opacity: .9 }).addTo(runtimeRouteLayer);
         positionedStops.forEach((stop) => {
           const current = stop.index === state.activeStop;
-          L.circleMarker([stop.mapPosition.lat, stop.mapPosition.lng], {
+          L.circleMarker(FieldbookMapCoordinates.toLatLng(stop.mapPosition, mapData?.bounds), {
             radius: current ? 8 : 5,
             color: current ? "#b74435" : "#344a40",
             weight: 2,
@@ -2398,7 +2405,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (shouldFit) {
           if (mapData?.offlineBasemap?.format === "static-image") {
             const bounds = mapData.bounds;
-            runtimeRouteMap.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]], { padding: [12, 12] });
+            runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(bounds), { padding: [12, 12] });
           } else if (positions.length > 1) runtimeRouteMap.fitBounds(positions, { padding: [24, 24], maxZoom: 12 });
           else runtimeRouteMap.setView(positions[0], 10);
           runtimeRouteSignature = signature;
@@ -2500,30 +2507,31 @@ Military rank || optional</textarea><span class="row-description">One field per 
       function renderMapLocationEditor() {
         const container = document.getElementById("map-location-rows");
         const bounds = state.setupPackage?.map?.bounds;
+        const image = FieldbookMapCoordinates.isImage(bounds);
         container.replaceChildren();
         routeLocations().forEach((location) => {
           const row = document.createElement("div");
           row.className = "map-location-row";
           row.dataset.locationId = location.id;
           const name = document.createElement("strong");
-          name.textContent = `${location.name} / ${location.kind}`;
+          name.textContent = `${location.name} / ${location.kind}${image ? " / y, x km (bottom-left origin)" : ""}`;
           const latitude = document.createElement("input");
           latitude.type = "number";
           latitude.step = "any";
           latitude.required = true;
-          latitude.value = String(location.mapPosition.lat);
-          latitude.setAttribute("aria-label", `${location.name} latitude`);
+          latitude.value = String(image ? location.mapPosition.y : location.mapPosition.lat);
+          latitude.setAttribute("aria-label", `${location.name} ${image ? "y / km north" : "latitude"}`);
           const longitude = document.createElement("input");
           longitude.type = "number";
           longitude.step = "any";
           longitude.required = true;
-          longitude.value = String(location.mapPosition.lng);
-          longitude.setAttribute("aria-label", `${location.name} longitude`);
+          longitude.value = String(image ? location.mapPosition.x : location.mapPosition.lng);
+          longitude.setAttribute("aria-label", `${location.name} ${image ? "x / km east" : "longitude"}`);
           if (bounds) {
-            latitude.min = String(bounds.south);
-            latitude.max = String(bounds.north);
-            longitude.min = String(bounds.west);
-            longitude.max = String(bounds.east);
+            latitude.min = String(image ? 0 : bounds.south);
+            latitude.max = String(image ? FieldbookMapCoordinates.heightKm(bounds) : bounds.north);
+            longitude.min = String(image ? 0 : bounds.west);
+            longitude.max = String(image ? bounds.widthKm : bounds.east);
           }
           row.append(name, latitude, longitude);
           container.append(row);
@@ -2693,13 +2701,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
           setting: requireText(input.campaign.setting, "Campaign setting", 100),
           era: typeof input.campaign.era === "string" ? input.campaign.era.slice(0, 60) : ""
         };
-        const rawBounds = input.map.bounds;
-        if (!isRecord(rawBounds) || ![rawBounds.south, rawBounds.west, rawBounds.north, rawBounds.east].every(Number.isFinite)
-          || rawBounds.south < -90 || rawBounds.north > 90 || rawBounds.west < -180 || rawBounds.east > 180
-          || rawBounds.south >= rawBounds.north || rawBounds.west >= rawBounds.east) {
+        const bounds = FieldbookMapCoordinates.normalizeBounds(input.map.bounds);
+        if (!bounds) {
           throw new Error("The setup package needs valid campaign-area bounds.");
         }
-        const bounds = { south: rawBounds.south, west: rawBounds.west, north: rawBounds.north, east: rawBounds.east };
         if (input.map.grid.coordinateSystem !== "axial-q-r" || input.map.grid.cellKm !== 10
           || !Array.isArray(input.map.grid.terrainCells) || input.map.grid.terrainCells.length > 10000) {
           throw new Error("The setup package contains an unsupported travel grid.");
@@ -2715,10 +2720,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           terrainCells[key] = cell.terrainType;
         });
         const origin = input.map.grid.origin === null
-          ? { lat: bounds.north, lng: bounds.west }
-          : isRecord(input.map.grid.origin) && Number.isFinite(input.map.grid.origin.lat) && Number.isFinite(input.map.grid.origin.lng)
-            && input.map.grid.origin.lat >= -90 && input.map.grid.origin.lat <= 90 && input.map.grid.origin.lng >= -180 && input.map.grid.origin.lng <= 180
-          ? { lat: input.map.grid.origin.lat, lng: input.map.grid.origin.lng }
+          ? FieldbookMapCoordinates.isImage(bounds) ? { x: 0, y: FieldbookMapCoordinates.heightKm(bounds) } : { lat: bounds.north, lng: bounds.west }
+          : FieldbookMapCoordinates.validPoint(input.map.grid.origin, bounds)
+          ? { ...input.map.grid.origin }
           : null;
         if (!origin) throw new Error("The setup package has an invalid grid origin.");
         if (!Array.isArray(input.factions) || input.factions.length > 200) throw new Error("The setup package faction list is invalid or too large.");
@@ -2735,20 +2739,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (influenceCells.length !== rawInfluenceCells.length) throw new Error(`The influence layer for ${name} contains an invalid or duplicate hex.`);
           return { id, name, influenceCells };
         });
-        const center = isRecord(input.map.center) && Number.isFinite(input.map.center.lat) && Number.isFinite(input.map.center.lng)
-          ? { lat: input.map.center.lat, lng: input.map.center.lng }
-          : { lat: (bounds.south + bounds.north) / 2, lng: (bounds.west + bounds.east) / 2 };
-        const zoom = Number.isFinite(input.map.zoom) ? Math.min(18, Math.max(2, input.map.zoom)) : 10;
+        const center = FieldbookMapCoordinates.contains(input.map.center, bounds)
+          ? { ...input.map.center } : FieldbookMapCoordinates.center(bounds);
+        const zoom = Number.isFinite(input.map.zoom) ? Math.min(18, Math.max(FieldbookMapCoordinates.isImage(bounds) ? -10 : 2, input.map.zoom)) : 10;
         const locations = Array.isArray(input.map.locations) ? input.map.locations.slice(0, 500).flatMap((location) => {
           if (!isRecord(location) || !isRecord(location.mapPosition)) return [];
-          const { lat, lng } = location.mapPosition;
-          if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < bounds.south || lat > bounds.north || lng < bounds.west || lng > bounds.east) return [];
+          if (!FieldbookMapCoordinates.contains(location.mapPosition, bounds)) return [];
           return [{
             id: typeof location.id === "string" ? location.id : null,
             name: typeof location.name === "string" ? location.name.slice(0, 160) : "Location",
             kind: typeof location.kind === "string" ? location.kind.slice(0, 80) : "Location",
             gridRef: typeof location.gridRef === "string" ? location.gridRef.slice(0, 40) : null,
-            position: { lat, lng }
+            position: { ...location.mapPosition }
           }];
         }) : [];
         if (!Array.isArray(input.settlements) || input.settlements.length > 500) throw new Error("The setup package settlement list is invalid or too large.");
@@ -2936,11 +2938,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function liveAxialForPosition(position, origin) {
+        const image = FieldbookMapCoordinates.isImage(state.setupPackage?.map.bounds);
         const metersPerLat = 111132;
         const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
         const radius = 10000 / Math.sqrt(3);
-        const eastMeters = (position.lng - origin.lng) * metersPerLng;
-        const northMeters = (position.lat - origin.lat) * metersPerLat;
+        const eastMeters = image ? (position.x - origin.x) * 1000 : (position.lng - origin.lng) * metersPerLng;
+        const northMeters = image ? (position.y - origin.y) * 1000 : (position.lat - origin.lat) * metersPerLat;
         const q = (Math.sqrt(3) / 3 * eastMeters - northMeters / 3) / radius;
         const r = (2 / 3 * northMeters) / radius;
         const x = q, z = r, y = -x - z;
@@ -2953,24 +2956,33 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function livePositionForMeters(x, y, origin) {
+        if (FieldbookMapCoordinates.isImage(state.setupPackage?.map.bounds)) return { x: origin.x + x / 1000, y: origin.y + y / 1000 };
         const metersPerLat = 111132;
         const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
         return { lat: origin.lat + y / metersPerLat, lng: origin.lng + x / metersPerLng };
       }
 
       function initializeInfluenceMap() {
+        if (influenceMap && state.setupPackage
+          && (influenceMap.options.crs === L.CRS.Simple) !== FieldbookMapCoordinates.isImage(state.setupPackage.map.bounds)) {
+          influenceBasemap.clear();
+          influenceMap.remove();
+          influenceMap = null;
+          influenceHexLayer = null;
+        }
         if (influenceMap || !state.setupPackage || !window.L) {
           if (state.setupPackage && !window.L) document.getElementById("influence-map-status").textContent = "Map library unavailable. Check network access and reload.";
           return;
         }
         const mapData = state.setupPackage.map;
-        influenceMap = L.map("live-influence-map", { minZoom: 2, maxZoom: 18 }).setView([mapData.center.lat, mapData.center.lng], mapData.zoom);
+        const image = FieldbookMapCoordinates.isImage(mapData.bounds);
+        influenceMap = L.map("live-influence-map", { crs: image ? L.CRS.Simple : L.CRS.EPSG3857, minZoom: image ? -10 : 2, maxZoom: 18 }).setView(FieldbookMapCoordinates.toLatLng(mapData.center, mapData.bounds), mapData.zoom);
         influenceBasemap = FieldbookBasemap.controller(influenceMap, (message) => { document.getElementById("influence-map-status").textContent = message; });
         influenceBasemap.set(mapData.offlineBasemap, mapData.bounds);
         influenceHexLayer = L.layerGroup().addTo(influenceMap);
         influenceMap.on("click", handleLiveInfluenceMapClick);
         influenceMap.on("moveend zoomend", renderLiveInfluenceGrid);
-        influenceMap.fitBounds([[mapData.bounds.south, mapData.bounds.west], [mapData.bounds.north, mapData.bounds.east]], { padding: [28, 28] });
+        influenceMap.fitBounds(FieldbookMapCoordinates.leafletBounds(mapData.bounds), { padding: [28, 28] });
       }
 
       function renderLiveInfluenceGrid() {
@@ -2979,14 +2991,15 @@ Military rank || optional</textarea><span class="row-description">One field per 
         influenceHexLayer.clearLayers();
         const { bounds, grid, locations } = setup.map;
         const origin = grid.origin;
+        const image = FieldbookMapCoordinates.isImage(bounds);
         const metersPerLat = 111132;
         const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
         const radius = 10000 / Math.sqrt(3);
         const view = influenceMap.getBounds();
         const corners = [view.getSouthWest(), view.getNorthWest(), view.getNorthEast(), view.getSouthEast()];
         const axialCorners = corners.map((corner) => {
-          const x = (corner.lng - origin.lng) * metersPerLng;
-          const y = (corner.lat - origin.lat) * metersPerLat;
+          const x = image ? (corner.lng - origin.x) * 1000 : (corner.lng - origin.lng) * metersPerLng;
+          const y = image ? (corner.lat - origin.y) * 1000 : (corner.lat - origin.lat) * metersPerLat;
           return { q: (Math.sqrt(3) / 3 * x - y / 3) / radius, r: (2 / 3 * y) / radius };
         });
         const qMin = Math.floor(Math.min(...axialCorners.map((point) => point.q))) - 2;
@@ -3010,11 +3023,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
             const x = radius * Math.sqrt(3) * (q + r / 2);
             const y = radius * 1.5 * r;
             const center = livePositionForMeters(x, y, origin);
-            if (center.lat < bounds.south || center.lat > bounds.north || center.lng < bounds.west || center.lng > bounds.east || !view.contains([center.lat, center.lng])) continue;
+            if (!FieldbookMapCoordinates.contains(center, bounds) || !view.contains(FieldbookMapCoordinates.toLatLng(center, bounds))) continue;
             const vertices = Array.from({ length: 6 }, (_, index) => {
               const angle = (30 + index * 60) * Math.PI / 180;
               const point = livePositionForMeters(x + radius * Math.cos(angle), y + radius * Math.sin(angle), origin);
-              return [point.lat, point.lng];
+              return FieldbookMapCoordinates.toLatLng(point, bounds);
             });
             const key = `${q},${r}`;
             const owners = cellOwners.get(key) || [];
@@ -3044,13 +3057,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
               const factionIndex = Math.max(0, setup.factions.findIndex((faction) => faction.id === document.getElementById("live-influence-faction").value));
               L.polygon(vertices, { color: liveInfluenceColors[factionIndex % liveInfluenceColors.length], weight: 4, fill: true, fillColor: liveInfluenceColors[factionIndex % liveInfluenceColors.length], fillOpacity: .18, interactive: false }).addTo(influenceHexLayer);
             }
-            if (influenceMap.getZoom() >= 9) {
-              L.marker([center.lat, center.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: "leaflet-hex-label", html: `Q${q >= 0 ? "+" : ""}${q} R${r >= 0 ? "+" : ""}${r}`, iconSize: [60, 12], iconAnchor: [30, 6] }) }).addTo(influenceHexLayer);
+            if (influenceMap.getZoom() >= (image ? 3 : 9)) {
+              L.marker(FieldbookMapCoordinates.toLatLng(center, bounds), { interactive: false, keyboard: false, icon: L.divIcon({ className: "leaflet-hex-label", html: `Q${q >= 0 ? "+" : ""}${q} R${r >= 0 ? "+" : ""}${r}`, iconSize: [60, 12], iconAnchor: [30, 6] }) }).addTo(influenceHexLayer);
             }
           }
         }
         locations.forEach((location) => {
-          L.circleMarker([location.position.lat, location.position.lng], { radius: 5, color: "#fff", weight: 2, fillColor: "#b74435", fillOpacity: 1, interactive: false }).addTo(influenceHexLayer)
+          L.circleMarker(FieldbookMapCoordinates.toLatLng(location.position, bounds), { radius: 5, color: "#fff", weight: 2, fillColor: "#b74435", fillOpacity: 1, interactive: false }).addTo(influenceHexLayer)
             .bindTooltip(location.name, { direction: "top", offset: [0, -5] });
         });
         document.getElementById("influence-map-status").textContent = liveInfluenceEditing
@@ -3062,7 +3075,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (factionSavePending || !liveInfluenceEditing || !state.setupPackage || !event.originalEvent.target.closest?.(".live-influence-hex")) return;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!factionId) return;
-        const { q, r } = liveAxialForPosition(event.latlng, state.setupPackage.map.grid.origin);
+        const { q, r } = liveAxialForPosition(FieldbookMapCoordinates.fromLatLng(event.latlng, state.setupPackage.map.bounds), state.setupPackage.map.grid.origin);
         const key = `${q},${r}`;
         if (stagedInfluenceCells.has(key)) stagedInfluenceCells.delete(key);
         else stagedInfluenceCells.add(key);
@@ -3179,6 +3192,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (!response.ok) throw new Error(result.error || "The campaign request failed.");
         return result;
       }
+      // Deferred runtime clients share the authenticated request and feedback boundary.
+      window.campaignApiRequest = campaignApiRequest;
+      window.showToast = showToast;
 
       document.addEventListener("fieldbook:report-saved", (event) => {
         if (state.runtimeCampaignId === event.detail.campaignId) {
@@ -3216,6 +3232,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const runtimeCampaignId = campaign.id;
         runtimeFactionLayers = layers;
         state = { ...state, runtimeCampaignId, setupPackage };
+        if (influenceMap) initializeInfluenceMap();
         influenceBasemap?.set(setupPackage.map.offlineBasemap, setupPackage.map.bounds);
         runtimeCampaignSelect.value = runtimeCampaignId;
         openPlayerSeedDialogButton.disabled = false;
@@ -3225,7 +3242,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         persist();
         renderLiveInfluenceControls();
         renderLiveInfluenceGrid();
-        if (influenceMap) influenceMap.fitBounds([[setupPackage.map.bounds.south, setupPackage.map.bounds.west], [setupPackage.map.bounds.north, setupPackage.map.bounds.east]], { padding: [28, 28] });
+        if (influenceMap) influenceMap.fitBounds(FieldbookMapCoordinates.leafletBounds(setupPackage.map.bounds), { padding: [28, 28] });
         document.getElementById("influence-map-status").textContent = `${setupPackage.campaign.name} / faction influence and settlement prominence saved in SQLite.`;
         document.dispatchEvent(new CustomEvent("fieldbook:campaign-selected", { detail: { campaignId: runtimeCampaignId } }));
         if (announce) showToast(`Runtime campaign loaded: ${setupPackage.campaign.name}.`);
@@ -3236,10 +3253,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (state.runtimeCampaignId !== publication.campaignId || !state.setupPackage) return;
         state.runtimeRevision = publication.campaignRevision;
         const mapData = state.setupPackage.map;
-        const changed = JSON.stringify(mapData.offlineBasemap) !== JSON.stringify(publication.catalog.offlineBasemap);
+        const changed = JSON.stringify([mapData.offlineBasemap, mapData.bounds]) !== JSON.stringify([publication.catalog.offlineBasemap, publication.catalog.bounds]);
         mapData.offlineBasemap = publication.catalog.offlineBasemap;
+        mapData.bounds = publication.catalog.bounds;
         persist();
         if (changed) {
+          if (influenceMap) initializeInfluenceMap();
           influenceBasemap?.set(mapData.offlineBasemap, mapData.bounds);
           if (runtimeDataLoaded) renderRuntimeRouteMap();
         }
@@ -4400,11 +4419,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const campaignId = state.runtimeCampaignId;
         const locations = [...document.querySelectorAll("#map-location-rows .map-location-row")].map((row) => {
           const inputs = row.querySelectorAll("input");
-          return { id: row.dataset.locationId, mapPosition: { lat: Number(inputs[0].value), lng: Number(inputs[1].value) } };
+          return { id: row.dataset.locationId, mapPosition: FieldbookMapCoordinates.fromLatLng({ lat: Number(inputs[0].value), lng: Number(inputs[1].value) }, state.setupPackage?.map.bounds) };
         });
-        if (!campaignId || !locations.length || locations.some(({ mapPosition }) => !Number.isFinite(mapPosition.lat) || !Number.isFinite(mapPosition.lng))) {
+        if (!campaignId || !locations.length || locations.some(({ mapPosition }) => !FieldbookMapCoordinates.validPoint(mapPosition, state.setupPackage?.map.bounds))) {
           mapEditorStatus.className = "feedback error";
-          mapEditorStatus.textContent = "Enter valid latitude and longitude for each campaign location.";
+          mapEditorStatus.textContent = FieldbookMapCoordinates.isImage(state.setupPackage?.map.bounds) ? "Enter valid x and y kilometres for each campaign location." : "Enter valid latitude and longitude for each campaign location.";
           return;
         }
         mapEditorSaveButton.disabled = true;

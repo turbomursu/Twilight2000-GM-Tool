@@ -5,4 +5,7 @@ data/offline-basemaps/*.json
 data/maps/atlas/*.pmtiles
 data/maps/atlas/*.image
 data/maps/atlas/*.json
+data/maps/**/*.image
+data/maps/**/*.json
+gmpack/campsetups/
 token.txt

@@ -6,6 +6,8 @@ const { createPlayerHandler } = require("./player.cjs");
 const { createUserHandler } = require("./users.cjs");
 const { uploadOfflineBasemap, getOfflineBasemapMetadata, sendOfflineBasemap, ASSET_ID_PATTERN } = require("./offline-basemaps.cjs");
 const { getPlayerMap } = require("./map-publications.cjs");
+const mapCoordinates = require("../map-coordinates.js");
+const { createSetupPackageHandler, campaignImageDirectories, safeAssetDirectory } = require("./setup-packages.cjs");
 
 const ROOT = join(__dirname, "..");
 const PUBLIC_FILES = new Map([
@@ -29,6 +31,7 @@ const PROTECTED_FILES = new Map([
   ["/vendor/leaflet-maplibre-gl.js", ["node_modules/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js", "text/javascript; charset=utf-8"]],
   ["/vendor/pmtiles.js", ["node_modules/pmtiles/dist/pmtiles.js", "text/javascript; charset=utf-8"]],
   ["/campaign-package-contract.js", ["campaign-package-contract.js", "text/javascript; charset=utf-8"]],
+  ["/map-coordinates.js", ["map-coordinates.js", "text/javascript; charset=utf-8"]],
   ["/campaign-setup-import-client.js", ["campaign-setup-import-client.js", "text/javascript; charset=utf-8"]],
   ["/vector-atlas-client.js", ["vector-atlas-client.js", "text/javascript; charset=utf-8"]],
   ["/auth-client.js", ["auth-client.js", "text/javascript; charset=utf-8"]],
@@ -68,15 +71,16 @@ function sendText(response, status, contentType, body, headOnly = false) {
   response.end(headOnly ? undefined : body);
 }
 
-function createAppHandler({ database, authHandler, campaignHandler, playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort }) {
+function createAppHandler({ database, authHandler, campaignHandler, playerHandler = createPlayerHandler({ database }), userHandler = createUserHandler({ database }), root = ROOT, offlineBasemapDir = join(root, "data", "maps", "atlas"), legacyOfflineBasemapDir = join(root, "data", "offline-basemaps"), surfaceRole, otherPort, logger = console }) {
   const offlineBasemapDirectories = [...new Set([offlineBasemapDir, legacyOfflineBasemapDir])];
   function findOfflineBasemapDirectory(assetId, ownerAccountId = null) {
-    return offlineBasemapDirectories.find((directory) => {
+    return [...offlineBasemapDirectories, ...campaignImageDirectories(root)].find((directory) => {
+      if (!safeAssetDirectory(directory, assetId)) return false;
       const metadata = getOfflineBasemapMetadata(directory, assetId);
       return metadata && (!ownerAccountId || metadata.ownerAccountId === ownerAccountId);
     }) || null;
   }
-  const validateOfflineBasemap = (ownerAccountId, reference) => {
+  const validateOfflineBasemap = (ownerAccountId, reference, bounds = null) => {
     const directory = findOfflineBasemapDirectory(reference.assetId, ownerAccountId);
     const metadata = directory && getOfflineBasemapMetadata(directory, reference.assetId);
     const file = directory && join(directory, metadata?.format === "static-image" ? `${reference.assetId}.image` : `${reference.assetId}.pmtiles`);
@@ -84,9 +88,14 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
       || (reference.format === "static-image" && !/^image\/(?:png|jpeg|webp)$/.test(metadata.contentType || ""))) {
       throw new Error("The offline basemap asset is not owned by this GM or its stored format does not match.");
     }
+    if (mapCoordinates.isImage(bounds)
+      && (reference.format !== "static-image" || metadata.width !== bounds.widthPixels || metadata.height !== bounds.heightPixels)) {
+      throw new Error("The image asset dimensions must match the declared image-coordinate map dimensions.");
+    }
     return true;
   };
   const effectiveCampaignHandler = campaignHandler || createCampaignHandler({ database, validateOfflineBasemap });
+  const setupPackageHandler = createSetupPackageHandler({ root, validateOfflineBasemap, findOfflineBasemapDirectory, logger });
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);
@@ -118,6 +127,7 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
       response.writeHead(302, { Location: destination.href, "Cache-Control": "no-store" });
       return response.end();
     }
+    if (/^\/api\/setup-packages(?:\/|$)/.test(url.pathname)) return setupPackageHandler(request, response, account, url.pathname);
     if (CAMPAIGN_PATH.test(url.pathname)) return effectiveCampaignHandler(request, response);
     const playerBasemapMatch = url.pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map-basemap$/);
     if (playerBasemapMatch) {

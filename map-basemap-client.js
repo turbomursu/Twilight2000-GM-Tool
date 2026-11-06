@@ -14,12 +14,11 @@
   }
 
   function imageLayer(map, basemap, bounds, onError) {
-    if (!bounds || ![bounds.south, bounds.west, bounds.north, bounds.east].every(Number.isFinite)
-      || bounds.south >= bounds.north || bounds.west >= bounds.east) {
+    if (!root.FieldbookMapCoordinates.normalizeBounds(bounds)) {
       throw new Error("Set valid campaign bounds before using a static map image.");
     }
     return root.L.imageOverlay(assetUrl(basemap),
-      [[bounds.south, bounds.west], [bounds.north, bounds.east]],
+      root.FieldbookMapCoordinates.leafletBounds(bounds),
       { attribution: attribution(basemap), interactive: false })
       .on("error", () => onError("Static map image is unavailable or cannot be decoded. Restore the image and its JSON sidecar on this server."))
       .addTo(map);
@@ -34,6 +33,10 @@
       layer = null;
     }
     function set(basemap, bounds) {
+      if (root.FieldbookMapCoordinates.isImage(bounds) && basemap?.format !== "static-image") {
+        onError("Image kilometre extents require a static map image. Online OSM and PMTiles require geographic bounds.");
+        return;
+      }
       clear();
       const token = generation;
       const report = (message) => { if (token === generation) onError(message); };

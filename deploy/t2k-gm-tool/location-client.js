@@ -1,10 +1,12 @@
 // Location Management Client Module
 // Handles GM-side location creation, editing, deletion, and display
 // Follows same pattern as personnel-client.js
+const FieldbookMapCoordinates = globalThis.FieldbookMapCoordinates;
 
 let locationState = {
   locations: [],
   runtimeCampaignId: null,
+  bounds: null,
   sortBy: 'name',
   filterKind: null,
   filterVisibility: null
@@ -12,11 +14,13 @@ let locationState = {
 
 // ===== API Functions =====
 
-async function loadLocationsForCampaign(campaignId) {
+async function loadLocationsForCampaign(campaignId, bounds) {
   if (!campaignId) return;
   locationState.runtimeCampaignId = campaignId;
+  locationState.bounds = bounds;
   try {
     const response = await campaignApiRequest(`/api/campaigns/${campaignId}/locations`, { method: 'GET' });
+    if (locationState.runtimeCampaignId !== campaignId) return;
     if (response && response.locations) {
       locationState.locations = response.locations;
       renderLocationList();
@@ -107,9 +111,25 @@ async function deleteLocationViaAPI(locationId) {
 
 // ===== Modal Handlers =====
 
+function locationCoordinateControls() {
+  const bounds = locationState.bounds;
+  const image = FieldbookMapCoordinates.isImage(bounds);
+  for (const [id, label, min, max] of [
+    ["location-lat", image ? "Y / kilometres north from bottom-left" : "Latitude", image ? 0 : bounds?.south, image ? FieldbookMapCoordinates.heightKm(bounds) : bounds?.north],
+    ["location-lng", image ? "X / kilometres east from bottom-left" : "Longitude", image ? 0 : bounds?.west, image ? bounds.widthKm : bounds?.east]
+  ]) {
+    document.querySelector(`label[for="${id}"]`).textContent = label;
+    const input = document.getElementById(id);
+    input.min = min ?? ""; input.max = max ?? "";
+    input.placeholder = image ? "0" : id === "location-lat" ? "61.4" : "14.9";
+  }
+  return image;
+}
+
 function openLocationCreationForm() {
   const modal = document.getElementById("location-editor-modal");
   if (!modal) return;
+  locationCoordinateControls();
   
   // Clear form for new location
   document.getElementById("location-name").value = "";
@@ -139,14 +159,15 @@ function openLocationEditorModal(locationId) {
   
   const modal = document.getElementById("location-editor-modal");
   if (!modal) return;
+  const image = locationCoordinateControls();
   
   // Populate form
   document.getElementById("location-name").value = location.name || "";
   document.getElementById("location-kind").value = location.kind || "Settlement";
   document.getElementById("location-description").value = location.description || "";
   document.getElementById("location-gridref").value = location.gridRef || "";
-  document.getElementById("location-lat").value = location.mapPosition?.lat ?? "";
-  document.getElementById("location-lng").value = location.mapPosition?.lng ?? "";
+  document.getElementById("location-lat").value = (image ? location.mapPosition?.y : location.mapPosition?.lat) ?? "";
+  document.getElementById("location-lng").value = (image ? location.mapPosition?.x : location.mapPosition?.lng) ?? "";
   document.getElementById("location-visibility").value = location.visibilityEligibility || "gm-only";
   document.getElementById("location-notes").value = location.gmNotes || "";
   
@@ -189,23 +210,24 @@ async function handleLocationSave() {
     }
     
     if (isNaN(lat) || isNaN(lng)) {
-      statusEl.textContent = "Error: Valid latitude and longitude are required.";
+      statusEl.textContent = FieldbookMapCoordinates.isImage(locationState.bounds) ? "Error: Valid x and y kilometres are required." : "Error: Valid latitude and longitude are required.";
       statusEl.style.color = "#c00";
       return;
     }
     
+    const mapPosition = FieldbookMapCoordinates.fromLatLng({ lat, lng }, locationState.bounds);
     const payload = {
       name,
       kind,
       description,
       gridRef,
-      mapPosition: { lat, lng },
+      mapPosition,
       visibilityEligibility: visibility,
       gmNotes: notes
     };
     
     if (isNew) {
-      await createLocationViaAPI(name, kind, { lat, lng }, {
+      await createLocationViaAPI(name, kind, mapPosition, {
         description,
         gridRef,
         visibilityEligibility: visibility
@@ -262,8 +284,9 @@ function renderLocationList() {
         <div class="kind">${escapeHtml(location.kind)}</div>
         ${visibilityBadge}
         <div class="coords">
-          <strong>Coords:</strong> ${location.mapPosition?.lat?.toFixed(2) ?? '?'}, 
-          ${location.mapPosition?.lng?.toFixed(2) ?? '?'}
+          ${FieldbookMapCoordinates.isImage(locationState.bounds)
+            ? `<strong>km (bottom-left):</strong> x ${location.mapPosition?.x?.toFixed(2) ?? '?'}, y ${location.mapPosition?.y?.toFixed(2) ?? '?'}`
+            : `<strong>Coords:</strong> ${location.mapPosition?.lat?.toFixed(2) ?? '?'}, ${location.mapPosition?.lng?.toFixed(2) ?? '?'}`}
         </div>
         ${location.gridRef ? `<div class="coords"><strong>Grid:</strong> ${escapeHtml(location.gridRef)}</div>` : ''}
         <div style="font-size: 9px; color: var(--muted); margin-bottom: 8px; line-height: 1.4;">
