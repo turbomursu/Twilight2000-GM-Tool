@@ -23,6 +23,7 @@ function harness() {
     return result;
   }
   const context = vm.createContext({
+    FieldbookMapCoordinates: require("../map-coordinates.js"),
     L: {
       imageOverlay: (url, coordinates, options) => layer("image", url, coordinates, options),
       tileLayer: (url, options) => layer("online", url, null, options)
@@ -121,6 +122,7 @@ test("GM background controls are wired on startup, before any map draft action",
     return nodes.get(selector);
   }
   const context = vm.createContext({
+    FieldbookMapCoordinates: require("../map-coordinates.js"),
     document: {
       querySelector: (selector) => selector === "#player-map-tab" ? null : node(selector),
       getElementById: (id) => node(`#${id}`),

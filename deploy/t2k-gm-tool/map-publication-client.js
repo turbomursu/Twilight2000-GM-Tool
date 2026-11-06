@@ -11,12 +11,14 @@
     let map = null;
     let baseZoom = 0;
     let current = null;
-    const center = (position) => [position.lat, position.lng];
+    const coordinates = globalThis.FieldbookMapCoordinates;
+    const center = (position) => coordinates.toLatLng(position, current.bounds);
+    const minimumZoom = () => coordinates.isImage(current.bounds) ? baseZoom - 2 : Math.max(0, baseZoom - 2);
     function clear() { if (map) map.remove(); map = null; current = null; container.replaceChildren(); }
     function updateZoom() {
       if (output) output.textContent = `${Math.round(100 * 2 ** (map.getZoom() - baseZoom))}%`;
       if (plus) plus.disabled = map.getZoom() >= baseZoom + 1;
-      if (minus) minus.disabled = map.getZoom() <= Math.max(0, baseZoom - 2);
+      if (minus) minus.disabled = map.getZoom() <= minimumZoom();
     }
     function label(text) {
       const element = document.createElement("span"); element.textContent = text;
@@ -25,11 +27,15 @@
     }
     async function render(snapshot) {
       if (!globalThis.L) throw new Error("Map library unavailable. Reload when connected.");
+      if (coordinates.isImage(snapshot.bounds) && snapshot.offlineBasemap?.format !== "static-image") {
+        throw new Error("Image kilometre extents require a static map image; online OSM and PMTiles require geographic bounds.");
+      }
       clear(); current = snapshot;
-      map = L.map(container, { zoomControl: false, zoomSnap: .25, zoomDelta: .25 });
-      const bounds = [[snapshot.bounds.south, snapshot.bounds.west], [snapshot.bounds.north, snapshot.bounds.east]];
-      baseZoom = Math.min(18, Math.max(0, map.getBoundsZoom(bounds)));
-      map.setMinZoom(Math.max(0, baseZoom - 2)); map.setMaxZoom(baseZoom + 1);
+      const image = coordinates.isImage(snapshot.bounds);
+      map = L.map(container, { crs: image ? L.CRS.Simple : L.CRS.EPSG3857, minZoom: image ? -10 : 0, zoomControl: false, zoomSnap: .25, zoomDelta: .25 });
+      const bounds = coordinates.leafletBounds(snapshot.bounds);
+      baseZoom = Math.min(18, Math.max(image ? -10 : 0, map.getBoundsZoom(bounds)));
+      map.setMinZoom(minimumZoom()); map.setMaxZoom(baseZoom + 1);
       map.setView(snapshot.playerPosition ? center(snapshot.playerPosition) : L.latLngBounds(bounds).getCenter(), baseZoom);
       if (snapshot.offlineBasemap?.format === "static-image") {
         const currentMap = map;
@@ -124,6 +130,12 @@
     let busy = false;
     let previewRevision = null;
     let markingCounter = 0;
+    const coordinates = globalThis.FieldbookMapCoordinates;
+    const imageExtent = () => coordinates.isImage(publication?.catalog.bounds);
+    const position = (first, second) => imageExtent() ? { x: second, y: first } : { lat: first, lng: second };
+    const firstValue = (point) => imageExtent() ? point?.y : point?.lat;
+    const secondValue = (point) => imageExtent() ? point?.x : point?.lng;
+    const vertexLabel = () => imageExtent() ? "x,y kilometres per line" : "longitude,latitude per line";
 
     function controls() {
       fields.disabled = busy || !publication; reload.disabled = busy || !id;
@@ -134,8 +146,9 @@
     function backgroundControls() {
       imageFields.hidden = backgroundKind.value !== "static-image";
       const basemap = publication?.catalog.offlineBasemap;
+      const bounds = publication?.catalog.bounds;
       document.querySelector("#gm-map-background-current").textContent = publication
-        ? `Current: ${basemap ? `${basemap.format === "static-image" ? "Static map image" : "Offline PMTiles"} / ${basemap.attribution}` : "Online OSM map"}. Bounds: ${publication.catalog.bounds.south}, ${publication.catalog.bounds.west} to ${publication.catalog.bounds.north}, ${publication.catalog.bounds.east}.`
+        ? `Current: ${basemap ? `${basemap.format === "static-image" ? "Static map image" : "Offline PMTiles"} / ${basemap.attribution}` : "Online OSM map"}. ${imageExtent() ? `Image extent: ${bounds.widthKm} × ${coordinates.heightKm(bounds)} km / origin bottom-left.` : `Bounds: ${bounds.south}, ${bounds.west} to ${bounds.north}, ${bounds.east}.`}`
         : "";
       controls();
     }
@@ -148,7 +161,7 @@
     function readDraft() {
       return { locationIds: [...form.querySelectorAll("[data-map-location]:checked")].map((input) => input.value),
         markings: [...form.querySelectorAll("[data-marking-id]")].map((row) => ({ id: row.dataset.markingId, label: row.querySelector("[data-mark-label]").value,
-          position: { lat: number(row.querySelector("[data-mark-lat]")), lng: number(row.querySelector("[data-mark-lng]")) } })),
+          position: position(number(row.querySelector("[data-mark-lat]")), number(row.querySelector("[data-mark-lng]"))) })),
         geometries: [...form.querySelectorAll("[data-geometry-id]")].map((row) => {
           const type = row.querySelector("[data-geometry-type]").value;
           const vertices = row.querySelector("[data-geometry-coordinates]").value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
@@ -160,7 +173,7 @@
             geometry: { type, coordinates: type === "Polygon" ? [vertices] : vertices } };
         }),
         routeLocationIds: [...draft.routeLocationIds],
-        playerPosition: !latitude.value && !longitude.value ? null : { lat: number(latitude), lng: number(longitude) } };
+        playerPosition: !latitude.value && !longitude.value ? null : position(number(latitude), number(longitude)) };
     }
     function choices() {
       const selected = new Set(readDraft().locationIds);
@@ -185,7 +198,7 @@
       const container = document.querySelector("#map-marking-entries"); container.replaceChildren();
       draft.markings.forEach((marking, index) => {
         const row = document.createElement("div"); row.className = "map-marking-row"; row.dataset.markingId = marking.id;
-        [["markLabel", "Marking label", marking.label], ["markLat", "Marking latitude", marking.position.lat], ["markLng", "Marking longitude", marking.position.lng]].forEach(([key, label, value]) => {
+        [["markLabel", "Marking label", marking.label], ["markLat", imageExtent() ? "Marking y / km north" : "Marking latitude", firstValue(marking.position)], ["markLng", imageExtent() ? "Marking x / km east" : "Marking longitude", secondValue(marking.position)]].forEach(([key, label, value]) => {
           const input = document.createElement("input"); input.dataset[key] = ""; input.setAttribute("aria-label", label);
           input.type = key === "markLabel" ? "text" : "number"; input.step = "any"; input.maxLength = 160; input.value = value ?? ""; row.append(input);
         });
@@ -210,7 +223,7 @@
         typeSelect.value = geometry.geometry.type;
         const coordinateInput = document.createElement("textarea");
         coordinateInput.dataset.geometryCoordinates = "";
-        coordinateInput.setAttribute("aria-label", "Geometry vertices / longitude,latitude per line");
+        coordinateInput.setAttribute("aria-label", `Geometry vertices / ${vertexLabel()}`);
         const vertices = geometry.geometry.type === "Polygon" ? geometry.geometry.coordinates[0] : geometry.geometry.coordinates;
         coordinateInput.value = vertices.map(([lng, lat]) => `${lng},${lat}`).join("\n");
         const remove = icon("×", "Remove geometry", () => {
@@ -235,7 +248,11 @@
         input.addEventListener("change", () => { const selected = new Set(readDraft().locationIds);
           draft.routeLocationIds = draft.routeLocationIds.filter((locationId) => selected.has(locationId)); routes(); choices(); invalidate(); });
       });
-      latitude.value = draft.playerPosition?.lat ?? ""; longitude.value = draft.playerPosition?.lng ?? "";
+      latitude.value = firstValue(draft.playerPosition) ?? ""; longitude.value = secondValue(draft.playerPosition) ?? "";
+      document.querySelector('label[for="map-player-latitude"]').textContent = imageExtent() ? "Player position / y (km north)" : "Player position / latitude";
+      document.querySelector('label[for="map-player-longitude"]').textContent = imageExtent() ? "Player position / x (km east)" : "Player position / longitude";
+      document.querySelector('label[for="map-geometry-coordinates"]').textContent = `Vertices / ${vertexLabel()}`;
+      geometryCoordinates.placeholder = imageExtent() ? "0,0\n10,10\n20,10" : "14.0,60.0\n14.2,60.1\n14.4,60.2";
       routes(); markings(); renderGeometries(); choices(); controls();
       backgroundControls();
     }
@@ -285,6 +302,10 @@
     applyBackground.addEventListener("click", async () => {
       if (busy || !publication || backgroundKind.value === "current") return;
       const imageMode = backgroundKind.value === "static-image";
+      if (imageExtent() && !imageMode) {
+        status.textContent = "Image kilometre extents require a static map image. Online OSM requires geographic bounds.";
+        return;
+      }
       const file = imageFile.files[0];
       const attribution = imageAttribution.value.trim();
       const licenseUrl = globalThis.FieldbookVectorAtlas.validLicenseUrl(imageLicense.value.trim());
@@ -323,13 +344,13 @@
     document.querySelector("#add-map-marking").addEventListener("click", () => {
       draft = readDraft(); const bounds = publication.catalog.bounds;
       draft.markings.push({ id: `mark-${Date.now()}-${markingCounter++}`, label: "Marking",
-        position: draft.playerPosition || { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 } }); markings(); invalidate();
+        position: draft.playerPosition || coordinates.center(bounds) }); markings(); invalidate();
     });
     addGeometryButton.addEventListener("click", () => {
       const vertices = geometryCoordinates.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
         .map((line) => line.split(",").map((value) => Number(value.trim())));
       if (!geometryLabel.value.trim() || vertices.some((coordinate) => coordinate.length !== 2 || !coordinate.every(Number.isFinite))) {
-        status.textContent = "Add a geometry label and valid longitude,latitude pairs.";
+        status.textContent = `Add a geometry label and valid ${vertexLabel()}.`;
         return;
       }
       if (geometryType.value === "Polygon" && vertices.length && (vertices[0][0] !== vertices[vertices.length - 1][0]
@@ -343,7 +364,7 @@
       invalidate();
     });
     positionChoice.addEventListener("change", () => { const location = publication.catalog.locations.find((item) => item.id === positionChoice.value);
-      if (location) { latitude.value = location.position.lat; longitude.value = location.position.lng; invalidate(); } });
+      if (location) { latitude.value = firstValue(location.position); longitude.value = secondValue(location.position); invalidate(); } });
     select.addEventListener("change", () => load(select.value)); document.addEventListener("fieldbook:campaign-selected", (event) => load(event.detail.campaignId)); load(select.value);
   }
 
@@ -365,7 +386,11 @@
         const serialized = JSON.stringify(result); content.hidden = false;
         if (serialized !== previous) { if (!await viewer.render(result.map) || token !== generation) return; previous = serialized; }
         document.querySelector("#player-map-name").textContent = result.map.name;
-        document.querySelector("#published-player-position").textContent = `Position / ${result.map.playerPosition.lat.toFixed(4)}, ${result.map.playerPosition.lng.toFixed(4)}`;
+        const position = result.map.playerPosition;
+        document.querySelector("#published-player-position").textContent = !position ? "Position / not published"
+          : globalThis.FieldbookMapCoordinates.isImage(result.map.bounds)
+            ? `Position / x ${position.x.toFixed(2)}, y ${position.y.toFixed(2)} km (bottom-left origin)`
+            : `Position / ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`;
         document.querySelector("#player-map-published-at").textContent = `Published / ${result.publishedAt}`; status.textContent = "";
       } catch (error) { if (token === generation) { clear(); status.textContent = `Map unavailable: ${error.message}`; } }
     }

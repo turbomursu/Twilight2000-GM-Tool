@@ -9,7 +9,7 @@ const root = join(__dirname, "..");
 const dashboard = readFileSync(join(root, "index.html"), "utf8");
 const adapter = dashboard.match(/ {6}function isRecord\(value\) \{[\s\S]*?(?= {6}function liveInfluenceForCampaign)/)[0];
 const normalizePackage = runInNewContext(`${adapter}\nnormalizeSetupPackageForInfluence`, {
-  FieldbookCampaignPackageContract: contract, Error
+  FieldbookCampaignPackageContract: contract, FieldbookMapCoordinates: require("../map-coordinates.js"), Error
 });
 
 class Element {

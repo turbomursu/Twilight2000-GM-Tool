@@ -10,6 +10,13 @@ const mapVisualization = (() => {
   let stopMarkers = [];
   let locationMarkers = [];
   let positionMarker = null;
+  let bounds = null;
+  const coordinates = globalThis.FieldbookMapCoordinates;
+  function point(location) {
+    const position = location.mapPosition || location;
+    const value = coordinates.isImage(bounds) ? { x: position.x, y: position.y } : { lat: position.lat, lng: position.lng };
+    return coordinates.validPoint(value, bounds) ? coordinates.toLatLng(value, bounds) : null;
+  }
   let visualizationState = {
     campaignId: null,
     routePublished: false,
@@ -22,10 +29,11 @@ const mapVisualization = (() => {
    * Initialize or reinitialize the map visualization layer
    * Called after map instance is created
    */
-  function initializeVisualization(leafletMapInstance) {
+  function initializeVisualization(leafletMapInstance, campaignBounds = null) {
     if (!leafletMapInstance) throw new Error("Leaflet map instance required.");
-    mapInstance = leafletMapInstance;
     clearAllMarkers();
+    mapInstance = leafletMapInstance;
+    bounds = campaignBounds;
   }
 
   /**
@@ -48,12 +56,11 @@ const mapVisualization = (() => {
       const location = locations[stop.locationId];
       if (!location) continue;
       
-      const lat = typeof location.lat === 'number' ? location.lat : null;
-      const lng = typeof location.lng === 'number' ? location.lng : null;
-      if (lat === null || lng === null) continue;
+      const position = point(location);
+      if (!position) continue;
       
-      polylineCoords.push([lat, lng]);
-      markersByOrdinal.set(stop.ordinal, {stop, location, lat, lng});
+      polylineCoords.push(position);
+      markersByOrdinal.set(stop.ordinal, {stop, location, position});
     }
 
     // Render polyline (visible to GM always, published only if isPublished)
@@ -89,7 +96,7 @@ const mapVisualization = (() => {
         popupAnchor: [0, -12]
       });
 
-      const marker = L.marker([data.lat, data.lng], {icon: stopIcon})
+      const marker = L.marker(data.position, {icon: stopIcon})
         .bindPopup(`<strong>${data.location.name || 'Location'}</strong><br/>Stop ${data.stop.ordinal + 1}<br/>${data.stop.detail || ''}`)
         .addTo(mapInstance);
       
@@ -109,11 +116,10 @@ const mapVisualization = (() => {
     if (!Array.isArray(locations)) return;
 
     for (const location of locations) {
-      const lat = typeof location.lat === 'number' ? location.lat : null;
-      const lng = typeof location.lng === 'number' ? location.lng : null;
-      if (lat === null || lng === null) continue;
+      const position = point(location);
+      if (!position) continue;
 
-      const locationIcon = L.circleMarker([lat, lng], {
+      const locationIcon = L.circleMarker(position, {
         radius: 6,
         color: isPublished ? '#0066ff' : '#666666',
         weight: 2,
@@ -137,9 +143,8 @@ const mapVisualization = (() => {
    * @param {boolean} isDraggable - True for GM, false for players
    */
   function renderPartyPosition(position, isDraggable = false) {
-    if (!mapInstance || typeof position.lat !== 'number' || typeof position.lng !== 'number') return;
-    
     clearPositionMarker();
+    if (!mapInstance || !position || !point(position)) return;
 
     const positionIcon = L.icon({
       iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI4IiBmaWxsPSIjZmY2NjAwIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==',
@@ -148,7 +153,7 @@ const mapVisualization = (() => {
       popupAnchor: [0, -12]
     });
 
-    positionMarker = L.marker([position.lat, position.lng], {
+    positionMarker = L.marker(point(position), {
       icon: positionIcon,
       draggable: isDraggable,
       title: 'Party Position'
@@ -160,10 +165,7 @@ const mapVisualization = (() => {
     if (isDraggable) {
       positionMarker.on('dragend', (evt) => {
         const newPos = evt.target.getLatLng();
-        dispatchEvent('partyPositionDragged', {
-          lat: newPos.lat,
-          lng: newPos.lng
-        });
+        dispatchEvent('partyPositionDragged', coordinates.fromLatLng(newPos, bounds));
       });
     }
   }
@@ -187,6 +189,7 @@ const mapVisualization = (() => {
    */
   async function refreshVisualizations(data) {
     if (!data || typeof data !== 'object') return;
+    if (data.bounds) bounds = data.bounds;
 
     updatePublicationState(data.publicationState);
 

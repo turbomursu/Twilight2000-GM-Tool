@@ -1,5 +1,6 @@
 (function (root) {
   "use strict";
+  const coordinates = root.FieldbookMapCoordinates || (typeof require === "function" ? require("./map-coordinates.js") : null);
 
   function isRecord(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -38,16 +39,25 @@
       fail("The setup package is missing its campaign or map data.");
     }
 
-    const { south, west, north, east } = input.map.bounds || {};
-    if (![south, west, north, east].every(Number.isFinite)
-      || south < -90 || north > 90 || west < -180 || east > 180 || south >= north || west >= east) {
+    const bounds = coordinates.normalizeBounds(input.map.bounds);
+    if (!bounds) {
       fail("The setup package needs valid campaign-area bounds.");
     }
     const basemap = input.map.offlineBasemap;
     if (basemap !== undefined && basemap !== null) assertOfflineBasemap(basemap);
+    if (coordinates.isImage(bounds) && (basemap?.format !== "static-image" || input.map.fieldPapersAtlas)) {
+      fail("Image-coordinate campaigns require a static image and cannot contain a geographic atlas.");
+    }
     const grid = input.map.grid;
     if (grid.coordinateSystem !== "axial-q-r" || grid.cellKm !== 10 || !Array.isArray(grid.terrainCells) || grid.terrainCells.length > 10000) {
       fail("The setup package contains an unsupported travel grid.");
+    }
+    if (coordinates.isImage(bounds) && (!coordinates.contains(grid.origin, bounds)
+      || grid.origin.x !== 0 || grid.origin.y !== coordinates.heightKm(bounds))) {
+      fail("The image travel grid must start at the image's top-left corner.");
+    }
+    if (coordinates.isImage(bounds) && (!Array.isArray(input.map.offlineAnnotations) || input.map.offlineAnnotations.length)) {
+      fail("Image-coordinate packages cannot contain geographic source annotations.");
     }
     const collectionLimits = [
       [input.map.locations, "location", 1, 500],
@@ -74,10 +84,7 @@
     let startingLocations = 0;
     input.map.locations.forEach((location) => {
       addId(location, "location");
-      if (typeof location.name !== "string" || !isRecord(location.mapPosition)
-        || ![location.mapPosition.lat, location.mapPosition.lng].every(Number.isFinite)
-        || location.mapPosition.lat < south || location.mapPosition.lat > north
-        || location.mapPosition.lng < west || location.mapPosition.lng > east
+      if (typeof location.name !== "string" || !coordinates.contains(location.mapPosition, bounds)
         || typeof location.isStartingLocation !== "boolean") {
         fail("Every setup location needs a name, an in-area map position, and an explicit starting-location value.");
       }

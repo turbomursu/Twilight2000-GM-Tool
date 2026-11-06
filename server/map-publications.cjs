@@ -1,6 +1,7 @@
 const { getRuntimeCampaign, getPlayerCharacter } = require("./runtime-store.cjs");
 const { appendAuditEvent } = require("./audit.cjs");
 const { assertOfflineBasemap } = require("../campaign-package-contract.js");
+const mapCoordinates = require("../map-coordinates.js");
 
 function record(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -8,23 +9,26 @@ function record(value, keys) {
 }
 
 function point(position) {
-  return { lat: position.lat, lng: position.lng };
+  return Object.hasOwn(position, "x") ? { x: position.x, y: position.y } : { lat: position.lat, lng: position.lng };
 }
 
 function boundedPoint(position, bounds) {
-  if (!record(position, ["lat", "lng"]) || !Number.isFinite(position.lat) || !Number.isFinite(position.lng)
-    || position.lat < bounds.south || position.lat > bounds.north
-    || position.lng < bounds.west || position.lng > bounds.east) throw new Error("Map coordinates must be within campaign bounds.");
-  return point(position);
+  if (!mapCoordinates.contains(position, bounds)) throw new Error("Map coordinates must be within campaign bounds.");
+  return mapCoordinates.isImage(bounds) ? { x: position.x, y: position.y } : { lat: position.lat, lng: position.lng };
 }
 
 function mapBounds(bounds) {
-  return { south: bounds.south, west: bounds.west, north: bounds.north, east: bounds.east };
+  return mapCoordinates.normalizeBounds(bounds);
 }
 
 function boundedGeoCoordinate(coordinate, bounds) {
   if (!Array.isArray(coordinate) || coordinate.length !== 2
     || !coordinate.every(Number.isFinite)) throw new Error("Map geometry coordinates must be longitude/latitude pairs.");
+  if (mapCoordinates.isImage(bounds)) {
+    const [x, y] = coordinate;
+    boundedPoint({ x, y }, bounds);
+    return [x, y];
+  }
   const [lng, lat] = coordinate;
   boundedPoint({ lat, lng }, bounds);
   return [lng, lat];
@@ -150,9 +154,13 @@ function updateGMMap(database, accountId, campaignId, input, validateOfflineBase
     const map = getGMMap(database, accountId, campaignId);
     if (!map) throw new Error("Runtime campaign not found.");
     if (map.revision !== input.expectedRevision) throw new Error("Map revision changed; reload before retrying.");
+    if (input.action === "basemap" && mapCoordinates.isImage(map.catalog.bounds)
+      && (input.basemap === null || input.basemap.format !== "static-image")) {
+      throw new Error("Image-coordinate campaigns must retain a static image basemap; geographic basemaps require geographic bounds.");
+    }
     if (input.action === "basemap" && input.basemap !== null) {
       if (typeof validateOfflineBasemap !== "function") throw new Error("The offline basemap asset could not be verified.");
-      validateOfflineBasemap(accountId, input.basemap);
+      validateOfflineBasemap(accountId, input.basemap, map.catalog.bounds);
       database.prepare("UPDATE maps SET offlineBasemap_json = ?, attribution = ? WHERE runtime_campaign_id = ?")
         .run(JSON.stringify(input.basemap), input.basemap.attribution, campaignId);
     } else if (input.action === "basemap") {

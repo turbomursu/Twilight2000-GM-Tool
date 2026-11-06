@@ -48,7 +48,11 @@ test("separated surfaces retain valid inline JavaScript and synchronized deploym
       new Script(script, { filename });
     }
   }
-  for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "server/app.cjs", "server/runtime-store.cjs", "server/sample-data.cjs"]) {
+  for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "campaign-package-contract.js",
+    "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js",
+    "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
+    "server/map-publications.cjs", "server/campaigns.cjs", "server/sample-data.cjs",
+    "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "project-features.html", "project-status.html"]) {
     assert.equal(
       readFileSync(join(__dirname, "..", "deploy", "t2k-gm-tool", filename), "utf8"),
       readFileSync(join(__dirname, "..", filename), "utf8"),

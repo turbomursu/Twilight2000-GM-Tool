@@ -14,6 +14,7 @@ const { getGMInventory, reviewInventoryProposal, manageGMInventory } = require("
 const { getGMConditions, updateGMConditions } = require("./conditions.cjs");
 const { listAuditEvents } = require("./audit.cjs");
 const { advanceRuntimeTime, rollRuntimeWeather } = require("./runtime-store.cjs");
+const mapCoordinates = require("../map-coordinates.js");
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -280,7 +281,8 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
         const result = restoreRuntimeSave(database, account.id, campaignId, body.backup, {
           confirmReplace: body.confirmReplace,
           confirmOlderBackup: body.confirmOlderBackup,
-          expectedRevision: body.expectedRevision
+          expectedRevision: body.expectedRevision,
+          validateOfflineBasemap
         });
         return sendJson(response, 200, { restore: result });
       } catch (error) {
@@ -293,7 +295,7 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
     if (request.method === "POST" && url.pathname === "/api/campaigns/import-backup") {
       try {
         const body = await readRuntimeRestoreBody(request);
-        const result = importRuntimeBackup(database, account.id, body.backup, body.playerAccountMap);
+        const result = importRuntimeBackup(database, account.id, body.backup, body.playerAccountMap, { validateOfflineBasemap });
         const campaign = getRuntimeCampaign(database, account.id, result.campaignId);
         return sendJson(response, 201, { campaign, import: result });
       } catch (error) {
@@ -306,7 +308,10 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
     if (request.method === "POST" && url.pathname === "/api/campaigns/import-setup") {
       try {
         const sourceJson = await readSetupPackage(request);
-        const result = importSetupPackage(database, sourceJson, { ownerAccountId: account.id });
+        const result = importSetupPackage(database, sourceJson, {
+          ownerAccountId: account.id,
+          validateOfflineBasemap
+        });
         const campaign = getRuntimeCampaign(database, account.id, result.runtimeCampaignId);
         return sendJson(response, 201, { campaign });
       } catch (error) {
@@ -688,10 +693,14 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
 
         if (request.method === "PUT") {
           const body = await readJsonBody(request);
-          if (typeof body.lat !== "number" || typeof body.lng !== "number") {
-            throw new HttpError(400, "Latitude and longitude must be numbers.");
-          }
-          const updated = updatePartyPosition(database, account.id, campaignId, body.lat, body.lng);
+          const bounds = campaign.setupPackage?.map?.bounds;
+          const position = mapCoordinates.isImage(bounds)
+            ? (Object.keys(body).length === 2 && Object.hasOwn(body, "x") && Object.hasOwn(body, "y") ? { x: body.x, y: body.y } : null)
+            : (Object.keys(body).length === 2 && Object.hasOwn(body, "lat") && Object.hasOwn(body, "lng") ? { lat: body.lat, lng: body.lng } : null);
+          if (!position) throw new HttpError(400, mapCoordinates.isImage(bounds)
+            ? "Position must contain x/y kilometre coordinates."
+            : "Position must contain latitude/longitude coordinates.");
+          const updated = updatePartyPosition(database, account.id, campaignId, position);
           return sendJson(response, 200, { position: updated });
         }
       } catch (error) {
