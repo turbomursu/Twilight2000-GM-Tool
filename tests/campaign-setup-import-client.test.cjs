@@ -19,12 +19,29 @@ class Element {
     this.hidden = false;
     this.open = false;
     this.clicks = 0;
+    this.children = [];
+    const classes = new Set();
+    this.classList = {
+      add: (value) => classes.add(value),
+      remove: (value) => classes.delete(value),
+      contains: (value) => classes.has(value)
+    };
   }
   addEventListener(type, listener) { this.listeners.set(type, listener); }
   async emit(type, event = { preventDefault() {} }) { await this.listeners.get(type)?.(event); }
   click() { this.clicks += 1; }
   showModal() { this.open = true; }
   close() { this.open = false; this.listeners.get("close")?.(); }
+  get options() { return this.children; }
+  replaceChildren(...children) {
+    this.children = children;
+    this.value = children[0]?.value || "";
+  }
+  append(child) {
+    const first = this.children.length === 0;
+    this.children.push(child);
+    if (first) this.value = child.value || "";
+  }
 }
 
 function sourcePackage() {
@@ -48,6 +65,60 @@ function deferred() {
   let reject;
   const promise = new Promise((accept, fail) => { resolve = accept; reject = fail; });
   return { promise, resolve, reject };
+}
+
+function runtimeHarness({ request } = {}) {
+  const elements = new Map();
+  const node = (id) => {
+    if (!elements.has(id)) elements.set(id, new Element());
+    return elements.get(id);
+  };
+  const select = node("runtime-campaign-select");
+  const placeholder = new Element();
+  placeholder.value = "";
+  placeholder.textContent = "Loading campaigns";
+  select.append(placeholder);
+  const requests = [];
+  const activations = [];
+  const snapshots = [];
+  const load = dashboard.match(/ {6}async function loadRuntimeCampaign[\s\S]*?(?= {6}async function refreshRuntimeCampaigns)/)[0];
+  const refresh = dashboard.match(/ {6}async function refreshRuntimeCampaigns[\s\S]*?(?= {6}runtimeCampaignSelect.addEventListener)/)[0];
+  const change = dashboard.match(/ {6}runtimeCampaignSelect\.addEventListener\("change", \(\) => \{[\s\S]*?\n {6}\}\);/)[0];
+  const context = {
+    state: { runtimeCampaignId: "previous-campaign" },
+    runtimeDataLoaded: true,
+    runtimeCampaignLoadGeneration: 0,
+    runtimeCampaignSelect: select,
+    location: { protocol: "http:" },
+    weatherD6Result: new Element(),
+    weatherRollOutcome: new Element(),
+    openPlayerSeedDialogButton: new Element(),
+    openCharacterChangesButton: new Element(),
+    exportRuntimeBackupButton: new Element(),
+    openRuntimeRestoreButton: new Element(),
+    document: {
+      createElement: () => new Element(),
+      getElementById: (id) => node(id)
+    },
+    updateWeatherRollAvailability() {},
+    campaignApiRequest: async (path) => {
+      requests.push(path);
+      return request(path);
+    },
+    activateRuntimeCampaign: (campaign) => {
+      activations.push(campaign.id);
+      context.state.runtimeCampaignId = campaign.id;
+    },
+    applyRuntimeSnapshot: (runtime) => {
+      snapshots.push(runtime);
+      context.runtimeDataLoaded = true;
+      context.state.runtimeCampaignId = runtime.campaign.id;
+    },
+    showToast() {},
+    Error
+  };
+  runInNewContext(`${load}\n${refresh}\n${change}\nthis.runtimeLoad = loadRuntimeCampaign; this.runtimeRefresh = refreshRuntimeCampaigns;`, context);
+  return { context, node, requests, activations, snapshots, select };
 }
 
 function harness({ request, onImported } = {}) {
@@ -227,6 +298,11 @@ test("the runtime handoff automatically selects and loads the new campaign rathe
   const refresh = dashboard.match(/ {6}async function refreshRuntimeCampaigns[\s\S]*?(?= {6}runtimeCampaignSelect.addEventListener)/)[0];
   const callback = dashboard.match(/onImported: (async \(campaign\) => \{[\s\S]*?\s{8}\})\s+\}\);/)[1];
   const selected = new Element();
+  selected.children = [
+    { value: "", textContent: "Choose a runtime campaign" },
+    { value: "previous-campaign", textContent: "Prior / Elsewhere" },
+    { value: "runtime-campaign", textContent: "Northbound / Dalarna" }
+  ];
   selected.value = "previous-campaign";
   selected.replaceChildren = () => {};
   selected.append = () => {};
@@ -235,6 +311,7 @@ test("the runtime handoff automatically selects and loads the new campaign rathe
   const views = [];
   const context = {
     state: { runtimeCampaignId: "previous-campaign" }, runtimeDataLoaded: true,
+    runtimeCampaignLoadGeneration: 0,
     runtimeCampaignSelect: selected,
     document: { createElement: () => new Element(), getElementById: () => new Element() },
     location: { protocol: "http:" },
@@ -268,4 +345,66 @@ test("the runtime handoff automatically selects and loads the new campaign rathe
   assert.equal(snapshots[0].campaign.id, "runtime-campaign");
   assert.deepEqual(views, ["influence"]);
   assert.equal(state.node("setup-import-dialog").open, false);
+});
+
+test("a successful campaign listing remains selectable when selected campaign details fail", async () => {
+  for (const failedPath of ["/api/campaigns/selected-campaign", "/api/campaigns/selected-campaign/runtime"]) {
+    const runtime = runtimeHarness({ request: async (path) => {
+      if (path === "/api/campaigns") return { campaigns: [
+        { id: "previous-campaign", name: "Prior", setting: "Elsewhere" },
+        { id: "selected-campaign", name: "Northbound", setting: "Dalarna" }
+      ] };
+      if (path.endsWith("/faction-layers")) return { layers: {} };
+      if (path === failedPath) throw new Error("Campaign record unavailable");
+      if (path.endsWith("/runtime")) return { runtime: { campaign: { id: "selected-campaign" } } };
+      return { campaign: { id: "selected-campaign", name: "Northbound" } };
+    } });
+    const result = await runtime.context.runtimeRefresh("selected-campaign");
+    assert.equal(result.ok, false);
+    assert.equal(result.failure, "loading");
+    assert.deepEqual(runtime.select.options.map((option) => option.value), ["", "previous-campaign", "selected-campaign"]);
+    assert.equal(runtime.select.disabled, false);
+    assert.equal(runtime.select.value, "previous-campaign");
+    assert.equal(runtime.context.runtimeDataLoaded, true);
+    assert.equal(runtime.context.state.runtimeCampaignId, "previous-campaign");
+    assert.deepEqual(runtime.activations, []);
+    assert.match(runtime.node("influence-map-status").textContent, /Could not load selected campaign selected-campaign/);
+    assert.match(runtime.node("influence-map-status").textContent, /previous campaign remains active/);
+    assert.equal(runtime.node("influence-map-status").classList.contains("error"), true);
+  }
+});
+
+test("a failed campaign detail load can be retried by reselecting the retained option", async () => {
+  let detailFails = true;
+  const runtime = runtimeHarness({ request: async (path) => {
+    if (path === "/api/campaigns") return { campaigns: [{ id: "selected-campaign", name: "Northbound", setting: "Dalarna" }] };
+    if (path.endsWith("/faction-layers")) return { layers: {} };
+    if (path.endsWith("/runtime")) return { runtime: { campaign: { id: "selected-campaign" } } };
+    if (detailFails) throw new Error("Temporary detail failure");
+    return { campaign: { id: "selected-campaign", name: "Northbound" } };
+  } });
+  const failed = await runtime.context.refreshRuntimeCampaigns("selected-campaign");
+  assert.equal(failed.failure, "loading");
+  assert.equal(runtime.select.options.some((option) => option.value === "selected-campaign"), true);
+  detailFails = false;
+  runtime.select.value = "selected-campaign";
+  await runtime.select.emit("change");
+  assert.equal(runtime.context.runtimeDataLoaded, true);
+  assert.equal(runtime.context.state.runtimeCampaignId, "selected-campaign");
+  assert.deepEqual(runtime.activations, ["selected-campaign"]);
+  assert.equal(runtime.snapshots.length, 1);
+  assert.equal(runtime.node("influence-map-status").classList.contains("error"), false);
+});
+
+test("an actual campaign-list failure is reported separately from selected-campaign loading", async () => {
+  const runtime = runtimeHarness({ request: async () => { throw new Error("Campaign database unavailable"); } });
+  const result = await runtime.context.refreshRuntimeCampaigns();
+  assert.equal(result.ok, false);
+  assert.equal(result.failure, "listing");
+  assert.match(result.message, /Campaign list unavailable: Campaign database unavailable/);
+  assert.equal(runtime.select.disabled, true);
+  assert.deepEqual(runtime.select.options.map((option) => option.textContent), ["Campaign list unavailable"]);
+  assert.equal(runtime.requests.length, 1);
+  assert.deepEqual(runtime.activations, []);
+  assert.match(runtime.node("influence-map-status").textContent, /Campaign list unavailable/);
 });
