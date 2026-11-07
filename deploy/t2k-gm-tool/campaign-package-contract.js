@@ -8,6 +8,10 @@
 
   function assertOfflineBasemap(basemap) {
     const fail = () => { throw new Error("The offline basemap must reference a supported asset, include attribution, and provide an HTTPS license URL for vector tiles."); };
+    if (isRecord(basemap) && basemap.format === "maptiler-style") {
+      if (Object.keys(basemap).length !== 2 || basemap.styleId !== "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420") fail();
+      return true;
+    }
     const hasLegacyFields = isRecord(basemap) && Object.keys(basemap).length === 3 && !Object.hasOwn(basemap, "licenseUrl");
     const hasLicenseFields = isRecord(basemap) && Object.keys(basemap).length === 4 && Object.hasOwn(basemap, "licenseUrl");
     const licenseUrl = hasLicenseFields ? basemap.licenseUrl : null;

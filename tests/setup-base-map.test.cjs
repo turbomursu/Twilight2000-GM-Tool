@@ -17,6 +17,8 @@ function harness(savedDraft = null, upload = null, save = null) {
   const layers = [];
   const exports = [];
   const savedPackages = new Map();
+  const basemapControllers = [];
+  let mapTilerKey = "";
   let currentMap = null;
   class Element {
     constructor(selector = "") {
@@ -88,11 +90,13 @@ function harness(savedDraft = null, upload = null, save = null) {
         getZoom() { return this.zoom; }, getCenter() { return { lat: this.position[0], lng: this.position[1] }; },
         getBounds() {
           const [[s, w], [n, e]] = this.extent;
-          return { getSouthWest: () => ({ lat: s, lng: w }), getNorthWest: () => ({ lat: n, lng: w }),
+          return { getSouth: () => s, getWest: () => w, getNorth: () => n, getEast: () => e,
+            getSouthWest: () => ({ lat: s, lng: w }), getNorthWest: () => ({ lat: n, lng: w }),
             getNorthEast: () => ({ lat: n, lng: e }), getSouthEast: () => ({ lat: s, lng: e }),
             contains: ([y, x]) => y >= s && y <= n && x >= w && x <= e };
         },
-        on() {}, invalidateSize() {}, remove() { this.removed = true; }, panTo() {}, removeLayer() {}
+        on(event, handler) { this.events ||= {}; this.events[event] = handler; }, fire(event) { this.events?.[event]?.(); },
+        invalidateSize() {}, remove() { this.removed = true; }, panTo() {}, removeLayer() {}
       };
       mapCalls.push(map);
       currentMap = map;
@@ -102,6 +106,7 @@ function harness(savedDraft = null, upload = null, save = null) {
     layerGroup: () => layer("group"),
     polygon: (points, options) => layer("polygon", points, options),
     marker: (points, options) => layer("marker", points, options),
+    circleMarker: (points, options) => layer("circleMarker", points, options),
     rectangle: (points, options) => layer("rectangle", points, options),
     geoJSON: (data) => layer("geoJSON", data), divIcon: (options) => options
   };
@@ -123,7 +128,27 @@ function harness(savedDraft = null, upload = null, save = null) {
     Error, Blob, setTimeout, clearTimeout,
     requestAnimationFrame: (callback) => callback(),
     FieldbookMapCoordinates: coordinates, FieldbookCampaignPackageContract: contract,
-    FieldbookBasemap: { assetUrl: (asset) => `/offline-basemaps/${asset.assetId}.image`, controller: () => ({ set() {}, clear() {} }) },
+    FieldbookBasemap: {
+      assetUrl: (asset) => `/offline-basemaps/${asset.assetId}.image`,
+      controller(map, onError) {
+        let basemap = null;
+        let key = mapTilerKey;
+        const instance = {
+          set(value) {
+            basemap = value;
+            if (value?.format === "maptiler-style") {
+              if (key) map.fire("fieldbook:maptiler-ready");
+              else onError("Enter a MapTiler API key in this browser to display the online campaign map.");
+            }
+          },
+          setMapTilerKey(value) { key = value; if (basemap?.format === "maptiler-style" && key) map.fire("fieldbook:maptiler-ready"); },
+          destroy() {}
+        };
+        basemapControllers.push(instance);
+        return instance;
+      },
+      setMapTilerKey(value) { mapTilerKey = value.trim(); basemapControllers.forEach((controller) => controller.setMapTilerKey(mapTilerKey)); }
+    },
     FieldbookVectorAtlas: { validLicenseUrl: (value) => value.startsWith("https://") ? value : null },
     fetch: async (path, options) => {
       if (path === "/api/setup-packages") {
@@ -132,11 +157,12 @@ function harness(savedDraft = null, upload = null, save = null) {
         if (save) return save(path, options);
         const id = randomUUID();
         const savedPackage = json(source);
-        savedPackage.map.offlineBasemap.assetId = randomUUID();
+        if (savedPackage.map.offlineBasemap?.assetId) savedPackage.map.offlineBasemap.assetId = randomUUID();
         savedPackages.set(`/api/setup-packages/${id}`, savedPackage);
         return { ok: true, json: async () => ({ saved: { id, packageUrl: `/api/setup-packages/${id}`,
           packagePath: `gmpack/campsetups/image-campaign-${id}-setup-v2.json`,
-          imagePath: `data/maps/image-campaign/${savedPackage.map.offlineBasemap.assetId}.image` } }) };
+          imagePath: savedPackage.map.offlineBasemap?.format === "static-image"
+            ? `data/maps/image-campaign/${savedPackage.map.offlineBasemap.assetId}.image` : null } }) };
       }
       if (savedPackages.has(path)) return { ok: true, text: async () => JSON.stringify(savedPackages.get(path)) };
       if (upload) return upload(path, options);
@@ -147,7 +173,7 @@ function harness(savedDraft = null, upload = null, save = null) {
   });
   context.window = context;
   vm.runInContext(script.replace("      state = loadDraft();", `      globalThis.setup = {
-        getState: () => state, showStep, collectPackage, normalizeImportedPackage, validatePackage, handleMapClick,
+        getState: () => state, showStep, collectPackage, normalizeImportedPackage, validatePackage, handleMapClick, saveDraft,
         gridCoordinatesForPosition, localMetersToPosition, selectTerrainCell
       };
       state = loadDraft();`), context);
@@ -155,6 +181,10 @@ function harness(savedDraft = null, upload = null, save = null) {
 }
 
 async function uploadImage(state, width = "100") {
+  if (state.node("#offline-basemap-kind").value !== "static-image") {
+    state.node("#offline-basemap-kind").value = "static-image";
+    await state.node("#offline-basemap-kind").emit("change");
+  }
   state.node("#image-width-km").value = width;
   state.node("#offline-basemap-attribution").value = "GM map credit";
   state.node("#offline-basemap-file").files = [{ type: "image/png", size: 100 }];
@@ -263,8 +293,10 @@ test("applying a saved package prevents an older image upload from replacing its
 
 test("fresh static-image setup uploads, proceeds, places locations, assigns terrain and exports a valid image package", async () => {
   const state = harness();
+  assert.equal(state.node("#offline-basemap-kind").value, "maptiler-style");
+  state.node("#offline-basemap-kind").value = "static-image";
+  await state.node("#offline-basemap-kind").emit("change");
   assert.equal(state.node("#offline-basemap-kind").value, "static-image");
-  assert.equal(state.node("#map-extract-tools").hidden, true);
   assert.equal(state.node("#continue-to-terrain").disabled, true);
   for (const [id, value] of Object.entries({
     "campaign-name": "Image campaign", "campaign-setting": "GM setting", "campaign-premise": "Private premise", "map-name": "Paper map"
@@ -329,37 +361,66 @@ test("fresh static-image setup uploads, proceeds, places locations, assigns terr
   assert.deepEqual(json(restored.context.setup.getState().locations[0].position), { x: 50, y: 25 });
 });
 
-test("source switching preserves independent image and extract drafts without fabricating geographic extents", async () => {
+test("MapTiler setup selects and resets opposite corners, keeps the transient key out of the package, and preserves image drafts", async () => {
   const state = harness();
-  await uploadImage(state);
-  state.node("#offline-basemap-kind").value = "pmtiles";
-  await state.node("#offline-basemap-kind").emit("change");
-  assert.equal(state.node("#map-extract-tools").hidden, false);
-  assert.equal(state.context.setup.getState().map.bounds, null);
-  assert.equal(state.node("#continue-to-terrain").disabled, true);
-  const extract = {
-    type: "FeatureCollection", features: [{
-      type: "Feature", properties: { type: "atlas", title: "Dalarna" },
-      geometry: { type: "Polygon", coordinates: [[[13, 60], [15, 60], [15, 62], [13, 62], [13, 60]]] }
-    }]
-  };
-  state.node("#fieldpapers-file").files = [{ name: "atlas.geojson", text: async () => JSON.stringify(extract) }];
-  await state.node("#fieldpapers-file").emit("change");
-  await state.node("#apply-fieldpapers-import").emit("click");
+  assert.equal(state.node("#offline-basemap-kind").value, "maptiler-style");
   assert.equal(state.node("#continue-to-terrain").disabled, false);
   state.context.setup.showStep("terrain");
-  assert.equal(state.currentMap().options.crs.name, "geographic");
-  assert.deepEqual(json(state.context.setup.getState().map.bounds), { south: 60, west: 13, north: 62, east: 15 });
+  assert.equal(state.node("#select-map-area-corners").disabled, true);
+  const apiKey = "session-only-maptiler-key";
+  state.node("#maptiler-reference-key").value = apiKey;
+  await state.node("#maptiler-reference-key").emit("input");
+  state.context.setup.saveDraft();
+  assert.equal(state.node("#select-map-area-corners").disabled, false);
+  await state.node("#select-map-area-corners").emit("click");
+  assert.equal(state.node("#campaign-area-selection-status").textContent, "Click the first corner of the campaign area.");
+  state.currentMap().events.click({ latlng: { lat: 55, lng: 25 } });
+  assert.equal(state.node("#campaign-area-selection-status").textContent, "First corner selected. Click the diagonally opposite corner to finish the campaign area.");
+  state.currentMap().events.click({ latlng: { lat: 55, lng: 10 } });
+  assert.equal(state.context.setup.getState().map.bounds, null);
+  assert.match(state.node("#terrain-map-status").textContent, /different latitudes and longitudes/);
+  state.currentMap().events.click({ latlng: { lat: 45, lng: 10 } });
+  const stateAfterSelection = state.context.setup.getState();
+  assert.deepEqual(json(stateAfterSelection.map.bounds), { south: 45, west: 10, north: 55, east: 25 });
+  assert.equal(stateAfterSelection.map.offlineBasemap.format, "maptiler-style");
+  assert.equal(state.node("#select-map-area-corners").hidden, true);
+  assert.equal(state.node("#reset-map-area-corners").hidden, false);
+  assert.ok(state.layers.some((entry) => entry.kind === "rectangle"));
+  await state.node("#reset-map-area-corners").emit("click");
+  assert.equal(state.context.setup.getState().map.bounds, null);
+  assert.equal(state.node("#reset-map-area-corners").hidden, true);
+  assert.equal(state.node("#select-map-area-corners").textContent, "Cancel corner selection");
+  state.currentMap().events.click({ latlng: { lat: 52, lng: 20 } });
+  state.currentMap().events.click({ latlng: { lat: 42, lng: 8 } });
+  const stateAfterReselection = state.context.setup.getState();
+  assert.deepEqual(json(stateAfterReselection.map.bounds), { south: 42, west: 8, north: 52, east: 20 });
+  assert.equal(state.node("#reset-map-area-corners").hidden, false);
+  for (const [id, value] of Object.entries({
+    "campaign-name": "Online campaign", "campaign-setting": "GM setting", "campaign-premise": "Private premise", "map-name": "Captured area"
+  })) state.node(`#${id}`).value = value;
+  stateAfterReselection.locations.push({ id: randomUUID(), name: "Start", kind: "Location",
+    position: { lat: 47, lng: 14 }, visibility: "gm-only", isStartingLocation: true });
+  assert.equal(state.context.setup.validatePackage(false).length, 0);
+  const exported = json(state.context.setup.collectPackage());
+  assert.equal(contract.assertCampaignSetupPackage(exported), true);
+  assert.deepEqual(exported.map.offlineBasemap, { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" });
+  assert.doesNotMatch(JSON.stringify(exported), new RegExp(apiKey));
+  assert.doesNotMatch(state.storage.get("fieldbook-campaign-setup-draft-v1"), new RegExp(apiKey));
+
   state.node("#offline-basemap-kind").value = "static-image";
   await state.node("#offline-basemap-kind").emit("change");
+  assert.equal(state.context.setup.getState().map.bounds, null);
+  assert.equal(state.node("#continue-to-terrain").disabled, true);
+  await uploadImage(state);
+  const imageBounds = json(state.context.setup.getState().map.bounds);
+  state.node("#offline-basemap-kind").value = "maptiler-style";
+  await state.node("#offline-basemap-kind").emit("change");
+  assert.deepEqual(json(state.context.setup.getState().map.bounds), { south: 42, west: 8, north: 52, east: 20 });
+  assert.equal(state.context.setup.getState().map.offlineBasemap.format, "maptiler-style");
   assert.equal(state.node("#continue-to-terrain").disabled, false);
-  assert.equal(state.context.setup.getState().map.bounds.type, "image-km");
   const restored = harness(JSON.parse(state.storage.get("fieldbook-campaign-setup-draft-v1")));
-  assert.equal(restored.context.setup.getState().map.bounds.widthKm, 100);
-  restored.node("#offline-basemap-kind").value = "pmtiles";
-  await restored.node("#offline-basemap-kind").emit("change");
-  assert.equal(restored.node("#continue-to-terrain").disabled, false);
-  assert.equal(restored.context.setup.getState().map.atlas.title, "Dalarna");
+  assert.deepEqual(json(restored.context.setup.getState().sourceDrafts["static-image"].map.bounds), imageBounds);
+  assert.equal(restored.context.setup.getState().sourceDrafts["static-image"].map.offlineBasemap.format, "static-image");
 });
 
 test("image package contract rejects geographic positions, unknown coordinate types and unscaled origins", async () => {
@@ -417,8 +478,21 @@ test("image coordinates enforce actual extent and preserve a measured 10 km axia
   assert.deepEqual(json(state.context.setup.gridCoordinatesForPosition(point)), { q: 1, r: 0, ref: "Q+01 R+00" });
 });
 
-test("manual bounds selection is absent and the helper loads before the package contract", () => {
+test("numeric bounds inputs are absent, MapTiler corners remain selectable, and the coordinate helper loads first", () => {
   assert.doesNotMatch(html, /id="(?:map-bounds-form|map-bound-south|draw-area|clear-area)"/);
+  assert.doesNotMatch(html, /Atlas GeoJSON|fieldpapers-file|map-extract-tools/);
   assert.ok(html.indexOf('src="/map-coordinates.js"') < html.indexOf('src="campaign-package-contract.js"'));
-  assert.match(html, /\.fieldpapers-tools\[hidden\].*\.field\[hidden\].*display: none/);
+  assert.match(html, /id="select-map-area-corners"/);
+});
+
+test("runtime-supplied MapTiler keys stay outside local drafts and setup package exports", async () => {
+  const state = harness();
+  const apiKey = "synthetic-only-reference-key";
+  state.node("#maptiler-reference-key").value = apiKey;
+  await state.node("#maptiler-reference-key").emit("input");
+  state.context.setup.saveDraft();
+
+  assert.doesNotMatch(state.storage.get("fieldbook-campaign-setup-draft-v1"), new RegExp(apiKey));
+  assert.doesNotMatch(JSON.stringify(state.context.setup.collectPackage()), new RegExp(apiKey));
+  assert.equal(state.context.setup.getState().map.bounds, null);
 });

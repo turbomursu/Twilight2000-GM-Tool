@@ -97,12 +97,17 @@ function validateMapDraft(draft, bounds, locations) {
 }
 
 function projectMap(map, offlineBasemapUrl = null) {
-  const basemapExtension = map.offlineBasemap?.format === "static-image" ? "image" : "pmtiles";
+  const basemap = map.offlineBasemap?.format === "maptiler-style"
+    ? { format: "maptiler-style", styleId: map.offlineBasemap.styleId }
+    : map.offlineBasemap ? (() => {
+      const basemapExtension = map.offlineBasemap.format === "static-image" ? "image" : "pmtiles";
+      return { format: map.offlineBasemap.format || "raster-pmtiles", assetId: map.offlineBasemap.assetId,
+        attribution: map.offlineBasemap.attribution, ...(map.offlineBasemap.licenseUrl ? { licenseUrl: map.offlineBasemap.licenseUrl } : {}),
+        assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.${basemapExtension}` };
+    })() : null;
   return {
     schemaVersion: 2, name: map.name, bounds: mapBounds(map.bounds),
-    offlineBasemap: map.offlineBasemap ? { format: map.offlineBasemap.format || "raster-pmtiles", assetId: map.offlineBasemap.assetId,
-      attribution: map.offlineBasemap.attribution, ...(map.offlineBasemap.licenseUrl ? { licenseUrl: map.offlineBasemap.licenseUrl } : {}),
-      assetUrl: offlineBasemapUrl || `/offline-basemaps/${map.offlineBasemap.assetId}.${basemapExtension}` } : null,
+    offlineBasemap: basemap,
     locations: map.locations.map((location) => ({ id: location.id, name: location.name, kind: location.kind, position: point(location.position) })),
     markings: map.markings.map((marking) => ({ id: marking.id, label: marking.label, position: point(marking.position) })),
     geometries: (map.geometries || []).map((entry) => ({ id: entry.id, label: entry.label, geometry: entry.geometry })),
@@ -159,10 +164,12 @@ function updateGMMap(database, accountId, campaignId, input, validateOfflineBase
       throw new Error("Image-coordinate campaigns must retain a static image basemap; geographic basemaps require geographic bounds.");
     }
     if (input.action === "basemap" && input.basemap !== null) {
-      if (typeof validateOfflineBasemap !== "function") throw new Error("The offline basemap asset could not be verified.");
-      validateOfflineBasemap(accountId, input.basemap, map.catalog.bounds);
+      if (input.basemap.format !== "maptiler-style") {
+        if (typeof validateOfflineBasemap !== "function") throw new Error("The offline basemap asset could not be verified.");
+        validateOfflineBasemap(accountId, input.basemap, map.catalog.bounds);
+      }
       database.prepare("UPDATE maps SET offlineBasemap_json = ?, attribution = ? WHERE runtime_campaign_id = ?")
-        .run(JSON.stringify(input.basemap), input.basemap.attribution, campaignId);
+        .run(JSON.stringify(input.basemap), input.basemap.attribution || "", campaignId);
     } else if (input.action === "basemap") {
       database.prepare("UPDATE maps SET offlineBasemap_json = NULL, attribution = '' WHERE runtime_campaign_id = ?").run(campaignId);
     }

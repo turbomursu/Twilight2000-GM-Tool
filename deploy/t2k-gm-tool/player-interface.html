@@ -371,6 +371,7 @@
         <div class="map-record">
           <div class="map-record-head"><h2 id="player-map-name">Player map</h2><span class="eyebrow">GM publication</span></div>
           <p id="player-map-status" role="status">Select an assigned campaign.</p>
+          <label class="field" id="player-maptiler-key-field" hidden><span>MapTiler API key / this browser session only</span><input id="player-maptiler-key" data-maptiler-key type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" placeholder="Enter a restricted MapTiler key"></label>
           <div id="player-map-content" hidden>
             <div class="map-controls" aria-label="Map zoom controls"><button type="button" id="player-map-minus" aria-label="Zoom out" title="Zoom out">&#8722;</button><output class="map-zoom-level" id="player-map-percent">100%</output><button type="button" id="player-map-plus" aria-label="Zoom in" title="Zoom in">+</button><button type="button" id="player-map-reset" title="Center on player position">Reset view</button></div>
             <div class="published-map-canvas" id="published-player-map" role="region" tabindex="0" aria-label="Published campaign map"></div>
@@ -553,6 +554,7 @@
   <script src="/vendor/pmtiles.js" defer></script>
   <script src="/vector-atlas-client.js" defer></script>
   <script src="/map-coordinates.js" defer></script>
+  <script src="/maptiler-reference-client.js" defer></script>
   <script src="/map-basemap-client.js" defer></script>
   <script src="/map-publication-client.js" defer></script>
   <script src="/comms-client.js" defer></script>

@@ -1,4 +1,14 @@
 (() => {
+  let mapTilerKey = "";
+  document.querySelectorAll("[data-maptiler-key]").forEach((input) => {
+    input.addEventListener("input", () => {
+      mapTilerKey = input.value.trim();
+      document.querySelectorAll("[data-maptiler-key]").forEach((other) => { if (other !== input) other.value = mapTilerKey; });
+      globalThis.FieldbookBasemap?.setMapTilerKey(mapTilerKey);
+      document.dispatchEvent(new CustomEvent("fieldbook:maptiler-key-changed"));
+    });
+  });
+
   async function request(path, options = {}) {
     const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options });
     const result = await response.json();
@@ -11,10 +21,11 @@
     let map = null;
     let baseZoom = 0;
     let current = null;
+    let basemapController = null;
     const coordinates = globalThis.FieldbookMapCoordinates;
     const center = (position) => coordinates.toLatLng(position, current.bounds);
     const minimumZoom = () => coordinates.isImage(current.bounds) ? baseZoom - 2 : Math.max(0, baseZoom - 2);
-    function clear() { if (map) map.remove(); map = null; current = null; container.replaceChildren(); }
+    function clear() { basemapController?.destroy(); basemapController = null; if (map) map.remove(); map = null; current = null; container.replaceChildren(); }
     function updateZoom() {
       if (output) output.textContent = `${Math.round(100 * 2 ** (map.getZoom() - baseZoom))}%`;
       if (plus) plus.disabled = map.getZoom() >= baseZoom + 1;
@@ -49,6 +60,14 @@
           layer.once("error", () => reject(new Error("Static map image is unavailable or cannot be decoded.")));
         });
         if (map !== currentMap) return false;
+      } else if (snapshot.offlineBasemap?.format === "maptiler-style") {
+        if (!globalThis.FieldbookBasemap || !mapTilerKey) throw new Error("Enter a MapTiler API key in this browser to display the online campaign map.");
+        basemapController = globalThis.FieldbookBasemap.controller(map, (message) => {
+          const status = document.querySelector(form ? "#gm-map-publication-status" : "#player-map-status");
+          if (status) status.textContent = message;
+        });
+        basemapController.setMapTilerKey(mapTilerKey);
+        basemapController.set(snapshot.offlineBasemap, snapshot.bounds);
       } else if (snapshot.offlineBasemap) {
         if (!globalThis.pmtiles?.PMTiles || !globalThis.pmtiles?.leafletRasterLayer) throw new Error("Local PMTiles renderer is unavailable.");
         const archiveUrl = snapshot.offlineBasemap.assetUrl || `/offline-basemaps/${encodeURIComponent(snapshot.offlineBasemap.assetId)}.pmtiles`;
@@ -148,8 +167,11 @@
       const basemap = publication?.catalog.offlineBasemap;
       const bounds = publication?.catalog.bounds;
       document.querySelector("#gm-map-background-current").textContent = publication
-        ? `Current: ${basemap ? `${basemap.format === "static-image" ? "Static map image" : "Offline PMTiles"} / ${basemap.attribution}` : "Online OSM map"}. ${imageExtent() ? `Image extent: ${bounds.widthKm} × ${coordinates.heightKm(bounds)} km / origin bottom-left.` : `Bounds: ${bounds.south}, ${bounds.west} to ${bounds.north}, ${bounds.east}.`}`
+        ? `Current: ${basemap ? basemap.format === "static-image" ? `Static map image / ${basemap.attribution}`
+          : basemap.format === "maptiler-style" ? "MapTiler online map / attribution is supplied by the style"
+            : `Offline PMTiles / ${basemap.attribution}` : "Online OSM map"}. ${imageExtent() ? `Image extent: ${bounds.widthKm} × ${coordinates.heightKm(bounds)} km / origin bottom-left.` : `Bounds: ${bounds.south}, ${bounds.west} to ${bounds.north}, ${bounds.east}.`}`
         : "";
+      document.querySelector("#gm-maptiler-key-field").hidden = basemap?.format !== "maptiler-style";
       controls();
     }
     function invalidate() { previewRevision = null; previewPanel.hidden = true; viewer.clear(); controls(); }
@@ -302,8 +324,8 @@
     applyBackground.addEventListener("click", async () => {
       if (busy || !publication || backgroundKind.value === "current") return;
       const imageMode = backgroundKind.value === "static-image";
-      if (imageExtent() && !imageMode) {
-        status.textContent = "Image kilometre extents require a static map image. Online OSM requires geographic bounds.";
+      if (imageExtent() && !imageMode && backgroundKind.value !== "current") {
+        status.textContent = "Image kilometre extents require a static map image. Online basemaps require geographic bounds.";
         return;
       }
       const file = imageFile.files[0];
@@ -317,7 +339,8 @@
       const campaignId = id; const token = generation; const pendingDraft = readDraft();
       busy = true; controls(); status.textContent = "Applying campaign background...";
       try {
-        let basemap = null;
+        let basemap = backgroundKind.value === "maptiler-style"
+          ? { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" } : null;
         if (imageMode) {
           const result = await request("/api/offline-basemaps", { method: "POST",
             headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
@@ -372,6 +395,7 @@
   if (mapTab) {
     const select = document.querySelector("#player-campaign-select"); const panel = document.querySelector('[data-panel="map"]');
     const content = document.querySelector("#player-map-content"); const status = document.querySelector("#player-map-status");
+    const mapTilerKeyField = document.querySelector("#player-maptiler-key-field");
     const plus = document.querySelector("#player-map-plus"); const minus = document.querySelector("#player-map-minus");
     const viewer = mapView(document.querySelector("#published-player-map"), document.querySelector("#player-map-percent"), plus, minus);
     let generation = 0; let previous = "";
@@ -379,10 +403,11 @@
       ["published-player-position", "player-map-published-at"].forEach((key) => { document.getElementById(key).textContent = ""; }); }
     async function load() {
       const token = ++generation; const id = select.value;
-      if (!id) { clear(); status.textContent = "Select an assigned campaign."; return; }
+      if (!id) { clear(); mapTilerKeyField.hidden = true; status.textContent = "Select an assigned campaign."; return; }
       try { const result = await request(`/api/player/campaigns/${encodeURIComponent(id)}/map`);
         if (token !== generation || select.value !== id) return;
-        if (!result.map) { clear(); status.textContent = "No map published."; return; }
+        if (!result.map) { clear(); mapTilerKeyField.hidden = true; status.textContent = "No map published."; return; }
+        mapTilerKeyField.hidden = result.map.offlineBasemap?.format !== "maptiler-style";
         const serialized = JSON.stringify(result); content.hidden = false;
         if (serialized !== previous) { if (!await viewer.render(result.map) || token !== generation) return; previous = serialized; }
         document.querySelector("#player-map-name").textContent = result.map.name;
@@ -398,6 +423,7 @@
     plus.addEventListener("click", () => viewer.zoom(.25)); minus.addEventListener("click", () => viewer.zoom(-.25)); document.querySelector("#player-map-reset").addEventListener("click", viewer.reset);
     select.addEventListener("change", () => { generation += 1; clear(); if (!panel.hidden) load(); });
     document.querySelector("#refresh-player-character").addEventListener("click", () => { if (!panel.hidden) { clear(); load(); } });
+    document.addEventListener("fieldbook:maptiler-key-changed", () => { if (!panel.hidden) { clear(); load(); } });
     document.addEventListener("visibilitychange", () => { if (!document.hidden && !panel.hidden) { clear(); load(); } });
     setInterval(() => { if (!document.hidden && !panel.hidden) load(); }, 15000);
   }

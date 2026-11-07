@@ -58,6 +58,9 @@ test("redirects anonymous requests to login and serves only public auth assets",
   const setupImportClient = await fetch(`${origin}/campaign-setup-import-client.js`, { redirect: "manual" });
   assert.equal(setupImportClient.status, 302);
   assert.equal(setupImportClient.headers.get("location"), "/login.html?next=%2Fcampaign-setup-import-client.js");
+  const mapTilerClient = await fetch(`${origin}/maptiler-reference-client.js`, { redirect: "manual" });
+  assert.equal(mapTilerClient.status, 302);
+  assert.equal(mapTilerClient.headers.get("location"), "/login.html?next=%2Fmaptiler-reference-client.js");
 
   const login = await fetch(`${origin}/login.html`);
   assert.equal(login.status, 200);
@@ -82,6 +85,11 @@ test("serves protected pages only for an active session and gates them again aft
   assert.equal(setupImportClient.status, 200);
   assert.match(setupImportClient.headers.get("content-type"), /text\/javascript/);
   assert.match(await setupImportClient.text(), /window.FieldbookSetupImport/);
+  const mapTilerClient = await fetch(`${origin}/maptiler-reference-client.js`, { headers: { Cookie: cookie } });
+  assert.equal(mapTilerClient.status, 200);
+  assert.match(mapTilerClient.headers.get("content-type"), /text\/javascript/);
+  assert.match(mapTilerClient.headers.get("content-security-policy"), /connect-src 'self' https:\/\/nominatim\.openstreetmap\.org https:\/\/api\.maptiler\.com/);
+  assert.match(await mapTilerClient.text(), /01a1b6c9-9a4c-7ab4-bf09-6d75353e5420/);
   const runtimeHtml = await protectedPage.text();
   assert.match(runtimeHtml, /data-auth-logout/);
   assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
@@ -100,13 +108,18 @@ test("serves protected pages only for an active session and gates them again aft
   const setupHtml = await setupPage.text();
   assert.match(setupHtml, /id="export-package-top"/);
   assert.equal([...setupHtml.matchAll(/\b(?:let|const)\s+basemapController\s*=/g)].length, 1);
+  assert.match(setupHtml, /\.offline-basemap-tools\[hidden\],\s*\.maptiler-reference\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/);
   for (const id of ["map-bound-south", "map-bound-west", "map-bound-north", "map-bound-east", "apply-map-bounds"]) {
     assert.doesNotMatch(setupHtml, new RegExp(`id="${id}"`));
   }
-  for (const id of ["offline-basemap-kind", "image-width-km", "map-extract-tools", "static-image-preview"]) {
+  for (const id of ["offline-basemap-kind", "maptiler-map-tools", "maptiler-reference-key", "image-width-km", "static-image-preview"]) {
     assert.match(setupHtml, new RegExp(`id="${id}"`));
   }
-  assert.match(setupHtml, /<option value="static-image">Static image<\/option><option value="pmtiles">Map extract<\/option>/);
+  assert.match(setupHtml, /id="select-map-area-corners"/);
+  assert.match(setupHtml, /id="reset-map-area-corners"/);
+  assert.doesNotMatch(setupHtml, /current view as campaign area|capture-map-area/i);
+  assert.doesNotMatch(setupHtml, /id="map-extract-tools"|Apply imported atlas|Atlas GeoJSON/i);
+  assert.match(setupHtml, /<option value="maptiler-style">Online MapTiler map<\/option><option value="static-image">Static image<\/option>/);
 
   for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md"]) {
     assert.equal((await fetch(`${origin}${path}`, { headers: { Cookie: cookie } })).status, 404);

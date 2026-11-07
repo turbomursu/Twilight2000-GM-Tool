@@ -184,6 +184,25 @@ test("GM-only ownership, same origin, media type, malformed JSON and size bounda
   assert.equal((await f.call("/api/setup-packages", { method: "PUT", body: input })).status, 405);
 });
 
+test("MapTiler setup saves and runtime imports carry only fixed style metadata and no static image", async (t) => {
+  const f = await fixture(t);
+  const input = setupPackage(null, true);
+  input.map.offlineBasemap = { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" };
+  input.map.attribution = "";
+  const saved = await f.call("/api/setup-packages", { method: "POST", body: input });
+  assert.equal(saved.status, 201, saved.body.error);
+  assert.equal(saved.body.saved.imagePath, null);
+  const exported = await f.call(saved.body.saved.packageUrl);
+  assert.deepEqual(exported.body, input);
+  assert.doesNotMatch(JSON.stringify(exported.body), /apiKey|YOUR_MAPTILER_API_KEY/);
+
+  const imported = await f.call("/api/campaigns/import-setup", { method: "POST", body: exported.body });
+  assert.equal(imported.status, 201, imported.body.error);
+  const publication = await f.call(`/api/campaigns/${imported.body.campaign.id}/map-publication`);
+  assert.deepEqual(publication.body.map.catalog.offlineBasemap, input.map.offlineBasemap);
+  assert.equal(publication.body.map.catalog.bounds.south, 0);
+});
+
 test("invalid schema/data/name and unowned, missing, mismatched or corrupt image create no export files", async (t) => {
   const f = await fixture(t);
   const sourceId = await f.upload();
