@@ -40,6 +40,10 @@ const PROTECTED_FILES = new Map([
   ["/situation-report-client.js", ["situation-report-client.js", "text/javascript; charset=utf-8"]],
   ["/map-publication-client.js", ["map-publication-client.js", "text/javascript; charset=utf-8"]],
   ["/map-basemap-client.js", ["map-basemap-client.js", "text/javascript; charset=utf-8"]],
+  ["/map-visualization-client.js", ["map-visualization-client.js", "text/javascript; charset=utf-8"]],
+  ["/personnel-client.js", ["personnel-client.js", "text/javascript; charset=utf-8"]],
+  ["/location-client.js", ["location-client.js", "text/javascript; charset=utf-8"]],
+  ["/route-client.js", ["route-client.js", "text/javascript; charset=utf-8"]],
   ["/comms-client.js", ["comms-client.js", "text/javascript; charset=utf-8"]],
   ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]],
   ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]],
@@ -96,7 +100,7 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
     return true;
   };
   const effectiveCampaignHandler = campaignHandler || createCampaignHandler({ database, validateOfflineBasemap });
-  const setupPackageHandler = createSetupPackageHandler({ root, validateOfflineBasemap, findOfflineBasemapDirectory, logger });
+  const setupPackageHandler = createSetupPackageHandler({ root, database, validateOfflineBasemap, findOfflineBasemapDirectory, logger });
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);

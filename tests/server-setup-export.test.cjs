@@ -50,6 +50,7 @@ async function fixture(t) {
     await once(server, "listening");
     return `http://127.0.0.1:${server.address().port}`;
   }
+
   let origin = await start();
   const boot = await fetch(`${origin}/api/auth/bootstrap`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -97,6 +98,30 @@ async function fixture(t) {
     }
   };
 }
+
+test("saved setup discovery is owner scoped and selection import is idempotent across retries", async (t) => {
+  const f = await fixture(t);
+  const setup = setupPackage(null, true);
+  setup.map.offlineBasemap = { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" };
+  const saved = await f.call("/api/setup-packages", { method: "POST", body: setup });
+  assert.equal(saved.status, 201);
+  const id = saved.body.saved.id;
+  const listing = await f.call("/api/setup-packages");
+  assert.deepEqual(listing.body.packages.map((record) => record.id), [id]);
+  assert.equal((await f.call("/api/setup-packages", { user: "other" })).body.packages.length, 0);
+  assert.equal((await f.call("/api/setup-packages", { user: "player" })).status, 403);
+  assert.equal((await f.call("/api/setup-packages", { user: null })).status, 401);
+  assert.equal((await f.call(`/api/setup-packages/${id}/import`, { user: "other", method: "POST" })).status, 404);
+  const imports = await Promise.all([1, 2].map(() => f.call(`/api/setup-packages/${id}/import`, { method: "POST" })));
+  assert.deepEqual(imports.map((result) => result.status).sort(), [200, 201]);
+  assert.equal(imports[0].body.campaign.id, imports[1].body.campaign.id);
+  f.database.prepare("UPDATE campaigns SET name = 'Live changes preserved' WHERE runtime_id = ?").run(imports[0].body.campaign.id);
+  const again = await f.call(`/api/setup-packages/${id}/import`, { method: "POST" });
+  assert.equal(again.body.reused, true);
+  assert.equal(again.body.campaign.name, "Live changes preserved");
+  assert.equal(f.database.prepare("SELECT COUNT(*) AS count FROM campaigns").get().count, 1);
+  assert.equal(JSON.stringify(listing.body).includes("apiKey"), false);
+});
 
 function savedFiles(root) {
   const directory = join(root, "gmpack", "campsetups");

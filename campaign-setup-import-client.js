@@ -32,10 +32,27 @@
       dialog.close();
     }
 
-    open.addEventListener("click", () => {
+    open.addEventListener("click", async () => {
       if (submitting) return;
       reset();
       fileInput.value = "";
+      if (typeof window.showOpenFilePicker === "function") {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            startIn: "downloads", multiple: false,
+            types: [{ description: "Campaign setup JSON", accept: { "application/json": [".json"] } }]
+          });
+          await readFile(await handle.getFile());
+          return;
+        } catch (error) {
+          if (error.name === "AbortError") return;
+          if (!["SecurityError", "NotAllowedError", "NotSupportedError"].includes(error.name)) {
+            feedback(`Could not open the setup picker: ${error.message}`, "error");
+            if (!dialog.open) dialog.showModal();
+            return;
+          }
+        }
+      }
       fileInput.click();
     });
     close.addEventListener("click", dismiss);
@@ -46,9 +63,8 @@
     });
     dialog.addEventListener("close", reset);
 
-    fileInput.addEventListener("change", async () => {
+    async function readFile(file) {
       if (submitting) return;
-      const file = fileInput.files?.[0];
       if (!file) return;
       reset();
       const currentRevision = revision;
@@ -76,7 +92,8 @@
         if (revision !== currentRevision) return;
         feedback(error instanceof Error ? error.message : "Could not read this setup package.", "error");
       }
-    });
+    }
+    fileInput.addEventListener("change", () => readFile(fileInput.files?.[0]));
 
     apply.addEventListener("click", async () => {
       if (submitting || pendingSource === null) return;

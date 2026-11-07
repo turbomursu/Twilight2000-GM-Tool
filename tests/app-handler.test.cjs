@@ -91,6 +91,15 @@ test("serves protected pages only for an active session and gates them again aft
   assert.match(mapTilerClient.headers.get("content-security-policy"), /connect-src 'self' https:\/\/nominatim\.openstreetmap\.org https:\/\/api\.maptiler\.com/);
   assert.match(await mapTilerClient.text(), /01a1b6c9-9a4c-7ab4-bf09-6d75353e5420/);
   const runtimeHtml = await protectedPage.text();
+  for (const asset of ["/map-visualization-client.js", "/personnel-client.js", "/location-client.js", "/route-client.js"]) {
+    const anonymous = await fetch(`${origin}${asset}`, { redirect: "manual" });
+    assert.equal(anonymous.status, 302);
+    const authenticated = await fetch(`${origin}${asset}`, { headers: { Cookie: cookie } });
+    assert.equal(authenticated.status, 200);
+    assert.match(authenticated.headers.get("content-type"), /text\/javascript/);
+  }
+  assert.match(runtimeHtml, /id="map-title">Campaign map/);
+  assert.match(runtimeHtml, /id="sample-route-sketch" hidden/);
   assert.match(runtimeHtml, /data-auth-logout/);
   assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
   const playerHtml = readFileSync(join(__dirname, "..", "player-interface.html"), "utf8");

@@ -67,7 +67,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function runtimeHarness({ request } = {}) {
+function runtimeHarness({ request, packages = [], setupListError } = {}) {
   const elements = new Map();
   const node = (id) => {
     if (!elements.has(id)) elements.set(id, new Element());
@@ -83,7 +83,7 @@ function runtimeHarness({ request } = {}) {
   const snapshots = [];
   const load = dashboard.match(/ {6}async function loadRuntimeCampaign[\s\S]*?(?= {6}async function refreshRuntimeCampaigns)/)[0];
   const refresh = dashboard.match(/ {6}async function refreshRuntimeCampaigns[\s\S]*?(?= {6}runtimeCampaignSelect.addEventListener)/)[0];
-  const change = dashboard.match(/ {6}runtimeCampaignSelect\.addEventListener\("change", \(\) => \{[\s\S]*?\n {6}\}\);/)[0];
+  const change = dashboard.match(/ {6}runtimeCampaignSelect\.addEventListener\("change", async \(\) => \{[\s\S]*?\n {6}\}\);/)[0];
   const context = {
     state: { runtimeCampaignId: "previous-campaign" },
     runtimeDataLoaded: true,
@@ -103,6 +103,10 @@ function runtimeHarness({ request } = {}) {
     updateWeatherRollAvailability() {},
     campaignApiRequest: async (path) => {
       requests.push(path);
+      if (path === "/api/setup-packages") {
+        if (setupListError) throw new Error(setupListError);
+        return { packages };
+      }
       return request(path);
     },
     activateRuntimeCampaign: (campaign) => {
@@ -121,7 +125,7 @@ function runtimeHarness({ request } = {}) {
   return { context, node, requests, activations, snapshots, select };
 }
 
-function harness({ request, onImported } = {}) {
+function harness({ request, onImported, picker } = {}) {
   const elements = new Map();
   const node = (id) => {
     if (!elements.has(id)) elements.set(id, new Element());
@@ -129,7 +133,7 @@ function harness({ request, onImported } = {}) {
   };
   const requests = [];
   const imported = [];
-  const window = {};
+  const window = { showOpenFilePicker: picker };
   runInNewContext(readFileSync(join(root, "campaign-setup-import-client.js"), "utf8"), {
     document: { getElementById: node, querySelector: () => node("open") }, window, Error
   });
@@ -169,6 +173,27 @@ test("preview and confirmation submit original setup JSON, including private ini
   assert.equal(state.node("setup-import-dialog").open, false);
   await state.node("apply-setup-import").emit("click");
   assert.equal(state.requests.length, 1);
+});
+
+test("supported picker requests Downloads and previews JSON without the input fallback", async () => {
+  let options;
+  const state = harness({ picker: async (input) => {
+    options = input;
+    return [{ getFile: async () => ({ name: "downloads.json", size: 100, text: async () => JSON.stringify(sourcePackage()) }) }];
+  } });
+  await state.node("open").emit("click");
+  assert.equal(options.startIn, "downloads");
+  assert.equal(options.types[0].accept["application/json"][0], ".json");
+  assert.equal(state.node("setup-package-file").clicks, 0);
+  assert.equal(state.node("apply-setup-import").disabled, false);
+});
+
+test("unsupported picker falls back to the file input and cancellation does not", async () => {
+  for (const name of ["SecurityError", "NotSupportedError", "AbortError"]) {
+    const state = harness({ picker: async () => { const error = new Error("Picker unavailable"); error.name = name; throw error; } });
+    await state.node("open").emit("click");
+    assert.equal(state.node("setup-package-file").clicks, name === "AbortError" ? 0 : 1);
+  }
 });
 
 test("invalid packages and oversize files cannot submit, including after an earlier valid preview", async () => {
@@ -321,6 +346,7 @@ test("the runtime handoff automatically selects and loads the new campaign rathe
     updateWeatherRollAvailability() {},
     campaignApiRequest: async (path) => {
       requests.push(path);
+      if (path === "/api/setup-packages") return { packages: [] };
       if (path === "/api/campaigns") return { campaigns: [
         { id: "previous-campaign", name: "Prior", setting: "Elsewhere" },
         { id: "runtime-campaign", name: "Northbound", setting: "Dalarna" }
@@ -339,7 +365,7 @@ test("the runtime handoff automatically selects and loads the new campaign rathe
   await state.node("apply-setup-import").emit("click");
   assert.equal(selected.value, "runtime-campaign");
   assert.deepEqual(requests, [
-    "/api/campaigns", "/api/campaigns/runtime-campaign",
+    "/api/campaigns", "/api/setup-packages", "/api/campaigns/runtime-campaign",
     "/api/campaigns/runtime-campaign/faction-layers", "/api/campaigns/runtime-campaign/runtime"
   ]);
   assert.equal(snapshots[0].campaign.id, "runtime-campaign");
@@ -407,4 +433,66 @@ test("an actual campaign-list failure is reported separately from selected-campa
   assert.equal(runtime.requests.length, 1);
   assert.deepEqual(runtime.activations, []);
   assert.match(runtime.node("influence-map-status").textContent, /Campaign list unavailable/);
+});
+
+test("saved setups are discovered without import and selection retries reuse the saved campaign", async () => {
+  let imported = false;
+  let failLoad = true;
+  const runtime = runtimeHarness({ packages: [{ id: "saved-one", name: "Creator campaign", setting: "Region" }], request: async (path) => {
+    if (path === "/api/campaigns") return { campaigns: imported ? [{ id: "live-one", name: "Creator campaign", setting: "Region" }] : [] };
+    if (path.endsWith("/import")) { imported = true; return { campaign: { id: "live-one", name: "Creator campaign" } }; }
+    if (path.endsWith("/faction-layers")) return { layers: {} };
+    if (path.endsWith("/runtime")) {
+      if (failLoad) throw new Error("Temporary loading failure");
+      return { runtime: { campaign: { id: "live-one" } } };
+    }
+    return { campaign: { id: "live-one" } };
+  } });
+  await runtime.context.runtimeRefresh();
+  assert.equal(runtime.select.disabled, false);
+  assert.equal(imported, false);
+  assert.match(runtime.select.options[1].textContent, /Saved setup/);
+  runtime.select.value = "setup:saved-one";
+  await runtime.select.emit("change");
+  assert.equal(runtime.select.disabled, false);
+  assert.match(runtime.node("influence-map-status").textContent, /existing import will be reused/);
+  failLoad = false;
+  runtime.select.value = "setup:saved-one";
+  await runtime.select.emit("change");
+  assert.equal(runtime.context.state.runtimeCampaignId, "live-one");
+  assert.equal(runtime.context.runtimeDataLoaded, true);
+});
+
+test("saved setup listing errors do not discard usable live campaign options", async () => {
+  const runtime = runtimeHarness({ setupListError: "Storage unavailable", request: async (path) => {
+    if (path === "/api/campaigns") return { campaigns: [{ id: "live-one", name: "Live", setting: "Region" }] };
+    if (path.endsWith("/faction-layers")) return { layers: {} };
+    if (path.endsWith("/runtime")) return { runtime: { campaign: { id: "live-one" } } };
+    return { campaign: { id: "live-one" } };
+  } });
+  await runtime.context.runtimeRefresh();
+  assert.equal(runtime.context.runtimeDataLoaded, true);
+  assert.equal(runtime.select.disabled, false);
+  assert.match(runtime.node("influence-map-status").textContent, /Saved Creator setups unavailable: Storage unavailable/);
+});
+
+test("saved setup selection locks duplicate imports until the request completes", async () => {
+  const pending = deferred();
+  let imports = 0;
+  const runtime = runtimeHarness({ packages: [{ id: "saved-one", name: "Creator", setting: "Region" }], request: async (path) => {
+    if (path === "/api/campaigns") return { campaigns: [] };
+    if (path.endsWith("/import")) { imports += 1; return pending.promise; }
+    throw new Error("Unexpected request");
+  } });
+  await runtime.context.runtimeRefresh();
+  runtime.select.value = "setup:saved-one";
+  const first = runtime.select.emit("change");
+  runtime.select.value = "setup:saved-one";
+  await runtime.select.emit("change");
+  assert.equal(imports, 1);
+  assert.equal(runtime.select.disabled, true);
+  pending.reject(new Error("Connection interrupted"));
+  await first;
+  assert.equal(runtime.select.disabled, false);
+  assert.equal(runtime.select.value, "");
 });

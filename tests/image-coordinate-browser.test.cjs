@@ -238,7 +238,22 @@ test("GM route overview uses image CRS, preserves panning on redraw and rebuilds
   h.context.renderRuntimeRouteMap();
   assert.equal(imageMap.removed, true);
   assert.equal(h.maps[1].options.crs, h.L.CRS.EPSG3857);
-  assert.deepEqual(plain(h.maps[1].position), [60, 14]);
+  assert.deepEqual(plain(h.maps[1].fitted), [[59, 13], [61, 15]]);
+  h.context.state.runtimeCampaignId = "another-geographic-campaign";
+  h.context.route = [];
+  h.context.renderRuntimeRouteMap();
+  assert.equal(h.maps[1].fits, 2);
+  assert.equal(node("runtime-route-map").hidden, false);
+  h.context.state.setupPackage.map = { bounds: geographic, offlineBasemap: { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" } };
+  h.context.renderRuntimeRouteMap();
+  assert.equal(node("runtime-maptiler-key-field").hidden, false);
+  assert.match(node("runtime-route-map-notice").textContent, /MapTiler API key/);
+  h.context.renderRuntimeRouteMap();
+  assert.equal(node("runtime-route-map-notice").hidden, false, "redraw retains the missing-key error");
+  h.context.state.setupPackage.map.bounds = null;
+  h.context.renderRuntimeRouteMap();
+  assert.equal(node("runtime-route-map").hidden, true);
+  assert.match(node("runtime-route-map-notice").textContent, /no valid map extent/);
 });
 
 test("GM location modal displays image labels and saves x/y to the GM endpoint", async () => {
