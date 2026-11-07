@@ -3,7 +3,8 @@ const { mkdtempSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const test = require("node:test");
-const { openRuntimeDatabase, importSetupPackage, getRuntimeDashboard, exportRuntimeSave, restoreRuntimeSave } = require("../server/runtime-store.cjs");
+const { openRuntimeDatabase, importSetupPackage, getRuntimeDashboard, updateRuntimeDashboard, exportRuntimeSave, restoreRuntimeSave } = require("../server/runtime-store.cjs");
+const coordinates = require("../map-coordinates.js");
 
 function validSetupPackage() {
   return {
@@ -34,6 +35,65 @@ function validSetupPackage() {
     scenarioNotes: [{ id: "note-1", title: "Bridge", body: "Status unknown.", visibility: "gm-only" }]
   };
 }
+
+test("hex waypoint saves use the declared grid in both coordinate spaces and roll back invalid drafts", () => {
+  for (const image of [false, true]) {
+    const database = openRuntimeDatabase();
+    try {
+      database.prepare(`INSERT INTO accounts (id, login_identifier, password_hash, global_role, created_at, updated_at)
+        VALUES ('gm', 'gm', 'test-hash', 'gm', '2026-11-08', '2026-11-08')`).run();
+      const setup = validSetupPackage();
+      setup.map.grid.origin = null;
+      if (image) {
+        setup.map.bounds = { type: "image-km", widthPixels: 600, heightPixels: 300, widthKm: 60 };
+        setup.map.center = { x: 30, y: 15 };
+        setup.map.fieldPapersAtlas = null;
+        setup.map.grid.origin = { x: 0, y: 30 };
+        setup.map.offlineBasemap = { format: "static-image", assetId: "00000000-0000-4000-8000-000000000001", attribution: "Test" };
+        setup.map.locations[0].mapPosition = { x: 2, y: 3 };
+      }
+      const result = importSetupPackage(database, JSON.stringify(setup), { ownerAccountId: "gm", validateOfflineBasemap() {} });
+      const id = result.runtimeCampaignId;
+      let runtime = getRuntimeDashboard(database, "gm", id);
+      const first = { locationId: runtime.route[0].locationId, detail: "Start", kmFromPrevious: 0 };
+      const hex = { q: 2, r: -1 };
+      const save = (route, account = "gm", revision = runtime.campaign.revision) =>
+        updateRuntimeDashboard(database, account, id, { route, expectedRevision: revision });
+      const waypoint = { hex, detail: "Waypoint", kmFromPrevious: 0 };
+      assert.throws(() => save([first, waypoint], "other"), /not found/);
+      assert.throws(() => save([first, waypoint], "gm", runtime.campaign.revision + 1), /revision changed/);
+      assert.throws(() => save([first, waypoint, { hex: { q: 9999, r: 9999 }, detail: "Bad", kmFromPrevious: 0 }]), /outside/);
+      assert.equal(database.prepare("SELECT COUNT(*) AS n FROM locations WHERE runtime_campaign_id = ?").get(id).n, 1);
+      assert.throws(() => save([first, waypoint, waypoint]), /same location/);
+      assert.equal(database.prepare("SELECT COUNT(*) AS n FROM locations WHERE runtime_campaign_id = ?").get(id).n, 1);
+      database.prepare(`INSERT INTO party_position (campaign_id, lat, lng, updated_at) VALUES (?, ?, ?, '2026-11-08T00:00:00.000Z')`)
+        .run(id, image ? 3 : 60, image ? 2 : 14);
+      const partyBefore = database.prepare("SELECT * FROM party_position WHERE campaign_id = ?").get(id);
+      runtime = save([first, waypoint]);
+      const center = coordinates.hexGeometry(2, -1, { ...setup.map.grid, origin: setup.map.grid.origin || { lat: 61, lng: 13 } }, setup.map.bounds).position;
+      assert.deepEqual(runtime.route[1].mapPosition, center);
+      const location = database.prepare("SELECT * FROM locations WHERE id = ? AND runtime_campaign_id = ?").get(runtime.route[1].locationId, id);
+      assert.equal(location.visibility_eligibility, "gm-only");
+      assert.equal(location.grid_ref, "2,-1");
+      assert.deepEqual(JSON.parse(location.coordinates_json), hex);
+      const locationId = runtime.route[1].locationId;
+      runtime = save([first, waypoint]);
+      assert.equal(runtime.route[1].locationId, locationId, "repeat saves reuse the center location");
+      assert.equal(database.prepare("SELECT COUNT(*) AS n FROM locations WHERE runtime_campaign_id = ?").get(id).n, 2);
+      assert.deepEqual(database.prepare("SELECT * FROM party_position WHERE campaign_id = ?").get(id), partyBefore);
+      assert.equal(runtime.dashboard.activeStopIndex, 0);
+      const reopened = getRuntimeDashboard(database, "gm", id);
+      assert.deepEqual(reopened.route, runtime.route);
+      const backup = exportRuntimeSave(database, "gm", id);
+      assert.doesNotThrow(() => restoreRuntimeSave(database, "gm", id, backup, {
+        expectedRevision: runtime.campaign.revision, confirmReplace: true, validateOfflineBasemap() {}
+      }));
+      assert.equal(backup.data.setupImport.source_json, JSON.stringify(setup));
+    } finally {
+      database.close();
+    }
+  }
+});
 
 test("imports a setup package as an independent runtime campaign and preserves its source", () => {
   const database = openRuntimeDatabase();

@@ -169,6 +169,8 @@
     .map-wrap { position: relative; overflow: hidden; background: #dce5d2; }
     #field-map { display: block; width: 100%; height: 335px; }
     .runtime-route-map { width: 100%; height: 335px; background: #e2e7e0; }
+    #sample-route-sketch[hidden], #sample-route-key[hidden], #runtime-route-map[hidden],
+    #runtime-route-map-key[hidden], #runtime-maptiler-key-field[hidden], #route-maptiler-key-field[hidden], #runtime-route-map-notice[hidden] { display: none; }
     .map-key { display: flex; flex-wrap: wrap; gap: 15px; padding: 11px 15px; border-top: 1px solid var(--line); color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
     .map-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
     .key-item { display: inline-flex; align-items: center; gap: 6px; }
@@ -190,6 +192,10 @@
     .route-stop small { display: block; color: var(--muted); font: 9px var(--mono); }
     .route-stop .distance { color: var(--muted); font: 9px var(--mono); }
     .route-editor-rows, .map-location-rows { display: grid; gap: 8px; }
+    #route-editor-dialog { width: min(1000px, calc(100vw - 28px)); max-height: 90vh; overflow-y: auto; }
+    #route-waypoint-map { height: 360px; min-height: 260px; border: 1px solid var(--line); }
+    #route-waypoint-map-status:empty, #route-waypoint-basemap-status:empty { display: none; }
+    .route-waypoint-number { background: #fff; color: #644916; border: 1px solid #a97832; border-radius: 50%; text-align: center; font: bold 12px/20px var(--mono); }
     .route-editor-row { display: grid; grid-template-columns: minmax(125px, 1.1fr) minmax(120px, 1.4fr) 100px auto; align-items: center; gap: 7px; }
     .map-location-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(100px, .7fr) minmax(100px, .7fr); align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
     .route-editor-row input, .route-editor-row select, .map-location-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); color: var(--ink); background: white; }
@@ -756,6 +762,8 @@
     #route-editor-modal {
       width: min(720px, calc(100vw - 28px));
       max-height: 85vh;
+    }
+    #route-editor-modal[open] {
       display: flex;
       flex-direction: column;
     }
@@ -1052,13 +1060,13 @@
           </div>
           <div class="dashboard-grid">
             <section class="panel" aria-labelledby="map-title">
-              <div class="panel-head"><div><div class="eyebrow">Theater / Campaign locations</div><h2 id="map-title">Route sketch</h2></div><div class="map-edit-actions"><span class="inline-hint" id="route-map-caption">FIELD SKETCH / NOT TO SCALE</span><button class="button" id="edit-runtime-map" type="button" hidden>Edit map</button></div></div>
-              <div class="map-wrap" id="sample-route-sketch"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated local sample route sketch"></canvas></div>
-              <div class="runtime-route-map" id="runtime-route-map" aria-label="Read-only campaign route map" hidden></div>
-              <p class="empty-state" id="runtime-route-map-notice" hidden></p>
+              <div class="panel-head"><div><div class="eyebrow">Theater / Campaign locations</div><h2 id="map-title">Campaign map</h2></div><div class="map-edit-actions"><span class="inline-hint" id="route-map-caption">ACTIVE CAMPAIGN / GM VIEW</span><button class="button" id="edit-runtime-map" type="button" hidden>Edit map</button></div></div>
+              <div class="map-wrap" id="sample-route-sketch" hidden><canvas id="field-map" aria-label="Legacy local sample sketch"></canvas></div>
+              <div class="runtime-route-map" id="runtime-route-map" aria-label="Active campaign map" hidden></div>
+              <p class="empty-state" id="runtime-route-map-notice">Select or import a runtime campaign to display its map.</p>
               <label class="field" id="runtime-maptiler-key-field" hidden><span>MapTiler API key / this browser session only</span><input id="runtime-maptiler-key" data-maptiler-key type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" placeholder="Enter a restricted MapTiler key"></label>
-              <div class="map-key" id="sample-route-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
-              <div class="map-key" id="runtime-route-map-key" hidden><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="inline-hint">Saved coordinates / background selected under Player map.</span></div>
+              <div class="map-key" id="sample-route-key" hidden><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
+              <div class="map-key" id="runtime-route-map-key" hidden><span class="key-item"><i class="key-mark"></i>Current route stop</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Campaign locations</span><span class="inline-hint">Party marker when recorded / GM-only view. Publication remains separate.</span></div>
             </section>
             <div class="side-stack">
               <section class="panel" aria-labelledby="situation-title-card">
@@ -1346,6 +1354,11 @@
   <dialog id="route-editor-dialog" aria-labelledby="route-editor-title">
     <div class="dialog-head"><div><div class="eyebrow">GM runtime / route stops</div><h2 id="route-editor-title">Edit campaign route</h2></div><button class="icon-button" id="close-route-editor" type="button" aria-label="Close route editor">×</button></div>
     <form class="dialog-form" id="route-editor-form">
+      <p class="row-description">Click a 10 km overlay hex to append its center as a waypoint. New center locations are GM-only and created only when you save. Distances stay GM-entered; planning does not move the party or publish the route.</p>
+      <div id="route-waypoint-map" aria-label="Route waypoint selection map"></div>
+      <div class="field" id="route-maptiler-key-field" hidden><label for="route-maptiler-key">MapTiler API key / this browser session only</label><input id="route-maptiler-key" type="password" autocomplete="off" data-maptiler-key></div>
+      <p class="feedback" id="route-waypoint-basemap-status" role="status"></p>
+      <p class="feedback" id="route-waypoint-map-status" role="status"></p>
       <div class="route-editor-rows" id="route-editor-rows"></div>
       <div class="field"><label for="route-add-location">Add campaign location</label><select id="route-add-location"></select></div>
       <button class="button" id="route-add-stop" type="button">Add route stop</button>
@@ -1806,6 +1819,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let influenceBasemap = null;
       let runtimeRouteSignature = "";
       let routeDraft = [];
+      let routeHexLocations = [];
+      let routeEditorMap = null;
+      let routeEditorBasemap = null;
+      let routeEditorHexLayer = null;
+      let routeEditorPathLayer = null;
+      let routeEditorCampaignId = "";
+      let routeEditorVisibleHexes = new Set();
       let stagedInfluenceCells = new Set();
       let liveInfluenceEditing = false;
       let runtimeDataLoaded = false;
@@ -2192,6 +2212,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeLocations: runtime.locations
         };
         runtimeDataLoaded = true;
+        state.partyMapPosition = null;
+        campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtime.campaign.id)}/party-position`)
+          .then(({ position }) => {
+            if (state.runtimeCampaignId !== runtime.campaign.id || !runtimeDataLoaded) return;
+            state.partyMapPosition = position;
+            renderRuntimeRouteMap();
+          }).catch((error) => {
+            if (state.runtimeCampaignId !== runtime.campaign.id) return;
+            const notice = document.getElementById("runtime-route-map-notice");
+            notice.textContent = `Party position unavailable: ${error.message}`;
+            notice.hidden = false;
+          });
         if (campaignChanged) clearConflictForm();
         // Load personnel archetypes and roster for the personnel client
         if (window.personnelClient) {
@@ -2332,7 +2364,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
         renderConflicts();
         renderNotes();
         if (runtimeDataLoaded) renderRuntimeRouteMap();
-        else drawMap();
+        else {
+          document.getElementById("runtime-route-map").hidden = true;
+          document.getElementById("runtime-maptiler-key-field").hidden = true;
+          document.getElementById("runtime-route-map-key").hidden = true;
+          document.getElementById("runtime-route-map-notice").hidden = false;
+          document.getElementById("runtime-route-map-notice").textContent = "Select or import a runtime campaign to display its map.";
+        }
       }
       function renderRuntimeRouteMap() {
         const sampleSketch = document.getElementById("sample-route-sketch");
@@ -2348,13 +2386,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
         sampleKey.hidden = true;
         runtimeKey.hidden = false;
         mapTilerKeyField.hidden = !usesMapTiler;
-        caption.textContent = "SAVED ROUTE / READ ONLY";
+        caption.textContent = `${mapData?.name || "CAMPAIGN MAP"} / GM VIEW`;
 
         const positionedStops = route.map((stop, index) => ({ ...stop, index }))
-          .filter((stop) => FieldbookMapCoordinates.validPoint(stop.mapPosition, mapData?.bounds));
-        if (!positionedStops.length && mapData?.offlineBasemap?.format !== "static-image" && !usesMapTiler) {
+          .filter((stop) => FieldbookMapCoordinates.contains(stop.mapPosition, mapData?.bounds));
+        if (!FieldbookMapCoordinates.normalizeBounds(mapData?.bounds)) {
           runtimeMapElement.hidden = true;
-          notice.textContent = "This campaign route has no saved map coordinates.";
+          notice.textContent = "The active campaign has no valid map extent. Review its setup package.";
           notice.hidden = false;
           return;
         }
@@ -2369,7 +2407,6 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeMapElement.hidden = true;
           return;
         }
-        notice.hidden = true;
         const imageCoordinates = FieldbookMapCoordinates.isImage(mapData?.bounds);
         if (runtimeRouteMap && (runtimeRouteMap.options.crs === L.CRS.Simple) !== imageCoordinates) {
           runtimeBasemap.destroy();
@@ -2381,7 +2418,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (!runtimeRouteMap) {
           runtimeRouteMap = L.map(runtimeMapElement, { crs: imageCoordinates ? L.CRS.Simple : L.CRS.EPSG3857, minZoom: imageCoordinates ? -10 : 2, maxZoom: 18, scrollWheelZoom: false });
           runtimeBasemap = FieldbookBasemap.controller(runtimeRouteMap, (message) => { notice.textContent = message; notice.hidden = false; });
-          runtimeRouteMap.on("fieldbook:maptiler-ready", () => { if (usesMapTiler) { notice.textContent = ""; notice.hidden = true; } });
+          runtimeRouteMap.on("fieldbook:maptiler-ready", () => {
+            if (state.setupPackage?.map.offlineBasemap?.format === "maptiler-style") { notice.textContent = ""; notice.hidden = true; }
+          });
           runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
 
           // Initialize map visualization client
@@ -2391,13 +2430,23 @@ Military rank || optional</textarea><span class="row-description">One field per 
         }
         const basemapSignature = JSON.stringify([state.runtimeCampaignId, mapData?.offlineBasemap, mapData?.bounds]);
         if (runtimeBasemapSignature !== basemapSignature) {
+          notice.hidden = true;
           runtimeBasemap.set(mapData?.offlineBasemap, mapData?.bounds);
           runtimeBasemapSignature = basemapSignature;
         }
+        if (window.mapVisualization) {
+          window.mapVisualization.initializeVisualization(runtimeRouteMap, mapData.bounds);
+          window.mapVisualization.renderPartyPosition(state.partyMapPosition, false);
+        }
 
-        const signature = `${basemapSignature}:${positionedStops.map((stop) => `${stop.name}:${JSON.stringify(stop.mapPosition)}`).join("|")}`;
+        const signature = basemapSignature;
         const shouldFit = signature !== runtimeRouteSignature;
         runtimeRouteLayer.clearLayers();
+        (state.runtimeLocations || []).filter((location) => FieldbookMapCoordinates.contains(location.mapPosition, mapData.bounds)).forEach((location) => {
+          L.circleMarker(FieldbookMapCoordinates.toLatLng(location.mapPosition, mapData.bounds), {
+            radius: 4, color: "#487c87", weight: 2, fillColor: "#dae7e7", fillOpacity: .8
+          }).bindTooltip(escapeHtml(location.name), { direction: "top" }).addTo(runtimeRouteLayer);
+        });
         const positions = positionedStops.map((stop) => FieldbookMapCoordinates.toLatLng(stop.mapPosition, mapData?.bounds));
         if (positions.length > 1) L.polyline(positions, { color: "#a97832", weight: 3, opacity: .9 }).addTo(runtimeRouteLayer);
         positionedStops.forEach((stop) => {
@@ -2411,30 +2460,23 @@ Military rank || optional</textarea><span class="row-description">One field per 
           }).bindTooltip(escapeHtml(stop.name), { direction: "top", offset: [0, -6] }).addTo(runtimeRouteLayer);
         });
         if (shouldFit) {
-          if (mapData?.offlineBasemap?.format === "static-image") {
-            const bounds = mapData.bounds;
-            runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(bounds), { padding: [12, 12] });
-          } else if (positions.length > 1) runtimeRouteMap.fitBounds(positions, { padding: [24, 24], maxZoom: 12 });
-          else if (positions.length === 1) runtimeRouteMap.setView(positions[0], 10);
-          else runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(mapData.bounds), { padding: [12, 12] });
+          runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(mapData.bounds), { padding: [12, 12] });
           runtimeRouteSignature = signature;
         }
         requestAnimationFrame(() => runtimeRouteMap?.invalidateSize({ pan: false }));
 
-        // Refresh publication-aware visualization layers
-        if (window.mapVisualization && state.runtimeCampaignId) {
-          window.mapVisualization.refreshVisualizations(state.runtimeCampaignId, route, state.runtimeLocations);
-        }
       }
       function routeLocations() {
         return state.runtimeLocations || [];
       }
       function routeEditorValues() {
-        return [...document.querySelectorAll("#route-editor-rows .route-editor-row")].map((row) => ({
-          locationId: row.querySelector("[data-route-location]").value,
-          detail: row.querySelector("[data-route-detail]").value,
-          kmFromPrevious: Number(row.querySelector("[data-route-distance]").value)
-        }));
+        return [...document.querySelectorAll("#route-editor-rows .route-editor-row")].map((row) => {
+          const locationId = row.querySelector("[data-route-location]").value;
+          const staged = routeHexLocations.find((location) => location.id === locationId);
+          return { ...(staged ? { hex: { q: staged.q, r: staged.r } } : { locationId }),
+            detail: row.querySelector("[data-route-detail]").value,
+            kmFromPrevious: Number(row.querySelector("[data-route-distance]").value) };
+        });
       }
       function renderRouteEditorRows() {
         const container = document.getElementById("route-editor-rows");
@@ -2446,10 +2488,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
           locationSelect.dataset.routeLocation = "";
           locationSelect.required = true;
           locationSelect.setAttribute("aria-label", `Route stop ${index + 1} location`);
-          routeLocations().filter((location) => !routeDraft.some((candidate, candidateIndex) => candidateIndex !== index && candidate.locationId === location.id))
+          [...routeLocations(), ...routeHexLocations].filter((location) => !routeDraft.some((candidate, candidateIndex) => candidateIndex !== index && candidate.locationId === location.id))
             .forEach((location) => locationSelect.add(new Option(location.name, location.id)));
           locationSelect.value = stop.locationId;
-          locationSelect.addEventListener("change", () => { routeDraft[index].locationId = locationSelect.value; });
+          locationSelect.addEventListener("change", () => { routeDraft[index].locationId = locationSelect.value; renderRouteEditorMap(); });
           const detailInput = document.createElement("input");
           detailInput.dataset.routeDetail = "";
           detailInput.maxLength = 160;
@@ -2503,15 +2545,140 @@ Military rank || optional</textarea><span class="row-description">One field per 
         addLocation.replaceChildren(new Option("Choose a location", ""));
         routeLocations().filter((location) => !used.has(location.id)).forEach((location) => addLocation.add(new Option(location.name, location.id)));
         if ([...addLocation.options].some((option) => option.value === selected)) addLocation.value = selected;
+        renderRouteEditorMap();
+      }
+      function handleRouteHexClick(position) {
+        const dialog = document.getElementById("route-editor-dialog");
+        const map = state.setupPackage?.map;
+        const feedback = document.getElementById("route-waypoint-map-status");
+        if (!dialog.open || routeEditorCampaignId !== state.runtimeCampaignId || document.getElementById("save-route-editor").disabled) return false;
+        if (!map || !FieldbookMapCoordinates.contains(position, map.bounds)) {
+          feedback.className = "feedback error";
+          feedback.textContent = "Choose a hex within the campaign map.";
+          return false;
+        }
+        const axial = FieldbookMapCoordinates.axialForPosition(position, map.grid.origin, map.bounds);
+        const hex = FieldbookMapCoordinates.hexGeometry(axial.q, axial.r, map.grid, map.bounds);
+        if (!hex || (routeEditorMap && !routeEditorVisibleHexes.has(hex.key))) {
+          feedback.className = "feedback error";
+          feedback.textContent = "Choose a visible overlay hex with its center inside the campaign map; zoom in if needed.";
+          return false;
+        }
+        const sameCenter = (location) => {
+          const p = location.mapPosition;
+          return FieldbookMapCoordinates.isImage(map.bounds)
+            ? Math.abs(p.x - hex.position.x) < 1e-8 && Math.abs(p.y - hex.position.y) < 1e-8
+            : Math.abs(p.lat - hex.position.lat) < 1e-8 && Math.abs(p.lng - hex.position.lng) < 1e-8;
+        };
+        let location = [...routeLocations(), ...routeHexLocations].find(sameCenter);
+        if (!location) {
+          location = { id: `hex:${hex.key}`, name: `Hex ${hex.key}`, q: hex.q, r: hex.r, mapPosition: hex.position };
+          routeHexLocations.push(location);
+        }
+        if (routeDraft.some((stop) => stop.locationId === location.id)) {
+          feedback.className = "feedback";
+          feedback.textContent = `${location.name} is already in the route.`;
+          return false;
+        }
+        if (routeDraft.length >= 200) {
+          feedback.className = "feedback error";
+          feedback.textContent = "A runtime route supports at most 200 stops.";
+          return false;
+        }
+        routeDraft.push({ locationId: location.id, detail: "Waypoint", kmFromPrevious: 0 });
+        renderRouteEditorRows();
+        feedback.className = "feedback";
+        feedback.textContent = `${location.name} added to the draft. Save route to apply.`;
+        return true;
+      }
+      function renderRouteEditorMap() {
+        if (!routeEditorMap || !document.getElementById("route-editor-dialog").open || routeEditorCampaignId !== state.runtimeCampaignId) return;
+        routeEditorHexLayer.clearLayers();
+        routeEditorPathLayer.clearLayers();
+        routeEditorVisibleHexes.clear();
+        const { bounds, grid } = state.setupPackage.map;
+        const view = routeEditorMap.getBounds();
+        const corners = [view.getSouthWest(), view.getNorthWest(), view.getNorthEast(), view.getSouthEast()]
+          .map((point) => FieldbookMapCoordinates.axialForPosition(FieldbookMapCoordinates.fromLatLng(point, bounds), grid.origin, bounds));
+        const qMin = Math.min(...corners.map((point) => point.q)) - 2, qMax = Math.max(...corners.map((point) => point.q)) + 2;
+        const rMin = Math.min(...corners.map((point) => point.r)) - 2, rMax = Math.max(...corners.map((point) => point.r)) + 2;
+        const locations = [...routeLocations(), ...routeHexLocations];
+        const points = routeDraft.map((stop) => locations.find((location) => location.id === stop.locationId)?.mapPosition).filter(Boolean);
+        const selected = new Set(points.map((point) => {
+          const axial = FieldbookMapCoordinates.axialForPosition(point, grid.origin, bounds);
+          return `${axial.q},${axial.r}`;
+        }));
+        if ((qMax - qMin + 1) * (rMax - rMin + 1) <= 900) {
+          const feedback = document.getElementById("route-waypoint-map-status");
+          if (feedback.textContent === "Zoom in to view the 10 km waypoint grid.") feedback.textContent = "";
+          for (let q = qMin; q <= qMax; q++) {
+            for (let r = rMin; r <= rMax; r++) {
+              const hex = FieldbookMapCoordinates.hexGeometry(q, r, grid, bounds);
+              if (!hex || !view.contains(FieldbookMapCoordinates.toLatLng(hex.position, bounds))) continue;
+              routeEditorVisibleHexes.add(hex.key);
+              L.polygon(hex.vertices.map((point) => FieldbookMapCoordinates.toLatLng(point, bounds)), {
+                color: selected.has(hex.key) ? "#a97832" : "#788779", weight: selected.has(hex.key) ? 3 : 1,
+                fillOpacity: selected.has(hex.key) ? .3 : .08, interactive: false
+              }).addTo(routeEditorHexLayer);
+              L.marker(FieldbookMapCoordinates.toLatLng(hex.position, bounds), {
+                interactive: false, icon: L.divIcon({ className: "hex-label", html: `${q},${r}`, iconSize: [48, 16] })
+              }).addTo(routeEditorHexLayer);
+            }
+          }
+        } else {
+          document.getElementById("route-waypoint-map-status").textContent = "Zoom in to view the 10 km waypoint grid.";
+        }
+        if (points.length > 1) L.polyline(points.map((point) => FieldbookMapCoordinates.toLatLng(point, bounds)),
+          { color: "#a97832", weight: 3, interactive: false }).addTo(routeEditorPathLayer);
+        points.forEach((point, index) => L.marker(FieldbookMapCoordinates.toLatLng(point, bounds), {
+          interactive: false, icon: L.divIcon({ className: "route-waypoint-number", html: String(index + 1), iconSize: [22, 22], iconAnchor: [11, 34] })
+        }).addTo(routeEditorPathLayer));
+      }
+      function initializeRouteEditorMap() {
+        const map = state.setupPackage?.map;
+        const feedback = document.getElementById("route-waypoint-map-status");
+        document.getElementById("route-maptiler-key-field").hidden = true;
+        document.getElementById("route-waypoint-basemap-status").textContent = "";
+        if (!map || !FieldbookMapCoordinates.normalizeBounds(map.bounds) || !window.L) {
+          feedback.className = "feedback error";
+          feedback.textContent = "Campaign map unavailable. Use manual route locations.";
+          return;
+        }
+        routeEditorMap = L.map("route-waypoint-map", { crs: FieldbookMapCoordinates.isImage(map.bounds) ? L.CRS.Simple : L.CRS.EPSG3857,
+          minZoom: FieldbookMapCoordinates.isImage(map.bounds) ? -10 : 2, maxZoom: 18 });
+        const basemapFeedback = document.getElementById("route-waypoint-basemap-status");
+        basemapFeedback.textContent = "";
+        routeEditorBasemap = FieldbookBasemap.controller(routeEditorMap, (message) => { basemapFeedback.textContent = message; });
+        routeEditorBasemap.set(map.offlineBasemap, map.bounds);
+        document.getElementById("route-maptiler-key-field").hidden = map.offlineBasemap?.format !== "maptiler-style";
+        routeEditorHexLayer = L.layerGroup().addTo(routeEditorMap);
+        routeEditorPathLayer = L.layerGroup().addTo(routeEditorMap);
+        routeEditorMap.on("click", (event) => handleRouteHexClick(FieldbookMapCoordinates.fromLatLng(event.latlng, map.bounds)));
+        routeEditorMap.on("moveend zoomend", renderRouteEditorMap);
+        routeEditorMap.fitBounds(FieldbookMapCoordinates.leafletBounds(map.bounds), { padding: [18, 18] });
+        renderRouteEditorMap();
+      }
+      function clearRouteEditorMap() {
+        routeEditorBasemap?.destroy();
+        routeEditorMap?.remove();
+        routeEditorMap = null;
+        routeEditorBasemap = null;
+        routeHexLocations = [];
+        routeDraft = [];
+        routeEditorCampaignId = "";
+        routeEditorVisibleHexes.clear();
       }
       function openRouteEditor() {
         if (!runtimeDataLoaded || !routeLocations().length) return;
+        clearRouteEditorMap();
+        routeEditorCampaignId = state.runtimeCampaignId;
         routeDraft = route.map(({ locationId, detail, kmFromPrevious }) => ({ locationId, detail, kmFromPrevious }));
         const status = document.getElementById("route-editor-status");
         status.className = "feedback";
         status.textContent = "";
         renderRouteEditorRows();
         document.getElementById("route-editor-dialog").showModal();
+        initializeRouteEditorMap();
       }
       function renderMapLocationEditor() {
         const container = document.getElementById("map-location-rows");
@@ -2947,28 +3114,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function liveAxialForPosition(position, origin) {
-        const image = FieldbookMapCoordinates.isImage(state.setupPackage?.map.bounds);
-        const metersPerLat = 111132;
-        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
-        const radius = 10000 / Math.sqrt(3);
-        const eastMeters = image ? (position.x - origin.x) * 1000 : (position.lng - origin.lng) * metersPerLng;
-        const northMeters = image ? (position.y - origin.y) * 1000 : (position.lat - origin.lat) * metersPerLat;
-        const q = (Math.sqrt(3) / 3 * eastMeters - northMeters / 3) / radius;
-        const r = (2 / 3 * northMeters) / radius;
-        const x = q, z = r, y = -x - z;
-        let roundedX = Math.round(x), roundedY = Math.round(y), roundedZ = Math.round(z);
-        const xDiff = Math.abs(roundedX - x), yDiff = Math.abs(roundedY - y), zDiff = Math.abs(roundedZ - z);
-        if (xDiff > yDiff && xDiff > zDiff) roundedX = -roundedY - roundedZ;
-        else if (yDiff > zDiff) roundedY = -roundedX - roundedZ;
-        else roundedZ = -roundedX - roundedY;
-        return { q: roundedX, r: roundedZ };
+        return FieldbookMapCoordinates.axialForPosition(position, origin, state.setupPackage?.map.bounds);
       }
 
       function livePositionForMeters(x, y, origin) {
-        if (FieldbookMapCoordinates.isImage(state.setupPackage?.map.bounds)) return { x: origin.x + x / 1000, y: origin.y + y / 1000 };
-        const metersPerLat = 111132;
-        const metersPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
-        return { lat: origin.lat + y / metersPerLat, lng: origin.lng + x / metersPerLng };
+        return FieldbookMapCoordinates.positionForMeters(x, y, origin, state.setupPackage?.map.bounds);
       }
 
       function initializeInfluenceMap() {
@@ -3356,6 +3506,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
           error.runtimeCampaignFailure = "listing";
           return { ok: false, failure: "listing", message };
         }
+        let savedPackages = [];
+        let setupListError = null;
+        try {
+          ({ packages: savedPackages } = await campaignApiRequest("/api/setup-packages"));
+        } catch (error) {
+          setupListError = `Saved Creator setups unavailable: ${error.message}`;
+        }
         runtimeCampaignSelect.replaceChildren();
         const emptyOption = document.createElement("option");
         emptyOption.value = "";
@@ -3367,7 +3524,13 @@ Military rank || optional</textarea><span class="row-description">One field per 
           option.textContent = `${campaign.name} / ${campaign.setting}`;
           runtimeCampaignSelect.append(option);
         });
-        runtimeCampaignSelect.disabled = campaigns.length === 0;
+        savedPackages.forEach((setup) => {
+          const option = document.createElement("option");
+          option.value = `setup:${setup.id}`;
+          option.textContent = `Saved setup / ${setup.name} / ${setup.setting} / ${setup.id.slice(0, 8)}`;
+          runtimeCampaignSelect.append(option);
+        });
+        runtimeCampaignSelect.disabled = campaigns.length === 0 && savedPackages.length === 0;
         const selectedId = campaigns.some((campaign) => campaign.id === preferredId)
           ? preferredId
           : campaigns[0]?.id || "";
@@ -3379,6 +3542,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (selectedId) {
           try {
             const loaded = await loadRuntimeCampaign(selectedId, false);
+            if (setupListError) {
+              document.getElementById("influence-map-status").textContent = setupListError;
+              document.getElementById("influence-map-status").classList.add("error");
+            }
             return { ok: loaded, failure: loaded ? null : "loading" };
           } catch (error) {
             return { ok: false, failure: "loading", message: error.message };
@@ -3389,11 +3556,41 @@ Military rank || optional</textarea><span class="row-description">One field per 
         document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
         const status = document.getElementById("influence-map-status");
         status.classList.remove("error");
-        status.textContent = campaigns.length ? "Choose a runtime campaign to load its campaign data." : "No runtime campaigns are available.";
+        status.textContent = setupListError || (savedPackages.length
+          ? "Choose a saved Creator setup to create and load its runtime campaign."
+          : "No runtime campaigns or saved Creator setups are available.");
+        if (setupListError) status.classList.add("error");
         return { ok: true, loaded: false };
       }
 
-      runtimeCampaignSelect.addEventListener("change", () => {
+      let savedSetupImportPending = false;
+      runtimeCampaignSelect.addEventListener("change", async () => {
+        if (savedSetupImportPending) return;
+        if (runtimeCampaignSelect.value.startsWith("setup:")) {
+          const setupId = runtimeCampaignSelect.value.slice(6);
+          runtimeCampaignSelect.value = runtimeDataLoaded ? state.runtimeCampaignId : "";
+          ++runtimeCampaignLoadGeneration;
+          savedSetupImportPending = true;
+          runtimeCampaignSelect.disabled = true;
+          const status = document.getElementById("influence-map-status");
+          status.classList.remove("error");
+          status.textContent = "Importing saved Creator setup...";
+          try {
+            const { campaign, reused } = await campaignApiRequest(`/api/setup-packages/${encodeURIComponent(setupId)}/import`, { method: "POST" });
+            const result = await refreshRuntimeCampaigns(campaign.id);
+            if (!result.ok) throw new Error(`Campaign saved; select it to retry loading. ${result.message || ""}`);
+            showToast(`${reused ? "Existing runtime campaign loaded" : "Runtime campaign created and loaded"}: ${campaign.name}.`);
+          } catch (error) {
+            runtimeCampaignSelect.value = runtimeDataLoaded ? state.runtimeCampaignId : "";
+            status.classList.add("error");
+            status.textContent = `Saved setup could not be loaded: ${error.message} Reselect the saved setup to retry; an existing import will be reused.`;
+            showToast(status.textContent);
+          } finally {
+            savedSetupImportPending = false;
+            runtimeCampaignSelect.disabled = runtimeCampaignSelect.options.length <= 1;
+          }
+          return;
+        }
         if (runtimeCampaignSelect.value) return loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
         else {
           runtimeDataLoaded = false;
@@ -4434,9 +4631,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
       const routeEditorForm = document.getElementById("route-editor-form");
       const routeEditorStatus = document.getElementById("route-editor-status");
       const routeEditorSaveButton = document.getElementById("save-route-editor");
+      routeEditorDialog.addEventListener("close", clearRouteEditorMap);
+      document.addEventListener("fieldbook:campaign-selected", (event) => {
+        if (routeEditorDialog.open && event.detail.campaignId !== routeEditorCampaignId) routeEditorDialog.close();
+      });
+      routeEditorDialog.addEventListener("cancel", (event) => { if (routeEditorSaveButton.disabled) event.preventDefault(); });
       document.getElementById("edit-runtime-route").addEventListener("click", openRouteEditor);
-      document.getElementById("close-route-editor").addEventListener("click", () => routeEditorDialog.close());
-      document.getElementById("cancel-route-editor").addEventListener("click", () => routeEditorDialog.close());
+      document.addEventListener("fieldbook:edit-runtime-route", openRouteEditor);
+      document.addEventListener("input", (event) => {
+        if (event.target.matches("[data-maptiler-key]")) document.getElementById("route-waypoint-basemap-status").textContent = "";
+      }, true);
+      document.getElementById("close-route-editor").addEventListener("click", () => { if (!routeEditorSaveButton.disabled) routeEditorDialog.close(); });
+      document.getElementById("cancel-route-editor").addEventListener("click", () => { if (!routeEditorSaveButton.disabled) routeEditorDialog.close(); });
       document.getElementById("route-add-stop").addEventListener("click", () => {
         const locationId = document.getElementById("route-add-location").value;
         if (!locationId || routeDraft.some((stop) => stop.locationId === locationId)) return;
@@ -4445,10 +4651,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
       });
       routeEditorForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (routeEditorSaveButton.disabled) return;
         const campaignId = state.runtimeCampaignId;
         const updates = routeEditorValues();
-        const locationIds = updates.map((stop) => stop.locationId);
-        if (!campaignId || !updates.length || updates.some((stop) => !stop.locationId || !Number.isSafeInteger(stop.kmFromPrevious) || stop.kmFromPrevious < 0)
+        const locationIds = updates.map((stop) => stop.locationId || `hex:${stop.hex.q},${stop.hex.r}`);
+        if (!campaignId || campaignId !== routeEditorCampaignId || !updates.length || updates.some((stop) => (!stop.locationId && !stop.hex) || !Number.isSafeInteger(stop.kmFromPrevious) || stop.kmFromPrevious < 0)
           || new Set(locationIds).size !== locationIds.length) {
           routeEditorStatus.className = "feedback error";
           routeEditorStatus.textContent = "Add at least one valid stop; each location can appear once in the runtime route.";

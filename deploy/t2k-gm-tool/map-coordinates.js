@@ -58,7 +58,42 @@
       : { lat: (bounds.south + bounds.north) / 2, lng: (bounds.west + bounds.east) / 2 };
   }
 
-  const api = Object.freeze({ isImage, normalizeBounds, heightKm, validPoint, contains, toLatLng, fromLatLng, leafletBounds, center });
+  function positionForMeters(x, y, origin, bounds) {
+    if (isImage(bounds)) return { x: origin.x + x / 1000, y: origin.y + y / 1000 };
+    return { lat: origin.lat + y / 111132, lng: origin.lng + x / (111320 * Math.cos(origin.lat * Math.PI / 180)) };
+  }
+
+  function axialForPosition(position, origin, bounds) {
+    const radius = 10000 / Math.sqrt(3);
+    const east = isImage(bounds) ? (position.x - origin.x) * 1000
+      : (position.lng - origin.lng) * 111320 * Math.cos(origin.lat * Math.PI / 180);
+    const north = isImage(bounds) ? (position.y - origin.y) * 1000 : (position.lat - origin.lat) * 111132;
+    const x = (Math.sqrt(3) / 3 * east - north / 3) / radius;
+    const z = (2 / 3 * north) / radius, y = -x - z;
+    let q = Math.round(x), r = Math.round(z);
+    const roundedY = Math.round(y);
+    const xDiff = Math.abs(q - x), yDiff = Math.abs(roundedY - y), zDiff = Math.abs(r - z);
+    if (xDiff > yDiff && xDiff > zDiff) q = -roundedY - r;
+    else if (yDiff <= zDiff) r = -q - roundedY;
+    return { q, r };
+  }
+
+  function hexGeometry(q, r, grid, bounds) {
+    if (!Number.isSafeInteger(q) || !Number.isSafeInteger(r) || !normalizeBounds(bounds)
+      || grid?.coordinateSystem !== "axial-q-r" || grid.cellKm !== 10 || !validPoint(grid.origin, bounds)) return null;
+    const radius = 10000 / Math.sqrt(3);
+    const x = radius * Math.sqrt(3) * (q + r / 2), y = radius * 1.5 * r;
+    const position = positionForMeters(x, y, grid.origin, bounds);
+    if (!contains(position, bounds)) return null;
+    const vertices = Array.from({ length: 6 }, (_, index) => {
+      const angle = (30 + index * 60) * Math.PI / 180;
+      return positionForMeters(x + radius * Math.cos(angle), y + radius * Math.sin(angle), grid.origin, bounds);
+    });
+    return { key: `${q},${r}`, q, r, position, vertices };
+  }
+
+  const api = Object.freeze({ isImage, normalizeBounds, heightKm, validPoint, contains, toLatLng, fromLatLng, leafletBounds, center,
+    positionForMeters, axialForPosition, hexGeometry });
   root.FieldbookMapCoordinates = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(globalThis);

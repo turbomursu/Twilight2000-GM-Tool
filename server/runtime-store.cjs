@@ -1776,7 +1776,41 @@ function updateRuntimeDashboard(database, accountId, runtimeId, input, options =
       if (!Array.isArray(input.route) || input.route.length < 1 || input.route.length > 200) {
         throw new Error("Route must contain between 1 and 200 stops.");
       }
+      let hexMap = null;
+      if (input.route.some((stop) => stop && Object.hasOwn(stop, "hex"))) {
+        const map = database.prepare(`SELECT maps.bounds_json, setup_imports.source_json FROM maps
+          JOIN setup_imports ON setup_imports.runtime_campaign_id = maps.runtime_campaign_id
+          WHERE maps.runtime_campaign_id = ?`).get(runtimeId);
+        if (!map) throw new Error("Campaign map not found.");
+        const bounds = JSON.parse(map.bounds_json);
+        const grid = { ...JSON.parse(map.source_json).map.grid };
+        if (grid.origin === null) grid.origin = mapCoordinates.isImage(bounds)
+          ? { x: 0, y: mapCoordinates.heightKm(bounds) } : { lat: bounds.north, lng: bounds.west };
+        hexMap = { bounds, grid };
+      }
       routeRows = input.route.map((stop) => {
+        if (stop && Object.hasOwn(stop, "hex")) {
+          if (Object.keys(stop).some((key) => !["hex", "detail", "kmFromPrevious"].includes(key))
+            || !stop.hex || Object.keys(stop.hex).length !== 2) throw new Error("A hex waypoint is invalid.");
+          const { bounds, grid } = hexMap;
+          const hex = mapCoordinates.hexGeometry(stop.hex.q, stop.hex.r, grid, bounds);
+          if (!hex) throw new Error("Hex waypoint is invalid or outside the campaign map bounds.");
+          const existing = current.locations.find((location) => {
+            const point = location.mapPosition;
+            return mapCoordinates.isImage(bounds) ? Math.abs(point.x - hex.position.x) < 1e-8 && Math.abs(point.y - hex.position.y) < 1e-8
+              : Math.abs(point.lat - hex.position.lat) < 1e-8 && Math.abs(point.lng - hex.position.lng) < 1e-8;
+          });
+          const id = existing?.id || randomUUID();
+          if (!existing) {
+            database.prepare(`INSERT INTO locations
+              (runtime_campaign_id, id, name, kind, description, grid_ref, coordinates_json, map_position_json, visibility_eligibility, is_starting_location)
+              VALUES (?, ?, ?, 'Waypoint', '', ?, ?, ?, 'gm-only', 0)`)
+              .run(runtimeId, id, `Hex ${hex.key}`, hex.key, JSON.stringify({ q: hex.q, r: hex.r }), JSON.stringify(hex.position));
+            current.locations.push({ id, name: `Hex ${hex.key}`, mapPosition: hex.position });
+            locationIds.add(id);
+          }
+          stop = { locationId: id, detail: stop.detail, kmFromPrevious: stop.kmFromPrevious };
+        }
         if (!stop || typeof stop !== "object" || Array.isArray(stop)
           || Object.keys(stop).some((key) => !["locationId", "detail", "kmFromPrevious"].includes(key))
           || typeof stop.locationId !== "string" || !locationIds.has(stop.locationId)

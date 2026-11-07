@@ -18,6 +18,18 @@ test("active campaign detail small text uses a readable 12px size", () => {
   assert.match(dashboard, /\.campaign-chip small\s*\{[^}]*font:\s*12px\s+var\(--mono\);/);
 });
 
+test("route ledger stays in a closed dialog until dedicated route management opens it", () => {
+  const closedStyle = dashboard.match(/#route-editor-modal\s*\{([^}]*)\}/)[1];
+  assert.doesNotMatch(closedStyle, /display\s*:/);
+  assert.match(dashboard, /#route-editor-modal\[open\]\s*\{[^}]*display:\s*flex/);
+  assert.match(dashboard, /<dialog id="route-editor-modal" aria-labelledby="route-editor-title">/);
+  const client = readFileSync(join(__dirname, "..", "route-client.js"), "utf8");
+  assert.match(client, /if \(!modal.open\) modal.showModal\(\)/);
+  assert.match(client, /modal.close\(\)/);
+  assert.doesNotMatch(client, /modal.style.display/);
+  assert.match(client, /data-action="open-route-editor"/);
+});
+
 test("authoring tools remain reachable outside the numbered live desk views", () => {
   const nav = dashboard.match(/<nav class="nav-list" aria-label="Views">([\s\S]*?)<\/nav>/)[1];
   assert.doesNotMatch(nav, /campaign-setup\.html|player-seeds\.html/);
@@ -49,7 +61,7 @@ test("separated surfaces retain valid inline JavaScript and synchronized deploym
     }
   }
   for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "maptiler-reference-client.js", "campaign-package-contract.js",
-    "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js",
+    "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js", "route-client.js",
     "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
     "server/map-publications.cjs", "server/campaigns.cjs", "server/sample-data.cjs",
     "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "project-features.html", "project-status.html"]) {

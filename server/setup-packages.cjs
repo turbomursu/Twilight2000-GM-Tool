@@ -1,8 +1,8 @@
 const { lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync, openSync, closeSync, fsyncSync, linkSync } = require("node:fs");
 const { resolve, relative, join, sep, parse } = require("node:path");
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
 const { assertCampaignSetupPackage } = require("../campaign-package-contract.js");
-const { openRuntimeDatabase, importSetupPackage } = require("./runtime-store.cjs");
+const { openRuntimeDatabase, importSetupPackage, getRuntimeCampaign } = require("./runtime-store.cjs");
 const { ASSET_ID_PATTERN, MAX_BASEMAP_BYTES, inspectStaticImage, getOfflineBasemapMetadata } = require("./offline-basemaps.cjs");
 
 const MAX_SETUP_BYTES = 25 * 1024 * 1024;
@@ -196,7 +196,26 @@ function getSetupPackage(root, ownerAccountId, id) {
   return JSON.parse(readFileSync(packageFile, "utf8"));
 }
 
-function createSetupPackageHandler({ root, validateOfflineBasemap, findOfflineBasemapDirectory, logger = console }) {
+function listSetupPackages(root, ownerAccountId) {
+  const directory = containedPath(root, "gmpack", "campsetups");
+  try { assertSafePath(directory, { directory: true }); } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+  const packages = [];
+  for (const name of readdirSync(directory)) {
+    const match = /-([0-9a-f-]{36})-setup-v2\.owner\.json$/i.exec(name);
+    if (!match) continue;
+    const setup = getSetupPackage(root, ownerAccountId, match[1]);
+    if (!setup) continue;
+    assertCampaignSetupPackage(setup);
+    packages.push({ id: match[1], name: setup.campaign.name, setting: setup.campaign.setting,
+      mapName: setup.map.name, format: setup.map.offlineBasemap?.format || "online" });
+  }
+  return packages.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+}
+
+function createSetupPackageHandler({ root, database, validateOfflineBasemap, findOfflineBasemapDirectory, logger = console }) {
   return async (request, response, account, pathname) => {
     function send(status, body) {
       response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
@@ -210,6 +229,33 @@ function createSetupPackageHandler({ root, validateOfflineBasemap, findOfflineBa
       }
       if (!account) throw new SetupHttpError(401, "Authentication required.");
       if (account.role !== "gm") throw new SetupHttpError(403, "GM account required.");
+      if (pathname === "/api/setup-packages" && request.method === "GET") {
+        return send(200, { packages: listSetupPackages(root, account.id) });
+      }
+      const importMatch = /^\/api\/setup-packages\/([^/]+)\/import$/.exec(pathname);
+      if (importMatch && request.method === "POST") {
+        const setup = getSetupPackage(root, account.id, importMatch[1]);
+        if (!setup) throw new SetupHttpError(404, "Setup package not found.");
+        const source = JSON.stringify(setup);
+        const checksum = createHash("sha256").update(source).digest("hex");
+        const existing = database.prepare(`SELECT campaigns.runtime_id AS id FROM campaigns
+          JOIN setup_imports ON setup_imports.runtime_campaign_id = campaigns.runtime_id
+          JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+          WHERE campaign_memberships.account_id = ? AND campaign_memberships.role = 'gm'
+            AND campaigns.active = 1 AND setup_imports.sha256 = ?
+          ORDER BY campaigns.created_at, campaigns.runtime_id LIMIT 1`).get(account.id, checksum);
+        if (existing) return send(200, { campaign: getRuntimeCampaign(database, account.id, existing.id), reused: true });
+        try {
+          if (setup.map.offlineBasemap && setup.map.offlineBasemap.format !== "maptiler-style") {
+            validateOfflineBasemap(account.id, setup.map.offlineBasemap, setup.map.bounds);
+          }
+          const imported = importSetupPackage(database, source, { ownerAccountId: account.id, validateOfflineBasemap });
+          return send(201, { campaign: getRuntimeCampaign(database, account.id, imported.runtimeCampaignId), reused: false });
+        } catch (error) {
+          if (error.code?.startsWith("ERR_SQLITE")) throw error;
+          throw new SetupHttpError(422, error.message);
+        }
+      }
       if (pathname === "/api/setup-packages" && request.method === "POST") {
         if (!/^application\/json(?:\s*;|$)/i.test(request.headers["content-type"] || "")) throw new SetupHttpError(415, "Content-Type must be application/json.");
         const chunks = [];

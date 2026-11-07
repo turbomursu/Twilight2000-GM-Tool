@@ -239,6 +239,10 @@ async function reorderRouteViaAPI(orderedLocationIds) {
 // ============================================================================
 
 function openRouteEditorModal() {
+  if (document.getElementById("route-editor-dialog")) {
+    document.dispatchEvent(new CustomEvent("fieldbook:edit-runtime-route"));
+    return;
+  }
   const modal = document.getElementById("route-editor-modal");
   if (!modal) {
     console.error("Route editor modal not found in DOM");
@@ -259,13 +263,13 @@ function openRouteEditorModal() {
   renderRouteList();
 
   // Show modal
-  modal.style.display = "flex";
+  if (!modal.open) modal.showModal();
 }
 
 function closeRouteEditorModal() {
   const modal = document.getElementById("route-editor-modal");
   if (modal) {
-    modal.style.display = "none";
+    modal.close();
   }
 }
 
