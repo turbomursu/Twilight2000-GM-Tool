@@ -48,7 +48,7 @@ test("separated surfaces retain valid inline JavaScript and synchronized deploym
       new Script(script, { filename });
     }
   }
-  for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "campaign-package-contract.js",
+  for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "maptiler-reference-client.js", "campaign-package-contract.js",
     "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js",
     "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
     "server/map-publications.cjs", "server/campaigns.cjs", "server/sample-data.cjs",

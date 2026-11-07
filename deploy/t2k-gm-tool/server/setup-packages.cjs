@@ -103,7 +103,7 @@ function saveSetupPackage(root, ownerAccountId, input, validateOfflineBasemap, f
       throw new Error("Campaign name must be nonempty and no longer than 80 characters.");
     }
     const reference = input.map.offlineBasemap;
-    if (reference) {
+    if (reference && reference.format !== "maptiler-style") {
       validateOfflineBasemap(ownerAccountId, reference, input.map.bounds);
       if (reference.format === "static-image") {
         image = readValidatedImage(findOfflineBasemapDirectory(reference.assetId, ownerAccountId), reference.assetId, input.map.bounds);

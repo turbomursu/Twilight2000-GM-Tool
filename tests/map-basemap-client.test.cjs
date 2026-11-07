@@ -14,6 +14,8 @@ function harness() {
   const credits = new Set();
   const map = {
     removeLayer(layer) { layer.removed = true; layer.events.remove?.(); },
+    fire(event) { this.events?.[event]?.(); },
+    events: {},
     attributionControl: { addAttribution(credit) { credits.add(credit); }, removeAttribution(credit) { credits.delete(credit); } }
   };
   function layer(kind, url, coordinates, options) {
@@ -32,7 +34,8 @@ function harness() {
       PMTiles: class { constructor(url) { this.url = url; } },
       leafletRasterLayer: (archive, options) => layer("raster", archive.url, null, options)
     },
-    FieldbookVectorAtlas: { validLicenseUrl: (url) => url?.startsWith("https://") ? url : null }
+    FieldbookVectorAtlas: { validLicenseUrl: (url) => url?.startsWith("https://") ? url : null },
+    FieldbookMapTilerReference: { buildStyleUrl: (key, styleId) => `https://api.maptiler.com/maps/${styleId}/style.json?key=${encodeURIComponent(key)}` }
   });
   vm.runInContext(source, context);
   return { api: context.FieldbookBasemap, context, map, layers, errors, credits,
@@ -98,6 +101,24 @@ test("late vector layers are removed when the GM switches to an image", async ()
   assert.equal(credits.size, 0);
 });
 
+test("MapTiler is a real online basemap with a transient key and no fake asset attribution", async () => {
+  const { controller, context, layers, errors } = harness();
+  let styleUrl = "";
+  context.FieldbookVectorAtlas.createMapTilerLayer = async (_map, url) => {
+    styleUrl = url;
+    return { events: {}, on(event, callback) { this.events[event] = callback; } };
+  };
+  const basemap = { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" };
+  controller.set(basemap, bounds);
+  assert.match(errors[0], /Enter a MapTiler API key/);
+  assert.equal(layers.length, 0, "missing keys do not fall back to another map");
+  controller.setMapTilerKey("session-only-key");
+  await Promise.resolve();
+  assert.match(styleUrl, /api\.maptiler\.com\/maps\/01a1b6c9-9a4c-7ab4-bf09-6d75353e5420\/style\.json\?key=session-only-key/);
+  assert.equal(layers.length, 0, "the real MapLibre adapter owns the online layer");
+  assert.equal(JSON.stringify(basemap).includes("session-only-key"), false);
+});
+
 test("all three surfaces load the shared image renderer before map clients", () => {
   for (const file of ["campaign-setup.html", "index.html", "player-interface.html"]) {
     const html = readFileSync(join(__dirname, "..", file), "utf8");
@@ -125,6 +146,7 @@ test("GM background controls are wired on startup, before any map draft action",
     FieldbookMapCoordinates: require("../map-coordinates.js"),
     document: {
       querySelector: (selector) => selector === "#player-map-tab" ? null : node(selector),
+      querySelectorAll: () => [],
       getElementById: (id) => node(`#${id}`),
       addEventListener() {}
     }

@@ -52,9 +52,10 @@
     if (!rendererPromise) {
       rendererPromise = import("/vendor/maplibre-gl.mjs").then((maplibregl) => {
         root.maplibregl = maplibregl;
-        if (!root.pmtiles?.Protocol) throw new Error("The local PMTiles vector protocol is unavailable.");
-        const protocol = new root.pmtiles.Protocol();
-        maplibregl.addProtocol("pmtiles", protocol.tile);
+        if (root.pmtiles?.Protocol) {
+          const protocol = new root.pmtiles.Protocol();
+          maplibregl.addProtocol("pmtiles", protocol.tile);
+        }
         return new Promise((resolve, reject) => {
           if (root.MaplibreGLLeaflet?.maplibreGL) return resolve(root.MaplibreGLLeaflet.maplibreGL);
           const script = document.createElement("script");
@@ -71,6 +72,7 @@
 
   async function createLayer(map, basemap, statusHandler) {
     if (basemap.format !== "vector-pmtiles") throw new Error("This is not a vector PMTiles atlas.");
+    if (!root.pmtiles?.PMTiles || !root.pmtiles?.Protocol) throw new Error("The local PMTiles vector protocol is unavailable.");
     const archiveUrl = basemap.assetUrl || `/offline-basemaps/${encodeURIComponent(basemap.assetId)}.pmtiles`;
     const archive = new root.pmtiles.PMTiles(archiveUrl);
     const metadata = await archive.getMetadata();
@@ -82,7 +84,18 @@
     return layer;
   }
 
-  const api = Object.freeze({ createStyle, addAttribution, createLayer, validLicenseUrl });
+  async function createMapTilerLayer(map, styleUrl, statusHandler, readyHandler) {
+    const maplibreGL = await getRenderer();
+    const layer = maplibreGL({ style: styleUrl }).addTo(map);
+    const maplibreMap = layer.getMaplibreMap();
+    maplibreMap.once("load", () => readyHandler?.());
+    if (statusHandler) maplibreMap.on("error", (event) => {
+      if (event?.error) statusHandler(`MapTiler map error: ${event.error.message || "map unavailable"}`);
+    });
+    return layer;
+  }
+
+  const api = Object.freeze({ createStyle, addAttribution, createLayer, createMapTilerLayer, validLicenseUrl });
   root.FieldbookVectorAtlas = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(globalThis);

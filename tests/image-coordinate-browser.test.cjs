@@ -321,7 +321,7 @@ test("GM publication controls submit image points and x/y geometry while incompa
   const context = vm.createContext({
     FieldbookMapCoordinates: coordinates,
     FieldbookVectorAtlas: { validLicenseUrl: () => null },
-    document: { querySelector: (selector) => selector === "#player-map-tab" ? null : node(selector),
+    document: { querySelectorAll: () => [], querySelector: (selector) => selector === "#player-map-tab" ? null : node(selector),
       getElementById: (id) => node(`#${id}`), createElement: () => new Node(),
       addEventListener() {}, dispatchEvent() {} },
     Option: class extends Node { constructor(text, value) { super(); this.textContent = text; this.value = value; } },

@@ -1056,6 +1056,7 @@
               <div class="map-wrap" id="sample-route-sketch"><span class="map-caption">Vansbro sector / grid 61-28</span><canvas id="field-map" aria-label="Illustrated local sample route sketch"></canvas></div>
               <div class="runtime-route-map" id="runtime-route-map" aria-label="Read-only campaign route map" hidden></div>
               <p class="empty-state" id="runtime-route-map-notice" hidden></p>
+              <label class="field" id="runtime-maptiler-key-field" hidden><span>MapTiler API key / this browser session only</span><input id="runtime-maptiler-key" data-maptiler-key type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" placeholder="Enter a restricted MapTiler key"></label>
               <div class="map-key" id="sample-route-key"><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="key-item"><i class="key-mark river"></i>Waterway</span></div>
               <div class="map-key" id="runtime-route-map-key" hidden><span class="key-item"><i class="key-mark"></i>Current position</span><span class="key-item"><i class="key-mark route"></i>Planned route</span><span class="inline-hint">Saved coordinates / background selected under Player map.</span></div>
             </section>
@@ -1100,13 +1101,14 @@
         <section class="view" id="view-publication" aria-labelledby="map-publication-title">
           <div class="page-heading"><div><div class="heading-tag">GM publication</div><h1 id="map-publication-title">Player map</h1></div><button class="button" id="reload-map-publication" type="button" disabled>Reload draft</button></div>
           <p class="feedback" id="gm-map-publication-status" role="status">Select a runtime campaign.</p>
+          <label class="field" id="gm-maptiler-key-field" hidden><span>MapTiler API key / this browser session only</span><input id="gm-maptiler-key" data-maptiler-key type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" placeholder="Enter a restricted MapTiler key"></label>
           <form id="gm-map-publication-form">
             <fieldset class="map-publication-fields" disabled>
               <section class="wide">
                 <h2>Campaign map background</h2>
                 <p class="feedback" id="gm-map-background-current"></p>
                 <p class="feedback">A north-up image stretches to the campaign bounds, keeping locations and routes aligned. Any information drawn into the image will be visible to players when published. Use an image you have permission to share. Changing the background updates GM maps only; preview and publish separately to update players.</p>
-                <div class="field"><label for="gm-map-background-kind">Background</label><select id="gm-map-background-kind"><option value="current">Keep current background</option><option value="static-image">Use a static map image</option><option value="online">Use online OSM map</option></select></div>
+                <div class="field"><label for="gm-map-background-kind">Background</label><select id="gm-map-background-kind"><option value="current">Keep current background</option><option value="static-image">Use a static map image</option><option value="maptiler-style">Use MapTiler online map</option><option value="online">Use online OSM map</option></select></div>
                 <div id="gm-map-image-fields" hidden>
                   <div class="field"><label for="gm-map-image-file">PNG, JPEG, or WebP / max 50 MiB</label><input id="gm-map-image-file" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"></div>
                   <div class="field"><label for="gm-map-image-attribution">Required attribution</label><input id="gm-map-image-attribution" maxlength="300" placeholder="Image author / required credit"></div>
@@ -1718,6 +1720,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="campaign-package-contract.js"></script>
   <script src="campaign-setup-import-client.js"></script>
   <script src="/vector-atlas-client.js"></script>
+  <script src="/maptiler-reference-client.js"></script>
   <script src="/map-basemap-client.js"></script>
   <script src="/auth-client.js" defer></script>
   <script src="/campaign-clock.js"></script>
@@ -2336,16 +2339,19 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const runtimeMapElement = document.getElementById("runtime-route-map");
         const runtimeKey = document.getElementById("runtime-route-map-key");
         const notice = document.getElementById("runtime-route-map-notice");
+        const mapTilerKeyField = document.getElementById("runtime-maptiler-key-field");
         const caption = document.getElementById("route-map-caption");
         const mapData = state.setupPackage?.map;
+        const usesMapTiler = mapData?.offlineBasemap?.format === "maptiler-style";
         sampleSketch.hidden = true;
         sampleKey.hidden = true;
         runtimeKey.hidden = false;
+        mapTilerKeyField.hidden = !usesMapTiler;
         caption.textContent = "SAVED ROUTE / READ ONLY";
 
         const positionedStops = route.map((stop, index) => ({ ...stop, index }))
           .filter((stop) => FieldbookMapCoordinates.validPoint(stop.mapPosition, mapData?.bounds));
-        if (!positionedStops.length && mapData?.offlineBasemap?.format !== "static-image") {
+        if (!positionedStops.length && mapData?.offlineBasemap?.format !== "static-image" && !usesMapTiler) {
           runtimeMapElement.hidden = true;
           notice.textContent = "This campaign route has no saved map coordinates.";
           notice.hidden = false;
@@ -2365,7 +2371,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         notice.hidden = true;
         const imageCoordinates = FieldbookMapCoordinates.isImage(mapData?.bounds);
         if (runtimeRouteMap && (runtimeRouteMap.options.crs === L.CRS.Simple) !== imageCoordinates) {
-          runtimeBasemap.clear();
+          runtimeBasemap.destroy();
           runtimeRouteMap.remove();
           runtimeRouteMap = null;
           runtimeBasemapSignature = null;
@@ -2374,6 +2380,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (!runtimeRouteMap) {
           runtimeRouteMap = L.map(runtimeMapElement, { crs: imageCoordinates ? L.CRS.Simple : L.CRS.EPSG3857, minZoom: imageCoordinates ? -10 : 2, maxZoom: 18, scrollWheelZoom: false });
           runtimeBasemap = FieldbookBasemap.controller(runtimeRouteMap, (message) => { notice.textContent = message; notice.hidden = false; });
+          runtimeRouteMap.on("fieldbook:maptiler-ready", () => { if (usesMapTiler) { notice.textContent = ""; notice.hidden = true; } });
           runtimeRouteLayer = L.featureGroup().addTo(runtimeRouteMap);
 
           // Initialize map visualization client
@@ -2407,7 +2414,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
             const bounds = mapData.bounds;
             runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(bounds), { padding: [12, 12] });
           } else if (positions.length > 1) runtimeRouteMap.fitBounds(positions, { padding: [24, 24], maxZoom: 12 });
-          else runtimeRouteMap.setView(positions[0], 10);
+          else if (positions.length === 1) runtimeRouteMap.setView(positions[0], 10);
+          else runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(mapData.bounds), { padding: [12, 12] });
           runtimeRouteSignature = signature;
         }
         requestAnimationFrame(() => runtimeRouteMap?.invalidateSize({ pan: false }));

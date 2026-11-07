@@ -34,6 +34,7 @@ const PROTECTED_FILES = new Map([
   ["/map-coordinates.js", ["map-coordinates.js", "text/javascript; charset=utf-8"]],
   ["/campaign-setup-import-client.js", ["campaign-setup-import-client.js", "text/javascript; charset=utf-8"]],
   ["/vector-atlas-client.js", ["vector-atlas-client.js", "text/javascript; charset=utf-8"]],
+  ["/maptiler-reference-client.js", ["maptiler-reference-client.js", "text/javascript; charset=utf-8"]],
   ["/auth-client.js", ["auth-client.js", "text/javascript; charset=utf-8"]],
   ["/player-seed-client.js", ["player-seed-client.js", "text/javascript; charset=utf-8"]],
   ["/situation-report-client.js", ["situation-report-client.js", "text/javascript; charset=utf-8"]],
@@ -66,7 +67,7 @@ function sendText(response, status, contentType, body, headOnly = false) {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://nominatim.openstreetmap.org; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://nominatim.openstreetmap.org https://api.maptiler.com; worker-src 'self' blob:; frame-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   });
   response.end(headOnly ? undefined : body);
 }

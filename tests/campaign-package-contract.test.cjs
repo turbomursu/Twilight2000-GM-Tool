@@ -42,6 +42,21 @@ test("accepts vector PMTiles metadata with an HTTPS license URL", () => {
   assert.equal(assertCampaignSetupPackage(input), true);
 });
 
+test("accepts the fixed MapTiler style without requiring separate attribution or an asset", () => {
+  const input = validPackage();
+  input.map.offlineBasemap = { format: "maptiler-style", styleId: "01a1b6c9-9a4c-7ab4-bf09-6d75353e5420" };
+  assert.equal(assertCampaignSetupPackage(input), true);
+  for (const invalid of [
+    { ...input.map.offlineBasemap, apiKey: "must-not-be-exported" },
+    { format: "maptiler-style", styleId: "another-style" },
+    { ...input.map.offlineBasemap, attribution: "manual attribution is not allowed here" }
+  ]) {
+    const changed = validPackage();
+    changed.map.offlineBasemap = invalid;
+    assert.throws(() => assertCampaignSetupPackage(changed), /offline basemap/);
+  }
+});
+
 test("rejects unsafe or incomplete offline basemap metadata", () => {
   for (const offlineBasemap of [
     { format: "raster-pmtiles", assetId: "../private", attribution: "Map" },
