@@ -1809,6 +1809,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let stagedInfluenceCells = new Set();
       let liveInfluenceEditing = false;
       let runtimeDataLoaded = false;
+      let runtimeCampaignLoadGeneration = 0;
       let editingPersonId = null;
       let editingConflictId = null;
       let editingConflictCampaignId = null;
@@ -3273,81 +3274,136 @@ Military rank || optional</textarea><span class="row-description">One field per 
       });
 
       async function loadRuntimeCampaign(runtimeCampaignId, announce = true) {
-        runtimeDataLoaded = false;
-        weatherD6Result.value = "";
-        weatherRollOutcome.value = "";
-        updateWeatherRollAvailability();
-        const { campaign } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}`);
-        const { layers } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/faction-layers`);
-        if (runtimeCampaignSelect.value !== runtimeCampaignId) return;
-        activateRuntimeCampaign(campaign, layers, announce);
-        const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/runtime`);
-        if (state.runtimeCampaignId === runtimeCampaignId) applyRuntimeSnapshot(runtime);
-      }
-
-      async function refreshRuntimeCampaigns(preferredId = state.runtimeCampaignId) {
-        const placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = location.protocol === "http:" ? "Loading campaigns" : "LAN HTTP service required";
-        runtimeCampaignSelect.replaceChildren(placeholder);
-        runtimeDataLoaded = false;
-        updateWeatherRollAvailability();
-        if (location.protocol !== "http:") {
-          runtimeCampaignSelect.disabled = true;
-          exportRuntimeBackupButton.disabled = true;
-          openRuntimeRestoreButton.disabled = true;
-          return;
-        }
-        try {
-          const { campaigns } = await campaignApiRequest("/api/campaigns");
-          runtimeCampaignSelect.replaceChildren();
-          const emptyOption = document.createElement("option");
-          emptyOption.value = "";
-          emptyOption.textContent = campaigns.length ? "Choose a runtime campaign" : "No runtime campaigns";
-          runtimeCampaignSelect.append(emptyOption);
-          campaigns.forEach((campaign) => {
-            const option = document.createElement("option");
-            option.value = campaign.id;
-            option.textContent = `${campaign.name} / ${campaign.setting}`;
-            runtimeCampaignSelect.append(option);
-          });
-          runtimeCampaignSelect.disabled = campaigns.length === 0;
-          const selectedId = campaigns.some((campaign) => campaign.id === preferredId)
-            ? preferredId
-            : campaigns[0]?.id || "";
-          runtimeCampaignSelect.value = selectedId;
-          openPlayerSeedDialogButton.disabled = !selectedId;
-          openCharacterChangesButton.disabled = !selectedId;
-          exportRuntimeBackupButton.disabled = !selectedId;
-          openRuntimeRestoreButton.disabled = !selectedId;
-          if (selectedId) await loadRuntimeCampaign(selectedId, false);
-          else {
-            runtimeDataLoaded = false;
-            updateWeatherRollAvailability();
-            document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
-          }
-        } catch (error) {
+        const generation = ++runtimeCampaignLoadGeneration;
+        const previousCampaignId = runtimeDataLoaded && state.runtimeCampaignId !== runtimeCampaignId
+          ? state.runtimeCampaignId : null;
+        const previousCampaignAvailable = previousCampaignId
+          && Array.from(runtimeCampaignSelect.options || []).some((option) => option.value === previousCampaignId);
+        runtimeCampaignSelect.value = previousCampaignAvailable ? previousCampaignId : "";
+        if (!previousCampaignAvailable) {
           runtimeDataLoaded = false;
-          updateWeatherRollAvailability();
-          runtimeCampaignSelect.disabled = true;
           openPlayerSeedDialogButton.disabled = true;
           openCharacterChangesButton.disabled = true;
           exportRuntimeBackupButton.disabled = true;
           openRuntimeRestoreButton.disabled = true;
-          runtimeCampaignSelect.replaceChildren();
-          const errorOption = document.createElement("option");
-          errorOption.value = "";
-          errorOption.textContent = "Campaign service unavailable";
-          runtimeCampaignSelect.append(errorOption);
-          document.getElementById("influence-map-status").textContent = error.message;
+        }
+        weatherD6Result.value = "";
+        weatherRollOutcome.value = "";
+        updateWeatherRollAvailability();
+        const status = document.getElementById("influence-map-status");
+        status.classList.remove("error");
+        status.textContent = previousCampaignAvailable
+          ? `Loading selected campaign ${runtimeCampaignId}… The previous campaign remains active.`
+          : `Loading selected campaign ${runtimeCampaignId}…`;
+        if (!previousCampaignAvailable) {
+          document.getElementById("influence-campaign-label").textContent = "Loading selected campaign";
+        }
+        try {
+          const { campaign } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}`);
+          const { layers } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/faction-layers`);
+          const { runtime } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtimeCampaignId)}/runtime`);
+          if (generation !== runtimeCampaignLoadGeneration) return false;
+          runtimeCampaignSelect.value = runtimeCampaignId;
+          activateRuntimeCampaign(campaign, layers, announce);
+          applyRuntimeSnapshot(runtime);
+          return true;
+        } catch (error) {
+          if (generation !== runtimeCampaignLoadGeneration) return false;
+          runtimeCampaignSelect.value = previousCampaignAvailable ? previousCampaignId : "";
+          if (!previousCampaignAvailable) {
+            runtimeDataLoaded = false;
+            updateWeatherRollAvailability();
+            openPlayerSeedDialogButton.disabled = true;
+            openCharacterChangesButton.disabled = true;
+            exportRuntimeBackupButton.disabled = true;
+            openRuntimeRestoreButton.disabled = true;
+            document.getElementById("influence-campaign-label").textContent = "No runtime campaign loaded";
+          }
+          status.classList.add("error");
+          status.textContent = previousCampaignAvailable
+            ? `Could not load selected campaign ${runtimeCampaignId}: ${error.message}. The previous campaign remains active; reselect this campaign to retry.`
+            : `Could not load selected campaign ${runtimeCampaignId}: ${error.message}. Campaign options remain available; select it to retry.`;
+          error.runtimeCampaignFailure = "loading";
+          error.message = `Selected campaign could not be loaded: ${error.message}`;
+          throw error;
         }
       }
 
+      async function refreshRuntimeCampaigns(preferredId = state.runtimeCampaignId) {
+        ++runtimeCampaignLoadGeneration;
+        if (location.protocol !== "http:") {
+          const message = "Campaign list unavailable: LAN HTTP service required.";
+          runtimeCampaignSelect.disabled = runtimeCampaignSelect.options.length <= 1;
+          document.getElementById("influence-map-status").textContent = message;
+          return { ok: false, failure: "listing", message };
+        }
+        let campaigns;
+        try {
+          ({ campaigns } = await campaignApiRequest("/api/campaigns"));
+        } catch (error) {
+          const hasCampaignOptions = runtimeCampaignSelect.options.length > 1;
+          runtimeCampaignSelect.disabled = !hasCampaignOptions;
+          if (!hasCampaignOptions) {
+            const errorOption = document.createElement("option");
+            errorOption.value = "";
+            errorOption.textContent = "Campaign list unavailable";
+            runtimeCampaignSelect.replaceChildren(errorOption);
+          }
+          const message = `Campaign list unavailable: ${error.message}`;
+          const status = document.getElementById("influence-map-status");
+          status.classList.add("error");
+          status.textContent = message;
+          error.runtimeCampaignFailure = "listing";
+          return { ok: false, failure: "listing", message };
+        }
+        runtimeCampaignSelect.replaceChildren();
+        const emptyOption = document.createElement("option");
+        emptyOption.value = "";
+        emptyOption.textContent = campaigns.length ? "Choose a runtime campaign" : "No runtime campaigns";
+        runtimeCampaignSelect.append(emptyOption);
+        campaigns.forEach((campaign) => {
+          const option = document.createElement("option");
+          option.value = campaign.id;
+          option.textContent = `${campaign.name} / ${campaign.setting}`;
+          runtimeCampaignSelect.append(option);
+        });
+        runtimeCampaignSelect.disabled = campaigns.length === 0;
+        const selectedId = campaigns.some((campaign) => campaign.id === preferredId)
+          ? preferredId
+          : campaigns[0]?.id || "";
+        runtimeCampaignSelect.value = selectedId;
+        openPlayerSeedDialogButton.disabled = !selectedId;
+        openCharacterChangesButton.disabled = !selectedId;
+        exportRuntimeBackupButton.disabled = !selectedId;
+        openRuntimeRestoreButton.disabled = !selectedId;
+        if (selectedId) {
+          try {
+            const loaded = await loadRuntimeCampaign(selectedId, false);
+            return { ok: loaded, failure: loaded ? null : "loading" };
+          } catch (error) {
+            return { ok: false, failure: "loading", message: error.message };
+          }
+        }
+        runtimeDataLoaded = false;
+        updateWeatherRollAvailability();
+        document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
+        const status = document.getElementById("influence-map-status");
+        status.classList.remove("error");
+        status.textContent = campaigns.length ? "Choose a runtime campaign to load its campaign data." : "No runtime campaigns are available.";
+        return { ok: true, loaded: false };
+      }
+
       runtimeCampaignSelect.addEventListener("change", () => {
-        if (runtimeCampaignSelect.value) loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
+        if (runtimeCampaignSelect.value) return loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
         else {
           runtimeDataLoaded = false;
+          ++runtimeCampaignLoadGeneration;
           updateWeatherRollAvailability();
+          openPlayerSeedDialogButton.disabled = true;
+          openCharacterChangesButton.disabled = true;
+          exportRuntimeBackupButton.disabled = true;
+          openRuntimeRestoreButton.disabled = true;
+          document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
         }
       });
       document.getElementById("reload-faction-layers").addEventListener("click", async () => {
@@ -3604,7 +3660,11 @@ Military rank || optional</textarea><span class="row-description">One field per 
           });
           pendingRuntimeImportBackup = null;
           runtimeImportDialog.close();
-          await refreshRuntimeCampaigns(campaign.id);
+          const selection = await refreshRuntimeCampaigns(campaign.id);
+          if (!selection.ok) {
+            showToast(`Backup imported / ${campaign.name}; ${selection.message || "runtime campaign could not be loaded."}`);
+            return;
+          }
           showToast(`Backup imported / ${campaign.name} / revision ${imported.revision}.`);
         } catch (error) {
           runtimeImportStatus.className = "feedback error";
@@ -4114,9 +4174,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
         normalizePackage: normalizeSetupPackageForInfluence,
         request: campaignApiRequest,
         onImported: async (campaign) => {
-          await refreshRuntimeCampaigns(campaign.id);
-          if (!runtimeDataLoaded || state.runtimeCampaignId !== campaign.id) {
-            throw new Error("The new campaign is saved, but the runtime service could not load it.");
+          const selection = await refreshRuntimeCampaigns(campaign.id);
+          if (!selection.ok || !runtimeDataLoaded || state.runtimeCampaignId !== campaign.id) {
+            throw new Error(selection.message || "The new campaign is saved, but the runtime service could not load it.");
           }
           setView("influence");
           showToast(`Runtime campaign created: ${campaign.name}.`);
