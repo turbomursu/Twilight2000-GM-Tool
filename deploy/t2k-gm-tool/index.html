@@ -298,6 +298,22 @@
     .note-card p { margin: 0; color: #536057; font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
     .empty-state { padding: 38px 20px; color: var(--muted); text-align: center; font: 12px var(--mono); }
     .inline-hint { color: var(--muted); font: 9px var(--mono); }
+    #roll-tables-dialog { width: min(760px, calc(100vw - 28px)); max-height: 90vh; overflow-y: auto; }
+    .roll-table-body { display: grid; gap: 14px; padding: 18px 20px 20px; }
+    .roll-table-tools, .roll-table-actions, .roll-table-page-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+    .roll-table-page-actions { align-items: center; justify-content: flex-end; }
+    .roll-table-page-actions p { max-width: 440px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .roll-table-tools .field { flex: 1 1 220px; }
+    .roll-table-results { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .roll-table-results th, .roll-table-results td { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .roll-table-results th { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .roll-table-result { display: block; width: 100%; padding: 12px; border-left: 3px solid var(--signal); background: #fff; }
+    .roll-table-result strong { display: block; margin-bottom: 6px; }
+    .roll-table-result p { margin: 0; white-space: pre-wrap; }
+    .roll-table-notes { display: grid; gap: 8px; padding-left: 18px; }
+    .roll-table-notes p { margin: 2px 0 0; color: var(--muted); }
+    #roll-table-status { margin: 0; padding: 8px 10px; border-left: 2px solid var(--fern); background: #fff; }
+    #roll-table-status.error { border-left-color: var(--signal); color: #842f25; background: var(--signal-pale); }
     dialog { width: min(480px, calc(100vw - 28px)); padding: 0; border: 1px solid #cbd4c8; border-radius: 4px; color: var(--ink); background: var(--surface); box-shadow: 0 18px 60px #10201844; }
     dialog::backdrop { background: #15231bb8; }
     .dialog-head { display: flex; align-items: start; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
@@ -323,9 +339,18 @@
     .published-map-canvas { width: 100%; height: 420px; min-width: 0; border: 1px solid var(--line); background: #e2e7e0; }
     .map-publication-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; min-width: 0; padding: 0; border: 0; }
     .map-publication-fields .wide { grid-column: 1 / -1; }
+    #gm-maptiler-key-field[hidden] { display: none; }
+    #map-hex-picker-dialog { width: min(940px, calc(100vw - 28px)); max-height: 92vh; overflow-y: auto; }
+    #map-hex-picker-canvas { height: min(58vh, 520px); min-height: 300px; border: 1px solid var(--line); }
+    #map-hex-picker-canvas .leaflet-container { height: 100%; }
+    #map-hex-picker-status:empty { display: none; }
+    #map-hex-picker-key-field[hidden] { display: none; }
+    .map-hex-label { background: transparent; border: 0; color: #263b30; font: 10px var(--mono); white-space: nowrap; text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff; text-align: center; }
+    .map-hex-selection-label { background: #fff; color: #644916; border: 1px solid #a97832; border-radius: 50%; text-align: center; font: bold 12px/22px var(--mono); }
+    #conflict-battle-link[hidden] { display: none; }
     .map-edit-locations { display: grid; gap: 8px; max-height: 220px; overflow: auto; padding: 8px 0; }
     .map-edit-locations label { display: flex; align-items: start; gap: 8px; font-size: 12px; overflow-wrap: anywhere; }
-    .map-marking-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; margin-bottom: 8px; }
+    .map-marking-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px; margin-bottom: 8px; }
     .map-marking-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); }
     .map-geometry-create { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(180px, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 12px; }
     .map-geometry-create .field { min-width: 0; }
@@ -1050,7 +1075,7 @@
         <section class="view active" id="view-situation" aria-labelledby="situation-title">
           <div class="page-heading">
             <div><div class="heading-tag">Campaign / <span id="campaign-era">Field report 014</span></div><h1 id="situation-title">Situation report</h1><p class="campaign-premise" id="campaign-premise" hidden></p></div>
-            <p id="situation-summary">The column is moving north through Dalarna. The road is passable, but the weather is turning.</p>
+            <div class="roll-table-page-actions"><p id="situation-summary">The column is moving north through Dalarna. The road is passable, but the weather is turning.</p><button class="button" type="button" data-action="open-roll-tables" data-roll-context="situation">Roll tables</button></div>
           </div>
           <div class="stats" aria-label="Campaign status">
             <div class="stat"><div class="stat-label">Days in field <span>01</span></div><div class="stat-value"><output id="stat-day">14</output><small>days</small></div></div>
@@ -1126,15 +1151,23 @@
               </section>
               <section><h2>Allowed locations</h2><div class="map-edit-locations" id="map-allowed-locations"></div></section>
               <section><h2>Published route</h2><div id="map-route-entries"></div><div class="field"><label for="map-route-location">Waypoint</label><select id="map-route-location"></select></div><button class="button" id="add-map-waypoint" type="button">Add waypoint</button></section>
-              <section class="wide"><div class="section-bar"><h2>Point markings</h2><button class="button" id="add-map-marking" type="button">Add marking</button></div><div id="map-marking-entries"></div></section>
+              <section class="wide"><div class="section-bar"><h2>Point markings</h2><button class="button" id="add-map-marking" type="button">Add marking / choose hex</button></div><div id="map-marking-entries"></div></section>
               <section class="wide"><div class="section-bar"><h2>Line and area geometry</h2></div><div class="map-geometry-create"><div class="field"><label for="map-geometry-type">Geometry type</label><select id="map-geometry-type"><option value="LineString">Line</option><option value="Polygon">Area</option></select></div><div class="field"><label for="map-geometry-label">Label</label><input id="map-geometry-label" maxlength="160" placeholder="Road, boundary, hazard"></div><button class="button" id="add-map-geometry" type="button">Add geometry</button><div class="field wide"><label for="map-geometry-coordinates">Vertices / longitude,latitude per line</label><textarea id="map-geometry-coordinates" placeholder="14.0,60.0&#10;14.2,60.1&#10;14.4,60.2"></textarea></div></div><p class="feedback">Line needs at least two vertices. Areas use one ring and close automatically. Every vertex must stay inside campaign bounds.</p><div id="map-geometry-entries"></div></section>
-              <div class="field"><label for="map-player-latitude">Player position / latitude</label><input id="map-player-latitude" type="number" step="any"></div>
-              <div class="field"><label for="map-player-longitude">Player position / longitude</label><input id="map-player-longitude" type="number" step="any"></div>
-              <div class="wide field"><label for="map-position-location">Position at location</label><select id="map-position-location"><option value="">Choose location</option></select></div>
+              <div class="field"><label for="map-player-latitude">Player position / latitude</label><input id="map-player-latitude" type="number" step="any" readonly aria-readonly="true"></div>
+              <div class="field"><label for="map-player-longitude">Player position / longitude</label><input id="map-player-longitude" type="number" step="any" readonly aria-readonly="true"></div>
+              <div class="wide field"><span class="field-label">Player position</span><div class="report-actions"><button class="button" id="choose-player-position-hex" type="button">Choose player hex</button><button class="button" id="clear-player-position" type="button">Clear position</button></div></div>
               <div class="wide report-actions"><button class="button" type="submit">Save map draft</button><button class="button" id="preview-map-publication" type="button">Preview map</button><button class="button button-primary" id="publish-map-publication" type="button" disabled>Publish map</button><button class="button button-danger" id="withdraw-map-publication" type="button" disabled>Withdraw map</button></div>
             </fieldset>
           </form>
           <section id="gm-map-preview" hidden><p class="eyebrow" id="gm-map-preview-label">Draft preview</p><div class="published-map-canvas" id="gm-map-preview-canvas" role="region" aria-label="Player map preview"></div></section>
+          <dialog id="map-hex-picker-dialog" aria-labelledby="map-hex-picker-title">
+            <div class="dialog-head"><div><div class="eyebrow">GM map / verified grid</div><h2 id="map-hex-picker-title">Choose a map hex</h2></div><button class="icon-button" id="close-map-hex-picker" type="button" aria-label="Cancel hex selection">×</button></div>
+            <label class="field" id="map-hex-picker-key-field" hidden><span>MapTiler API key / this browser session only</span><input id="map-hex-picker-key" data-maptiler-key type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" placeholder="Enter a restricted MapTiler key"></label>
+            <p class="row-description">Select a visible 10 km campaign hex. Its center will be used; map clicks outside the grid do nothing.</p>
+            <div id="map-hex-picker-canvas" role="region" aria-label="Campaign map hex picker"></div>
+            <p class="feedback" id="map-hex-picker-status" role="status" aria-live="polite"></p>
+            <div class="dialog-actions"><button class="button" id="cancel-map-hex-picker" type="button">Cancel</button><button class="button button-primary" id="use-map-hex" type="button" disabled>Use selected hex</button></div>
+          </dialog>
         </section>
 
         <section class="view comms-workspace" id="view-comms" data-comms-role="gm" aria-labelledby="gm-comms-title">
@@ -1171,7 +1204,7 @@
         <section class="view" id="view-roster" aria-labelledby="roster-title">
           <div class="page-heading">
             <div><div class="heading-tag">Column / personnel record</div><h1 id="roster-title">Personnel</h1></div>
-            <button class="button button-primary" data-action="open-person"><span aria-hidden="true">+</span> Add person</button>
+            <div class="roll-table-page-actions"><button class="button" type="button" data-action="open-roll-tables" data-roll-context="personnel">Roll tables</button><button class="button button-primary" data-action="open-person"><span aria-hidden="true">+</span> Add person</button></div>
           </div>
           <div class="section-bar"><div><h2>Attached personnel</h2><p id="roster-count"></p></div><span class="inline-hint">LOCAL CAMPAIGN RECORD</span></div>
           <div class="roster-grid" id="roster-grid"></div>
@@ -1180,8 +1213,9 @@
         <section class="view" id="view-conflicts" aria-labelledby="conflicts-title">
           <div class="page-heading">
             <div><div class="heading-tag">GM-only / campaign record</div><h1 id="conflicts-title">Conflict ledger</h1></div>
+            <div class="roll-table-page-actions"><button class="button" type="button" data-action="open-roll-tables" data-roll-context="conflicts">Roll tables</button><a class="button button-primary" id="conflict-battle-link" href="combat.html" target="_blank" rel="noopener" hidden>Open battle resolver</a></div>
           </div>
-          <p>Record incidents and threats for GM review. Categories and status are descriptive only; this ledger does not calculate escalation, generate encounters, or publish to players.</p>
+          <p>Record incidents and threats for GM review. Categories and status are descriptive only; this ledger does not calculate escalation, generate encounters, or publish to players. The battle resolver opens separately for the selected campaign and only calculates when you explicitly resolve an attack; its results are not added to this ledger or campaign record.</p>
           <div class="conflict-layout movement-grid">
             <section class="panel" aria-labelledby="conflict-form-title">
               <div class="panel-head"><div><div class="eyebrow">Manual record</div><h2 id="conflict-form-title">New incident</h2></div></div>
@@ -1211,7 +1245,7 @@
         <section class="view" id="view-movement" aria-labelledby="movement-title">
           <div class="page-heading">
             <div><div class="heading-tag">Route / supply ledger</div><h1 id="movement-title">Movement</h1></div>
-            <p>Track the column's travel day, distance, and remaining provisions.</p>
+            <div class="roll-table-page-actions"><p>Track the column's travel day, distance, and remaining provisions.</p><button class="button" type="button" data-action="open-roll-tables" data-roll-context="movement">Roll tables</button></div>
           </div>
           <div class="movement-grid">
             <section class="panel" aria-labelledby="travel-day-title">
@@ -1314,6 +1348,15 @@
                 <div class="panel-body influence-tools">
                   <button class="button" id="open-player-seed-dialog" type="button" disabled>Assign player seed</button>
                   <label class="field"><span class="eyebrow">Faction layer</span><select id="live-influence-faction" disabled><option value="">Import a setup package</option></select></label>
+                  <form id="runtime-faction-form">
+                    <fieldset id="runtime-faction-fields" disabled>
+                      <div class="field"><label class="eyebrow" for="runtime-faction-name">Add campaign faction</label><input id="runtime-faction-name" maxlength="120" required placeholder="Northern Brigade"></div>
+                      <div class="field"><label class="eyebrow" for="runtime-faction-description">Description</label><input id="runtime-faction-description" maxlength="500" placeholder="Optional GM-only summary"></div>
+                      <div class="field"><label class="eyebrow" for="runtime-faction-color">Map color</label><input id="runtime-faction-color" type="color" value="#808080"></div>
+                      <button class="button" id="runtime-faction-submit" type="submit">Add faction</button>
+                    </fieldset>
+                    <p class="feedback" id="runtime-faction-feedback" role="status">Add a campaign-scoped faction to manage its influence.</p>
+                  </form>
                   <div class="dialog-actions"><button class="button" id="live-influence-edit" type="button" disabled>Select hexes</button><button class="button button-primary" id="live-influence-save" type="button" disabled>Save layer</button><button class="button" id="live-influence-clear" type="button" disabled>Clear selected</button><button class="button" id="reload-faction-layers" type="button">Reload layers</button></div>
                   <p class="feedback" id="live-influence-feedback" role="status">Faction edits are GM-only SQLite state; the setup source remains unchanged.</p>
                   <div class="influence-list" id="live-influence-factions"><div class="empty-state">No influence layers loaded.</div></div>
@@ -1724,6 +1767,33 @@ Military rank || optional</textarea><span class="row-description">One field per 
     </div>
   </dialog>
 
+  <dialog id="roll-tables-dialog" aria-labelledby="roll-tables-title">
+    <div class="dialog-head">
+      <div><div class="eyebrow">Shared GM catalog / no campaign changes</div><h2 id="roll-tables-title">Roll tables</h2></div>
+      <button class="icon-button" type="button" data-roll-close aria-label="Close roll tables">×</button>
+    </div>
+    <div class="roll-table-body">
+      <p class="inline-hint" id="roll-table-context-label">Opened from Situation. Tables are shared across campaigns and GM accounts; players cannot access them.</p>
+      <div class="roll-table-tools">
+        <label class="field" for="roll-table-select"><span class="eyebrow">Table</span><select id="roll-table-select"></select></label>
+        <button class="button" type="button" id="roll-table-reload">Reload</button>
+        <button class="button" type="button" id="roll-table-export">Download catalog</button>
+        <button class="button" type="button" id="roll-table-template">Empty template</button>
+        <button class="button" type="button" id="roll-table-import">Import JSON</button>
+        <input id="roll-table-file" type="file" accept=".json,application/json" hidden>
+      </div>
+      <div class="roll-table-actions"><button class="button button-primary" type="button" id="roll-table-roll" disabled>Roll</button><output class="roll-table-result" id="roll-table-result" aria-live="polite" hidden></output></div>
+      <p class="feedback" id="roll-table-status" role="status" aria-live="polite">Loading shared catalog…</p>
+      <div id="roll-table-detail"></div>
+      <details>
+        <summary>JSON import format</summary>
+        <p>Use a top-level object with <code>schemaVersion: 1</code> and a <code>tables</code> array. Each table needs a unique lowercase <code>id</code>, <code>name</code>, <code>contexts</code>, dice notation such as <code>2d6</code>, <code>columns</code>, inclusive <code>rows</code> ranges with matching text <code>values</code>, and optional label/text <code>notes</code>. Ranges must cover every possible total exactly once. An empty contexts array makes a table available in every section. Text is displayed as plain text; HTML is not interpreted.</p>
+      </details>
+      <p class="inline-hint">Only an explicit GM click generates a result. Rolls are not recorded or applied to campaign state.</p>
+      <div class="roll-table-actions"><button class="button" type="button" data-roll-close>Done</button></div>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="/vendor/leaflet.js"></script>
@@ -1747,6 +1817,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/personnel-client.js" defer></script>
   <script src="/location-client.js" defer></script>
   <script src="/route-client.js" defer></script>
+  <script src="/roll-table-contract.js"></script>
+  <script src="/roll-tables-client.js"></script>
   <script>
     (() => {
       const STORAGE_KEY = "fieldbook-twilight-2000-v1";
@@ -1835,6 +1907,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
       let editingConflictCampaignId = null;
       let runtimeFactionLayers = null;
       let factionSavePending = false;
+      let factionCreatePending = false;
 
       function loadState() {
         try {
@@ -2212,6 +2285,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeLocations: runtime.locations
         };
         runtimeDataLoaded = true;
+        renderConflictBattleLink();
         state.partyMapPosition = null;
         campaignApiRequest(`/api/campaigns/${encodeURIComponent(runtime.campaign.id)}/party-position`)
           .then(({ position }) => {
@@ -2913,7 +2987,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (!Array.isArray(rawInfluenceCells) || rawInfluenceCells.length > 10000) throw new Error(`The influence layer for ${name} is invalid or too large.`);
           const influenceCells = normalizeInfluenceCellIds(rawInfluenceCells);
           if (influenceCells.length !== rawInfluenceCells.length) throw new Error(`The influence layer for ${name} contains an invalid or duplicate hex.`);
-          return { id, name, influenceCells };
+          const color = typeof faction.color === "string" && /^#[0-9a-f]{6}$/i.test(faction.color)
+            ? faction.color : null;
+          return { id, name, color, influenceCells };
         });
         const center = FieldbookMapCoordinates.contains(input.map.center, bounds)
           ? { ...input.map.center } : FieldbookMapCoordinates.center(bounds);
@@ -2970,6 +3046,55 @@ Military rank || optional</textarea><span class="row-description">One field per 
       function liveInfluenceForCampaign() {
         if (state.runtimeCampaignId) return runtimeFactionLayers?.campaignId === state.runtimeCampaignId ? runtimeFactionLayers.influence : {};
         return state.liveInfluence?.[activeWorkspaceId()] || {};
+      }
+
+      async function createRuntimeFaction(event) {
+        event.preventDefault();
+        const campaignId = state.runtimeCampaignId;
+        if (!campaignId || runtimeFactionLayers?.campaignId !== campaignId || factionSavePending || factionCreatePending) return;
+        const status = document.getElementById("runtime-faction-feedback");
+        factionCreatePending = true;
+        renderLiveInfluenceControls();
+        status.textContent = "Adding faction to the selected campaign…";
+        try {
+          const { faction, campaignRevision } = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/factions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: document.getElementById("runtime-faction-name").value,
+              description: document.getElementById("runtime-faction-description").value,
+              color: document.getElementById("runtime-faction-color").value,
+              expectedRevision: runtimeFactionLayers.revision
+            })
+          });
+          if (state.runtimeCampaignId !== campaignId) return;
+          if (!faction || typeof faction.id !== "string" || !Number.isSafeInteger(campaignRevision)) {
+            throw new Error("The server returned an invalid faction result.");
+          }
+          state.setupPackage.factions.push({
+            id: faction.id,
+            name: faction.name,
+            color: faction.color,
+            influenceCells: []
+          });
+          runtimeFactionLayers = {
+            ...runtimeFactionLayers,
+            revision: campaignRevision,
+            influence: { ...runtimeFactionLayers.influence, [faction.id]: [] }
+          };
+          state.runtimeRevision = campaignRevision;
+          document.getElementById("runtime-faction-form").reset();
+          document.getElementById("live-influence-faction").value = faction.id;
+          status.textContent = `${faction.name} was added to this campaign. Its influence layer is empty until you select and save hexes.`;
+          renderLiveInfluenceControls();
+          renderLiveInfluenceGrid();
+          showToast(`Faction added: ${faction.name}.`);
+        } catch (error) {
+          if (state.runtimeCampaignId === campaignId) status.textContent = `Faction was not added: ${error.message}`;
+        } finally {
+          factionCreatePending = false;
+          renderLiveInfluenceControls();
+        }
       }
 
       function activeWorkspaceId() {
@@ -3174,7 +3299,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         setup.factions.forEach((faction, factionIndex) => {
           (liveLayers[faction.id] || faction.influenceCells).forEach((key) => {
             if (!cellOwners.has(key)) cellOwners.set(key, []);
-            cellOwners.get(key).push({ factionId: faction.id, color: liveInfluenceColors[factionIndex % liveInfluenceColors.length] });
+            cellOwners.get(key).push({ factionId: faction.id, color: faction.color || liveInfluenceColors[factionIndex % liveInfluenceColors.length] });
           });
         });
         for (let q = qMin; q <= qMax; q += 1) {
@@ -3214,7 +3339,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
             });
             if (stagedInfluenceCells.has(key) && !owners.length) {
               const factionIndex = Math.max(0, setup.factions.findIndex((faction) => faction.id === document.getElementById("live-influence-faction").value));
-              L.polygon(vertices, { color: liveInfluenceColors[factionIndex % liveInfluenceColors.length], weight: 4, fill: true, fillColor: liveInfluenceColors[factionIndex % liveInfluenceColors.length], fillOpacity: .18, interactive: false }).addTo(influenceHexLayer);
+              const selectedFaction = setup.factions[factionIndex];
+              const color = selectedFaction?.color || liveInfluenceColors[factionIndex % liveInfluenceColors.length];
+              L.polygon(vertices, { color, weight: 4, fill: true, fillColor: color, fillOpacity: .18, interactive: false }).addTo(influenceHexLayer);
             }
             if (influenceMap.getZoom() >= (image ? 3 : 9)) {
               L.marker(FieldbookMapCoordinates.toLatLng(center, bounds), { interactive: false, keyboard: false, icon: L.divIcon({ className: "leaflet-hex-label", html: `Q${q >= 0 ? "+" : ""}${q} R${r >= 0 ? "+" : ""}${r}`, iconSize: [60, 12], iconAnchor: [30, 6] }) }).addTo(influenceHexLayer);
@@ -3262,7 +3389,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           row.className = "influence-row";
           const swatch = document.createElement("i");
           swatch.className = "influence-swatch";
-          swatch.style.color = liveInfluenceColors[index % liveInfluenceColors.length];
+          swatch.style.color = faction.color || liveInfluenceColors[index % liveInfluenceColors.length];
           const name = document.createElement("span");
           name.textContent = faction.name;
           const count = document.createElement("small");
@@ -3285,6 +3412,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const saveButton = document.getElementById("live-influence-save");
         const clearButton = document.getElementById("live-influence-clear");
         const feedback = document.getElementById("live-influence-feedback");
+        document.getElementById("runtime-faction-fields").disabled = !state.runtimeCampaignId
+          || runtimeFactionLayers?.campaignId !== state.runtimeCampaignId || factionSavePending || factionCreatePending;
         const setup = state.setupPackage;
         factionSelect.replaceChildren();
         const placeholder = document.createElement("option");
@@ -3407,6 +3536,18 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (announce) showToast(`Runtime campaign loaded: ${setupPackage.campaign.name}.`);
       }
 
+      function renderConflictBattleLink() {
+        const link = document.getElementById("conflict-battle-link");
+        const campaignId = runtimeDataLoaded ? state.runtimeCampaignId : null;
+        if (!campaignId) {
+          link.hidden = true;
+          link.removeAttribute("href");
+          return;
+        }
+        link.href = `combat.html?campaign=${encodeURIComponent(campaignId)}`;
+        link.hidden = false;
+      }
+
       document.addEventListener("fieldbook:map-saved", (event) => {
         const publication = event.detail;
         if (state.runtimeCampaignId !== publication.campaignId || !state.setupPackage) return;
@@ -3432,6 +3573,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         runtimeCampaignSelect.value = previousCampaignAvailable ? previousCampaignId : "";
         if (!previousCampaignAvailable) {
           runtimeDataLoaded = false;
+          renderConflictBattleLink();
           openPlayerSeedDialogButton.disabled = true;
           openCharacterChangesButton.disabled = true;
           exportRuntimeBackupButton.disabled = true;
@@ -3462,6 +3604,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           runtimeCampaignSelect.value = previousCampaignAvailable ? previousCampaignId : "";
           if (!previousCampaignAvailable) {
             runtimeDataLoaded = false;
+            renderConflictBattleLink();
             updateWeatherRollAvailability();
             openPlayerSeedDialogButton.disabled = true;
             openCharacterChangesButton.disabled = true;
@@ -3552,6 +3695,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           }
         }
         runtimeDataLoaded = false;
+        renderConflictBattleLink();
         updateWeatherRollAvailability();
         document.getElementById("influence-campaign-label").textContent = "No runtime campaign selected";
         const status = document.getElementById("influence-map-status");
@@ -3594,6 +3738,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         if (runtimeCampaignSelect.value) return loadRuntimeCampaign(runtimeCampaignSelect.value).catch((error) => showToast(error.message));
         else {
           runtimeDataLoaded = false;
+          renderConflictBattleLink();
           ++runtimeCampaignLoadGeneration;
           updateWeatherRollAvailability();
           openPlayerSeedDialogButton.disabled = true;
@@ -4384,6 +4529,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         renderLiveInfluenceControls();
         renderLiveInfluenceGrid();
       });
+      document.getElementById("runtime-faction-form").addEventListener("submit", createRuntimeFaction);
       document.getElementById("live-influence-edit").addEventListener("click", (event) => {
         liveInfluenceEditing = !liveInfluenceEditing;
         if (liveInfluenceEditing) stagedInfluenceCells.clear();

@@ -2,6 +2,7 @@ const { existsSync, readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { getAccountHomePath, getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
 const { createCampaignHandler } = require("./campaigns.cjs");
+const { createRollTablesHandler } = require("./roll-tables-api.cjs");
 const { createPlayerHandler } = require("./player.cjs");
 const { createUserHandler } = require("./users.cjs");
 const { uploadOfflineBasemap, getOfflineBasemapMetadata, sendOfflineBasemap, ASSET_ID_PATTERN } = require("./offline-basemaps.cjs");
@@ -44,6 +45,8 @@ const PROTECTED_FILES = new Map([
   ["/personnel-client.js", ["personnel-client.js", "text/javascript; charset=utf-8"]],
   ["/location-client.js", ["location-client.js", "text/javascript; charset=utf-8"]],
   ["/route-client.js", ["route-client.js", "text/javascript; charset=utf-8"]],
+  ["/roll-table-contract.js", ["roll-table-contract.js", "text/javascript; charset=utf-8"]],
+  ["/roll-tables-client.js", ["roll-tables-client.js", "text/javascript; charset=utf-8"]],
   ["/comms-client.js", ["comms-client.js", "text/javascript; charset=utf-8"]],
   ["/inventory-client.js", ["inventory-client.js", "text/javascript; charset=utf-8"]],
   ["/conditions-client.js", ["conditions-client.js", "text/javascript; charset=utf-8"]],
@@ -62,6 +65,7 @@ const AUTH_PATHS = new Set([
   "/api/auth/logout"
 ]);
 const CAMPAIGN_PATH = /^\/api\/campaigns(?:\/|$)/;
+const ROLL_TABLES_PATH = /^\/api\/roll-tables(?:\/|$)/;
 const PLAYER_API_PATH = /^\/api\/player(?:\/|$)/;
 const USER_API_PATH = /^\/api\/(?:users|player-seeds)(?:\/|$)/;
 
@@ -100,6 +104,7 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
     return true;
   };
   const effectiveCampaignHandler = campaignHandler || createCampaignHandler({ database, validateOfflineBasemap });
+  const rollTablesHandler = createRollTablesHandler({ database });
   const setupPackageHandler = createSetupPackageHandler({ root, database, validateOfflineBasemap, findOfflineBasemapDirectory, logger });
   return async (request, response) => {
     const url = new URL(request.url, "http://fieldbook.invalid");
@@ -133,6 +138,7 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
       return response.end();
     }
     if (/^\/api\/setup-packages(?:\/|$)/.test(url.pathname)) return setupPackageHandler(request, response, account, url.pathname);
+    if (ROLL_TABLES_PATH.test(url.pathname)) return rollTablesHandler(request, response);
     if (CAMPAIGN_PATH.test(url.pathname)) return effectiveCampaignHandler(request, response);
     const playerBasemapMatch = url.pathname.match(/^\/api\/player\/campaigns\/([^/]+)\/map-basemap$/);
     if (playerBasemapMatch) {

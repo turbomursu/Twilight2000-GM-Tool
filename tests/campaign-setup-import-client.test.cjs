@@ -101,6 +101,7 @@ function runtimeHarness({ request, packages = [], setupListError } = {}) {
       getElementById: (id) => node(id)
     },
     updateWeatherRollAvailability() {},
+    renderConflictBattleLink() {},
     campaignApiRequest: async (path) => {
       requests.push(path);
       if (path === "/api/setup-packages") {

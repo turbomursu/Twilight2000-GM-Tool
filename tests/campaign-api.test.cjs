@@ -436,6 +436,11 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   const playerPath = `${origin}/api/player/campaigns/${campaign.id}/map`;
   const playerBasemapPath = `${origin}/api/player/campaigns/${campaign.id}/map-basemap`;
   const readPlayer = async (authCookie = playerCookies[0]) => (await fetch(playerPath, { headers: { Cookie: authCookie } })).json();
+  const gmMap = await (await fetch(gmPath, { headers: { Cookie: cookie } })).json();
+  assert.deepEqual(gmMap.map.catalog.grid, {
+    coordinateSystem: "axial-q-r", cellKm: 10, origin: { lat: 61, lng: 13 }
+  });
+  assert.doesNotMatch(JSON.stringify(gmMap), /terrainCells|SECRET/);
   const action = (input, authCookie = cookie, extraHeaders = {}) => fetch(gmPath, { method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: authCookie, ...extraHeaders }, body: JSON.stringify(input) });
   assert.equal((await fetch(playerPath)).status, 401);
@@ -474,6 +479,7 @@ test("GM-selected maps exclude hidden records and publish read-only to all four 
   assert.deepEqual(published.map, { ...preview.preview, offlineBasemap: { ...preview.preview.offlineBasemap,
     assetUrl: `/api/player/campaigns/${campaign.id}/map-basemap` } });
   assert.deepEqual(Object.keys(published.map).sort(), ["bounds", "geometries", "locations", "markings", "name", "offlineBasemap", "playerPosition", "route", "schemaVersion"]);
+  assert.equal(Object.hasOwn(published.map, "grid"), false, "the private campaign grid is not published to players");
   assert.deepEqual(published.map.offlineBasemap, { ...source.map.offlineBasemap, assetUrl: `/api/player/campaigns/${campaign.id}/map-basemap` });
   const playerBasemap = await fetch(`${origin}${published.map.offlineBasemap.assetUrl}`, { headers: { Cookie: playerCookies[0], Range: "bytes=0-15" } });
   assert.equal(playerBasemap.status, 206);
@@ -700,6 +706,102 @@ test("faction layer API persists and clears campaign-scoped edits with revision 
   const outsiderCookie = login.headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(path, { headers: { Cookie: outsiderCookie } })).status, 404);
   assert.equal((await put({ expectedRevision: 3, factionId: "faction-1", cells: [] }, { Cookie: outsiderCookie })).status, 404);
+});
+
+test("runtime faction creation is owner-scoped, validated, revisioned, audited, and separate from setup source", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const setup = validSetupPackage();
+  const imported = await fetch(`${origin}/api/campaigns/import-setup`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(setup)
+  });
+  assert.equal(imported.status, 201);
+  const campaignId = (await imported.json()).campaign.id;
+  const campaignPath = `${origin}/api/campaigns/${campaignId}`;
+  const creationPath = `${origin}/api/campaigns/${campaignId}/factions`;
+  const campaignBefore = await (await fetch(campaignPath, { headers: { Cookie: cookie } })).json();
+  const create = (body, authCookie = cookie, extraHeaders = {}) => fetch(creationPath, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: authCookie, ...extraHeaders },
+    body: JSON.stringify(body)
+  });
+
+  assert.equal((await create({ name: "Northern Brigade", expectedRevision: campaignBefore.campaign.revision }, "", {})).status, 401);
+  assert.equal((await create({ name: "Northern Brigade", expectedRevision: campaignBefore.campaign.revision }, cookie, { Origin: "http://untrusted.example" })).status, 403);
+  assert.equal((await create({ name: "   ", expectedRevision: campaignBefore.campaign.revision })).status, 422);
+  assert.equal((await create({ name: "Northern Brigade", color: "red", expectedRevision: campaignBefore.campaign.revision })).status, 422);
+  assert.equal((await create({ name: "Northern Brigade", unexpected: true, expectedRevision: campaignBefore.campaign.revision })).status, 422);
+  assert.equal((await create({ name: "Northern Brigade", expectedRevision: campaignBefore.campaign.revision + 1 })).status, 409);
+
+  const createdResponse = await create({
+    name: "Northern Brigade", description: "Local command", color: "#3d6175", expectedRevision: campaignBefore.campaign.revision
+  });
+  assert.equal(createdResponse.status, 201);
+  const created = await createdResponse.json();
+  assert.equal(created.faction.name, "Northern Brigade");
+  assert.equal(created.faction.color, "#3d6175");
+  assert.equal(created.campaignRevision, campaignBefore.campaign.revision + 1);
+  assert.equal((await create({ name: " northern brigade ", expectedRevision: created.campaignRevision })).status, 409);
+
+  const reloadedCampaign = await (await fetch(campaignPath, { headers: { Cookie: cookie } })).json();
+  assert.ok(reloadedCampaign.campaign.setupPackage.factions.some((faction) =>
+    faction.id === created.faction.id && faction.name === "Northern Brigade" && faction.color === "#3d6175"));
+  const source = JSON.parse(database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId).source_json);
+  assert.deepEqual(source.factions.map((faction) => faction.id), ["faction-1"]);
+  const layers = await (await fetch(`${origin}/api/campaigns/${campaignId}/faction-layers`, { headers: { Cookie: cookie } })).json();
+  assert.deepEqual(layers.layers.influence[created.faction.id], []);
+  const audit = database.prepare("SELECT action, target_type, target_id, campaign_revision_before, campaign_revision_after FROM audit_events WHERE campaign_id = ? AND action = 'faction.create'").get(campaignId);
+  assert.deepEqual({ ...audit }, {
+    action: "faction.create", target_type: "faction", target_id: created.faction.id,
+    campaign_revision_before: campaignBefore.campaign.revision, campaign_revision_after: created.campaignRevision
+  });
+
+  const hash = database.prepare("SELECT password_hash FROM accounts WHERE login_identifier = 'gm-user'").get().password_hash;
+  const timestamp = new Date().toISOString();
+  database.prepare("INSERT INTO accounts (id, login_identifier, password_hash, created_at, updated_at, global_role) VALUES ('faction-outsider', 'faction-outsider', ?, ?, ?, 'gm')").run(hash, timestamp, timestamp);
+  const login = await fetch(`${origin}/api/auth/login`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "faction-outsider", password })
+  });
+  assert.equal(login.status, 200);
+  const outsiderCookie = login.headers.get("set-cookie").split(";")[0];
+  assert.equal((await create({ name: "Unauthorized", expectedRevision: created.campaignRevision }, outsiderCookie)).status, 404);
+});
+
+test("battle resolver API is limited to the owning GM and does not mutate campaign state", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const imported = await fetch(`${origin}/api/campaigns/import-setup`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(validSetupPackage())
+  });
+  assert.equal(imported.status, 201);
+  const campaignId = (await imported.json()).campaign.id;
+  const combatPath = `${origin}/api/campaigns/${campaignId}/combat/close-combat`;
+  const body = JSON.stringify({
+    weaponName: "Training weapon", weaponBaseDamage: 2, weaponThreshold: 4,
+    strengthRoll: 6, ccRoll: 5, targetArmorLevel: 0
+  });
+  assert.equal((await fetch(combatPath, { method: "POST", headers: { "Content-Type": "application/json" }, body })).status, 401);
+
+  const hash = database.prepare("SELECT password_hash FROM accounts WHERE login_identifier = 'gm-user'").get().password_hash;
+  const timestamp = new Date().toISOString();
+  database.prepare("INSERT INTO accounts (id, login_identifier, password_hash, created_at, updated_at, global_role) VALUES ('combat-outsider', 'combat-outsider', ?, ?, ?, 'gm')").run(hash, timestamp, timestamp);
+  const login = await fetch(`${origin}/api/auth/login`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "combat-outsider", password })
+  });
+  assert.equal(login.status, 200);
+  const outsiderCookie = login.headers.get("set-cookie").split(";")[0];
+  assert.equal((await fetch(combatPath, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: outsiderCookie }, body
+  })).status, 404);
+
+  const before = database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision;
+  const resolved = await fetch(combatPath, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body
+  });
+  assert.equal(resolved.status, 200);
+  assert.ok((await resolved.json()).damage);
+  assert.equal(database.prepare("SELECT revision FROM campaigns WHERE runtime_id = ?").get(campaignId).revision, before);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE campaign_id = ?").get(campaignId).count, 0);
 });
 
 test("conflict incident ledger is GM-only, manually managed, revision checked, audited, and recoverable", async (t) => {

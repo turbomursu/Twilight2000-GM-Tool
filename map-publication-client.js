@@ -130,7 +130,6 @@
     const latitude = document.querySelector("#map-player-latitude");
     const longitude = document.querySelector("#map-player-longitude");
     const routeChoice = document.querySelector("#map-route-location");
-    const positionChoice = document.querySelector("#map-position-location");
     const geometryType = document.querySelector("#map-geometry-type");
     const geometryLabel = document.querySelector("#map-geometry-label");
     const geometryCoordinates = document.querySelector("#map-geometry-coordinates");
@@ -149,6 +148,18 @@
     let busy = false;
     let previewRevision = null;
     let markingCounter = 0;
+    const pickerDialog = document.querySelector("#map-hex-picker-dialog");
+    const pickerMapNode = document.querySelector("#map-hex-picker-canvas");
+    const pickerStatus = document.querySelector("#map-hex-picker-status");
+    const pickerConfirm = document.querySelector("#use-map-hex");
+    let pickerMap = null;
+    let pickerBasemap = null;
+    let pickerHexLayer = null;
+    let pickerContextLayer = null;
+    let pickerMode = null;
+    let pickerSelection = null;
+    let pickerVisibleHexes = new Map();
+    let pickerCampaignId = "";
     const coordinates = globalThis.FieldbookMapCoordinates;
     const imageExtent = () => coordinates.isImage(publication?.catalog.bounds);
     const position = (first, second) => imageExtent() ? { x: second, y: first } : { lat: first, lng: second };
@@ -199,8 +210,8 @@
     }
     function choices() {
       const selected = new Set(readDraft().locationIds);
-      [routeChoice, positionChoice].forEach((input) => { input.replaceChildren(new Option("Choose selected location", ""));
-        publication.catalog.locations.filter((location) => selected.has(location.id)).forEach((location) => input.add(new Option(location.name, location.id))); });
+      routeChoice.replaceChildren(new Option("Choose selected location", ""));
+      publication.catalog.locations.filter((location) => selected.has(location.id)).forEach((location) => routeChoice.add(new Option(location.name, location.id)));
     }
     function routes() {
       const container = document.querySelector("#map-route-entries"); container.replaceChildren();
@@ -222,9 +233,17 @@
         const row = document.createElement("div"); row.className = "map-marking-row"; row.dataset.markingId = marking.id;
         [["markLabel", "Marking label", marking.label], ["markLat", imageExtent() ? "Marking y / km north" : "Marking latitude", firstValue(marking.position)], ["markLng", imageExtent() ? "Marking x / km east" : "Marking longitude", secondValue(marking.position)]].forEach(([key, label, value]) => {
           const input = document.createElement("input"); input.dataset[key] = ""; input.setAttribute("aria-label", label);
-          input.type = key === "markLabel" ? "text" : "number"; input.step = "any"; input.maxLength = 160; input.value = value ?? ""; row.append(input);
+          input.type = key === "markLabel" ? "text" : "number"; input.step = "any"; input.maxLength = 160; input.value = value ?? "";
+          if (key !== "markLabel") { input.readOnly = true; input.setAttribute("aria-readonly", "true"); }
+          row.append(input);
         });
-        row.append(icon("\u00d7", "Remove marking", () => { draft = readDraft(); draft.markings.splice(index, 1); markings(); invalidate(); })); container.append(row);
+        const choose = document.createElement("button");
+        choose.type = "button";
+        choose.className = "button";
+        choose.textContent = "Choose hex";
+        choose.setAttribute("aria-label", `Choose map hex for ${marking.label}`);
+        choose.addEventListener("click", () => openHexPicker({ type: "marking", id: marking.id }));
+        row.append(choose, icon("\u00d7", "Remove marking", () => { draft = readDraft(); draft.markings.splice(index, 1); markings(); invalidate(); })); container.append(row);
       });
     }
     function renderGeometries() {
@@ -258,6 +277,153 @@
         geometryEntries.append(row);
       });
     }
+    function pickerCoordinateText(hex) {
+      const position = hex.position;
+      return coordinates.isImage(publication.catalog.bounds)
+        ? `Hex ${hex.key} / center ${position.x.toFixed(2)}, ${position.y.toFixed(2)} km`
+        : `Hex ${hex.key} / center ${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`;
+    }
+    function drawPickerHexes() {
+      if (!pickerMap || !pickerHexLayer || !publication || pickerCampaignId !== id) return;
+      pickerHexLayer.clearLayers();
+      pickerVisibleHexes.clear();
+      const grid = publication.catalog.grid;
+      const bounds = publication.catalog.bounds;
+      if (!grid || grid.coordinateSystem !== "axial-q-r" || grid.cellKm !== 10) {
+        pickerStatus.textContent = "This campaign has no verified 10 km axial grid. Hex selection is unavailable.";
+        pickerConfirm.disabled = true;
+        return;
+      }
+      const view = pickerMap.getBounds();
+      const corners = [view.getSouthWest(), view.getNorthWest(), view.getNorthEast(), view.getSouthEast()]
+        .map((point) => coordinates.axialForPosition(coordinates.fromLatLng(point, bounds), grid.origin, bounds));
+      const qMin = Math.min(...corners.map((point) => point.q)) - 2;
+      const qMax = Math.max(...corners.map((point) => point.q)) + 2;
+      const rMin = Math.min(...corners.map((point) => point.r)) - 2;
+      const rMax = Math.max(...corners.map((point) => point.r)) + 2;
+      if ((qMax - qMin + 1) * (rMax - rMin + 1) > 900) {
+        pickerStatus.textContent = "Zoom in to view the 10 km hex grid.";
+        pickerConfirm.disabled = true;
+        return;
+      }
+      if (!pickerSelection) pickerStatus.textContent = "Click a hex, then confirm its center.";
+      for (let q = qMin; q <= qMax; q += 1) {
+        for (let r = rMin; r <= rMax; r += 1) {
+          const hex = coordinates.hexGeometry(q, r, grid, bounds);
+          if (!hex || !view.contains(coordinates.toLatLng(hex.position, bounds))) continue;
+          pickerVisibleHexes.set(hex.key, hex);
+          const selected = pickerSelection?.key === hex.key;
+          const polygon = L.polygon(hex.vertices.map((point) => coordinates.toLatLng(point, bounds)), {
+            color: selected ? "#a16822" : "#596b5f", weight: selected ? 3 : 1,
+            fillColor: selected ? "#e5bd70" : "#e4ece2", fillOpacity: selected ? .48 : .12,
+            interactive: true
+          }).addTo(pickerHexLayer);
+          polygon.on("click", (event) => {
+            if (!pickerMode || pickerCampaignId !== id
+              || !coordinates.contains(coordinates.fromLatLng(event.latlng, bounds), bounds)) return;
+            pickerSelection = hex;
+            pickerStatus.textContent = `${pickerCoordinateText(hex)} selected.`;
+            pickerConfirm.disabled = false;
+            drawPickerHexes();
+          });
+          L.marker(coordinates.toLatLng(hex.position, bounds), {
+            interactive: false,
+            icon: L.divIcon({ className: selected ? "map-hex-selection-label" : "map-hex-label",
+              html: hex.key, iconSize: [48, selected ? 24 : 16], iconAnchor: [24, selected ? 12 : 8] })
+          }).addTo(pickerHexLayer);
+        }
+      }
+    }
+    function disposeHexPicker() {
+      pickerBasemap?.destroy();
+      pickerBasemap = null;
+      pickerMap?.remove();
+      pickerMap = null;
+      pickerHexLayer = null;
+      pickerContextLayer = null;
+      pickerMode = null;
+      pickerSelection = null;
+      pickerVisibleHexes.clear();
+      pickerConfirm.disabled = true;
+      pickerMapNode.replaceChildren();
+    }
+    function openHexPicker(mode) {
+      if (!publication || !publication.catalog.grid) {
+        status.textContent = "Hex selection is unavailable because this campaign has no verified grid.";
+        return;
+      }
+      draft = readDraft();
+      pickerMode = mode;
+      pickerSelection = null;
+      pickerCampaignId = id;
+      pickerConfirm.disabled = true;
+      const currentPosition = mode.type === "player-position" ? draft.playerPosition
+        : mode.type === "marking" ? draft.markings.find((marking) => marking.id === mode.id)?.position : null;
+      document.querySelector("#map-hex-picker-title").textContent = mode.type === "player-position"
+        ? "Choose player position hex" : mode.type === "add-marking" ? "Choose marking hex" : "Choose marking hex";
+      pickerStatus.textContent = currentPosition ? "Current marker is shown on the map. Click a hex to move it." : "Click a hex, then confirm its center.";
+      document.querySelector("#map-hex-picker-key-field").hidden = publication.catalog.offlineBasemap?.format !== "maptiler-style";
+      pickerDialog.showModal();
+      try {
+        const bounds = publication.catalog.bounds;
+        pickerMap = L.map(pickerMapNode, {
+          crs: coordinates.isImage(bounds) ? L.CRS.Simple : L.CRS.EPSG3857,
+          minZoom: coordinates.isImage(bounds) ? -10 : 0,
+          maxZoom: 18,
+          zoomSnap: .25,
+          zoomDelta: .25
+        });
+        pickerBasemap = globalThis.FieldbookBasemap.controller(pickerMap, (message) => { pickerStatus.textContent = message; });
+        pickerBasemap.set(publication.catalog.offlineBasemap, bounds);
+        pickerContextLayer = L.layerGroup().addTo(pickerMap);
+        pickerHexLayer = L.layerGroup().addTo(pickerMap);
+        const locations = publication.catalog.locations;
+        locations.filter((location) => draft.locationIds.includes(location.id)).forEach((location) =>
+          L.circleMarker(coordinates.toLatLng(location.position, bounds), { radius: 5, color: "#315a48", fillColor: "#edf3eb", fillOpacity: .9, interactive: false })
+            .addTo(pickerContextLayer));
+        draft.markings.forEach((marking) =>
+          L.circleMarker(coordinates.toLatLng(marking.position, bounds), { radius: 6, color: "#a16822", fillColor: "#f0d6a0", fillOpacity: .9, interactive: false })
+            .addTo(pickerContextLayer));
+        const route = draft.routeLocationIds.map((locationId) => locations.find((location) => location.id === locationId))
+          .filter(Boolean);
+        if (route.length > 1) L.polyline(route.map((location) => coordinates.toLatLng(location.position, bounds)),
+          { color: "#a13e35", weight: 3, dashArray: "8 5", interactive: false }).addTo(pickerContextLayer);
+        if (draft.playerPosition) L.circleMarker(coordinates.toLatLng(draft.playerPosition, bounds),
+          { radius: 9, color: "#922e29", fillColor: "#db5c45", fillOpacity: .8, interactive: false }).addTo(pickerContextLayer);
+        pickerMap.fitBounds(coordinates.leafletBounds(bounds), { padding: [24, 24] });
+        pickerMap.on("moveend zoomend", drawPickerHexes);
+        drawPickerHexes();
+        requestAnimationFrame(() => pickerMap?.invalidateSize({ pan: false }));
+      } catch (error) {
+        pickerStatus.textContent = `Campaign map unavailable: ${error.message}`;
+      }
+    }
+    function applyHexSelection() {
+      if (!pickerMode || !pickerSelection || pickerCampaignId !== id || !pickerVisibleHexes.has(pickerSelection.key)) return;
+      draft = readDraft();
+      const position = pickerSelection.position;
+      if (pickerMode.type === "player-position") {
+        latitude.value = firstValue(position);
+        longitude.value = secondValue(position);
+      } else if (pickerMode.type === "add-marking") {
+        draft.markings.push({ id: `mark-${Date.now()}-${markingCounter++}`, label: "Marking", position });
+        markings();
+      } else {
+        const marking = draft.markings.find((entry) => entry.id === pickerMode.id);
+        if (!marking) return;
+        marking.position = position;
+        markings();
+      }
+      invalidate();
+      pickerDialog.close();
+    }
+    pickerConfirm.addEventListener("click", applyHexSelection);
+    document.querySelector("#cancel-map-hex-picker").addEventListener("click", () => pickerDialog.close());
+    document.querySelector("#close-map-hex-picker").addEventListener("click", () => pickerDialog.close());
+    pickerDialog.addEventListener("cancel", (event) => {
+      if (busy) event.preventDefault();
+    });
+    pickerDialog.addEventListener("close", disposeHexPicker);
     function renderDraft() {
       draft = structuredClone(publication.draft);
       draft.geometries ||= [];
@@ -271,14 +437,15 @@
           draft.routeLocationIds = draft.routeLocationIds.filter((locationId) => selected.has(locationId)); routes(); choices(); invalidate(); });
       });
       latitude.value = firstValue(draft.playerPosition) ?? ""; longitude.value = secondValue(draft.playerPosition) ?? "";
-      document.querySelector('label[for="map-player-latitude"]').textContent = imageExtent() ? "Player position / y (km north)" : "Player position / latitude";
-      document.querySelector('label[for="map-player-longitude"]').textContent = imageExtent() ? "Player position / x (km east)" : "Player position / longitude";
+      document.querySelector('label[for="map-player-latitude"]').textContent = imageExtent() ? "Selected hex center / y (km north)" : "Selected hex center / latitude";
+      document.querySelector('label[for="map-player-longitude"]').textContent = imageExtent() ? "Selected hex center / x (km east)" : "Selected hex center / longitude";
       document.querySelector('label[for="map-geometry-coordinates"]').textContent = `Vertices / ${vertexLabel()}`;
       geometryCoordinates.placeholder = imageExtent() ? "0,0\n10,10\n20,10" : "14.0,60.0\n14.2,60.1\n14.4,60.2";
       routes(); markings(); renderGeometries(); choices(); controls();
       backgroundControls();
     }
     async function load(campaignId) {
+      if (pickerDialog.open) pickerDialog.close();
       const token = ++generation; id = campaignId; publication = null; draft = null; invalidate(); form.reset();
       ["map-allowed-locations", "map-route-entries", "map-marking-entries", "map-geometry-entries"].forEach((key) => document.getElementById(key).replaceChildren());
       status.textContent = id ? "Loading map draft..." : "Select a runtime campaign.";
@@ -364,10 +531,13 @@
     reload.addEventListener("click", () => { if (!publication || JSON.stringify(readDraft()) === JSON.stringify(publication.draft)
       || confirm("Discard unsaved map edits and reload?")) load(select.value); });
     document.querySelector("#add-map-waypoint").addEventListener("click", () => { if (routeChoice.value) { draft.routeLocationIds.push(routeChoice.value); routes(); invalidate(); } });
-    document.querySelector("#add-map-marking").addEventListener("click", () => {
-      draft = readDraft(); const bounds = publication.catalog.bounds;
-      draft.markings.push({ id: `mark-${Date.now()}-${markingCounter++}`, label: "Marking",
-        position: draft.playerPosition || coordinates.center(bounds) }); markings(); invalidate();
+    document.querySelector("#add-map-marking").addEventListener("click", () => openHexPicker({ type: "add-marking" }));
+    document.querySelector("#choose-player-position-hex").addEventListener("click", () => openHexPicker({ type: "player-position" }));
+    document.querySelector("#clear-player-position").addEventListener("click", () => {
+      latitude.value = "";
+      longitude.value = "";
+      draft = readDraft();
+      invalidate();
     });
     addGeometryButton.addEventListener("click", () => {
       const vertices = geometryCoordinates.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
@@ -386,8 +556,6 @@
       geometryCoordinates.value = "";
       invalidate();
     });
-    positionChoice.addEventListener("change", () => { const location = publication.catalog.locations.find((item) => item.id === positionChoice.value);
-      if (location) { latitude.value = firstValue(location.position); longitude.value = secondValue(location.position); invalidate(); } });
     select.addEventListener("change", () => load(select.value)); document.addEventListener("fieldbook:campaign-selected", (event) => load(event.detail.campaignId)); load(select.value);
   }
 

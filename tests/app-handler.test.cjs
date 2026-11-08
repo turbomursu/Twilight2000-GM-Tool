@@ -49,7 +49,7 @@ test("redirects anonymous requests to login and serves only public auth assets",
   const protectedPage = await fetch(`${origin}/campaign-setup.html`, { redirect: "manual" });
   assert.equal(protectedPage.status, 302);
   assert.equal(protectedPage.headers.get("location"), "/login.html?next=%2Fcampaign-setup.html");
-  for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md"]) {
+  for (const path of ["/project-status.html", "/project-features.html", "/ROADMAP.md", "/FEATURES.md", "/roll-tables.json"]) {
     assert.equal((await fetch(`${origin}${path}`)).status, 404);
   }
   const weatherRules = await fetch(`${origin}/weather-rules.js`, { redirect: "manual" });
@@ -91,7 +91,7 @@ test("serves protected pages only for an active session and gates them again aft
   assert.match(mapTilerClient.headers.get("content-security-policy"), /connect-src 'self' https:\/\/nominatim\.openstreetmap\.org https:\/\/api\.maptiler\.com/);
   assert.match(await mapTilerClient.text(), /01a1b6c9-9a4c-7ab4-bf09-6d75353e5420/);
   const runtimeHtml = await protectedPage.text();
-  for (const asset of ["/map-visualization-client.js", "/personnel-client.js", "/location-client.js", "/route-client.js"]) {
+  for (const asset of ["/map-visualization-client.js", "/personnel-client.js", "/location-client.js", "/route-client.js", "/roll-table-contract.js", "/roll-tables-client.js"]) {
     const anonymous = await fetch(`${origin}${asset}`, { redirect: "manual" });
     assert.equal(anonymous.status, 302);
     const authenticated = await fetch(`${origin}${asset}`, { headers: { Cookie: cookie } });
@@ -100,6 +100,8 @@ test("serves protected pages only for an active session and gates them again aft
   }
   assert.match(runtimeHtml, /id="map-title">Campaign map/);
   assert.match(runtimeHtml, /id="sample-route-sketch" hidden/);
+  assert.match(runtimeHtml, /id="roll-tables-dialog"/);
+  assert.equal((runtimeHtml.match(/data-action="open-roll-tables"/g) || []).length, 4);
   assert.match(runtimeHtml, /data-auth-logout/);
   assert.doesNotMatch(runtimeHtml, /project-status\.html|project-features\.html|ROADMAP\.md|FEATURES\.md/);
   const playerHtml = readFileSync(join(__dirname, "..", "player-interface.html"), "utf8");

@@ -1,0 +1,2920 @@
+{
+  "schemaVersion": 1,
+  "tables": [
+    {
+      "id": "weather",
+      "name": "Weather",
+      "contexts": [],
+      "dice": "1d6",
+      "columns": [
+        "Roll",
+        "Result"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Weather improves"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 5,
+          "values": [
+            "2-5",
+            "No change"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Weather worsens"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Fair Weather",
+          "text": "Maximum visibility in darkness is 10 combat hexes (15 with strong moonlight)."
+        },
+        {
+          "label": "Cloudy",
+          "text": "Cloud cover reduces visibility during the dark shifts of the day to 5 combat hexes (50 meters)."
+        },
+        {
+          "label": "Heavy Rain/Snow",
+          "text": "Limits visibility to 20 combat hexes in the daytime and 5 hexes at night. Gives a −1 modifier to all ranged attacks. Requires a STAMINA check for marching and gives a −2 modifier to DRIVING rolls. A heavy rain will only last one shift – after a shift of heavy rain, the weather automatically shifts to cloudy."
+        }
+      ]
+    },
+    {
+      "id": "driving-mishaps",
+      "name": "Driving Mishaps",
+      "contexts": [],
+      "dice": "2d6",
+      "columns": [
+        "Roll",
+        "Mishap",
+        "Effect"
+      ],
+      "rows": [
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Broken Axle",
+            "The vehicle becomes inoperable, its reliability rating reduced to zero."
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Roadkill",
+            "The vehicle hits a random animal (roll a D6 on the hunting table). The animal is killed (and can be used for food), but also inflicts damage on the vehicle front equal to half its hit capacity (rounding up)."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Busted Gearbox",
+            "The vehicle cannot move any further. Fixing the problem requires a TECH roll and a vehicle spare part. One attempt per shift can be made."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Dirty Fuel",
+            "The engine stops due to dirt or water in the fuel. All of the fuel in the tank needs to be drained and the vehicle refueled before it can continue."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Bogged Down",
+            "The vehicle gets stuck and moves no further this shift. Getting loose requires a STAMINA roll or help from another vehicle. One attempt per shift can be made."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Wrong Turn",
+            "The driver makes a wrong turn and needs to turn around and go back. One hex of movement is lost this shift."
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Roadblock",
+            "The road ahead is blocked by debris, a landslide, or fallen trees. The driver must choose a different hex to move into, or remove the obstacle (STAMINA roll, taking one shift)."
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Engine Overheated",
+            "The vehicle must stop for the rest of the shift."
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Blown Tire/Thrown Track",
+            "The vehicle cannot move any further. Fixing the problem requires a TECH roll (+2) and a vehicle spare part. One attempt per shift can be made."
+          ]
+        },
+        {
+          "min": 11,
+          "max": 11,
+          "values": [
+            "11",
+            "Crash",
+            "The vehicle crashes into a tree, rock, or barricade, and suffers damage to the front equal to its travel speed rating. The crash may attract unwanted attention."
+          ]
+        },
+        {
+          "min": 12,
+          "max": 12,
+          "values": [
+            "12",
+            "Engine Blown",
+            "The vehicle becomes inoperable, its reliability rating reduced to zero."
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "hunting",
+      "name": "Hunting",
+      "contexts": [],
+      "dice": "1d6",
+      "columns": [
+        "Roll",
+        "Animal",
+        "Hit Capacity",
+        "Trapping",
+        "Food"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Grouse¹",
+            "1",
+            "No",
+            "1"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Rabbit",
+            "1",
+            "Yes",
+            "1"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Fox",
+            "1",
+            "Yes",
+            "D3"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Deer",
+            "2",
+            "No",
+            "2D6"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Boar",
+            "3",
+            "No",
+            "2D6×2"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Moose",
+            "6",
+            "No",
+            "2D6×4"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Hunting",
+          "text": "Roll SURVIVAL, modified for terrain type. Success means you’ve tracked prey – roll on the hunting table. If you roll multiple successes, roll once for each and choose which to hunt."
+        },
+        {
+          "label": "Killing Prey",
+          "text": "Make a RECON roll to move into position without alerting the animal, then make a ranged attack. If your attack inflicts damage equal to or in excess of the hit capacity, or if you roll a critical hit, the animal is killed. Otherwise it escapes. You usually only get one shot."
+        },
+        {
+          "label": "Food",
+          "text": "The Food column indicates how many rations of domestic food your prey yields, once the meat has been cut and cooked. You can eat raw meat, but you must make a STAMINA roll to resist food poisoning."
+        },
+        {
+          "label": "Trapping",
+          "text": "Animals marked Yes for Trapping can be caught using simple snares. Instead of shooting the animal, make another SURVIVAL roll after tracking – if successful, the animal is caught."
+        },
+        {
+          "label": "Repeat Hunting",
+          "text": "Only one character can roll for hunting in the same hex during the same shift, but others can help the roll. For each shift you hunt again in the same hex, you get a −1 cumulative modifier. This modifier is reset after a week."
+        }
+      ]
+    },
+    {
+      "id": "hit-location",
+      "name": "Hit Location",
+      "contexts": [],
+      "dice": "1d6",
+      "columns": [
+        "Roll",
+        "Hit Location"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Legs"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 4,
+          "values": [
+            "2–4",
+            "Torso"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Arm"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Head"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "When to Roll",
+          "text": "Roll when a human target is hit by a ranged attack, in close combat, or by an explosion. If you fired a called shot or struck an aimed blow, you can choose the hit location freely."
+        },
+        {
+          "label": "Pushing",
+          "text": "Never roll hit location for damage from pushing."
+        }
+      ]
+    },
+    {
+      "id": "critical-injury-head",
+      "name": "Critical Injury – Head",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Injury",
+        "Lethal",
+        "Time Limit",
+        "Effects",
+        "Heal Time"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Ear slashed",
+            "No",
+            "–",
+            "RECON −1",
+            "D6"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Concussion",
+            "No",
+            "–",
+            "CUF −1",
+            "D6"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Nose crushed",
+            "No",
+            "–",
+            "RECON and PERSUASION −1",
+            "2D6"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Shattered teeth",
+            "No",
+            "–",
+            "PERSUASION −2",
+            "3D6"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Cracked skull",
+            "Yes",
+            "Shift",
+            "CUF −2",
+            "2D6"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Gouged eye",
+            "Yes",
+            "Shift",
+            "RANGED COMBAT and RECON −2",
+            "Permanent"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Brain hemorrhage",
+            "Yes",
+            "Stretch",
+            "All INT skills −2",
+            "3D6"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Shattered neck",
+            "Yes",
+            "Stretch",
+            "Fall down, immobile",
+            "4D6"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Crushed windpipe",
+            "Yes",
+            "Round",
+            "STAMINA and MOBILITY −2",
+            "3D6"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Brains blown out",
+            "Yes",
+            "–",
+            "Instant death",
+            "–"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Severe Injuries",
+          "text": "If damage exceeds the crit threshold by 2+ steps, roll two D10s and use the highest. By 4+ steps, roll three D10s and use the highest."
+        },
+        {
+          "label": "Lethal",
+          "text": "If lethal, you must make a death save (STAMINA) when the time limit expires. If you fail, you die. If you succeed, you must save again when the time limit expires again."
+        }
+      ]
+    },
+    {
+      "id": "critical-injury-torso",
+      "name": "Critical Injury – Torso",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Injury",
+        "Lethal",
+        "Time Limit",
+        "Effects",
+        "Heal Time"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Snapped collarbone",
+            "No",
+            "–",
+            "MOBILITY −1",
+            "D6"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Broken ribs",
+            "No",
+            "–",
+            "STAMINA and MOBILITY −1",
+            "2D6"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Cracked pelvis",
+            "No",
+            "–",
+            "MOBILITY −2",
+            "3D6"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Bleeding gut",
+            "Yes",
+            "Shift",
+            "STAMINA −2, any MOBILITY roll reopens wound",
+            "2D6"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Ruptured kidney",
+            "Yes",
+            "Shift",
+            "1 damage at any MOBILITY roll",
+            "2D6"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Punctured lung",
+            "Yes",
+            "Shift",
+            "STAMINA and MOBILITY −2",
+            "2D6"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Cracked spine",
+            "Yes",
+            "Shift",
+            "Fall down, immobile",
+            "4D6"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Torn intestines",
+            "Yes",
+            "Stretch",
+            "STAMINA −1 and disease virulence −3, incubation one shift",
+            "2D6"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Internal bleeding",
+            "Yes",
+            "Round",
+            "Fall down, cannot run, only crawl",
+            "3D6"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Heart impaled",
+            "Yes",
+            "–",
+            "Instant death",
+            "–"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Severe Injuries",
+          "text": "If damage exceeds the crit threshold by 2+ steps, roll two D10s and use the highest. By 4+ steps, roll three D10s and use the highest."
+        },
+        {
+          "label": "Lethal",
+          "text": "If lethal, you must make a death save (STAMINA) when the time limit expires. If you fail, you die. If you succeed, you must save again when the time limit expires again."
+        }
+      ]
+    },
+    {
+      "id": "critical-injury-legs",
+      "name": "Critical Injury – Legs",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Injury",
+        "Lethal",
+        "Time Limit",
+        "Effects",
+        "Heal Time"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Crushed toes",
+            "No",
+            "–",
+            "Running becomes a slow action",
+            "2D6"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Dislocated knee",
+            "No",
+            "–",
+            "Can’t run, only crawl",
+            "D6"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Severed tendons",
+            "No",
+            "–",
+            "Running is slow action, MOBILITY −2",
+            "2D6"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Broken shinbone",
+            "No",
+            "–",
+            "Can’t run, only crawl",
+            "3D6"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Crushed ankle",
+            "No",
+            "–",
+            "Can’t run, MOBILITY −2",
+            "2D6"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Cracked hip",
+            "No",
+            "–",
+            "Can’t run, MOBILITY −2",
+            "3D6"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Thigh gash",
+            "Yes",
+            "Shift",
+            "Running is slow action, MOBILITY −2",
+            "D6"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Shattered knee",
+            "Yes",
+            "Shift",
+            "Can’t run, MOBILITY −2",
+            "3D6"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Arterial bleeding",
+            "Yes",
+            "Stretch",
+            "Running becomes a slow action",
+            "2D6"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Severed leg",
+            "Yes",
+            "Stretch",
+            "Can’t run, MOBILITY −2",
+            "Permanent"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Leg Crits",
+          "text": "In addition to the listed effects, all leg crits make you fall down."
+        },
+        {
+          "label": "Severe Injuries",
+          "text": "If damage exceeds the crit threshold by 2+ steps, roll two D10s and use the highest. By 4+ steps, roll three D10s and use the highest."
+        },
+        {
+          "label": "Lethal",
+          "text": "If lethal, you must make a death save (STAMINA) when the time limit expires. If you fail, you die. If you succeed, you must save again when the time limit expires again."
+        }
+      ]
+    },
+    {
+      "id": "critical-injury-arms",
+      "name": "Critical Injury – Arms",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Injury",
+        "Lethal",
+        "Time Limit",
+        "Effects",
+        "Heal Time"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Dislocated shoulder",
+            "No",
+            "–",
+            "RANGED COMBAT −2 with two-handed weapons",
+            "D6"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Slashed forearm",
+            "No",
+            "–",
+            "RANGED COMBAT −2 with two-handed weapons",
+            "2D6"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Crushed fingers",
+            "No",
+            "–",
+            "RANGED COMBAT −2 with two-handed weapons",
+            "3D6"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Dislocated elbow",
+            "No",
+            "–",
+            "Two-handed weapons cannot be used",
+            "D6"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Broken forearm",
+            "No",
+            "–",
+            "Two-handed weapons cannot be used",
+            "2D6"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Crushed wrist",
+            "No",
+            "–",
+            "Two-handed weapons cannot be used",
+            "3D6"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Bleeding shoulder",
+            "Yes",
+            "Shift",
+            "RANGED COMBAT −2 with two-handed weapons",
+            "D6"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Shattered elbow",
+            "Yes",
+            "Shift",
+            "Two-handed weapons cannot be used",
+            "3D6"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Arterial bleeding",
+            "Yes",
+            "Stretch",
+            "RANGED COMBAT −2 with two-handed weapons",
+            "2D6"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Severed arm",
+            "Yes",
+            "Stretch",
+            "Two-handed weapons cannot be used",
+            "Permanent"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Arm Crits",
+          "text": "In addition to the listed effects, all arm crits automatically make you drop any held items."
+        },
+        {
+          "label": "Severe Injuries",
+          "text": "If damage exceeds the crit threshold by 2+ steps, roll two D10s and use the highest. By 4+ steps, roll three D10s and use the highest."
+        },
+        {
+          "label": "Lethal",
+          "text": "If lethal, you must make a death save (STAMINA) when the time limit expires. If you fail, you die. If you succeed, you must save again when the time limit expires again."
+        }
+      ]
+    },
+    {
+      "id": "critical-injury-mental",
+      "name": "Critical Injury – Mental",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Injury",
+        "Effects"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Nervous tremble",
+            "RANGED COMBAT and DRIVING −1"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Anxious",
+            "RECON and SURVIVAL −1"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Sullen",
+            "COMMAND and PERSUASION −1"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Nightmares",
+            "CUF roll every shift spent sleeping – if failed, the sleep doesn’t count"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Nocturnal",
+            "Sleep only possible during morning and day shifts"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Phobia",
+            "1 stress each round in the same hex as the object of phobia (related to trauma)"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Alcoholism",
+            "1 point of stress and no stress recovery each shift without drinking alcohol"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Paranoia",
+            "Effects are to be roleplayed"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Psychosis",
+            "EMP roll (attribute only) in stressful situations, failure triggers violent rampage"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Catatonic",
+            "Immobile and non-responsive"
+          ]
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "camp-mishaps",
+      "name": "Camp Mishaps",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Mishap",
+        "Effect"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Food Spoiled",
+            "Your food has rotted or been infected by insects. Half the rations you are carrying are spoiled."
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Flooding",
+            "Heavy rainfall starts in the middle of the night. The camp is flooded and everything gets soaking wet. All characters must roll for STAMINA to avoid becoming hypothermic, and no one gets any sleep."
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "Fire Dies",
+            "The firewood is wet, and your campfire goes out. Except in warm weather, everyone must roll for STAMINA to avoid becoming hypothermic."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "Fire!",
+            "The flames from your campfire spread out of control. If you have a tent, it’s destroyed. Each character suffers the effects of fire with intensity D, and must make a MOBILITY roll to save their gear. Failure means that one piece of equipment (Referee’s discretion) is lost in the fire."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Ants",
+            "Your camp sits right in the middle of an ant road. You each suffer 1 point of stress and no one gets any sleep here."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Lice",
+            "A randomly selected character has caught lice. It itches horribly, and they get a rash all over their body. The victim suffers 1 point of stress each day and cannot sleep this day. A successful MEDICAL AID roll stops the effect."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Mosquito Swarm",
+            "A large swarm of mosquitoes attacks the camp, driving everyone crazy. Roll two D6 base dice for each character – for each bane rolled, the character suffers 1 point of stress."
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "Savage Animal",
+            "A starving wolf, dog, boar or even a bear attacks the camp. For stats, see page 38 of the Referee’s Manual."
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Lost Gear",
+            "A randomly selected character has lost a piece of gear. The Referee decides what was lost, and if it can be found."
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Broken Gear",
+            "An item belonging to a randomly selected character is broken. The Referee decides what item it is. The item can be repaired with a TECH roll."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Making Camp",
+          "text": "Make a SURVIVAL roll. If your roll succeeds, you find a sheltered place to spend the night. If your roll fails, you set up camp anyway, but the Referee makes a hidden roll on this mishap table. Re-roll if the mishap is not applicable to the situation."
+        }
+      ]
+    },
+    {
+      "id": "scrounging",
+      "name": "Scrounging",
+      "contexts": [],
+      "dice": "1d100",
+      "columns": [
+        "Roll",
+        "Item",
+        "Effect",
+        "Spare Parts",
+        "Weight",
+        "Value"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "01",
+            "Alarm clock",
+            "–",
+            "1 general",
+            "½",
+            "10"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "02",
+            "Aspirin bottle",
+            "Page 130 (D6 doses remaining)",
+            "–",
+            "0",
+            "D6×15"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "03",
+            "Axe",
+            "Page 93",
+            "–",
+            "1",
+            "30"
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "04",
+            "Baseball bat",
+            "As club",
+            "–",
+            "1",
+            "5"
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "05",
+            "Bible",
+            "–",
+            "–",
+            "¼",
+            "10"
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "06",
+            "Bicycle",
+            "Page 116",
+            "2 general",
+            "5",
+            "50"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "07",
+            "Bicycle pump",
+            "–",
+            "1 general",
+            "1",
+            "15"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "08",
+            "Binoculars",
+            "Page 129",
+            "–",
+            "½",
+            "50"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "09",
+            "Box of cereal, unopened",
+            "D3 rations of domestic food",
+            "–",
+            "D3×½",
+            "D3×10"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Box of chocolates (still edible)",
+            "D3 field rations",
+            "–",
+            "D3×¼",
+            "D3×20"
+          ]
+        },
+        {
+          "min": 11,
+          "max": 11,
+          "values": [
+            "11",
+            "Bullhorn (broken)",
+            "–",
+            "1 general",
+            "1",
+            "10"
+          ]
+        },
+        {
+          "min": 12,
+          "max": 12,
+          "values": [
+            "12",
+            "Candelabra",
+            "–",
+            "–",
+            "1",
+            "25"
+          ]
+        },
+        {
+          "min": 13,
+          "max": 13,
+          "values": [
+            "13",
+            "Candy bar",
+            "One field ration",
+            "–",
+            "¼",
+            "20"
+          ]
+        },
+        {
+          "min": 14,
+          "max": 14,
+          "values": [
+            "14",
+            "Car tire",
+            "–",
+            "1 vehicle",
+            "2",
+            "50"
+          ]
+        },
+        {
+          "min": 15,
+          "max": 15,
+          "values": [
+            "15",
+            "Carving knife",
+            "As knife",
+            "–",
+            "½",
+            "5"
+          ]
+        },
+        {
+          "min": 16,
+          "max": 16,
+          "values": [
+            "16",
+            "Champagne glasses, D6",
+            "–",
+            "–",
+            "D6×¼",
+            "D6×20"
+          ]
+        },
+        {
+          "min": 17,
+          "max": 17,
+          "values": [
+            "17",
+            "Chandelier",
+            "–",
+            "–",
+            "2",
+            "50"
+          ]
+        },
+        {
+          "min": 18,
+          "max": 18,
+          "values": [
+            "18",
+            "Charcoal grill",
+            "SURVIVAL +1 when cooking",
+            "1 general",
+            "3",
+            "100"
+          ]
+        },
+        {
+          "min": 19,
+          "max": 19,
+          "values": [
+            "19",
+            "Cigarettes, half-empty pack",
+            "Removes 1 point of stress but gives −1 to STAMINA rolls for one shift. 2D6 uses.",
+            "–",
+            "0",
+            "2D6×10"
+          ]
+        },
+        {
+          "min": 20,
+          "max": 20,
+          "values": [
+            "20",
+            "Coloring book for kids (half done)",
+            "–",
+            "–",
+            "¼",
+            "5"
+          ]
+        },
+        {
+          "min": 21,
+          "max": 21,
+          "values": [
+            "21",
+            "Cooking pot",
+            "SURVIVAL +1 when cooking",
+            "–",
+            "½",
+            "20"
+          ]
+        },
+        {
+          "min": 22,
+          "max": 22,
+          "values": [
+            "22",
+            "Credit card",
+            "–",
+            "–",
+            "0",
+            "1"
+          ]
+        },
+        {
+          "min": 23,
+          "max": 23,
+          "values": [
+            "23",
+            "Crime novel",
+            "–",
+            "–",
+            "¼",
+            "3"
+          ]
+        },
+        {
+          "min": 24,
+          "max": 24,
+          "values": [
+            "24",
+            "Crowbar",
+            "TECH +1 for rough work, can be used as club",
+            "–",
+            "1",
+            "5"
+          ]
+        },
+        {
+          "min": 25,
+          "max": 25,
+          "values": [
+            "25",
+            "Deodorant bottle",
+            "–",
+            "–",
+            "0",
+            "10"
+          ]
+        },
+        {
+          "min": 26,
+          "max": 26,
+          "values": [
+            "26",
+            "Desk lamp",
+            "–",
+            "1 electronic",
+            "1",
+            "15"
+          ]
+        },
+        {
+          "min": 27,
+          "max": 27,
+          "values": [
+            "27",
+            "Doll",
+            "–",
+            "–",
+            "¼",
+            "15"
+          ]
+        },
+        {
+          "min": 28,
+          "max": 28,
+          "values": [
+            "28",
+            "Electric guitar",
+            "Requires electricity",
+            "1 electronic",
+            "1",
+            "30"
+          ]
+        },
+        {
+          "min": 29,
+          "max": 29,
+          "values": [
+            "29",
+            "Electric mixer",
+            "Requires electricity",
+            "1 electronic",
+            "½",
+            "20"
+          ]
+        },
+        {
+          "min": 30,
+          "max": 30,
+          "values": [
+            "30",
+            "Electric shaver",
+            "Requires electricity",
+            "1 electronic",
+            "¼",
+            "25"
+          ]
+        },
+        {
+          "min": 31,
+          "max": 31,
+          "values": [
+            "31",
+            "Electric toothbrush",
+            "Requires electricity",
+            "1 electronic",
+            "¼",
+            "25"
+          ]
+        },
+        {
+          "min": 32,
+          "max": 32,
+          "values": [
+            "32",
+            "Extension cord",
+            "–",
+            "1 electronic",
+            "¼",
+            "15"
+          ]
+        },
+        {
+          "min": 33,
+          "max": 33,
+          "values": [
+            "33",
+            "Face mask, cartoon animal",
+            "–",
+            "–",
+            "0",
+            "5"
+          ]
+        },
+        {
+          "min": 34,
+          "max": 34,
+          "values": [
+            "34",
+            "Fantasy novel, very thick",
+            "–",
+            "–",
+            "¼",
+            "5"
+          ]
+        },
+        {
+          "min": 35,
+          "max": 35,
+          "values": [
+            "35",
+            "Fire extinguisher",
+            "Puts out fire in a hex or a vehicle. One use only.",
+            "–",
+            "2",
+            "150"
+          ]
+        },
+        {
+          "min": 36,
+          "max": 36,
+          "values": [
+            "36",
+            "Fireworks, D6, still functional",
+            "As flares (page 129)",
+            "–",
+            "D6×¼",
+            "D6×5"
+          ]
+        },
+        {
+          "min": 37,
+          "max": 37,
+          "values": [
+            "37",
+            "Fishing pole",
+            "Page 131",
+            "–",
+            "1",
+            "25"
+          ]
+        },
+        {
+          "min": 38,
+          "max": 38,
+          "values": [
+            "38",
+            "Flashlight (broken)",
+            "Needs repair. Requires battery.",
+            "1 electronic",
+            "¼",
+            "20"
+          ]
+        },
+        {
+          "min": 39,
+          "max": 39,
+          "values": [
+            "39",
+            "Floor lamp",
+            "Requires electricity",
+            "1 electronic",
+            "1",
+            "15"
+          ]
+        },
+        {
+          "min": 40,
+          "max": 40,
+          "values": [
+            "40",
+            "Football",
+            "–",
+            "–",
+            "¼",
+            "5"
+          ]
+        },
+        {
+          "min": 41,
+          "max": 41,
+          "values": [
+            "41",
+            "Frying pan",
+            "SURVIVAL +1 when cooking",
+            "–",
+            "½",
+            "20"
+          ]
+        },
+        {
+          "min": 42,
+          "max": 42,
+          "values": [
+            "42",
+            "Gaffer tape",
+            "TECH +1 when jury rigging",
+            "–",
+            "¼",
+            "25"
+          ]
+        },
+        {
+          "min": 43,
+          "max": 43,
+          "values": [
+            "43",
+            "Golf club",
+            "As club",
+            "–",
+            "1",
+            "5"
+          ]
+        },
+        {
+          "min": 44,
+          "max": 44,
+          "values": [
+            "44",
+            "Hair dryer",
+            "–",
+            "1 electronic",
+            "½",
+            "20"
+          ]
+        },
+        {
+          "min": 45,
+          "max": 45,
+          "values": [
+            "45",
+            "Hair gel",
+            "–",
+            "–",
+            "0",
+            "5"
+          ]
+        },
+        {
+          "min": 46,
+          "max": 46,
+          "values": [
+            "46",
+            "Hedge trimmer",
+            "As knife",
+            "1 general",
+            "1",
+            "10"
+          ]
+        },
+        {
+          "min": 47,
+          "max": 47,
+          "values": [
+            "47",
+            "Hockey club",
+            "As club",
+            "–",
+            "1",
+            "5"
+          ]
+        },
+        {
+          "min": 48,
+          "max": 48,
+          "values": [
+            "48",
+            "Hunting bow",
+            "Page 94",
+            "–",
+            "1",
+            "150"
+          ]
+        },
+        {
+          "min": 49,
+          "max": 49,
+          "values": [
+            "49",
+            "Hunting rifle",
+            "Page 95",
+            "2 weapon",
+            "1",
+            "varies"
+          ]
+        },
+        {
+          "min": 50,
+          "max": 50,
+          "values": [
+            "50",
+            "Infant formula",
+            "D6 field rations",
+            "–",
+            "D6×¼",
+            "D6×20"
+          ]
+        },
+        {
+          "min": 51,
+          "max": 51,
+          "values": [
+            "51",
+            "Instant coffee",
+            "D6 uses, removes sleep deprivation",
+            "–",
+            "D6×¼",
+            "D6×10"
+          ]
+        },
+        {
+          "min": 52,
+          "max": 52,
+          "values": [
+            "52",
+            "Instant noodles",
+            "D6 rations of domestic food",
+            "–",
+            "D6×½",
+            "D6×10"
+          ]
+        },
+        {
+          "min": 53,
+          "max": 53,
+          "values": [
+            "53",
+            "Iron pipe",
+            "As club",
+            "–",
+            "1",
+            "1"
+          ]
+        },
+        {
+          "min": 54,
+          "max": 54,
+          "values": [
+            "54",
+            "Ladies hat",
+            "–",
+            "–",
+            "0",
+            "5"
+          ]
+        },
+        {
+          "min": 55,
+          "max": 55,
+          "values": [
+            "55",
+            "Laptop computer, broken",
+            "–",
+            "2 electronic",
+            "1",
+            "50"
+          ]
+        },
+        {
+          "min": 56,
+          "max": 56,
+          "values": [
+            "56",
+            "Lawn mower",
+            "–",
+            "2 general",
+            "4",
+            "25"
+          ]
+        },
+        {
+          "min": 57,
+          "max": 57,
+          "values": [
+            "57",
+            "Lipstick",
+            "–",
+            "–",
+            "0",
+            "3"
+          ]
+        },
+        {
+          "min": 58,
+          "max": 58,
+          "values": [
+            "58",
+            "Loudspeaker (broken)",
+            "–",
+            "1 general, 1 electronic",
+            "2",
+            "30"
+          ]
+        },
+        {
+          "min": 59,
+          "max": 59,
+          "values": [
+            "59",
+            "Mathematics textbook",
+            "–",
+            "–",
+            "½",
+            "20"
+          ]
+        },
+        {
+          "min": 60,
+          "max": 60,
+          "values": [
+            "60",
+            "Microwave oven (broken)",
+            "Requires electricity",
+            "1 general, 1 electronic",
+            "3",
+            "30"
+          ]
+        },
+        {
+          "min": 61,
+          "max": 61,
+          "values": [
+            "61",
+            "Mirror",
+            "–",
+            "–",
+            "2",
+            "5"
+          ]
+        },
+        {
+          "min": 62,
+          "max": 62,
+          "values": [
+            "62",
+            "Movie DVDs, D6",
+            "–",
+            "–",
+            "0",
+            "D6×1"
+          ]
+        },
+        {
+          "min": 63,
+          "max": 63,
+          "values": [
+            "63",
+            "Movie poster",
+            "–",
+            "–",
+            "¼",
+            "3"
+          ]
+        },
+        {
+          "min": 64,
+          "max": 64,
+          "values": [
+            "64",
+            "Music CDs, D6",
+            "–",
+            "–",
+            "¼",
+            "D6×1"
+          ]
+        },
+        {
+          "min": 65,
+          "max": 65,
+          "values": [
+            "65",
+            "National flag, torn",
+            "–",
+            "–",
+            "0",
+            "10"
+          ]
+        },
+        {
+          "min": 66,
+          "max": 66,
+          "values": [
+            "66",
+            "Necktie",
+            "–",
+            "–",
+            "0",
+            "5"
+          ]
+        },
+        {
+          "min": 67,
+          "max": 67,
+          "values": [
+            "67",
+            "Oriental carpet",
+            "–",
+            "–",
+            "2",
+            "15"
+          ]
+        },
+        {
+          "min": 68,
+          "max": 68,
+          "values": [
+            "68",
+            "Photo of happy family",
+            "–",
+            "–",
+            "0",
+            "3"
+          ]
+        },
+        {
+          "min": 69,
+          "max": 69,
+          "values": [
+            "69",
+            "Playing cards",
+            "–",
+            "–",
+            "0",
+            "10"
+          ]
+        },
+        {
+          "min": 70,
+          "max": 70,
+          "values": [
+            "70",
+            "Raincoat",
+            "STAMINA +1 against chemical weapons",
+            "–",
+            "½",
+            "25"
+          ]
+        },
+        {
+          "min": 71,
+          "max": 71,
+          "values": [
+            "71",
+            "Remote control",
+            "–",
+            "1 electronic",
+            "0",
+            "15"
+          ]
+        },
+        {
+          "min": 72,
+          "max": 72,
+          "values": [
+            "72",
+            "Revolver",
+            "Page 94",
+            "1 weapon",
+            "½",
+            "75"
+          ]
+        },
+        {
+          "min": 73,
+          "max": 73,
+          "values": [
+            "73",
+            "Saxophone",
+            "–",
+            "1 general",
+            "1",
+            "25"
+          ]
+        },
+        {
+          "min": 74,
+          "max": 74,
+          "values": [
+            "74",
+            "Shopping cart",
+            "Carries 20 encumbrance units",
+            "1 general",
+            "3",
+            "20"
+          ]
+        },
+        {
+          "min": 75,
+          "max": 75,
+          "values": [
+            "75",
+            "Shotgun",
+            "Page 96",
+            "2 weapon",
+            "1",
+            "varies"
+          ]
+        },
+        {
+          "min": 76,
+          "max": 76,
+          "values": [
+            "76",
+            "Skateboard",
+            "MOBILITY +1 on pavement",
+            "–",
+            "1",
+            "15"
+          ]
+        },
+        {
+          "min": 77,
+          "max": 77,
+          "values": [
+            "77",
+            "Ski hat",
+            "STAMINA +1 against cold",
+            "–",
+            "0",
+            "10"
+          ]
+        },
+        {
+          "min": 78,
+          "max": 78,
+          "values": [
+            "78",
+            "Sleeping pad",
+            "SURVIVAL +1 when sleeping on bare ground",
+            "–",
+            "½",
+            "10"
+          ]
+        },
+        {
+          "min": 79,
+          "max": 79,
+          "values": [
+            "79",
+            "Snowglobe",
+            "–",
+            "–",
+            "¼",
+            "5"
+          ]
+        },
+        {
+          "min": 80,
+          "max": 80,
+          "values": [
+            "80",
+            "Sports jersey",
+            "–",
+            "–",
+            "0",
+            "5"
+          ]
+        },
+        {
+          "min": 81,
+          "max": 81,
+          "values": [
+            "81",
+            "Teddy bear",
+            "–",
+            "–",
+            "¼",
+            "5"
+          ]
+        },
+        {
+          "min": 82,
+          "max": 82,
+          "values": [
+            "82",
+            "Tent (fits four)",
+            "SURVIVAL +1 to make camp",
+            "–",
+            "4",
+            "50"
+          ]
+        },
+        {
+          "min": 83,
+          "max": 83,
+          "values": [
+            "83",
+            "Tire iron",
+            "TECH +1 on vehicles",
+            "–",
+            "2",
+            "25"
+          ]
+        },
+        {
+          "min": 84,
+          "max": 84,
+          "values": [
+            "84",
+            "Top hat",
+            "–",
+            "–",
+            "0",
+            "10"
+          ]
+        },
+        {
+          "min": 85,
+          "max": 85,
+          "values": [
+            "85",
+            "Toy sword",
+            "–",
+            "–",
+            "½",
+            "5"
+          ]
+        },
+        {
+          "min": 86,
+          "max": 86,
+          "values": [
+            "86",
+            "Trombone",
+            "–",
+            "–",
+            "1",
+            "20"
+          ]
+        },
+        {
+          "min": 87,
+          "max": 87,
+          "values": [
+            "87",
+            "TV set, broken",
+            "Requires electricity",
+            "2 general, 2 electronic",
+            "4",
+            "50"
+          ]
+        },
+        {
+          "min": 88,
+          "max": 88,
+          "values": [
+            "88",
+            "Twinkies, still edible",
+            "D6 rations of domestic food",
+            "–",
+            "D6×½",
+            "D6×10"
+          ]
+        },
+        {
+          "min": 89,
+          "max": 89,
+          "values": [
+            "89",
+            "Typewriter",
+            "–",
+            "2 general",
+            "2",
+            "60"
+          ]
+        },
+        {
+          "min": 90,
+          "max": 90,
+          "values": [
+            "90",
+            "Vacuum cleaner",
+            "Requires electricity",
+            "1 general, 1 electronic",
+            "2",
+            "30"
+          ]
+        },
+        {
+          "min": 91,
+          "max": 91,
+          "values": [
+            "91",
+            "Video game console",
+            "–",
+            "1 electronic",
+            "½",
+            "20"
+          ]
+        },
+        {
+          "min": 92,
+          "max": 92,
+          "values": [
+            "92",
+            "Walkie-talkies (broken)",
+            "Page 129 (need repair)",
+            "1 electronic",
+            "½",
+            "50"
+          ]
+        },
+        {
+          "min": 93,
+          "max": 93,
+          "values": [
+            "93",
+            "Walkman with headphones and cassette",
+            "–",
+            "1 electronic",
+            "¼",
+            "25"
+          ]
+        },
+        {
+          "min": 94,
+          "max": 94,
+          "values": [
+            "94",
+            "Wallet full of moldy cash",
+            "–",
+            "–",
+            "0",
+            "3"
+          ]
+        },
+        {
+          "min": 95,
+          "max": 95,
+          "values": [
+            "95",
+            "Wine bottle, undrinkable",
+            "–",
+            "–",
+            "½",
+            "2"
+          ]
+        },
+        {
+          "min": 96,
+          "max": 96,
+          "values": [
+            "96",
+            "Wristwatch, broken",
+            "–",
+            "1 electronic",
+            "0",
+            "20"
+          ]
+        },
+        {
+          "min": 97,
+          "max": 97,
+          "values": [
+            "97",
+            "Yellowed copy of Twilight: 2000 RPG, 1st edition",
+            "–",
+            "–",
+            "½",
+            "10"
+          ]
+        },
+        {
+          "min": 98,
+          "max": 98,
+          "values": [
+            "98",
+            "Roll twice on the table",
+            "–",
+            "–",
+            "–",
+            "–"
+          ]
+        },
+        {
+          "min": 99,
+          "max": 99,
+          "values": [
+            "99",
+            "Roll three times on the table",
+            "–",
+            "–",
+            "–",
+            "–"
+          ]
+        },
+        {
+          "min": 100,
+          "max": 100,
+          "values": [
+            "00",
+            "Roll four times on the table",
+            "–",
+            "–",
+            "–",
+            "–"
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Scrounging",
+          "text": "Spend a shift scrounging in your current hex. Roll SURVIVAL, modified by terrain type. For each success (six rolled), roll D100 on the scrap table. Only one character can roll for scrounging per hex per shift, but others can help the roll. Each repeated scrounge in the same hex gives a cumulative −1 modifier."
+        },
+        {
+          "label": "Terrain Modifiers",
+          "text": "Road +1, Open (no modifier), Woods −1, Hills −1, Mountains −2, Swamp −2, Ruins +2. Lakes/Rivers: scrounging not possible."
+        },
+        {
+          "label": "Quick Search",
+          "text": "In areas likely to have scrap (e.g. settlements), the Referee may allow a quick search with no dice roll, giving one free roll on the scrap table. This doesn’t count as scrounging and doesn’t take a full shift."
+        },
+        {
+          "label": "Spare Parts",
+          "text": "The Spare Parts column indicates parts that can be scavenged from the find. Scavenging takes a full shift, separate from scrounging time."
+        },
+        {
+          "label": "Value",
+          "text": "The Value column is the approximate value of the item in bullets."
+        }
+      ]
+    },
+    {
+      "id": "mood-elements-road",
+      "name": "Mood Elements – Road",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Mood Element"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Blackened husk of a car on the side of the road. Exposed ribs of a corpse hanging out an open door, picked clean by time and carrion eaters. A light rain drums a funeral rhythm on the rusting roof. Old bullet holes let faint light through the left and right sides of the vehicle."
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "A crater hollows the center of the road, partially filled by a pool covered in a film of faintly green scum. No bird nor bug lurks anyway near it. The only drinker is a figure with its head hanging motionlessly in the water. The skeletal stock of an AKM (inoperable but can be repaired) pokes from under the body."
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "The street holds a single house whose windows are boarded up with plywood. Birdsong comes from a single tree, its limbs stripped bare by fire. Yet the house itself remains curiously intact. A faint keening comes from inside, plaintive and haunting."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "A finger of smoke wends its way toward the leaden sky where the road and horizon meet. A structure burns there, though too far away to see what kind. The wind blows from that direction bringing the scent of ash and burning flesh."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "A traffic jam, frozen in time. Almost every car holds skeletal commuters. They never made their destinations but instead died here, victims of a direct chemical attack or a wayward cloud from some battle. The most banal of ends. A few managed to crawl out of their vehicles and lay white and bony on the road. A bird’s nest crowns one boxy, European car."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "An old stone overpass collapsed here. The remnants hang above, fragments of the original bridge. The masonry is old, ancient even. It might have stood for 1,000 years before it finally gave way. Two squirrels flee the mound of debris and head off toward parts unknown."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "A car lies upside down, crushed flat under its own weight. Some meters away is another vehicle which tried to meld with a tree along the side of the road. No bodies appear to rest in either car, so the drivers must have made it from the accident. A couple of long-dead road flares speak to police and emergency vehicles having been here, when such things were common, even expected at an accident."
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "The road rises ahead over a long hill, allowing words painted on the black asphalt to be read in sequence. Each appears to be a surname and a date, from just two years ago. People who died here? People who just wanted to leave their names behind? Given another few years, the already fading names will be washed away by erosion."
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "An old checkpoint. Uneven terrain lies to either side of the road, further littered with steel hedgehogs. Sandbags lay atop crushed cars providing a place for a machine gun emplacement, though the weapon itself is long gone. Where there might have been a gate are oil barrels piled three deep. Whoever left this post didn’t want anyone getting through easily."
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "An empty wagon made from the back end of an old Chevrolet lies untended on one side of the road. It got a flat, by the looks of it. A wooden tongue, once hitched to horses, protrudes limply from the wagon’s body. The horses and driver are gone."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Mood Elements",
+          "text": "To give even empty wasteland some life and character, roll a D10 or choose a mood element for the terrain type. These are not immediate threats, but can include finds or offer bonus opportunities to scavenge, scrounge or hunt. They can also affect the weather."
+        }
+      ]
+    },
+    {
+      "id": "mood-elements-woods",
+      "name": "Mood Elements – Woods",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Mood Element"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "A deer stands in the middle of the trail. It grazes silently, spot lit by a ray of light shining through a hole in the canopy of foliage above. It doesn’t seem to mind your presence. Birds quietly chirp above and, for a moment, it’s as if the world had not changed and everything remained as it should have been."
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Several irregular pits of varying depths reveal themselves as foxholes. The deeper ones show remnants of MREs, a few brass casings, and other detritus while the shallow ones evidence rusted C-rat cans melding with the earth and speak of the World War prior to this. It seems soldiers died for this same plot of land a half century apart, maybe much longer."
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "An ancient, gnarled oak has enveloped a bicycle. The latter sticks out through part of the trunk as if transfixed by some great force, but the rusted patina and vegetation growing through it show that it’s just age, that nature reclaims all things of man. A single, yellow playing card still sticks out from the spokes."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "From a high-boughed oak hangs a single noose. No one hangs with it. Perhaps no judgment was passed here, or someone reconsidered suicide. Back home, it might be a spooky Halloween prop on someone’s front yard, but it’s truly scary here."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Cabins in the middle of a clearing near a small lake. Some cast-off canoes lay near the shore. The glass on the buildings is caked in dust, scoured by the elements. On two upright pieces of timber is an arched sign indicating this was once some kind of summer camp for children. Their voices no longer echo over the scene and seem a potent absence."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "An old bus sits in the middle of the woods. Rust flakes along the sides and top. The windows are spiderwebbed with cracks. Tires flat, the whole thing has sunk several inches into the earth. A tombstone lays to one side and, next to it, the skull and femur of someone else. The rest of the last resident was no doubt taken by animals some time ago."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "A dead airman hangs from their chute, tangled in the upper branches of a tall tree. His white helmet hangs slack against the chest. A breeze stirs the lifeless puppet as the wind tugs at its flight suit and pushes it gently back and forth."
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "A deep ravine opens here. The trees on either side flank it like stoic soldiers. Below, a weak stream bubbles through. The sound of croaking frogs mixes with the mewling of some small mammals, unseen in the deeper brush. Abandoned at the bottom, the stream flowing around it, is a child’s tricycle, its red paint faded."
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "A mighty tree lays broken at mid-point, its other half resting in the arms of another stout mate. The smell of pine needles suffuses the air, and an ancient train track wends under the arch made by the cleaved tree, headed east and west."
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "The forest opens into a small field where a break in the clouds allows a thick finger of daylight to halo the grass ahead. White flowers grow there, and small insects whir above on little sorties. The forest picks up again just beyond this seemingly tranquil scene. The smell of pollen rides the air."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Mood Elements",
+          "text": "To give even empty wasteland some life and character, roll a D10 or choose a mood element for the terrain type. These are not immediate threats, but can include finds or offer bonus opportunities to scavenge, scrounge or hunt. They can also affect the weather."
+        }
+      ]
+    },
+    {
+      "id": "mood-elements-fields",
+      "name": "Mood Elements – Fields",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Mood Element"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "Wooden crosses, like rectilinear white flowers, bloom over the field. It’s a hastily dug cemetery, the markers spaced unevenly, each going nameless. The clouds above slump slowly across the horizon as perhaps they did when these people were buried. Not long ago by the look of the graves."
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "Stalks of wheat crowd around a central, man-made piece of machinery – a tractor, gone to rust and time. Probably older than anything used in the last 50 years, it last saw usefulness before all this madness and died, mercifully, before."
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "The sun projects the silhouettes of figures on horseback moving across the land. It’s almost pastoral, travelers out of another time, until you see the recognizable shapes of assault rifles on their backs. They march single file, seemingly unaware of you as the sky bleeds its last light of the day."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "The humps of dead tanks sit scattered in the field around you. The hulks are burnt-out, punctured by the holes that killed them. A few are covered in graffiti, though none of it readable from here. They might be sleeping, iron oxide beasts gone still and inert for the season. They were stripped of anything movable some time ago. Whatever battle took place here went nameless."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "The breeze stirs the tall grass, then shifts, causing it to sway in unison like people do at fervent religious events or once did at concerts. A few wild dogs poke their heads out, sniff at the air, then disappear back to wherever they came from."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "The wreck of a helicopter lays like a huge bent and broken dragonfly, rotors twisted at odd angles, nose having tried to burrow into the dirt on impact. Blackened by fire and looted since, it’s now nothing but a memorial to when humanity had the ability to fly."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "A redness comes over the yellow grass stretching to the horizon as the sun descends on yet another day. Clouds, like darkened cotton candy are pulled across the sky in striations of deep blue and purple. It could be the subject of a painting and, perhaps, in another time it might have been. Only slouching telephone poles now speak of the presence of man."
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "The skeletons of cattle litter this field. Each seems to have died where it stood, falling over peacefully. The white bones have been bleached by the sun. Probably casualties of a chemical attack from early in the war."
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "Rising out of the grass, atop a low hill, is a giant crucifix made of steel. The two pieces appear to have been welded together from the barrels of Soviet and American tanks. Probably some kind of artistic reason behind that, though whoever took the time to do this is long gone. Along the American barrel, faintly, reads the fading name “Mustang Sally.”"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "This field was once tilled, though no substantial crops remain. A white clapboard house stands watch. The roof caved in and the second story sunk into the main structure. The rusted hinges of a remaining porch swing squeak as it rocks in the wind. Even now, a few pieces of flaking paint fall from the side of the house, are picked up briefly by the wind, then set back to earth."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Mood Elements",
+          "text": "To give even empty wasteland some life and character, roll a D10 or choose a mood element for the terrain type. These are not immediate threats, but can include finds or offer bonus opportunities to scavenge, scrounge or hunt. They can also affect the weather."
+        }
+      ]
+    },
+    {
+      "id": "rumors",
+      "name": "Rumors",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Rumor"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "An American special forces colonel is building an army. He’s looking for volunteers willing to take on difficult, dangerous operations for the “good of all man.” Sounds dubious, but what if he’s telling the truth?"
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "The Soviets have amassed a small “army” prepared to take a city in the area. The city needs all the help it can get. But, the Soviets are paying more. They have food, gold, weapons – you name it. Can the PCs pass up such a wealth of supplies? Do they want to get involved in a major battle again, just after the great loss at Kalisz [Örebro]?"
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "The child of an important political figure in a nearby city has gone missing. The official offers “supplies, medicine, and gold to live well for the rest of your life” for the child’s return. However, the rumor also suggests the child might have run away and doesn’t want to return."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "An intact “Topol-M” supposedly exists somewhere out in the country. The RT-2PM2 Topol-M is a mobile ICBM launcher. Anyone in possession of such a weapon would wield enormous power – or be able to cause untold carnage. Any power in the area offers a reward for it, but it might be best to make it disappear once and for all."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "An American unit discovered a sizable amount of gold hidden by the Germans in World War II. But, before they could get it packed and shipped out, they were hit by a devastating attack. There’s a survivor, though, who knows the location of the gold. It’s enough to buy your way home to a life of ease."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "A group of marauders began taking slaves a month ago. Some of their newly acquired forced laborers are remnants of the 5th Infantry Division – wounded soldiers from a field hospital no less. The PCs might be able to rescue them, but the marauders are said to be powerful."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "A former soldier-come-gangster is obsessed with jazz. They want a very specific jazz album on vinyl and are willing to pay. People say the gangster is crazy but the reward is real. Stranger things bring needed supplies in a devastated world. What’s the worst that could happen looking for an old jazz album?"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "A legitimate monster stalks the woods nearby. The PCs need to go through these woods to avoid adversaries on either side of the forest. Surely, the rumor isn’t about a real monster? That’s just the stuff of horror movies, right?"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "An American General is calling all troops to meet in a port city for a trip home. The PCs don’t have much time to get there. They also have no assurance of the rumor’s veracity, but the possibility of going home makes up for a whole lot of doubt, doesn’t it?"
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "Documents related to Operation Reset went down with a Blackhawk helicopter fleeing the Battle of Kalisz [Örebro]. Its last reported location is in the area, but no one is sure precisely where. Every intelligence faction wants the papers."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Rumors",
+          "text": "During their travels, the PCs can hear many rumors about what’s going on at locations in the area. It’s up to you whether these rumors are false or true, and in the latter case, to decide what happens when the PCs arrive."
+        }
+      ]
+    },
+    {
+      "id": "radio-chatter",
+      "name": "Radio Chatter",
+      "contexts": [],
+      "dice": "1d10",
+      "columns": [
+        "Roll",
+        "Transmission"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 1,
+          "values": [
+            "1",
+            "The airwaves are quiet as the grave, and the PCs hear nothing but static."
+          ]
+        },
+        {
+          "min": 2,
+          "max": 2,
+          "values": [
+            "2",
+            "The PCs hear sporadic communication between Soviet army units in the area. If the PCs speak Russian and make a COMMAND roll, they can gain valuable intelligence about the local Soviet forces."
+          ]
+        },
+        {
+          "min": 3,
+          "max": 3,
+          "values": [
+            "3",
+            "The PCs overhear a conversation between the nearest Soviet HQ and a field commander. If the PCs know Russian, they will understand that the field commander is refusing to obey orders and effectively deserting."
+          ]
+        },
+        {
+          "min": 4,
+          "max": 4,
+          "values": [
+            "4",
+            "The PCs pick up a desperate plea for help from a civilian family in a farm nearby, being attacked by marauders. The civilians desperately beg for help. If the PCs go to their aid, it plays out like the Ace of Hearts encounter."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "A unit of US stragglers (PCx1 in number) call for help. They are under heavy fire from a larger Soviet force (PCx3 in number, including an APC or even a tank). If the PCs go to their aid, they will be getting themselves into a very dangerous fight."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "A badly wounded American soldier calls for help. They are close, but the PCs have heard of traps like this before. Do they aid the supposedly fallen comrade or ignore their dying plea?"
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "The PCs pick up the chatter of a group of Polish [Swedish] partisans (PCx3) preparing to execute American stragglers (PCx1) for unspecified war crimes. It is unclear whether these Americans are guilty. Do the PCs intervene?"
+          ]
+        },
+        {
+          "min": 8,
+          "max": 8,
+          "values": [
+            "8",
+            "The radio picks up what appears to be a rock station, complete with DJ. It’s a taste of the old days, but peppered with supposed “news” about current weather, military forces in the area, and local news. Do the PCs believe the voice? Can they triangulate the location of the broadcast?"
+          ]
+        },
+        {
+          "min": 9,
+          "max": 9,
+          "values": [
+            "9",
+            "A fervent storm of prophetic, revivalist Biblical mish-mash pours forth from the radio. Whoever is broadcasting speaks German, Russian, and Polish [Swedish]. They speak of the end times and “The Reckoning Ahead.” At the end, the voice calls all the faithful to a familiar landmark within 2D6 hexes. The “gathering” takes place in a few days."
+          ]
+        },
+        {
+          "min": 10,
+          "max": 10,
+          "values": [
+            "10",
+            "A cryptic voice repeats a string of seemingly random numbers and letters, then suddenly utters the words “Operation Reset.” Then, the message starts over. The message is a code, but the PCs have no way of deciphering it at this point."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Radio Chatter",
+          "text": "If the PCs have access to a radio, and one character spends a shift monitoring it, roll on this table to see if they pick up any chatter. A PC can’t do anything else (such as marching or scrounging) while manning the radio."
+        },
+        {
+          "label": "Range",
+          "text": "Most radios that the PCs will likely have access to will have a range of 1–3 hexes. Keep this in mind when deciding the location from which a transmission is sent."
+        }
+      ]
+    },
+    {
+      "id": "stationary-encounters",
+      "name": "Stationary Encounters",
+      "contexts": [],
+      "dice": "1d100",
+      "columns": [
+        "Roll",
+        "Encounter"
+      ],
+      "rows": [
+        {
+          "min": 1,
+          "max": 4,
+          "values": [
+            "1–4",
+            "Draw an encounter normally. Only encounters marked with the campsite symbol are triggered."
+          ]
+        },
+        {
+          "min": 5,
+          "max": 5,
+          "values": [
+            "5",
+            "Refugees: 2D6 starving and hypothermic refugees arrive, having seen the PCs pass or heard rumors of their presence. They ask for food and protection. If the PCs give it to them, they will be grateful and can share a rumor or two (page 51). If the PCs chase them off, the refugees might tip off a local faction about their presence – add an additional +1 on the next roll on this table. The refugees can be used for replacement PCs, if needed."
+          ]
+        },
+        {
+          "min": 6,
+          "max": 6,
+          "values": [
+            "6",
+            "Stragglers: D6 stragglers of the same nationality as some of the PCs appear at the camp. The soldiers ask for food and ammo. They act friendly and will share rumors, but will take the first chance to steal from the PCs and leave. The stragglers can be used for replacement PCs, if needed."
+          ]
+        },
+        {
+          "min": 7,
+          "max": 7,
+          "values": [
+            "7",
+            "Scouts: A group of scouts sent from a faction nearby, equal in number to the PCs, arrives to observe them. They can be marauder or military. Allow the PCs a RECON roll to spot the scouts (opposed roll). If spotted, the scouts might attack, retreat, or negotiate, depending on their goals."
+          ]
+        },
+        {
+          "min": 8,
+          "max": 100,
+          "values": [
+            "8+",
+            "Large Force: A larger unit from a nearby faction, twice as many soldiers as the PCs and equipped with vehicles and/or heavy weapons, arrives. They demand that the PCs surrender to them, and they can attack if not obeyed. The PCs will need to flee, fight, or talk their way out of the situation. If combat breaks out, the enemies will retreat if they lose half of their number, but might then come back with a larger force the next time you roll this encounter."
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "label": "Stationary Encounters",
+          "text": "When the PCs remain in one place for an extended period of time, roll on this table once per day, adding the number of days the PCs have remained stationary to the roll."
+        }
+      ]
+    }
+  ]
+}

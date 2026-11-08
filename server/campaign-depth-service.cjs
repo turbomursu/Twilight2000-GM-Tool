@@ -17,25 +17,38 @@ const { randomUUID } = require("node:crypto");
 // Faction Management
 // ============================================================================
 
-function createFaction(database, campaignId, factionData) {
+function createFaction(database, campaignId, factionData, runtimeOptions = null) {
   if (!campaignId || typeof campaignId !== "string") {
     throw new Error("Campaign ID is required");
   }
-  if (!factionData || typeof factionData !== "object") {
+  if (!factionData || typeof factionData !== "object" || Array.isArray(factionData)) {
     throw new Error("Faction data is required");
+  }
+  if (runtimeOptions && (Object.keys(factionData).some((key) => ![
+    "name", "description", "color", "leader", "goal", "strength", "notes", "expectedRevision"
+  ].includes(key)) || !Number.isSafeInteger(runtimeOptions.expectedRevision) || runtimeOptions.expectedRevision < 0)) {
+    throw new Error("Faction data or campaign revision is invalid.");
   }
 
   const id = randomUUID();
-  const name = (factionData.name || "").trim();
-  const description = (factionData.description || "").trim();
-  const color = (factionData.color || "#808080").trim();
-  const leader = (factionData.leader || "").trim();
-  const goal = (factionData.goal || "").trim();
-  const strength = (factionData.strength || "unknown").trim();
-  const notes = (factionData.notes || "").trim();
+  const text = (value, label, maximum) => {
+    if (value === undefined || value === null) return "";
+    if (typeof value !== "string" || value.length > maximum) throw new Error(`Faction ${label} must be text under ${maximum + 1} characters.`);
+    return value.trim();
+  };
+  const name = text(factionData.name, "name", runtimeOptions ? 120 : 255);
+  const description = text(factionData.description, "description", 500);
+  const color = text(factionData.color, "color", 7) || "#808080";
+  const leader = text(factionData.leader, "leader", 120);
+  const goal = text(factionData.goal, "goal", 500);
+  const strength = text(factionData.strength, "strength", 80) || "unknown";
+  const notes = text(factionData.notes, "notes", 2000);
 
-  if (!name || name.length > 255) {
+  if (!name) {
     throw new Error("Faction name is required and must be under 255 characters");
+  }
+  if (runtimeOptions && !/^#[0-9a-f]{6}$/i.test(color)) {
+    throw new Error("Faction color must be a six-digit hex color.");
   }
 
   const stmt = database.prepare(`
@@ -45,6 +58,23 @@ function createFaction(database, campaignId, factionData) {
 
   database.exec("BEGIN IMMEDIATE");
   try {
+    if (runtimeOptions) {
+      const owner = database.prepare(`SELECT campaigns.revision FROM campaigns
+        JOIN campaign_memberships ON campaign_memberships.campaign_id = campaigns.runtime_id
+        JOIN accounts ON accounts.id = campaign_memberships.account_id
+        WHERE campaigns.runtime_id = ? AND campaigns.active = 1 AND accounts.id = ?
+          AND accounts.global_role = 'gm' AND accounts.disabled = 0 AND campaign_memberships.role = 'gm'`)
+        .get(campaignId, runtimeOptions.accountId);
+      if (!owner) throw new Error("Campaign not found.");
+      if (owner.revision !== runtimeOptions.expectedRevision) {
+        throw new Error("Campaign revision changed; reload before adding a faction.");
+      }
+    }
+    if (runtimeOptions) {
+      const duplicate = database.prepare("SELECT name FROM factions WHERE runtime_campaign_id = ?")
+        .all(campaignId).some((faction) => faction.name.normalize("NFKC").trim().toLowerCase() === name.normalize("NFKC").toLowerCase());
+      if (duplicate) throw new Error("Faction name already exists in this campaign.");
+    }
     stmt.run(campaignId, id, name, description, color);
 
     if (leader || goal || strength || notes) {
@@ -63,13 +93,27 @@ function createFaction(database, campaignId, factionData) {
       updateStmt.run(updatedDescription, campaignId, id);
     }
 
+    if (runtimeOptions) {
+      const timestamp = new Date().toISOString();
+      const updated = database.prepare("UPDATE campaigns SET revision = revision + 1, updated_at = ? WHERE runtime_id = ? AND revision = ?")
+        .run(timestamp, campaignId, runtimeOptions.expectedRevision);
+      if (updated.changes !== 1) throw new Error("Campaign revision changed; reload before adding a faction.");
+      require("./audit.cjs").appendAuditEvent(database, runtimeOptions.accountId, campaignId, {
+        action: "faction.create", targetType: "faction", targetId: id,
+        campaignRevisionBefore: runtimeOptions.expectedRevision
+      });
+    }
+
     database.exec("COMMIT");
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
   }
 
-  return { id, name, description, color, leader, goal, strength, notes };
+  return {
+    id, name, description, color, leader, goal, strength, notes,
+    ...(runtimeOptions ? { campaignRevision: runtimeOptions.expectedRevision + 1 } : {})
+  };
 }
 
 function getFaction(database, campaignId, factionId) {

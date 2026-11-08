@@ -159,18 +159,56 @@ test("upgrades either version 21 database layout to the merged schema", () => {
   let database;
   try {
     database = openRuntimeDatabase(databasePath);
-    database.exec("DROP TABLE conflict_incidents; PRAGMA user_version = 21");
+    database.exec("DROP TABLE conflict_incidents; DROP TABLE roll_table_catalog; PRAGMA user_version = 21");
     database.close();
     database = openRuntimeDatabase(databasePath);
-    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 22);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 24);
     assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get());
+    assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'roll_table_catalog'").get());
+    assert.equal(JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json).tables.length, 17);
     assert.ok(database.prepare("PRAGMA table_info(accounts)").all().some(({ name }) => name === "must_change_password"));
-    database.exec("ALTER TABLE accounts DROP COLUMN must_change_password; PRAGMA user_version = 21");
+    database.exec("ALTER TABLE accounts DROP COLUMN must_change_password; DROP TABLE roll_table_catalog; PRAGMA user_version = 21");
     database.close();
     database = openRuntimeDatabase(databasePath);
-    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 22);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 24);
     assert.ok(database.prepare("PRAGMA table_info(accounts)").all().some(({ name }) => name === "must_change_password"));
     assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get());
+    assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'roll_table_catalog'").get());
+    assert.equal(JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json).tables.length, 17);
+  } finally {
+    if (database) database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("version 23 upgrades add the supplied D100 table only to an untouched shared catalog", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fieldbook-roll-table-catalog-migration-"));
+  const databasePath = join(directory, "campaign.sqlite");
+  let database;
+  try {
+    database = openRuntimeDatabase(databasePath);
+    const catalogRow = database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get();
+    const oldCatalog = JSON.parse(catalogRow.catalog_json);
+    oldCatalog.tables = oldCatalog.tables.filter(({ id }) => id !== "stationary-encounters");
+    database.prepare("UPDATE roll_table_catalog SET catalog_json = ? WHERE id = 1").run(JSON.stringify(oldCatalog));
+    database.exec("PRAGMA user_version = 23");
+    database.close();
+
+    database = openRuntimeDatabase(databasePath);
+    const upgraded = JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 24);
+    assert.equal(upgraded.tables.find(({ id }) => id === "stationary-encounters").dice, "1d100");
+    assert.equal(upgraded.tables.length, 17);
+
+    database.prepare("UPDATE roll_table_catalog SET revision = 3, catalog_json = ? WHERE id = 1")
+      .run(JSON.stringify({ schemaVersion: 1, tables: [] }));
+    database.exec("PRAGMA user_version = 23");
+    database.close();
+
+    database = openRuntimeDatabase(databasePath);
+    const customized = database.prepare("SELECT revision, catalog_json FROM roll_table_catalog WHERE id = 1").get();
+    assert.equal(customized.revision, 3);
+    assert.deepEqual(JSON.parse(customized.catalog_json), { schemaVersion: 1, tables: [] });
   } finally {
     if (database) database.close();
     rmSync(directory, { recursive: true, force: true });

@@ -297,10 +297,16 @@ test("GM and player pages load coordinates before every coordinate-aware map cli
   }
 });
 
-test("GM publication controls submit image points and x/y geometry while incompatible switching makes no request", async () => {
-  const nodes = new Map(), requests = [];
+test("GM publication controls choose image hexes for markings and player position without manual coordinates", async () => {
+  for (const imageMode of [true, false]) {
+  const campaignBounds = imageMode ? bounds : geographic;
+  const campaignBasemap = imageMode ? image : null;
+  const campaignGrid = imageMode
+    ? { coordinateSystem: "axial-q-r", cellKm: 10, origin: { x: 50, y: 25 } }
+    : { coordinateSystem: "axial-q-r", cellKm: 10, origin: { lat: 60, lng: 14 } };
+  const nodes = new Map(), requests = [], pickerMaps = [];
   class Node {
-    constructor() { this.value = ""; this.dataset = {}; this.handlers = {}; this.children = []; }
+    constructor() { this.value = ""; this.dataset = {}; this.handlers = {}; this.children = []; this.options = this.children; this.open = false; this.disabled = false; }
     set value(value) { this._value = String(value); }
     get value() { return this._value; }
     addEventListener(event, callback) { this.handlers[event] = callback; }
@@ -309,6 +315,8 @@ test("GM publication controls submit image points and x/y geometry while incompa
     add(child) { this.append(child); }
     setAttribute() {}
     reset() {}
+    showModal() { this.open = true; }
+    close() { this.open = false; this.handlers.close?.(); }
     querySelector(selector) {
       const attribute = selector.match(/^\[data-([a-z-]+)\]$/);
       if (attribute) {
@@ -329,12 +337,44 @@ test("GM publication controls submit image points and x/y geometry while incompa
     return nodes.get(selector);
   };
   const map = {
-    revision: 1, catalog: { bounds, offlineBasemap: image, locations: [] },
-    draft: { locationIds: [], routeLocationIds: [], markings: [], geometries: [], playerPosition: { x: 12, y: 8 } }
+    revision: 1, catalog: { bounds: campaignBounds, offlineBasemap: campaignBasemap, grid: campaignGrid, locations: [] },
+    draft: { locationIds: [], routeLocationIds: [], markings: [], geometries: [],
+      playerPosition: imageMode ? { x: 12, y: 8 } : { lat: 60, lng: 14 } }
+  };
+  node("#map-player-latitude").readOnly = true;
+  node("#map-player-longitude").readOnly = true;
+  const makeLayer = (kind, points, options = {}) => ({
+    kind, points, options, handlers: {},
+    addTo(target) { if (target.layers) target.layers.push(this); return this; },
+    on(event, handler) { this.handlers[event] = handler; return this; },
+    bindTooltip() { return this; }
+  });
+  const L = {
+    CRS: { Simple: {}, EPSG3857: {} },
+    map(_container, options) {
+      const current = {
+        options, handlers: {}, groups: [], getBounds() { return imageMode
+          ? { getSouthWest: () => ({ lat: 0, lng: 0 }), getNorthWest: () => ({ lat: 50, lng: 0 }),
+            getNorthEast: () => ({ lat: 50, lng: 100 }), getSouthEast: () => ({ lat: 0, lng: 100 }), contains: () => true }
+          : { getSouthWest: () => ({ lat: campaignBounds.south, lng: campaignBounds.west }), getNorthWest: () => ({ lat: campaignBounds.north, lng: campaignBounds.west }),
+            getNorthEast: () => ({ lat: campaignBounds.north, lng: campaignBounds.east }), getSouthEast: () => ({ lat: campaignBounds.south, lng: campaignBounds.east }), contains: () => true }; },
+        fitBounds() {}, on(event, callback) { this.handlers[event] = callback; return this; },
+        invalidateSize() {}, remove() {}, setView() { return this; }
+      };
+      pickerMaps.push(current); return current;
+    },
+    layerGroup() { return { layers: [], addTo(target) { target.groups.push(this); return this; }, clearLayers() { this.layers = []; } }; },
+    polygon: (points, options) => makeLayer("polygon", points, options),
+    marker: (points, options) => makeLayer("marker", points, options),
+    circleMarker: (points, options) => makeLayer("circle", points, options),
+    polyline: (points, options) => makeLayer("line", points, options),
+    divIcon: (options) => options
   };
   node("#runtime-campaign-select").value = "owned";
   const context = vm.createContext({
+    L, requestAnimationFrame: (callback) => callback(),
     FieldbookMapCoordinates: coordinates,
+    FieldbookBasemap: { controller: () => ({ set() {}, destroy() {} }) },
     FieldbookVectorAtlas: { validLicenseUrl: () => null },
     document: { querySelectorAll: () => [], querySelector: (selector) => selector === "#player-map-tab" ? null : node(selector),
       getElementById: (id) => node(`#${id}`), createElement: () => new Node(),
@@ -349,25 +389,71 @@ test("GM publication controls submit image points and x/y geometry while incompa
   });
   vm.runInContext(read("map-publication-client.js"), context);
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(node("#map-player-latitude").value, "8");
-  assert.equal(node("#map-player-longitude").value, "12");
-  assert.match(node('label[for="map-player-longitude"]').textContent, /x \(km east\)/);
-  assert.match(node('label[for="map-geometry-coordinates"]').textContent, /x,y kilometres/);
-  assert.match(node("#gm-map-background-current").textContent, /100 × 50 km/);
-  node("#gm-map-background-kind").value = "online";
-  await node("#save-gm-map-background").handlers.click();
-  assert.equal(requests.length, 1);
-  assert.match(node("#gm-map-publication-status").textContent, /requires? geographic bounds/);
+  assert.equal(node("#map-player-latitude").value, imageMode ? "8" : "60");
+  assert.equal(node("#map-player-longitude").value, imageMode ? "12" : "14");
+  assert.match(node('label[for="map-player-longitude"]').textContent, imageMode ? /x \(km east\)/ : /longitude/);
+  assert.equal(node("#map-player-latitude").readOnly, true);
+  assert.equal(node("#map-player-longitude").readOnly, true);
+  assert.equal(node("#gm-maptiler-key-field").hidden, true, "the background key is hidden unless the campaign uses MapTiler");
+  assert.match(node('label[for="map-geometry-coordinates"]').textContent, imageMode ? /x,y kilometres/ : /longitude,latitude/);
+  if (imageMode) {
+    assert.match(node("#gm-map-background-current").textContent, /100 × 50 km/);
+    node("#gm-map-background-kind").value = "online";
+    await node("#save-gm-map-background").handlers.click();
+    assert.equal(requests.length, 1);
+    assert.match(node("#gm-map-publication-status").textContent, /requires? geographic bounds/);
+  } else {
+    assert.match(node("#gm-map-background-current").textContent, /Bounds: 59, 13 to 61, 15/);
+  }
   node("#map-geometry-type").value = "Polygon";
   node("#map-geometry-label").value = "Area";
   node("#map-geometry-coordinates").value = "0,0\n10,0\n10,10";
   node("#add-map-geometry").handlers.click();
+  const clickHex = (q, r) => {
+    const contextGroup = pickerMaps.at(-1);
+    assert.ok(contextGroup);
+    const expected = coordinates.hexGeometry(q, r, map.catalog.grid, campaignBounds);
+    const group = contextGroup.handlers;
+    assert.ok(group);
+    const polygonGroup = contextGroup.groups[1];
+    assert.ok(polygonGroup);
+    const wanted = expected.vertices.map((point) => coordinates.toLatLng(point, campaignBounds));
+    const polygon = polygonGroup.layers.find((layer) => JSON.stringify(plain(layer.points)) === JSON.stringify(plain(wanted)));
+    assert.ok(polygon, `visible hex ${q},${r} should be drawn`);
+    polygon.handlers.click({ latlng: { lat: -1, lng: -1 } });
+    assert.equal(node("#use-map-hex").disabled, true, "out-of-bounds clicks cannot select a hex");
+    const latlng = coordinates.toLatLng(expected.position, campaignBounds);
+    polygon.handlers.click({ latlng: { lat: latlng[0], lng: latlng[1] } });
+    assert.equal(node("#use-map-hex").disabled, false);
+    return expected.position;
+  };
+  const selectHex = (q, r) => {
+    const position = clickHex(q, r);
+    node("#use-map-hex").handlers.click();
+    assert.equal(node("#map-hex-picker-dialog").open, false);
+    return position;
+  };
   node("#add-map-marking").handlers.click();
-  node("#map-player-latitude").value = "25"; node("#map-player-longitude").value = "30";
+  assert.equal(node("#map-hex-picker-key-field").hidden, true, "the picker key is hidden unless the campaign uses MapTiler");
+  assert.equal(node("#map-marking-entries").children.length, 0, "opening picker alone does not add a marking");
+  clickHex(2, -1);
+  node("#cancel-map-hex-picker").handlers.click();
+  assert.equal(node("#map-hex-picker-dialog").open, false);
+  assert.equal(node("#map-marking-entries").children.length, 0, "cancel leaves the draft unchanged");
+  node("#add-map-marking").handlers.click();
+  const markingPosition = selectHex(2, -1);
+  assert.equal(node("#map-marking-entries").children.length, 1);
+  const moveMarking = node("#map-marking-entries").children[0].children.find((child) => child.textContent === "Choose hex");
+  moveMarking.handlers.click();
+  const movedMarkingPosition = selectHex(3, -1);
+  node("#choose-player-position-hex").handlers.click();
+  const playerPosition = selectHex(4, -2);
   await node("#gm-map-publication-form").handlers.submit({ preventDefault() {} });
-  assert.deepEqual(JSON.parse(requests.at(-1).options.body).draft.playerPosition, { x: 30, y: 25 });
   const submitted = JSON.parse(requests.at(-1).options.body).draft;
+  assert.deepEqual(submitted.playerPosition, playerPosition);
   assert.deepEqual(submitted.geometries[0].geometry.coordinates, [[[0, 0], [10, 0], [10, 10], [0, 0]]]);
-  assert.deepEqual(submitted.markings[0].position, { x: 12, y: 8 });
+  assert.deepEqual(submitted.markings[0].position, movedMarkingPosition);
+  assert.notDeepEqual(markingPosition, movedMarkingPosition);
   assert.equal(requests.at(-1).path, "/api/campaigns/owned/map-publication");
+  }
 });
