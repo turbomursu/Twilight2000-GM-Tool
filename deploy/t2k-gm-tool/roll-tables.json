@@ -2862,7 +2862,7 @@
       "id": "stationary-encounters",
       "name": "Stationary Encounters",
       "contexts": [],
-      "dice": "1d100",
+      "dice": "1d10",
       "columns": [
         "Roll",
         "Encounter"
@@ -2902,7 +2902,7 @@
         },
         {
           "min": 8,
-          "max": 100,
+          "max": 10,
           "values": [
             "8+",
             "Large Force: A larger unit from a nearby faction, twice as many soldiers as the PCs and equipped with vehicles and/or heavy weapons, arrives. They demand that the PCs surrender to them, and they can attack if not obeyed. The PCs will need to flee, fight, or talk their way out of the situation. If combat breaks out, the enemies will retreat if they lose half of their number, but might then come back with a larger force the next time you roll this encounter."

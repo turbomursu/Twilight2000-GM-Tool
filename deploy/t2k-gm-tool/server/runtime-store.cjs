@@ -301,7 +301,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-  if (version > 24) {
+  if (version > 26) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -838,6 +838,48 @@ function openRuntimeDatabase(path = ":memory:") {
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
+  if (version < 25) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE campaign_combat_weapons (
+        id TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(runtime_id) ON DELETE CASCADE,
+        name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+        normalized_name TEXT NOT NULL,
+        weapon_kind TEXT NOT NULL CHECK (weapon_kind IN ('ranged', 'close', 'grenade', 'heavy')),
+        details_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (campaign_id, normalized_name)
+      ) STRICT;
+      CREATE INDEX campaign_combat_weapons_by_campaign ON campaign_combat_weapons(campaign_id, name);
+      PRAGMA user_version = 25;`);
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 26) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const current = database.prepare("SELECT revision, catalog_json FROM roll_table_catalog WHERE id = 1").get();
+      if (current?.revision === 0) {
+        const catalog = validateRollTableCatalog(JSON.parse(current.catalog_json));
+        const stationaryEncounters = validateRollTableCatalog(require("../roll-tables.json"))
+          .tables.find(({ id }) => id === "stationary-encounters");
+        if (stationaryEncounters) {
+          const hasStationaryEncounters = catalog.tables.some(({ id }) => id === stationaryEncounters.id);
+          const updatedCatalog = validateRollTableCatalog({
+            ...catalog,
+            tables: hasStationaryEncounters
+              ? catalog.tables.map((table) => table.id === stationaryEncounters.id ? stationaryEncounters : table)
+              : [...catalog.tables, stationaryEncounters]
+          });
+          database.prepare("UPDATE roll_table_catalog SET catalog_json = ?, updated_at = ? WHERE id = 1")
+            .run(JSON.stringify(updatedCatalog), new Date().toISOString());
+        }
+      }
+      database.exec("PRAGMA user_version = 26");
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
   database.exec("BEGIN");
   try {
     loadDefaultNPCArchetypes(database);
@@ -931,6 +973,7 @@ function collectRuntimeSave(database, gmAccountId, runtimeId, options = {}) {
     auditEvents: queryRows("SELECT * FROM audit_events WHERE campaign_id = ? ORDER BY sequence", runtimeId),
     dailySupplyUsage: queryRows("SELECT * FROM daily_supply_usage WHERE campaign_id = ? ORDER BY game_date", runtimeId),
     conflictIncidents: queryRows("SELECT * FROM conflict_incidents WHERE campaign_id = ? ORDER BY incident_date DESC, sort_order, id", runtimeId),
+    campaignCombatWeapons: queryRows("SELECT * FROM campaign_combat_weapons WHERE campaign_id = ? ORDER BY name COLLATE NOCASE", runtimeId),
     routeStops: queryRows("SELECT * FROM route_stops WHERE campaign_id = ? ORDER BY ordinal", runtimeId),
     personnel: queryRows("SELECT * FROM personnel WHERE campaign_id = ? ORDER BY sort_order", runtimeId),
     journalEntries: queryRows("SELECT * FROM journal_entries WHERE campaign_id = ? ORDER BY id", runtimeId),
@@ -973,6 +1016,7 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     auditEvents: Object.hasOwn(backup.data, "auditEvents") ? backup.data.auditEvents.map((row) => ({ ...row, game_time: Object.hasOwn(row, "game_time") ? row.game_time : null })) : [],
     dailySupplyUsage: Object.hasOwn(backup.data, "dailySupplyUsage") ? backup.data.dailySupplyUsage : [],
     conflictIncidents: Object.hasOwn(backup.data, "conflictIncidents") ? backup.data.conflictIncidents : [],
+    campaignCombatWeapons: Object.hasOwn(backup.data, "campaignCombatWeapons") ? backup.data.campaignCombatWeapons : [],
     partyPosition: Object.hasOwn(backup.data, "partyPosition") ? backup.data.partyPosition : null,
     dashboardState: backup.data.dashboardState ? { ...backup.data.dashboardState,
       game_time: Object.hasOwn(backup.data.dashboardState, "game_time") ? backup.data.dashboardState.game_time : "00:00",
@@ -1007,7 +1051,8 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     characterConditions: 1000,
     auditEvents: 100000,
     dailySupplyUsage: 100000,
-    conflictIncidents: 500
+    conflictIncidents: 500,
+    campaignCombatWeapons: 500
   };
   for (const [key, maximum] of Object.entries(limits)) {
     if (!Array.isArray(data[key]) || data[key].length > maximum) fail(`The runtime backup has an invalid ${key} list.`);
@@ -1054,7 +1099,8 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     characterConditions: "campaign_id",
     auditEvents: "campaign_id",
     dailySupplyUsage: "campaign_id",
-    conflictIncidents: "campaign_id"
+    conflictIncidents: "campaign_id",
+    campaignCombatWeapons: "campaign_id"
   };
   for (const [tableKey, campaignKey] of Object.entries(campaignKeys)) {
     if (data[tableKey].some((row) => row[campaignKey] !== targetRuntimeId)) fail(`The runtime backup contains a ${tableKey} row for another campaign.`);
@@ -1073,6 +1119,24 @@ function validateRuntimeSave(backup, targetRuntimeId) {
     || new Set(data.conflictIncidents.map((incident) => incident.sort_order)).size !== data.conflictIncidents.length) {
     fail("The runtime backup contains duplicate conflict incident identifiers or ordering.");
   }
+  const combatWeaponIds = new Set();
+  const combatWeaponNames = new Set();
+  data.campaignCombatWeapons.forEach((row) => {
+    if (typeof row.id !== "string" || !row.id || row.id.length > 120 || combatWeaponIds.has(row.id)
+      || typeof row.name !== "string" || typeof row.normalized_name !== "string"
+      || combatWeaponNames.has(row.normalized_name)
+      || typeof row.created_at !== "string" || !Number.isFinite(Date.parse(row.created_at))) {
+      fail("The runtime backup contains invalid campaign custom weapon metadata.");
+    }
+    let details;
+    try { details = JSON.parse(row.details_json); } catch { fail("The runtime backup contains invalid campaign custom weapon data."); }
+    try {
+      const validated = validateCampaignCombatWeapon(row.name, row.weapon_kind, details);
+      if (validated.normalizedName !== row.normalized_name) fail("The runtime backup contains an invalid custom weapon name.");
+    } catch { fail("The runtime backup contains invalid campaign custom weapon fields."); }
+    combatWeaponIds.add(row.id);
+    combatWeaponNames.add(row.normalized_name);
+  });
   if (data.dashboardState.campaign_id !== targetRuntimeId || data.routeStops.some((stop, index) => stop.ordinal !== index)) {
     fail("The runtime backup has invalid dashboard or route ordering data.");
   }
@@ -1243,6 +1307,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
       ["character_conditions", "campaign_id"],
       ["inventory_proposals", "campaign_id"], ["inventory_items", "campaign_id"],
       ["comms_messages", "campaign_id"],
+      ["campaign_combat_weapons", "campaign_id"],
       ["character_change_requests", "campaign_id"], ["player_seats", "campaign_id"], ["characters", "campaign_id"],
       ["conflict_incidents", "campaign_id"], ["route_stops", "campaign_id"], ["personnel", "campaign_id"], ["journal_entries", "campaign_id"],
       ["runtime_dashboard_state", "campaign_id"], ["settlement_factions", "runtime_campaign_id"],
@@ -1303,6 +1368,7 @@ function restoreRuntimeSave(database, gmAccountId, targetRuntimeId, backup, opti
     insertRows("route_stops", ["campaign_id", "ordinal", "location_id", "detail", "km_from_previous"], data.routeStops);
     insertRows("personnel", ["campaign_id", "id", "name", "role", "condition", "readiness", "sort_order"], data.personnel);
     insertRows("conflict_incidents", ["campaign_id", "id", "incident_type", "status", "title", "notes", "incident_date", "sort_order", "created_at", "updated_at"], data.conflictIncidents);
+    insertRows("campaign_combat_weapons", ["id", "campaign_id", "name", "normalized_name", "weapon_kind", "details_json", "created_at"], data.campaignCombatWeapons);
     insertRows("journal_entries", ["campaign_id", "id", "title", "body", "entry_date", "kind", "created_at"], data.journalEntries);
     insertRows("comms_messages", ["id", "campaign_id", "sender_account_id", "sender_role", "sender_label", "message_text", "game_date", "game_time", "day_number", "created_at", "sort_order"], data.commsMessages.map((row) => ({ ...row, game_time: row.game_time ?? null })));
     insertRows("characters", ["id", "campaign_id", "status", "fields_json", "created_at", "updated_at"], data.characters);
@@ -1413,7 +1479,7 @@ function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, op
 
     const runtimeCampaignRows = ["terrainCells", "locations", "settlements", "factions", "factionInfluenceCells", "settlementFactions", "gmNotes"];
     runtimeCampaignRows.forEach((key) => data[key].forEach((row) => { row.runtime_campaign_id = targetRuntimeId; }));
-    const campaignRows = ["routeStops", "personnel", "journalEntries", "conflictIncidents", "characters", "playerSeats", "characterChangeRequests",
+    const campaignRows = ["routeStops", "personnel", "journalEntries", "conflictIncidents", "campaignCombatWeapons", "characters", "playerSeats", "characterChangeRequests",
       "commsMessages", "inventoryItems", "inventoryProposals", "characterConditions", "auditEvents", "dailySupplyUsage"];
     campaignRows.forEach((key) => data[key].forEach((row) => { row.campaign_id = targetRuntimeId; }));
     data.setupImport.runtime_campaign_id = targetRuntimeId;
@@ -2885,6 +2951,81 @@ function listNPCArchetypes(database, campaignId) {
   }));
 }
 
+function normalizeCombatWeaponName(name) {
+  return name.normalize("NFKC").trim().toLocaleLowerCase("en-US");
+}
+
+function validateCampaignCombatWeapon(name, kind, details) {
+  if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
+    throw new Error("Custom weapon name must be between 1 and 100 characters.");
+  }
+  if (!["ranged", "close", "grenade", "heavy"].includes(kind)) {
+    throw new Error("Custom weapon type is invalid.");
+  }
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    throw new Error("Custom weapon details are invalid.");
+  }
+  const expected = {
+    ranged: ["baseDamage", "threshold"],
+    close: ["baseDamage", "threshold"],
+    grenade: ["blastPower", "threshold"],
+    heavy: ["baseDamage", "threshold", "weaponType"]
+  }[kind];
+  if (Object.keys(details).length !== expected.length || expected.some((key) => !Object.hasOwn(details, key))) {
+    throw new Error("Custom weapon details are incomplete.");
+  }
+  for (const key of expected.filter((key) => key !== "weaponType")) {
+    if (!Number.isSafeInteger(details[key]) || details[key] < (key === "threshold" ? 1 : kind === "ranged" || kind === "close" ? 0 : 1)) {
+      throw new Error(`Custom weapon ${key} is invalid.`);
+    }
+  }
+  if (kind === "heavy" && !["grenade-frag", "grenade-shaped", "mine-anti-personnel", "mine-anti-vehicle"].includes(details.weaponType)) {
+    throw new Error("Custom heavy weapon type is invalid.");
+  }
+  return { name: name.trim(), normalizedName: normalizeCombatWeaponName(name), details };
+}
+
+function listCampaignCombatWeapons(database, campaignId) {
+  return database.prepare(`SELECT id, name, weapon_kind, details_json, created_at
+    FROM campaign_combat_weapons WHERE campaign_id = ? ORDER BY name COLLATE NOCASE`).all(campaignId).map((row) => ({
+    id: row.id,
+    name: row.name,
+    kind: row.weapon_kind,
+    details: JSON.parse(row.details_json),
+    createdAt: row.created_at
+  }));
+}
+
+function saveCampaignCombatWeapon(database, campaignId, name, kind, details) {
+  const weapon = validateCampaignCombatWeapon(name, kind, details);
+  const knownNames = new Set(listNPCArchetypes(database, campaignId).flatMap((archetype) =>
+    archetype.equipment.flatMap((item) => item.category === "weapon" && typeof item.name === "string"
+      ? item.name.split(/\s+or\s+/i).map((alternative) => alternative.replace(/\s+with\s+.*$/i, "").trim())
+        .filter(Boolean).map(normalizeCombatWeaponName)
+      : [])));
+  if (knownNames.has(weapon.normalizedName)) return { status: "already-known", weapon: null };
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  const insertion = database.prepare(`INSERT INTO campaign_combat_weapons
+    (id, campaign_id, name, normalized_name, weapon_kind, details_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(campaign_id, normalized_name) DO NOTHING`).run(
+    id, campaignId, weapon.name, weapon.normalizedName, kind, JSON.stringify(weapon.details), createdAt
+  );
+  const saved = database.prepare(`SELECT id, name, weapon_kind, details_json, created_at
+    FROM campaign_combat_weapons WHERE campaign_id = ? AND normalized_name = ?`).get(campaignId, weapon.normalizedName);
+  if (!saved) throw new Error("Campaign weapon could not be saved.");
+  const existing = {
+    id: saved.id,
+    name: saved.name,
+    kind: saved.weapon_kind,
+    details: JSON.parse(saved.details_json),
+    createdAt: saved.created_at
+  };
+  const unchanged = existing.kind === kind && canonicalJson(existing.details) === canonicalJson(weapon.details);
+  return { status: insertion.changes ? "saved" : unchanged ? "already-saved" : "conflict", weapon: existing };
+}
+
 function getNPCArchetype(database, archetypeId) {
   const row = database.prepare(`SELECT * FROM npc_archetypes WHERE id = ?`).get(archetypeId);
   if (!row) return null;
@@ -3709,6 +3850,8 @@ module.exports = {
   reviewCharacterChangeRequest,
   loadDefaultNPCArchetypes,
   listNPCArchetypes,
+  listCampaignCombatWeapons,
+  saveCampaignCombatWeapon,
   getNPCArchetype,
   listLocationsForCampaign,
   createLocation,

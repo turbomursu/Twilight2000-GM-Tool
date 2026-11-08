@@ -1,5 +1,5 @@
 const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
-const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard, listNPCArchetypes, createPersonnelFromArchetype, listLocationsForCampaign, createLocation, updateLocation, deleteLocation, listRouteStopsForCampaign, createRouteStop, updateRouteStop, deleteRouteStop, reorderRouteStops, getMapPublicationState, updateMapPublicationState, getPublicationHistory, getPartyPosition, updatePartyPosition } = require("./runtime-store.cjs");
+const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, getRuntimeDashboard, importRuntimeBackup, importSetupPackage, listCampaignPlayerSeeds, listCharacterChangeRequests, listRuntimeCampaigns, restoreRuntimeSave, reviewCharacterChangeRequest, updateRuntimeDashboard, listNPCArchetypes, listCampaignCombatWeapons, saveCampaignCombatWeapon, createPersonnelFromArchetype, listLocationsForCampaign, createLocation, updateLocation, deleteLocation, listRouteStopsForCampaign, createRouteStop, updateRouteStop, deleteRouteStop, reorderRouteStops, getMapPublicationState, updateMapPublicationState, getPublicationHistory, getPartyPosition, updatePartyPosition } = require("./runtime-store.cjs");
 const { createCombatHandler } = require("./combat-api.cjs");
 const { BackupScheduleType, createBackupSchedule, getBackupSchedule, updateBackupSchedule, getBackupHistory, initializeBackupScheduler } = require("./backup-scheduler.cjs");
 const depthService = require("./campaign-depth-service.cjs");
@@ -362,7 +362,21 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
       if (!getRuntimeCampaign(database, account.id, campaignId)) {
         return sendJson(response, 404, { error: "Campaign not found." });
       }
-      return createCombatHandler({ database })(request, response, campaignId, combatMatch[2]);
+      return createCombatHandler({ database, saveCampaignCombatWeapon })(request, response, campaignId, combatMatch[2]);
+    }
+
+    const combatWeaponsMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/combat-weapons$/);
+    if (combatWeaponsMatch && request.method === "GET") {
+      try {
+        const campaignId = decodeURIComponent(combatWeaponsMatch[1]);
+        if (!getRuntimeCampaign(database, account.id, campaignId)) {
+          return sendJson(response, 404, { error: "Campaign not found." });
+        }
+        return sendJson(response, 200, { weapons: listCampaignCombatWeapons(database, campaignId) });
+      } catch (error) {
+        const status = error instanceof HttpError ? error.status : 400;
+        return sendJson(response, status, { error: error.message });
+      }
     }
 
     const changeListMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/character-changes$/);

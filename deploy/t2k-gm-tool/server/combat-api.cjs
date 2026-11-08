@@ -17,7 +17,7 @@ const { logRangedAttack, logHeavyWeapon, logVehicleCombat } = require("./combat-
  * @param {DatabaseSync} options.database
  * @returns {Function} Request handler
  */
-function createCombatHandler({ database }) {
+function createCombatHandler({ database, saveCampaignCombatWeapon }) {
   return async (request, response, campaignId, combatType) => {
     if (request.method !== "POST") {
       response.writeHead(405, { "Content-Type": "application/json; charset=utf-8" });
@@ -26,19 +26,19 @@ function createCombatHandler({ database }) {
     }
     
     if (combatType === "ranged-attack") {
-      return handleRangedAttack(request, response, campaignId, database);
+      return handleRangedAttack(request, response, campaignId, database, saveCampaignCombatWeapon);
     }
     
     if (combatType === "close-combat") {
-      return handleCloseCombat(request, response, campaignId, database);
+      return handleCloseCombat(request, response, campaignId, database, saveCampaignCombatWeapon);
     }
     
     if (combatType === "grenade") {
-      return handleGrenade(request, response, campaignId, database);
+      return handleGrenade(request, response, campaignId, database, saveCampaignCombatWeapon);
     }
     
     if (combatType === "heavy-weapon") {
-      return handleHeavyWeapon(request, response, campaignId, database);
+      return handleHeavyWeapon(request, response, campaignId, database, saveCampaignCombatWeapon);
     }
     
     if (combatType === "vehicle-combat") {
@@ -50,10 +50,37 @@ function createCombatHandler({ database }) {
   };
 }
 
+function sendResolvedCombat(response, result, input, campaignId, kind, name, details, database, saveCampaignCombatWeapon) {
+  if (input.saveCustomWeapon === true) {
+    try {
+      if (typeof saveCampaignCombatWeapon !== "function") throw new Error("Weapon catalog storage is unavailable.");
+      const saved = saveCampaignCombatWeapon(database, campaignId, name, kind, details);
+      result.weaponCatalog = {
+        status: saved.status,
+        message: saved.status === "saved"
+          ? "Custom weapon saved to this campaign."
+          : saved.status === "already-saved"
+            ? "This custom weapon was already saved to this campaign."
+            : saved.status === "already-known"
+              ? "This name already exists in the NPC equipment catalog; it was not copied into campaign custom weapons."
+              : "A campaign weapon with this name already exists; the saved entry was kept unchanged."
+      };
+    } catch (error) {
+      console.error("Failed to save campaign combat weapon:", error.message);
+      result.weaponCatalog = {
+        status: "failed",
+        message: "Combat resolved, but the custom weapon could not be saved. Repeat this calculation to retry."
+      };
+    }
+  }
+  response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(result));
+}
+
 /**
  * Handle ranged attack resolution
  */
-async function handleRangedAttack(request, response, campaignId, database) {
+async function handleRangedAttack(request, response, campaignId, database, saveCampaignCombatWeapon) {
   try {
     let body = "";
     for await (const chunk of request) {
@@ -103,8 +130,8 @@ async function handleRangedAttack(request, response, campaignId, database) {
       input.ammoRolls || []
     );
     
-    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify(result));
+    sendResolvedCombat(response, result, input, campaignId, "ranged", input.weaponName,
+      { baseDamage: input.weaponBaseDamage, threshold: input.weaponThreshold }, database, saveCampaignCombatWeapon);
     
   } catch (error) {
     response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
@@ -115,7 +142,7 @@ async function handleRangedAttack(request, response, campaignId, database) {
 /**
  * Handle close combat resolution
  */
-async function handleCloseCombat(request, response, campaignId, database) {
+async function handleCloseCombat(request, response, campaignId, database, saveCampaignCombatWeapon) {
   try {
     let body = "";
     for await (const chunk of request) {
@@ -151,8 +178,8 @@ async function handleCloseCombat(request, response, campaignId, database) {
       input.targetArmorLevel || 0
     );
     
-    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify(result));
+    sendResolvedCombat(response, result, input, campaignId, "close", input.weaponName,
+      { baseDamage: input.weaponBaseDamage, threshold: input.weaponThreshold }, database, saveCampaignCombatWeapon);
     
   } catch (error) {
     response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
@@ -163,7 +190,7 @@ async function handleCloseCombat(request, response, campaignId, database) {
 /**
  * Handle grenade throw resolution
  */
-async function handleGrenade(request, response, campaignId, database) {
+async function handleGrenade(request, response, campaignId, database, saveCampaignCombatWeapon) {
   try {
     let body = "";
     for await (const chunk of request) {
@@ -198,8 +225,8 @@ async function handleGrenade(request, response, campaignId, database) {
       }
     );
     
-    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify(result));
+    sendResolvedCombat(response, result, input, campaignId, "grenade", input.grenadeName,
+      { blastPower: input.blastPower, threshold: input.threshold || 2 }, database, saveCampaignCombatWeapon);
     
   } catch (error) {
     response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
@@ -210,7 +237,7 @@ async function handleGrenade(request, response, campaignId, database) {
 /**
  * Handle heavy weapon resolution (grenades, mines)
  */
-async function handleHeavyWeapon(request, response, campaignId, database) {
+async function handleHeavyWeapon(request, response, campaignId, database, saveCampaignCombatWeapon) {
   try {
     let body = "";
     for await (const chunk of request) {
@@ -253,8 +280,8 @@ async function handleHeavyWeapon(request, response, campaignId, database) {
       input.scatterRoll || null
     );
     
-    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify(result));
+    sendResolvedCombat(response, result, input, campaignId, "heavy", input.weaponName,
+      { baseDamage: input.baseDamage, threshold: input.threshold, weaponType: input.weaponType }, database, saveCampaignCombatWeapon);
     
   } catch (error) {
     response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });

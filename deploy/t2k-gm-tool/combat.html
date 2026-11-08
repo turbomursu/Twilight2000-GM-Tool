@@ -86,6 +86,7 @@
       margin-bottom: 10px;
     }
     .result-detail { margin: 8px 0; }
+    .result-warning { margin: 8px 0; color: var(--signal); font-weight: 700; }
     .result-detail strong { color: var(--ink); }
     .tabs {
       display: flex;
@@ -113,11 +114,22 @@
       color: var(--muted);
       margin-top: 4px;
     }
+    .dice-choices { min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--line); }
+    .dice-choices legend { font-size: 0.9rem; font-weight: 600; }
+    .dice-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .dice-options label { display: inline-flex; align-items: center; gap: 4px; padding: 6px; border: 1px solid var(--line); cursor: pointer; }
+    .dice-options label:has(:checked) { background: #344a40; color: white; }
+    :focus-visible { outline: 3px solid #b74435; outline-offset: 2px; }
+    .form-row-3 { display: grid; gap: 16px; }
+    .tabs { flex-wrap: wrap; }
+    .embedded h1 { display: none; }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>🎲 Combat Calculator</h1>
+  <p class="help-text">Calculation only: results are not saved or published. Enter your physical dice results; weapon data and applicable die sizes remain GM-verified. Existing calculator coverage is limited, not a full combat procedure.</p>
+  <p id="weaponCatalogStatus" class="help-text" role="status">Known names come from NPC equipment; campaign custom weapons appear in their matching menu. Names do not supply rules: enter and verify all resolver stats and weapon type. A new Other/custom weapon is saved to this campaign only after a successful calculation.</p>
   
   <div class="tabs">
     <button class="tab-button active" data-tab="ranged">Ranged</button>
@@ -381,8 +393,105 @@
 
   // Initialize combat client
   function initCombat() {
-    const campaignId = new URLSearchParams(window.location.search).get('campaign') || 'demo';
-    combatClient = new CombatClient(campaignId);
+    const params = new URLSearchParams(window.location.search);
+    const campaignId = params.get('campaign');
+    combatClient = campaignId ? new CombatClient(campaignId) : null;
+    const weaponKinds = ['ranged', 'close', 'grenade', 'heavy'];
+    const weaponFieldSets = [
+      { baseDamage: 'rangedBaseDamage', threshold: 'rangedThreshold' },
+      { baseDamage: 'ccBaseDamage', threshold: 'ccThreshold' },
+      { blastPower: 'grenPower', threshold: 'grenThreshold' },
+      { baseDamage: 'hwBaseDamage', threshold: 'hwThreshold', weaponType: 'hwType' }
+    ];
+    const weaponSelectors = ['rangedWeapon', 'ccWeapon', 'grenName', 'hwName'].map((id, index) =>
+      CombatClient.createWeaponSelector(document.getElementById(id), document, weapon => {
+        for (const [key, fieldId] of Object.entries(weaponFieldSets[index])) {
+          document.getElementById(fieldId).value = weapon.details[key];
+        }
+      }));
+    if (combatClient) {
+      Promise.all([combatClient.loadKnownWeaponNames(), combatClient.loadCampaignWeapons()]).then(([names, weapons]) => {
+        weaponSelectors.forEach((selector, index) => selector.populate(names, weapons, weaponKinds[index]));
+      }).catch(error => {
+        document.getElementById('weaponCatalogStatus').textContent = error.message + ' Other/custom remains available.';
+      });
+    }
+    if (params.get('embedded') === '1') document.body.classList.add('embedded');
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && window.parent !== window) {
+        event.preventDefault();
+        window.parent.postMessage({ type: 'fieldbook:close-combat' }, window.location.origin);
+      }
+    });
+    // Only existing bounded dice faces become choices; free numeric data stays editable.
+    document.querySelectorAll('input[type="number"][max="12"], #hwScatter').forEach(input => {
+      const label = input.previousElementSibling;
+      const fieldset = document.createElement('fieldset');
+      fieldset.className = 'dice-choices';
+      const legend = document.createElement('legend');
+      legend.textContent = label.textContent;
+      fieldset.append(legend);
+      const options = document.createElement('div');
+      options.className = 'dice-options';
+      const optional = input.id === 'hwScatter';
+      const max = Number(input.max);
+      for (let face = optional ? 0 : 1; face <= max; face++) {
+        const choice = document.createElement('label');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = input.id + 'Choice';
+        radio.value = face === 0 ? '' : String(face);
+        radio.required = !optional;
+        radio.checked = optional && face === 0;
+        radio.addEventListener('change', () => { input.value = radio.value; });
+        choice.append(radio, document.createTextNode(face === 0 ? 'Not rolled' : String(face)));
+        options.append(choice);
+      }
+      fieldset.append(options);
+      label.remove();
+      input.type = 'hidden';
+      input.before(fieldset);
+    });
+    document.querySelectorAll('.form-group > label').forEach(label => {
+      const input = label.nextElementSibling;
+      if (input?.id) label.htmlFor = input.id;
+    });
+    document.querySelectorAll('input[type="number"]').forEach(input => { input.required = true; });
+    document.querySelectorAll('.result-box').forEach(box => {
+      box.setAttribute('role', 'status');
+      box.setAttribute('aria-live', 'polite');
+      box.tabIndex = -1;
+    });
+    const resolvers = { ranged: resolveRanged, close: resolveCloseCombat, grenade: resolveGrenade,
+      heavy: resolveHeavyWeapon, vehicle: resolveVehicleCombat };
+    document.querySelectorAll('button[onclick]').forEach(button => {
+      button.removeAttribute('onclick');
+      button.type = 'button';
+      button.addEventListener('click', async () => {
+        const pane = button.closest('.tab-content');
+        if (button.disabled) return;
+        const resultBox = pane.querySelector('.result-box');
+        resultBox.style.display = 'none';
+        if (!combatClient) return showError('Select a runtime campaign from the GM Desk first.');
+        for (const input of pane.querySelectorAll('input, select')) {
+          if (input.id.endsWith('Mods')) {
+            input.setCustomValidity(input.value.trim() && !/^\s*[+-]?\d+\s*(,\s*[+-]?\d+\s*)*$/.test(input.value)
+              ? 'Enter whole-number modifiers separated by commas.' : '');
+          }
+          if (!input.reportValidity()) return;
+        }
+        button.disabled = true;
+        resultBox.textContent = 'Resolving attack…';
+        resultBox.style.display = 'block';
+        try { await resolvers[pane.id](); }
+        finally { button.disabled = false; }
+      });
+    });
+    document.querySelectorAll('.tab-button').forEach(button => {
+      button.type = 'button';
+      button.setAttribute('aria-controls', button.dataset.tab);
+      button.setAttribute('aria-pressed', String(button.classList.contains('active')));
+    });
   }
 
   // Tab switching
@@ -391,6 +500,7 @@
       document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       e.target.classList.add('active');
+      document.querySelectorAll('.tab-button').forEach(b => b.setAttribute('aria-pressed', String(b === e.target)));
       document.getElementById(e.target.dataset.tab).classList.add('active');
     });
   });
@@ -413,12 +523,13 @@
         rangedCombatRoll: document.getElementById('rangedRCRoll').value,
         targetArmorLevel: document.getElementById('rangedArmor').value,
         modifierDeltas: mods,
-        ammoAvailable: document.getElementById('rangedAmmo').value
+        ammoAvailable: document.getElementById('rangedAmmo').value,
+        saveCustomWeapon: weaponSelectors[0].shouldSaveCustom()
       });
 
       displayResult(result, 'rangedResult');
     } catch (err) {
-      alert('Error: ' + err.message);
+      showError(err.message, 'rangedResult');
     }
   }
 
@@ -430,12 +541,13 @@
         weaponThreshold: document.getElementById('ccThreshold').value,
         strengthRoll: document.getElementById('ccStrRoll').value,
         closeCombatRoll: document.getElementById('ccCCRoll').value,
-        targetArmorLevel: document.getElementById('ccArmor').value
+        targetArmorLevel: document.getElementById('ccArmor').value,
+        saveCustomWeapon: weaponSelectors[1].shouldSaveCustom()
       });
 
       displayResult(result, 'closeResult');
     } catch (err) {
-      alert('Error: ' + err.message);
+      showError(err.message, 'closeResult');
     }
   }
 
@@ -446,12 +558,13 @@
         blastPower: document.getElementById('grenPower').value,
         threshold: document.getElementById('grenThreshold').value,
         agilityRoll: document.getElementById('grenAgiRoll').value,
-        mobilityRoll: document.getElementById('grenMobRoll').value
+        mobilityRoll: document.getElementById('grenMobRoll').value,
+        saveCustomWeapon: weaponSelectors[2].shouldSaveCustom()
       });
 
       displayResult(result, 'grenadeResult');
     } catch (err) {
-      alert('Error: ' + err.message);
+      showError(err.message, 'grenadeResult');
     }
   }
 
@@ -465,12 +578,13 @@
         agilityRoll: document.getElementById('hwAgiRoll').value,
         mobilityRoll: document.getElementById('hwMobRoll').value,
         targetArmorLevel: document.getElementById('hwArmor').value,
-        scatterRoll: document.getElementById('hwScatter').value || null
+        scatterRoll: document.getElementById('hwScatter').value || null,
+        saveCustomWeapon: weaponSelectors[3].shouldSaveCustom()
       });
 
       displayResult(result, 'heavyResult');
     } catch (err) {
-      alert('Error: ' + err.message);
+      showError(err.message, 'heavyResult');
     }
   }
 
@@ -494,46 +608,43 @@
 
       displayResult(result, 'vehicleResult');
     } catch (err) {
-      alert('Error: ' + err.message);
+      showError(err.message, 'vehicleResult');
     }
+  }
+
+  function showError(message, elementId) {
+    const elem = elementId ? document.getElementById(elementId) : document.querySelector('.tab-content.active .result-box');
+    elem.textContent = 'Not resolved: ' + message;
+    elem.style.display = 'block';
+    elem.focus();
   }
 
   function displayResult(result, elementId) {
     const elem = document.getElementById(elementId);
-    let html = '<div class="result-outcome">';
-    html += result.summary?.outcome || (result.hit?.isHit ? 'HIT' : 'MISS');
-    html += '</div>';
-
-    if (result.weapon) {
-      html += '<div class="result-detail"><strong>Weapon:</strong> ' + result.weapon.name + '</div>';
+    elem.replaceChildren();
+    function line(text, className = 'result-detail') {
+      const row = document.createElement('div');
+      row.className = className;
+      row.textContent = text;
+      elem.append(row);
     }
-
-    if (result.damage?.total !== undefined) {
-      html += '<div class="result-detail"><strong>Damage:</strong> ' + result.damage.total + '</div>';
-    }
-
+    line(result.summary?.outcome || (result.hit?.isHit ? 'HIT' : 'MISS'), 'result-outcome');
+    if (result.weapon) line('Weapon: ' + result.weapon.name);
+    if (result.damage?.total !== undefined) line('Damage: ' + result.damage.total);
     if (result.blast?.primaryHexDamage !== undefined) {
-      html += '<div class="result-detail"><strong>Primary Damage:</strong> ' + result.blast.primaryHexDamage + '</div>';
+      line('Primary Damage: ' + result.blast.primaryHexDamage);
       if (result.blast.adjacentHexDamage > 0) {
-        html += '<div class="result-detail"><strong>Adjacent Damage:</strong> ' + result.blast.adjacentHexDamage + '</div>';
-        html += '<div class="result-detail"><strong>Affected Hexes:</strong> ' + result.blast.affectedHexes + '</div>';
+        line('Adjacent Damage: ' + result.blast.adjacentHexDamage);
+        line('Affected Hexes: ' + result.blast.affectedHexes);
       }
     }
-
-    if (result.critical) {
-      html += '<div class="result-detail"><strong>⚡ CRITICAL HIT</strong></div>';
-    }
-
-    if (result.effect?.outcome) {
-      html += '<div class="result-detail"><strong>Vehicle Effect:</strong> ' + result.effect.outcome + '</div>';
-    }
-
-    if (result.summary?.description) {
-      html += '<div class="result-detail">' + result.summary.description + '</div>';
-    }
-
-    elem.innerHTML = html;
+    if (result.critical) line('CRITICAL HIT');
+    if (result.effect?.outcome) line('Vehicle Effect: ' + result.effect.outcome);
+    if (result.summary?.description) line(result.summary.description);
+    if (result.weaponCatalog?.message) line(result.weaponCatalog.message, result.weaponCatalog.status === 'failed' || result.weaponCatalog.status === 'conflict' ? 'result-warning' : 'result-detail');
+    line('Combat result is calculation-only and is not saved or published.');
     elem.style.display = 'block';
+    elem.focus();
   }
 
   // Initialize on load

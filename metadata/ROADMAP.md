@@ -1,6 +1,6 @@
 # Development Roadmap — Plan B Edition
 
-**Last updated:** 07 Nov 2026
+**Last updated:** 08 Nov 2026
 **Strategy:** Session management first. Complete existing session workflows before expanding interconnected simulation systems.
 **Reference:** [Plan B — Scope Assessment](../gmpack/plan-b.html)
 
@@ -25,6 +25,10 @@ Keep a setup package distinct from a running campaign save. Importing setup data
 New setup imports now create dashboard bookkeeping and a starting-location route in the import transaction, then select and load the new campaign. Review the explicit baseline (2000-01-01 00:00, day 0, zero distance/supplies, weather Not recorded) before play; setup era remains descriptive. This does not retroactively repair previously imported campaigns without dashboards or advance broader runtime feature status.
 
 **Shared GM roll tables:** A schema-versioned catalog is persisted outside campaign records and shared across GM accounts on one service. GM-only JSON import/export uses strict die-range validation and revision checks; the context-aware modal is available from Situation, Personnel, Movement, and Conflicts. Rolling requires an explicit click, does not alter campaign state, and is not recorded. See [`ROLL_TABLES.md`](ROLL_TABLES.md) for the schema, limits, and validation rules.
+
+**Combat resolver UX (08 Nov 2026):** Conflicts opens the existing calculator in a native modal over the GM Desk, retaining the selected campaign. Existing 1–12 dice inputs and optional 1–6 scatter use radio choices; genuinely free numeric data remains editable. Required choices, numeric bounds, and modifier format are validated before explicit calculation. Close/Escape discards output and restores desk focus. The current combat API does not persist results or mutate campaign state; applicable die sizes and incomplete mechanics remain GM-verified. Combat recording and broader rules automation require a separate delivery slice.
+
+**Weapon-name refinement (08 Nov 2026):** Each weapon-name input now uses an independent dropdown populated from the existing owner-scoped NPC equipment catalog, plus saved campaign custom weapons in the matching category and Other/custom. Loadout quantities are removed and alternatives split into names; no weapon stats or rules are inferred. Selecting a saved custom weapon restores only its previously entered weapon-specific fields. A new custom entry is saved after successful explicit calculation; duplicate saves do not overwrite, and save failures are reported without discarding the calculation. Stored data remains GM-provided, not verified or inferred rules data. Catalog failure leaves custom entry available. Verified weapon-stat catalogs and a two-sided/opposed combat model remain outside this UX slice.
 
 ## Historical Baseline (02 Nov 2026 — Phase 3.4 Complete ✅ Milestone 3 Closed)
 
@@ -782,7 +786,7 @@ Historical integration check (01 Nov 2026): combined recovery, cross-host runtim
 - Generate threat intelligence, missions, ambushes, raids, roadblocks, sabotage encounters, and opposing forces as GM-reviewed scenario material.
 - Implement tactical encounter tools and the battle calculator using verified Fourth Edition procedures.
 - Keep encounter generation separate from rules resolution; label assumptions and homebrew.
-- Initial implementation slice: a GM-only, manually authored conflict/incident ledger. It records descriptive categories and status without calculating escalation, resolving encounters, or publishing to players. The ledger links to the existing standalone battle resolver with the selected campaign ID; resolution remains an explicit GM action and does not update the ledger or runtime campaign state.
+- Initial implementation slice: a GM-only, manually authored conflict/incident ledger. It records descriptive categories and status without calculating escalation, resolving encounters, or publishing to players. The ledger opens the existing battle resolver in a GM Desk modal with the selected campaign ID and bounded dice-face radio choices; resolution remains an explicit GM action and does not update the ledger or runtime campaign state.
 
 **Exit checks:** Rules-backed calculations match source-checked examples; generated threats and encounters remain editable proposals; reports identify their sources and uncertainty.
 

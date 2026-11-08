@@ -804,6 +804,88 @@ test("battle resolver API is limited to the owning GM and does not mutate campai
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE campaign_id = ?").get(campaignId).count, 0);
 });
 
+test("custom resolver weapons are campaign-scoped, saved only after success, and never overwritten", async (t) => {
+  const { origin, database } = await startTestServer(t);
+  const cookie = await bootstrapGM(origin);
+  const importCampaign = async (id) => {
+    const setup = validSetupPackage();
+    setup.campaign.id = id;
+    const response = await fetch(`${origin}/api/campaigns/import-setup`, {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify(setup)
+    });
+    assert.equal(response.status, 201);
+    return (await response.json()).campaign;
+  };
+  const campaign = await importCampaign("combat-weapon-campaign");
+  const otherCampaign = await importCampaign("combat-weapon-other-campaign");
+  const path = `${origin}/api/campaigns/${campaign.id}/combat/close-combat`;
+  const catalogPath = `${origin}/api/campaigns/${campaign.id}/combat-weapons`;
+  const input = {
+    weaponName: "Campaign club", weaponBaseDamage: 2, weaponThreshold: 4,
+    strengthRoll: 6, ccRoll: 5, targetArmorLevel: 0, saveCustomWeapon: true
+  };
+  const resolve = (body = input, authCookie = cookie) => fetch(path, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: authCookie }, body: JSON.stringify(body)
+  });
+  assert.equal((await fetch(catalogPath)).status, 401);
+  assert.equal((await fetch(catalogPath, { headers: { Cookie: cookie } })).status, 200);
+  assert.equal((await fetch(`${origin}/api/campaigns/${otherCampaign.id}/combat-weapons`, { headers: { Cookie: cookie } })).status, 200);
+  assert.deepEqual((await (await fetch(`${origin}/api/campaigns/${otherCampaign.id}/combat-weapons`, { headers: { Cookie: cookie } })).json()).weapons, []);
+
+  const hash = database.prepare("SELECT password_hash FROM accounts WHERE login_identifier = 'gm-user'").get().password_hash;
+  const timestamp = new Date().toISOString();
+  database.prepare("INSERT INTO accounts (id, login_identifier, password_hash, created_at, updated_at, global_role) VALUES ('combat-weapon-outsider', 'combat-weapon-outsider', ?, ?, ?, 'gm')").run(hash, timestamp, timestamp);
+  const outsiderLogin = await fetch(`${origin}/api/auth/login`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "combat-weapon-outsider", password })
+  });
+  const outsiderCookie = outsiderLogin.headers.get("set-cookie").split(";")[0];
+  assert.equal((await fetch(catalogPath, { headers: { Cookie: outsiderCookie } })).status, 404);
+
+  assert.equal((await resolve({ ...input, ccRoll: 13 })).status, 400);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM campaign_combat_weapons WHERE campaign_id = ?").get(campaign.id).count, 0);
+  let response;
+  response = await resolve({ ...input, weaponName: "AK-74" });
+  assert.equal((await response.json()).weaponCatalog.status, "already-known");
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM campaign_combat_weapons WHERE campaign_id = ?").get(campaign.id).count, 0);
+  response = await resolve();
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).weaponCatalog.status, "saved");
+
+  response = await resolve();
+  assert.equal((await response.json()).weaponCatalog.status, "already-saved");
+  response = await resolve({ ...input, weaponBaseDamage: 9 });
+  assert.equal((await response.json()).weaponCatalog.status, "conflict");
+  let listed = await (await fetch(catalogPath, { headers: { Cookie: cookie } })).json();
+  assert.equal(listed.weapons.length, 1);
+  assert.deepEqual(listed.weapons[0], {
+    id: listed.weapons[0].id, name: "Campaign club", kind: "close",
+    details: { baseDamage: 2, threshold: 4 }, createdAt: listed.weapons[0].createdAt
+  });
+
+  database.exec(`CREATE TRIGGER reject_campaign_weapon BEFORE INSERT ON campaign_combat_weapons
+    WHEN NEW.name = 'Storage failure' BEGIN SELECT RAISE(ABORT, 'test persistence failure'); END;`);
+  response = await resolve({ ...input, weaponName: "Storage failure" });
+  assert.equal(response.status, 200);
+  const failedSave = await response.json();
+  assert.equal(failedSave.weaponCatalog.status, "failed");
+  assert.ok(failedSave.damage);
+  database.exec("DROP TRIGGER reject_campaign_weapon");
+  response = await resolve({ ...input, weaponName: "Storage failure" });
+  assert.equal((await response.json()).weaponCatalog.status, "saved");
+
+  listed = await (await fetch(catalogPath, { headers: { Cookie: cookie } })).json();
+  assert.equal(listed.weapons.length, 2);
+  assert.equal(listed.weapons.find(({ name }) => name === "Campaign club").details.baseDamage, 2);
+  const gmId = database.prepare("SELECT id FROM accounts WHERE login_identifier = 'gm-user'").get().id;
+  const backup = exportRuntimeSave(database, gmId, campaign.id);
+  assert.equal(backup.data.campaignCombatWeapons.length, 2);
+  restoreRuntimeSave(database, gmId, campaign.id, backup, {
+    confirmReplace: true, confirmOlderBackup: true, expectedRevision: backup.sourceRevision
+  });
+  listed = await (await fetch(catalogPath, { headers: { Cookie: cookie } })).json();
+  assert.equal(listed.weapons.length, 2);
+});
+
 test("conflict incident ledger is GM-only, manually managed, revision checked, audited, and recoverable", async (t) => {
   const { origin, database } = await startTestServer(t);
   const gmCookie = await bootstrapGM(origin);

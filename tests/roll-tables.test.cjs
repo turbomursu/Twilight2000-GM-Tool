@@ -53,14 +53,34 @@ test("the bundled shared catalog validates and every included table maps all die
   assert.equal(catalog.tables.length, 17);
   assert.ok(catalog.tables.every((table) => table.contexts.length === 0));
   const stationaryEncounters = catalog.tables.find((table) => table.id === "stationary-encounters");
-  assert.equal(stationaryEncounters.dice, "1d100");
+  assert.equal(stationaryEncounters.dice, "1d10");
   assert.deepEqual(stationaryEncounters.rows.map(({ min, max }) => [min, max]), [
-    [1, 4], [5, 5], [6, 6], [7, 7], [8, 100]
+    [1, 4], [5, 5], [6, 6], [7, 7], [8, 10]
   ]);
+  assert.deepEqual(
+    Array.from({ length: 10 }, (_, index) => stationaryEncounters.rows.find(({ min, max }) => min <= index + 1 && index + 1 <= max)?.values[0]),
+    ["1–4", "1–4", "1–4", "1–4", "5", "6", "7", "8+", "8+", "8+"]
+  );
 });
 
 test("roll-table catalogs require unique names and complete, non-overlapping die ranges", () => {
   assert.deepEqual(validateRollTableCatalog({ schemaVersion: 1, tables: [] }), { schemaVersion: 1, tables: [] });
+  assert.deepEqual(
+    Array.from({ length: 10 }, (_, index) => rollDice("1d10", (sides) => {
+      assert.equal(sides, 10);
+      return index;
+    })),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  );
+  let d10Calls = 0;
+  const d10 = (sides) => {
+    d10Calls += 1;
+    assert.equal(sides, 10);
+    return d10Calls === 1 ? 0 : 9;
+  };
+  assert.equal(rollDice("1d10", d10), 1);
+  assert.equal(rollDice("1d10", d10), 10);
+  assert.equal(d10Calls, 2);
   assert.equal(rollDice("2d6", (sides) => sides - 1), 12);
   assert.equal(rollDice("2d6", (() => { const values = [0, 5]; return () => values.shift(); })()), 7);
   assert.throws(() => validateRollTableCatalog({

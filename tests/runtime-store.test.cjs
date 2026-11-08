@@ -159,18 +159,18 @@ test("upgrades either version 21 database layout to the merged schema", () => {
   let database;
   try {
     database = openRuntimeDatabase(databasePath);
-    database.exec("DROP TABLE conflict_incidents; DROP TABLE roll_table_catalog; PRAGMA user_version = 21");
+    database.exec("DROP TABLE conflict_incidents; DROP TABLE roll_table_catalog; DROP TABLE campaign_combat_weapons; PRAGMA user_version = 21");
     database.close();
     database = openRuntimeDatabase(databasePath);
-    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 24);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 26);
     assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get());
     assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'roll_table_catalog'").get());
     assert.equal(JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json).tables.length, 17);
     assert.ok(database.prepare("PRAGMA table_info(accounts)").all().some(({ name }) => name === "must_change_password"));
-    database.exec("ALTER TABLE accounts DROP COLUMN must_change_password; DROP TABLE roll_table_catalog; PRAGMA user_version = 21");
+    database.exec("ALTER TABLE accounts DROP COLUMN must_change_password; DROP TABLE roll_table_catalog; DROP TABLE campaign_combat_weapons; PRAGMA user_version = 21");
     database.close();
     database = openRuntimeDatabase(databasePath);
-    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 24);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 26);
     assert.ok(database.prepare("PRAGMA table_info(accounts)").all().some(({ name }) => name === "must_change_password"));
     assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'conflict_incidents'").get());
     assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'roll_table_catalog'").get());
@@ -181,7 +181,7 @@ test("upgrades either version 21 database layout to the merged schema", () => {
   }
 });
 
-test("version 23 upgrades add the supplied D100 table only to an untouched shared catalog", () => {
+test("version upgrades use the supplied D10 table only for an untouched shared catalog", () => {
   const directory = mkdtempSync(join(tmpdir(), "fieldbook-roll-table-catalog-migration-"));
   const databasePath = join(directory, "campaign.sqlite");
   let database;
@@ -191,18 +191,35 @@ test("version 23 upgrades add the supplied D100 table only to an untouched share
     const oldCatalog = JSON.parse(catalogRow.catalog_json);
     oldCatalog.tables = oldCatalog.tables.filter(({ id }) => id !== "stationary-encounters");
     database.prepare("UPDATE roll_table_catalog SET catalog_json = ? WHERE id = 1").run(JSON.stringify(oldCatalog));
-    database.exec("PRAGMA user_version = 23");
+    database.exec("DROP TABLE campaign_combat_weapons; PRAGMA user_version = 23");
     database.close();
 
     database = openRuntimeDatabase(databasePath);
     const upgraded = JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json);
-    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 24);
-    assert.equal(upgraded.tables.find(({ id }) => id === "stationary-encounters").dice, "1d100");
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 26);
+    assert.equal(upgraded.tables.find(({ id }) => id === "stationary-encounters").dice, "1d10");
     assert.equal(upgraded.tables.length, 17);
+
+    const legacyStationary = require("../roll-tables.json").tables.find(({ id }) => id === "stationary-encounters");
+    const d100Stationary = {
+      ...legacyStationary,
+      dice: "1d100",
+      rows: legacyStationary.rows.map((row) => row.min === 8 ? { ...row, max: 100 } : row)
+    };
+    const catalogAtVersion25 = JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json);
+    catalogAtVersion25.tables = catalogAtVersion25.tables.map((table) => table.id === d100Stationary.id ? d100Stationary : table);
+    database.prepare("UPDATE roll_table_catalog SET catalog_json = ? WHERE id = 1").run(JSON.stringify(catalogAtVersion25));
+    database.exec("PRAGMA user_version = 25");
+    database.close();
+
+    database = openRuntimeDatabase(databasePath);
+    const migratedFrom25 = JSON.parse(database.prepare("SELECT catalog_json FROM roll_table_catalog WHERE id = 1").get().catalog_json);
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 26);
+    assert.equal(migratedFrom25.tables.find(({ id }) => id === "stationary-encounters").dice, "1d10");
 
     database.prepare("UPDATE roll_table_catalog SET revision = 3, catalog_json = ? WHERE id = 1")
       .run(JSON.stringify({ schemaVersion: 1, tables: [] }));
-    database.exec("PRAGMA user_version = 23");
+    database.exec("PRAGMA user_version = 25");
     database.close();
 
     database = openRuntimeDatabase(databasePath);
