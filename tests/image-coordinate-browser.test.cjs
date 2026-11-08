@@ -214,7 +214,8 @@ test("GM route overview uses image CRS, preserves panning on redraw and rebuilds
     return map;
   };
   Object.assign(h.context, {
-    document: { getElementById: node }, window: {}, state: { setupPackage: { map: { bounds, offlineBasemap: image } }, runtimeCampaignId: "image", activeStop: 0 },
+    document: { getElementById: node }, window: { FieldbookMapTooltips: require("../map-tooltip-client.js") },
+    state: { setupPackage: { map: { bounds, offlineBasemap: image } }, runtimeCampaignId: "image", activeStop: 0 },
     route: [{ name: "Camp", mapPosition: { x: 10, y: 20 } }, { name: "Depot", mapPosition: { x: 30, y: 25 } }],
     runtimeRouteMap: null, runtimeRouteLayer: null, runtimeBasemap: null, runtimeBasemapSignature: null, runtimeRouteSignature: null,
     escapeHtml: (value) => value

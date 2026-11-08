@@ -73,6 +73,16 @@ test("redirects anonymous requests to login and serves only public auth assets",
   assert.equal((await fetch(`${origin}/server/runtime-store.cjs`)).status, 404);
 });
 
+test("combat page permits only authenticated GM same-origin embedding", async (t) => {
+  const { origin, database } = await startApp(t, { includeDatabase: true });
+  const response = await bootstrap(origin);
+  const cookie = response.headers.get("set-cookie").split(";")[0];
+  database.prepare("UPDATE accounts SET global_role = 'player' WHERE login_identifier = 'gm-user'").run();
+  const playerResponse = await fetch(`${origin}/combat.html?embedded=1`, { headers: { Cookie: cookie }, redirect: "manual" });
+  assert.equal(playerResponse.status, 302);
+  assert.equal(playerResponse.headers.get("location"), "/player-interface.html");
+});
+
 test("serves protected pages only for an active session and gates them again after logout", async (t) => {
   const origin = await startApp(t);
   const bootstrapResponse = await bootstrap(origin);
@@ -81,6 +91,13 @@ test("serves protected pages only for an active session and gates them again aft
 
   const protectedPage = await fetch(`${origin}/index.html`, { headers: { Cookie: cookie } });
   assert.equal(protectedPage.status, 200);
+  assert.match(protectedPage.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+  const combatPage = await fetch(`${origin}/combat.html?campaign=test&embedded=1`, { headers: { Cookie: cookie } });
+  assert.equal(combatPage.status, 200);
+  assert.match(combatPage.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  const combatHead = await fetch(`${origin}/combat.html`, { method: "HEAD", headers: { Cookie: cookie } });
+  assert.match(combatHead.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  assert.equal((await fetch(`${origin}/combat.html`, { redirect: "manual" })).status, 302);
   const setupImportClient = await fetch(`${origin}/campaign-setup-import-client.js`, { headers: { Cookie: cookie } });
   assert.equal(setupImportClient.status, 200);
   assert.match(setupImportClient.headers.get("content-type"), /text\/javascript/);
@@ -91,7 +108,7 @@ test("serves protected pages only for an active session and gates them again aft
   assert.match(mapTilerClient.headers.get("content-security-policy"), /connect-src 'self' https:\/\/nominatim\.openstreetmap\.org https:\/\/api\.maptiler\.com/);
   assert.match(await mapTilerClient.text(), /01a1b6c9-9a4c-7ab4-bf09-6d75353e5420/);
   const runtimeHtml = await protectedPage.text();
-  for (const asset of ["/map-visualization-client.js", "/personnel-client.js", "/location-client.js", "/route-client.js", "/roll-table-contract.js", "/roll-tables-client.js"]) {
+  for (const asset of ["/map-visualization-client.js", "/map-tooltip-client.js", "/personnel-client.js", "/location-client.js", "/route-client.js", "/roll-table-contract.js", "/roll-tables-client.js"]) {
     const anonymous = await fetch(`${origin}${asset}`, { redirect: "manual" });
     assert.equal(anonymous.status, 302);
     const authenticated = await fetch(`${origin}${asset}`, { headers: { Cookie: cookie } });

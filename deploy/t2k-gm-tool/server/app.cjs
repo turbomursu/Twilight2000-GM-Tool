@@ -42,6 +42,7 @@ const PROTECTED_FILES = new Map([
   ["/map-publication-client.js", ["map-publication-client.js", "text/javascript; charset=utf-8"]],
   ["/map-basemap-client.js", ["map-basemap-client.js", "text/javascript; charset=utf-8"]],
   ["/map-visualization-client.js", ["map-visualization-client.js", "text/javascript; charset=utf-8"]],
+  ["/map-tooltip-client.js", ["map-tooltip-client.js", "text/javascript; charset=utf-8"]],
   ["/personnel-client.js", ["personnel-client.js", "text/javascript; charset=utf-8"]],
   ["/location-client.js", ["location-client.js", "text/javascript; charset=utf-8"]],
   ["/route-client.js", ["route-client.js", "text/javascript; charset=utf-8"]],
@@ -69,13 +70,13 @@ const ROLL_TABLES_PATH = /^\/api\/roll-tables(?:\/|$)/;
 const PLAYER_API_PATH = /^\/api\/player(?:\/|$)/;
 const USER_API_PATH = /^\/api\/(?:users|player-seeds)(?:\/|$)/;
 
-function sendText(response, status, contentType, body, headOnly = false) {
+function sendText(response, status, contentType, body, headOnly = false, allowSameOriginFrame = false) {
   response.writeHead(status, {
     "Content-Type": contentType,
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://nominatim.openstreetmap.org https://api.maptiler.com; worker-src 'self' blob:; frame-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "Content-Security-Policy": `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://nominatim.openstreetmap.org https://api.maptiler.com; worker-src 'self' blob:; frame-src 'self'; font-src 'self' data:; frame-ancestors '${allowSameOriginFrame ? "self" : "none"}'; base-uri 'self'; form-action 'self'`
   });
   response.end(headOnly ? undefined : body);
 }
@@ -238,12 +239,12 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
       response.writeHead(302, { Location: "/index.html", "Cache-Control": "no-store" });
       return response.end();
     }
-      if (["/index.html", "/campaign-setup.html", "/player-seeds.html"].includes(url.pathname) && account.role !== "gm") {
+      if (["/index.html", "/campaign-setup.html", "/player-seeds.html", "/combat.html"].includes(url.pathname) && account.role !== "gm") {
       response.writeHead(302, { Location: "/player-interface.html", "Cache-Control": "no-store" });
       return response.end();
     }
     try {
-      return sendText(response, 200, protectedFile[1], readFileSync(join(root, protectedFile[0])), headOnly);
+      return sendText(response, 200, protectedFile[1], readFileSync(join(root, protectedFile[0])), headOnly, url.pathname === "/combat.html");
     } catch {
       return sendText(response, 404, "text/plain; charset=utf-8", "Not found.", headOnly);
     }

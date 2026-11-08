@@ -30,4 +30,4 @@ Download the empty template from the modal. Imports must be standard JSON in thi
 
 Validation accepts at most 200 tables and 5 MiB per import. IDs and case-insensitive names must be unique. Dice use `NdS` notation with 1-20 dice, 2-100 sides, and no total above 1,000. Each table needs 2-8 unique column labels and 1-1,000 ranges. Inclusive integer ranges must cover every possible dice total exactly once without overlaps or gaps; every row must provide one plain-text value for each column. Notes are optional label/text pairs. Unknown properties are rejected. Text is rendered as text, never interpreted as HTML.
 
-The initial catalog includes the 17 supplied tables. **Stationary Encounters** uses `1d100` and its ranges cover 1–100. The GM confirmed redistribution rights for the included user-provided data; no external table content is fetched or added.
+The initial catalog includes the 17 supplied tables. **Stationary Encounters** uses one `1d10`, with ranges covering 1–10. The GM confirmed redistribution rights for the included user-provided data; no external table content is fetched or added.

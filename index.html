@@ -169,6 +169,7 @@
     .map-wrap { position: relative; overflow: hidden; background: #dce5d2; }
     #field-map { display: block; width: 100%; height: 335px; }
     .runtime-route-map { width: 100%; height: 335px; background: #e2e7e0; }
+    .leaflet-tooltip.map-feature-tooltip { box-sizing: border-box; max-width: min(280px, calc(100% - 24px)); white-space: normal; text-align: center; }
     #sample-route-sketch[hidden], #sample-route-key[hidden], #runtime-route-map[hidden],
     #runtime-route-map-key[hidden], #runtime-maptiler-key-field[hidden], #route-maptiler-key-field[hidden], #runtime-route-map-notice[hidden] { display: none; }
     .map-key { display: flex; flex-wrap: wrap; gap: 15px; padding: 11px 15px; border-top: 1px solid var(--line); color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
@@ -197,6 +198,8 @@
     #route-waypoint-map-status:empty, #route-waypoint-basemap-status:empty { display: none; }
     .route-waypoint-number { background: #fff; color: #644916; border: 1px solid #a97832; border-radius: 50%; text-align: center; font: bold 12px/20px var(--mono); }
     .route-editor-row { display: grid; grid-template-columns: minmax(125px, 1.1fr) minmax(120px, 1.4fr) 100px auto; align-items: center; gap: 7px; }
+    .route-march-estimate { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; }
+    .route-march-estimate.error { color: var(--signal); }
     .map-location-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(100px, .7fr) minmax(100px, .7fr); align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
     .route-editor-row input, .route-editor-row select, .map-location-row input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); color: var(--ink); background: white; }
     .map-location-row strong { overflow-wrap: anywhere; font-size: 11px; }
@@ -348,6 +351,8 @@
     .map-hex-label { background: transparent; border: 0; color: #263b30; font: 10px var(--mono); white-space: nowrap; text-shadow: 0 1px 2px #fff, 0 -1px 2px #fff; text-align: center; }
     .map-hex-selection-label { background: #fff; color: #644916; border: 1px solid #a97832; border-radius: 50%; text-align: center; font: bold 12px/22px var(--mono); }
     #conflict-battle-link[hidden] { display: none; }
+    #combat-resolver-dialog { width: min(1040px, calc(100vw - 28px)); max-height: 94vh; }
+    #combat-resolver-frame { display: block; width: 100%; height: 72vh; border: 0; }
     .map-edit-locations { display: grid; gap: 8px; max-height: 220px; overflow: auto; padding: 8px 0; }
     .map-edit-locations label { display: flex; align-items: start; gap: 8px; font-size: 12px; overflow-wrap: anywhere; }
     .map-marking-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px; margin-bottom: 8px; }
@@ -1213,9 +1218,9 @@
         <section class="view" id="view-conflicts" aria-labelledby="conflicts-title">
           <div class="page-heading">
             <div><div class="heading-tag">GM-only / campaign record</div><h1 id="conflicts-title">Conflict ledger</h1></div>
-            <div class="roll-table-page-actions"><button class="button" type="button" data-action="open-roll-tables" data-roll-context="conflicts">Roll tables</button><a class="button button-primary" id="conflict-battle-link" href="combat.html" target="_blank" rel="noopener" hidden>Open battle resolver</a></div>
+            <div class="roll-table-page-actions"><button class="button" type="button" data-action="open-roll-tables" data-roll-context="conflicts">Roll tables</button><button class="button button-primary" id="conflict-battle-link" type="button" aria-haspopup="dialog" aria-controls="combat-resolver-dialog" hidden>Open battle resolver</button></div>
           </div>
-          <p>Record incidents and threats for GM review. Categories and status are descriptive only; this ledger does not calculate escalation, generate encounters, or publish to players. The battle resolver opens separately for the selected campaign and only calculates when you explicitly resolve an attack; its results are not added to this ledger or campaign record.</p>
+          <p>Record incidents and threats for GM review. Categories and status are descriptive only; this ledger does not calculate escalation, generate encounters, or publish to players. The battle resolver opens in a modal for the selected campaign and only calculates when you explicitly resolve an attack; its results are not added to this ledger or campaign record.</p>
           <div class="conflict-layout movement-grid">
             <section class="panel" aria-labelledby="conflict-form-title">
               <div class="panel-head"><div><div class="eyebrow">Manual record</div><h2 id="conflict-form-title">New incident</h2></div></div>
@@ -1374,6 +1379,12 @@
     </main>
   </div>
 
+  <dialog id="combat-resolver-dialog" aria-labelledby="combat-resolver-title">
+    <div class="dialog-head"><div><div class="eyebrow">GM runtime / calculation only</div><h2 id="combat-resolver-title">Battle resolver</h2><p id="combat-resolver-campaign"></p></div><button class="icon-button" id="close-combat-resolver" type="button" aria-label="Close battle resolver" autofocus>×</button></div>
+    <iframe id="combat-resolver-frame" title="Combat attack inputs and results"></iframe>
+    <div class="dialog-form"><div class="dialog-actions"><button class="button" id="cancel-combat-resolver" type="button">Close / discard results</button></div></div>
+  </dialog>
+
   <dialog id="note-dialog" aria-labelledby="note-dialog-title">
     <div class="dialog-head"><div><div class="eyebrow">Campaign dispatch</div><h2 id="note-dialog-title">New journal entry</h2></div><button class="icon-button" data-action="close-note" aria-label="Close dialog">×</button></div>
     <form class="dialog-form" id="note-form">
@@ -1397,7 +1408,7 @@
   <dialog id="route-editor-dialog" aria-labelledby="route-editor-title">
     <div class="dialog-head"><div><div class="eyebrow">GM runtime / route stops</div><h2 id="route-editor-title">Edit campaign route</h2></div><button class="icon-button" id="close-route-editor" type="button" aria-label="Close route editor">×</button></div>
     <form class="dialog-form" id="route-editor-form">
-      <p class="row-description">Click a 10 km overlay hex to append its center as a waypoint. New center locations are GM-only and created only when you save. Distances stay GM-entered; planning does not move the party or publish the route.</p>
+      <p class="row-description">Click a 10 km overlay hex to append its center as a waypoint. Marching estimates follow the straight line between nearest valid hex centers: road/open hexes count as half a shift, other known terrain as one shift, rounded up. Mixed terrain is a planning estimate; missing or unknown terrain suppresses it. Source: T2K Referee Aid, Strategic Play / Marching. Driving remains GM-managed. New center locations are GM-only and created only when you save. Planning does not move the party or publish the route.</p>
       <div id="route-waypoint-map" aria-label="Route waypoint selection map"></div>
       <div class="field" id="route-maptiler-key-field" hidden><label for="route-maptiler-key">MapTiler API key / this browser session only</label><input id="route-maptiler-key" type="password" autocomplete="off" data-maptiler-key></div>
       <p class="feedback" id="route-waypoint-basemap-status" role="status"></p>
@@ -1799,6 +1810,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
   <script src="/vendor/leaflet.js"></script>
   <script src="/map-coordinates.js"></script>
   <script src="./map-visualization-client.js"></script>
+  <script src="/map-tooltip-client.js"></script>
   <script src="/vendor/pmtiles.js"></script>
   <script src="campaign-package-contract.js"></script>
   <script src="campaign-setup-import-client.js"></script>
@@ -2517,21 +2529,21 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const shouldFit = signature !== runtimeRouteSignature;
         runtimeRouteLayer.clearLayers();
         (state.runtimeLocations || []).filter((location) => FieldbookMapCoordinates.contains(location.mapPosition, mapData.bounds)).forEach((location) => {
-          L.circleMarker(FieldbookMapCoordinates.toLatLng(location.mapPosition, mapData.bounds), {
+          window.FieldbookMapTooltips.bindVerticalTooltip(L.circleMarker(FieldbookMapCoordinates.toLatLng(location.mapPosition, mapData.bounds), {
             radius: 4, color: "#487c87", weight: 2, fillColor: "#dae7e7", fillOpacity: .8
-          }).bindTooltip(escapeHtml(location.name), { direction: "top" }).addTo(runtimeRouteLayer);
+          }), runtimeRouteMap, escapeHtml(location.name)).addTo(runtimeRouteLayer);
         });
         const positions = positionedStops.map((stop) => FieldbookMapCoordinates.toLatLng(stop.mapPosition, mapData?.bounds));
         if (positions.length > 1) L.polyline(positions, { color: "#a97832", weight: 3, opacity: .9 }).addTo(runtimeRouteLayer);
         positionedStops.forEach((stop) => {
           const current = stop.index === state.activeStop;
-          L.circleMarker(FieldbookMapCoordinates.toLatLng(stop.mapPosition, mapData?.bounds), {
+          window.FieldbookMapTooltips.bindVerticalTooltip(L.circleMarker(FieldbookMapCoordinates.toLatLng(stop.mapPosition, mapData?.bounds), {
             radius: current ? 8 : 5,
             color: current ? "#b74435" : "#344a40",
             weight: 2,
             fillColor: current ? "#b74435" : "#e8ece5",
             fillOpacity: 1
-          }).bindTooltip(escapeHtml(stop.name), { direction: "top", offset: [0, -6] }).addTo(runtimeRouteLayer);
+          }), runtimeRouteMap, escapeHtml(stop.name)).addTo(runtimeRouteLayer);
         });
         if (shouldFit) {
           runtimeRouteMap.fitBounds(FieldbookMapCoordinates.leafletBounds(mapData.bounds), { padding: [12, 12] });
@@ -2543,14 +2555,97 @@ Military rank || optional</textarea><span class="row-description">One field per 
       function routeLocations() {
         return state.runtimeLocations || [];
       }
+      function routeHexPathForStop(index) {
+        const map = state.setupPackage?.map;
+        if (!map?.grid || !FieldbookMapCoordinates.normalizeBounds(map.bounds)) return null;
+        const locations = [...routeLocations(), ...routeHexLocations];
+        const getAxial = (stop) => {
+          const location = locations.find((candidate) => candidate.id === stop?.locationId);
+          const position = location?.mapPosition;
+          if (!position || !FieldbookMapCoordinates.contains(position, map.bounds)) return null;
+          const axial = FieldbookMapCoordinates.axialForPosition(position, map.grid.origin, map.bounds);
+          return FieldbookMapCoordinates.hexGeometry(axial.q, axial.r, map.grid, map.bounds) ? axial : null;
+        };
+        const from = getAxial(routeDraft[index - 1]);
+        const to = getAxial(routeDraft[index]);
+        if (!from || !to) return null;
+        const distance = Math.max(
+          Math.abs(to.q - from.q),
+          Math.abs(to.r - from.r),
+          Math.abs((to.q + to.r) - (from.q + from.r))
+        );
+        const cells = [];
+        for (let step = 0; step <= distance; step++) {
+          const fraction = distance ? step / distance : 0;
+          const qFloat = from.q + (to.q - from.q) * fraction;
+          const rFloat = from.r + (to.r - from.r) * fraction;
+          const sFloat = -qFloat - rFloat;
+          let q = Math.round(qFloat), r = Math.round(rFloat), s = Math.round(sFloat);
+          const qDifference = Math.abs(q - qFloat);
+          const rDifference = Math.abs(r - rFloat);
+          const sDifference = Math.abs(s - sFloat);
+          if (qDifference > rDifference && qDifference > sDifference) q = -r - s;
+          else if (rDifference > sDifference) r = -q - s;
+          else s = -q - r;
+          if (!FieldbookMapCoordinates.hexGeometry(q, r, map.grid, map.bounds)) return null;
+          cells.push({ q, r });
+        }
+        return { map, cells };
+      }
       function routeEditorValues() {
-        return [...document.querySelectorAll("#route-editor-rows .route-editor-row")].map((row) => {
+        return [...document.querySelectorAll("#route-editor-rows .route-editor-row")].map((row, index) => {
           const locationId = row.querySelector("[data-route-location]").value;
           const staged = routeHexLocations.find((location) => location.id === locationId);
+          const derivedDistance = routeDistanceForStop(index);
           return { ...(staged ? { hex: { q: staged.q, r: staged.r } } : { locationId }),
             detail: row.querySelector("[data-route-detail]").value,
-            kmFromPrevious: Number(row.querySelector("[data-route-distance]").value) };
+            kmFromPrevious: derivedDistance ?? Number(row.querySelector("[data-route-distance]").value) };
         });
+      }
+      function routeDistanceForStop(index) {
+        if (index === 0) return 0;
+        const traversal = routeHexPathForStop(index);
+        return traversal ? (traversal.cells.length - 1) * traversal.map.grid.cellKm : null;
+      }
+      function routeMarchingEstimate(index) {
+        if (index === 0) return { status: "start", message: "Starting location; no marching leg." };
+        const traversal = routeHexPathForStop(index);
+        if (!traversal) return { status: "unavailable", message: "Marching estimate unavailable: one or both waypoint centers are outside the valid campaign grid." };
+        const enteredCells = traversal.cells.slice(1);
+        if (!enteredCells.length) return { status: "estimate", shifts: 0, message: "Marching estimate: 0 shifts (same campaign hex)." };
+        const terrainLabels = {
+          road: "Road", open: "Open", woods: "Woods", hills: "Hills",
+          mountains: "Mountains", "lake-river": "Lake / river", swamp: "Swamp", ruins: "Ruins"
+        };
+        const terrainCells = traversal.map.grid.terrainCells;
+        let roadOpenHexes = 0;
+        let otherTerrainHexes = 0;
+        for (const cell of enteredCells) {
+          const key = `${cell.q},${cell.r}`;
+          if (!terrainCells || !Object.hasOwn(terrainCells, key)) {
+            return { status: "unavailable", message: `Marching estimate unavailable: terrain is unassigned for traversed hex ${key}.` };
+          }
+          const terrain = terrainCells[key];
+          if (!Object.hasOwn(terrainLabels, terrain)) {
+            return { status: "unavailable", message: `Marching estimate unavailable: unrecognized terrain in traversed hex ${key}.` };
+          }
+          if (terrain === "road" || terrain === "open") roadOpenHexes++;
+          else otherTerrainHexes++;
+        }
+        const mixed = roadOpenHexes > 0 && otherTerrainHexes > 0;
+        const shifts = Math.ceil(roadOpenHexes / 2 + otherTerrainHexes);
+        const terrainSummary = [
+          roadOpenHexes ? `${roadOpenHexes} road/open hex${roadOpenHexes === 1 ? "" : "es"}` : "",
+          otherTerrainHexes ? `${otherTerrainHexes} other-terrain hex${otherTerrainHexes === 1 ? "" : "es"}` : ""
+        ].filter(Boolean).join(" and ");
+        return {
+          status: "estimate",
+          shifts,
+          roadOpenHexes,
+          otherTerrainHexes,
+          mixed,
+          message: `${mixed ? "Planning estimate" : "Marching estimate"}: ${shifts} shift${shifts === 1 ? "" : "s"} (${terrainSummary}; straight-line route).`
+        };
       }
       function renderRouteEditorRows() {
         const container = document.getElementById("route-editor-rows");
@@ -2565,7 +2660,10 @@ Military rank || optional</textarea><span class="row-description">One field per 
           [...routeLocations(), ...routeHexLocations].filter((location) => !routeDraft.some((candidate, candidateIndex) => candidateIndex !== index && candidate.locationId === location.id))
             .forEach((location) => locationSelect.add(new Option(location.name, location.id)));
           locationSelect.value = stop.locationId;
-          locationSelect.addEventListener("change", () => { routeDraft[index].locationId = locationSelect.value; renderRouteEditorMap(); });
+          locationSelect.addEventListener("change", () => {
+            routeDraft[index].locationId = locationSelect.value;
+            renderRouteEditorRows();
+          });
           const detailInput = document.createElement("input");
           detailInput.dataset.routeDetail = "";
           detailInput.maxLength = 160;
@@ -2580,9 +2678,20 @@ Military rank || optional</textarea><span class="row-description">One field per 
           distanceInput.max = "1000000";
           distanceInput.step = "1";
           distanceInput.required = true;
-          distanceInput.value = String(stop.kmFromPrevious);
-          distanceInput.setAttribute("aria-label", `Route stop ${index + 1} kilometers from previous`);
+          const derivedDistance = routeDistanceForStop(index);
+          if (derivedDistance !== null) stop.kmFromPrevious = derivedDistance;
+          distanceInput.value = String(derivedDistance ?? stop.kmFromPrevious);
+          distanceInput.readOnly = derivedDistance !== null;
+          distanceInput.title = derivedDistance === null
+            ? "Enter the saved distance because one or both waypoint centers are outside the valid campaign grid."
+            : "Calculated from the canonical centers of the nearest valid campaign hexes.";
+          distanceInput.setAttribute("aria-label", `Route stop ${index + 1} kilometers from previous${derivedDistance === null ? " / manual fallback" : " / calculated from hex centers"}`);
           distanceInput.addEventListener("input", () => { routeDraft[index].kmFromPrevious = distanceInput.value; });
+          const marching = routeMarchingEstimate(index);
+          const marchingOutput = document.createElement("p");
+          marchingOutput.className = `route-march-estimate${marching.status === "unavailable" ? " error" : ""}`;
+          marchingOutput.setAttribute("role", "status");
+          marchingOutput.textContent = marching.message;
           const actions = document.createElement("div");
           actions.className = "person-actions";
           const makeAction = (text, label, action, disabled = false) => {
@@ -2610,7 +2719,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
               renderRouteEditorRows();
             })
           );
-          row.append(locationSelect, detailInput, distanceInput, actions);
+          row.append(locationSelect, detailInput, distanceInput, actions, marchingOutput);
           container.append(row);
         });
         const used = new Set(routeDraft.map((stop) => stop.locationId));
@@ -3349,8 +3458,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
           }
         }
         locations.forEach((location) => {
-          L.circleMarker(FieldbookMapCoordinates.toLatLng(location.position, bounds), { radius: 5, color: "#fff", weight: 2, fillColor: "#b74435", fillOpacity: 1, interactive: false }).addTo(influenceHexLayer)
-            .bindTooltip(location.name, { direction: "top", offset: [0, -5] });
+          window.FieldbookMapTooltips.bindVerticalTooltip(L.circleMarker(FieldbookMapCoordinates.toLatLng(location.position, bounds), {
+            radius: 5, color: "#fff", weight: 2, fillColor: "#b74435", fillOpacity: 1, className: "live-influence-location"
+          }), influenceMap, escapeHtml(location.name)).addTo(influenceHexLayer);
         });
         document.getElementById("influence-map-status").textContent = liveInfluenceEditing
           ? "Selection mode active. Click hexes to stage or unstage this faction's influence."
@@ -3358,7 +3468,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
       }
 
       function handleLiveInfluenceMapClick(event) {
-        if (factionSavePending || !liveInfluenceEditing || !state.setupPackage || !event.originalEvent.target.closest?.(".live-influence-hex")) return;
+        if (factionSavePending || !liveInfluenceEditing || !state.setupPackage
+          || !event.originalEvent.target.closest?.(".live-influence-hex, .live-influence-location")) return;
         const factionId = document.getElementById("live-influence-faction").value;
         if (!factionId) return;
         const { q, r } = liveAxialForPosition(FieldbookMapCoordinates.fromLatLng(event.latlng, state.setupPackage.map.bounds), state.setupPackage.map.grid.origin);
@@ -3541,12 +3652,33 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const campaignId = runtimeDataLoaded ? state.runtimeCampaignId : null;
         if (!campaignId) {
           link.hidden = true;
-          link.removeAttribute("href");
           return;
         }
-        link.href = `combat.html?campaign=${encodeURIComponent(campaignId)}`;
         link.hidden = false;
       }
+
+      const combatResolverDialog = document.getElementById("combat-resolver-dialog");
+      const combatResolverFrame = document.getElementById("combat-resolver-frame");
+      document.getElementById("conflict-battle-link").addEventListener("click", () => {
+        const campaignId = runtimeDataLoaded ? state.runtimeCampaignId : null;
+        if (!campaignId || combatResolverDialog.open) return;
+        document.getElementById("combat-resolver-campaign").textContent =
+          runtimeCampaignSelect.selectedOptions[0]?.textContent || campaignId;
+        combatResolverFrame.src = `combat.html?campaign=${encodeURIComponent(campaignId)}&embedded=1`;
+        combatResolverDialog.showModal();
+      });
+      function closeCombatResolver() { combatResolverDialog.close(); }
+      document.getElementById("close-combat-resolver").addEventListener("click", closeCombatResolver);
+      document.getElementById("cancel-combat-resolver").addEventListener("click", closeCombatResolver);
+      combatResolverDialog.addEventListener("close", () => {
+        combatResolverFrame.removeAttribute("src");
+        document.getElementById("conflict-battle-link").focus();
+      });
+      // Escape in the embedded document does not bubble to the parent dialog.
+      window.addEventListener("message", (event) => {
+        if (event.origin === window.location.origin && event.source === combatResolverFrame.contentWindow &&
+            event.data?.type === "fieldbook:close-combat") closeCombatResolver();
+      });
 
       document.addEventListener("fieldbook:map-saved", (event) => {
         const publication = event.detail;

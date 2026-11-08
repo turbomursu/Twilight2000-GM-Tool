@@ -13,6 +13,119 @@ class CombatClient {
   }
 
   /**
+   * Name suggestions only, from the runtime's existing NPC equipment catalog.
+   * Strip loadout quantities, not weapon names. No stats or rules are inferred.
+   */
+  static knownWeaponNames(archetypes) {
+    const names = new Set();
+    for (const archetype of archetypes) {
+      for (const item of archetype.equipment || []) {
+        if (item.category !== 'weapon' || typeof item.name !== 'string') continue;
+        for (const alternative of item.name.split(/\s+or\s+/i)) {
+          const name = alternative.replace(/\s+with\s+.*$/i, '').trim();
+          if (name) names.add(name);
+        }
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
+
+  async loadKnownWeaponNames() {
+    try {
+      const response = await fetch('/api/campaigns/' + encodeURIComponent(this.campaignId) + '/npc-archetypes');
+      if (!response.ok) throw new Error('Catalog request failed.');
+      const data = await response.json();
+      if (!Array.isArray(data.archetypes)) throw new Error('Invalid catalog.');
+      return CombatClient.knownWeaponNames(data.archetypes);
+    } catch {
+      throw new Error('Known weapon names unavailable; use Other/custom.');
+    }
+  }
+
+  async loadCampaignWeapons() {
+    try {
+      const response = await fetch('/api/campaigns/' + encodeURIComponent(this.campaignId) + '/combat-weapons');
+      if (!response.ok) throw new Error('Campaign weapon request failed.');
+      const data = await response.json();
+      if (!Array.isArray(data.weapons)) throw new Error('Invalid campaign weapon catalog.');
+      return data.weapons;
+    } catch {
+      throw new Error('Saved campaign weapons unavailable; use the other catalog options.');
+    }
+  }
+
+  /**
+   * Keep the existing resolver input as a hidden value; each selector owns its
+   * own state. Custom text is editable/required only when explicitly selected.
+   */
+  static createWeaponSelector(input, doc = document, onSavedWeaponSelected = () => {}) {
+    const select = doc.createElement('select');
+    select.id = input.id + 'Select';
+    select.required = true;
+    const placeholder = doc.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Choose weapon…';
+    const other = doc.createElement('option');
+    other.value = '__custom__';
+    other.textContent = 'Other/custom';
+    select.append(placeholder, other);
+    const customLabel = doc.createElement('label');
+    const custom = doc.createElement('input');
+    custom.id = input.id + 'Custom';
+    custom.type = 'text';
+    custom.placeholder = 'GM-defined weapon name';
+    customLabel.htmlFor = custom.id;
+    customLabel.textContent = 'Custom weapon name';
+    const knownNameKeys = new Set();
+    const savedByName = new Map();
+    function sync() {
+      const isCustom = select.value === other.value;
+      customLabel.hidden = custom.hidden = !isCustom;
+      custom.disabled = !isCustom;
+      custom.required = isCustom;
+      const nameKey = custom.value.trim().normalize('NFKC').toLocaleLowerCase('en-US');
+      custom.setCustomValidity(isCustom
+        ? !nameKey ? 'Enter a custom weapon name.'
+          : knownNameKeys.has(nameKey) ? 'This weapon is already in the catalog; select it from the list.'
+            : ''
+        : '');
+      input.value = isCustom ? custom.value.trim() : select.value;
+      if (!isCustom && savedByName.has(select.value.normalize('NFKC').toLocaleLowerCase('en-US'))) {
+        onSavedWeaponSelected(savedByName.get(select.value.normalize('NFKC').toLocaleLowerCase('en-US')));
+      }
+    }
+    select.addEventListener('change', sync);
+    custom.addEventListener('input', sync);
+    input.type = 'hidden';
+    input.value = '';
+    input.before(select, customLabel, custom);
+    sync();
+    return {
+      populate(names, campaignWeapons = [], kind = null) {
+        for (const name of names) {
+          knownNameKeys.add(name.normalize('NFKC').toLocaleLowerCase('en-US'));
+          const option = doc.createElement('option');
+          option.value = option.textContent = name;
+          select.insertBefore(option, other);
+        }
+        for (const weapon of campaignWeapons.filter(item => item.kind === kind)) {
+          const nameKey = weapon.name.normalize('NFKC').toLocaleLowerCase('en-US');
+          if (knownNameKeys.has(nameKey)) continue;
+          knownNameKeys.add(nameKey);
+          savedByName.set(nameKey, weapon);
+          const option = doc.createElement('option');
+          option.value = option.textContent = weapon.name;
+          select.insertBefore(option, other);
+        }
+        sync();
+      },
+      shouldSaveCustom() {
+        return select.value === other.value;
+      }
+    };
+  }
+
+  /**
    * Resolve a ranged attack
    */
   async resolveRangedAttack(input) {
@@ -29,7 +142,8 @@ class CombatClient {
       targetArmorLevel: parseInt(input.targetArmorLevel) || 0,
       modifierDeltas: input.modifierDeltas || [],
       ammoDieType: parseInt(input.ammoDieType) || 0,
-      ammoAvailable: parseInt(input.ammoAvailable) || 0
+      ammoAvailable: parseInt(input.ammoAvailable) || 0,
+      saveCustomWeapon: input.saveCustomWeapon === true
     };
 
     if (payload.ammoDieType > 0 && input.ammoRolls) {
@@ -48,8 +162,9 @@ class CombatClient {
       weaponBaseDamage: parseInt(input.weaponBaseDamage),
       weaponThreshold: parseInt(input.weaponThreshold),
       strengthRoll: parseInt(input.strengthRoll),
-      closeCombatRoll: parseInt(input.closeCombatRoll),
-      targetArmorLevel: parseInt(input.targetArmorLevel) || 0
+      ccRoll: parseInt(input.closeCombatRoll),
+      targetArmorLevel: parseInt(input.targetArmorLevel) || 0,
+      saveCustomWeapon: input.saveCustomWeapon === true
     };
 
     return this._post('/api/campaigns/' + this.campaignId + '/combat/close-combat', payload);
@@ -65,7 +180,8 @@ class CombatClient {
       threshold: parseInt(input.threshold) || 2,
       agilityRoll: parseInt(input.agilityRoll),
       mobilityRoll: parseInt(input.mobilityRoll),
-      targetArmorLevel: parseInt(input.targetArmorLevel) || 0
+      targetArmorLevel: parseInt(input.targetArmorLevel) || 0,
+      saveCustomWeapon: input.saveCustomWeapon === true
     };
 
     return this._post('/api/campaigns/' + this.campaignId + '/combat/grenade', payload);
@@ -85,7 +201,8 @@ class CombatClient {
       agilityRoll: parseInt(input.agilityRoll),
       mobilityRoll: parseInt(input.mobilityRoll),
       targetArmorLevel: parseInt(input.targetArmorLevel) || 0,
-      scatterRoll: input.scatterRoll ? parseInt(input.scatterRoll) : null
+      scatterRoll: input.scatterRoll ? parseInt(input.scatterRoll) : null,
+      saveCustomWeapon: input.saveCustomWeapon === true
     };
 
     return this._post('/api/campaigns/' + this.campaignId + '/combat/heavy-weapon', payload);

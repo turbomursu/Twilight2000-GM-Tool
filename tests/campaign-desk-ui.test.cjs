@@ -30,6 +30,16 @@ test("route ledger stays in a closed dialog until dedicated route management ope
   assert.match(client, /data-action="open-route-editor"/);
 });
 
+test("runtime route editor estimates marching shifts from traversed known terrain only", () => {
+  assert.match(dashboard, /function routeHexPathForStop\(index\)/);
+  assert.match(dashboard, /function routeMarchingEstimate\(index\)/);
+  assert.match(dashboard, /Math\.ceil\(roadOpenHexes \/ 2 \+ otherTerrainHexes\)/);
+  assert.match(dashboard, /unassigned for traversed hex/);
+  assert.match(dashboard, /unrecognized terrain in traversed hex/);
+  assert.match(dashboard, /Driving remains GM-managed/);
+  assert.match(dashboard, /Mixed terrain is a planning estimate/);
+});
+
 test("authoring tools remain reachable outside the numbered live desk views", () => {
   const nav = dashboard.match(/<nav class="nav-list" aria-label="Views">([\s\S]*?)<\/nav>/)[1];
   assert.doesNotMatch(nav, /campaign-setup\.html|player-seeds\.html/);
@@ -65,7 +75,12 @@ test("faction influence lets the GM add campaign-scoped factions and manage thei
 
 test("conflicts launches the existing battle resolver for the selected campaign without resolving automatically", () => {
   const conflicts = dashboard.match(/<section class="view" id="view-conflicts"[\s\S]*?<section class="view" id="view-movement"/)[0];
-  assert.match(conflicts, /id="conflict-battle-link" href="combat\.html" target="_blank" rel="noopener" hidden/);
+  assert.match(conflicts, /id="conflict-battle-link" type="button" aria-haspopup="dialog" aria-controls="combat-resolver-dialog" hidden/);
+  assert.match(dashboard, /<dialog id="combat-resolver-dialog" aria-labelledby="combat-resolver-title">/);
+  assert.match(dashboard, /<iframe id="combat-resolver-frame" title="Combat attack inputs and results">/);
+  assert.match(dashboard, /combatResolverDialog\.showModal\(\)/);
+  assert.match(dashboard, /combatResolverFrame\.removeAttribute\("src"\)/);
+  assert.match(dashboard, /event\.source === combatResolverFrame\.contentWindow/);
   assert.match(conflicts, /results are not added to this ledger or campaign record/);
   assert.match(dashboard, /combat\.html\?campaign=\$\{encodeURIComponent\(campaignId\)\}/);
   assert.match(dashboard, /runtimeDataLoaded \? state\.runtimeCampaignId : null/);
@@ -79,11 +94,16 @@ test("separated surfaces retain valid inline JavaScript and synchronized deploym
       new Script(script, { filename });
     }
   }
+  assert.match(dashboard, /window\.FieldbookMapTooltips\.bindVerticalTooltip/);
+  assert.match(dashboard, /<script src="\/map-tooltip-client\.js"><\/script>/);
+  assert.match(dashboard, /map-feature-tooltip/);
+  assert.match(dashboard, /closest\?\.\("\.live-influence-hex, \.live-influence-location"\)/);
   for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "maptiler-reference-client.js", "campaign-package-contract.js",
     "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js", "route-client.js",
-    "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
+    "map-tooltip-client.js", "roll-tables.json", "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
     "server/map-publications.cjs", "server/campaigns.cjs", "server/campaign-depth-service.cjs", "server/audit.cjs", "server/sample-data.cjs",
-    "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "project-features.html", "project-status.html", "combat.html"]) {
+    "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "metadata/ROLL_TABLES.md",
+    "project-features.html", "project-status.html", "combat.html", "combat-client.js"]) {
     assert.equal(
       readFileSync(join(__dirname, "..", "deploy", "t2k-gm-tool", filename), "utf8"),
       readFileSync(join(__dirname, "..", filename), "utf8"),
