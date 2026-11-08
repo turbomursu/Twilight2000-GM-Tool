@@ -120,7 +120,20 @@ function getGMMap(database, accountId, campaignId) {
   const campaign = getRuntimeCampaign(database, accountId, campaignId);
   if (!campaign) return null;
   const source = database.prepare("SELECT name, bounds_json, offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(campaignId);
+  const bounds = mapBounds(JSON.parse(source.bounds_json));
   const offlineBasemap = source.offlineBasemap_json ? JSON.parse(source.offlineBasemap_json) : null;
+  const setupImport = database.prepare("SELECT source_json FROM setup_imports WHERE runtime_campaign_id = ?").get(campaignId);
+  let grid = null;
+  if (setupImport) {
+    const sourceGrid = JSON.parse(setupImport.source_json).map.grid;
+    const origin = sourceGrid.origin || (mapCoordinates.isImage(bounds)
+      ? { x: 0, y: mapCoordinates.heightKm(bounds) } : { lat: bounds.north, lng: bounds.west });
+    if (sourceGrid.coordinateSystem === "axial-q-r" && sourceGrid.cellKm === 10
+      && mapCoordinates.validPoint(origin, bounds)) {
+      grid = { coordinateSystem: sourceGrid.coordinateSystem, cellKm: sourceGrid.cellKm,
+        origin: mapCoordinates.isImage(bounds) ? { x: origin.x, y: origin.y } : { lat: origin.lat, lng: origin.lng } };
+    }
+  }
   const locations = database.prepare(`SELECT id, name, kind, map_position_json, visibility_eligibility
     FROM locations WHERE runtime_campaign_id = ? ORDER BY name, id`).all(campaignId).map((location) => ({
     id: location.id, name: location.name, kind: location.kind,
@@ -129,7 +142,7 @@ function getGMMap(database, accountId, campaignId) {
   const row = database.prepare("SELECT * FROM map_publications WHERE campaign_id = ?").get(campaignId);
   return {
     campaignId, campaignRevision: campaign.revision, revision: row?.revision ?? 0,
-    catalog: { name: source.name, bounds: mapBounds(JSON.parse(source.bounds_json)), locations, offlineBasemap },
+    catalog: { name: source.name, bounds, grid, locations, offlineBasemap },
     draft: row ? JSON.parse(row.draft_json) : { locationIds: [], markings: [], geometries: [], routeLocationIds: [], playerPosition: null },
     published: row?.published_json ? projectMap(JSON.parse(row.published_json)) : null,
     publishedAt: row?.published_at ?? null

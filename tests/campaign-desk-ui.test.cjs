@@ -53,8 +53,27 @@ test("runtime delegates package handoff while retaining live map normalization",
   assert.match(dashboard, /!runtimeDataLoaded \|\| state.runtimeCampaignId !== campaign.id/);
 });
 
+test("faction influence lets the GM add campaign-scoped factions and manage their live layers", () => {
+  assert.match(dashboard, /id="view-influence"[\s\S]*id="runtime-faction-form"/);
+  assert.match(dashboard, /id="runtime-faction-name" maxlength="120" required/);
+  assert.match(dashboard, /id="runtime-faction-color" type="color"/);
+  assert.match(dashboard, /runtime-faction-form"\)\.addEventListener\("submit", createRuntimeFaction\)/);
+  assert.match(dashboard, /expectedRevision: runtimeFactionLayers\.revision/);
+  assert.match(dashboard, /state\.setupPackage\.factions\.push/);
+  assert.match(dashboard, /Faction was not added:/);
+});
+
+test("conflicts launches the existing battle resolver for the selected campaign without resolving automatically", () => {
+  const conflicts = dashboard.match(/<section class="view" id="view-conflicts"[\s\S]*?<section class="view" id="view-movement"/)[0];
+  assert.match(conflicts, /id="conflict-battle-link" href="combat\.html" target="_blank" rel="noopener" hidden/);
+  assert.match(conflicts, /results are not added to this ledger or campaign record/);
+  assert.match(dashboard, /combat\.html\?campaign=\$\{encodeURIComponent\(campaignId\)\}/);
+  assert.match(dashboard, /runtimeDataLoaded \? state\.runtimeCampaignId : null/);
+  assert.doesNotMatch(dashboard, /combatClient\.resolve|\/combat\/(?:ranged-attack|close-combat|grenade|heavy-weapon|vehicle-combat)/);
+});
+
 test("separated surfaces retain valid inline JavaScript and synchronized deployment assets", () => {
-  for (const filename of ["index.html", "campaign-setup.html"]) {
+  for (const filename of ["index.html", "campaign-setup.html", "combat.html"]) {
     const html = readFileSync(join(__dirname, "..", filename), "utf8");
     for (const [, script] of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
       new Script(script, { filename });
@@ -63,8 +82,8 @@ test("separated surfaces retain valid inline JavaScript and synchronized deploym
   for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "maptiler-reference-client.js", "campaign-package-contract.js",
     "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js", "route-client.js",
     "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
-    "server/map-publications.cjs", "server/campaigns.cjs", "server/sample-data.cjs",
-    "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "project-features.html", "project-status.html"]) {
+    "server/map-publications.cjs", "server/campaigns.cjs", "server/campaign-depth-service.cjs", "server/audit.cjs", "server/sample-data.cjs",
+    "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "project-features.html", "project-status.html", "combat.html"]) {
     assert.equal(
       readFileSync(join(__dirname, "..", "deploy", "t2k-gm-tool", filename), "utf8"),
       readFileSync(join(__dirname, "..", filename), "utf8"),

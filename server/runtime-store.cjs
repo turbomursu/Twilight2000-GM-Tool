@@ -2,6 +2,7 @@ const { createHash, randomBytes, randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 const { assertCampaignSetupPackage, assertOfflineBasemap } = require("../campaign-package-contract.js");
 const mapCoordinates = require("../map-coordinates.js");
+const { validateRollTableCatalog } = require("../roll-table-contract.js");
 
 const schema = `
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -300,7 +301,7 @@ function openRuntimeDatabase(path = ":memory:") {
   if (path !== ":memory:") database.exec("PRAGMA journal_mode = WAL");
 
   const version = database.prepare("PRAGMA user_version").get().user_version;
-  if (version > 22) {
+  if (version > 24) {
     database.close();
     throw new Error(`Database schema version ${version} is newer than this application supports.`);
   }
@@ -795,6 +796,45 @@ function openRuntimeDatabase(path = ":memory:") {
         CREATE INDEX conflict_incidents_by_campaign ON conflict_incidents(campaign_id, incident_date DESC, sort_order);`);
       }
       database.exec("PRAGMA user_version = 22");
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 23) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.exec(`CREATE TABLE roll_table_catalog (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        revision INTEGER NOT NULL CHECK (revision >= 0),
+        catalog_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT;`);
+      const catalog = validateRollTableCatalog(require("../roll-tables.json"));
+      database.prepare("INSERT INTO roll_table_catalog (id, revision, catalog_json, updated_at) VALUES (1, 0, ?, ?)")
+        .run(JSON.stringify(catalog), new Date().toISOString());
+      database.exec("PRAGMA user_version = 23");
+      database.exec("COMMIT");
+    } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
+  }
+  if (version < 24) {
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const current = database.prepare("SELECT revision, catalog_json FROM roll_table_catalog WHERE id = 1").get();
+      if (current?.revision === 0) {
+        const catalog = validateRollTableCatalog(JSON.parse(current.catalog_json));
+        const stationaryEncounters = require("../roll-tables.json").tables.find(({ id }) => id === "stationary-encounters");
+        if (stationaryEncounters) {
+          const updatedCatalog = validateRollTableCatalog({
+            ...catalog,
+            tables: [
+              ...catalog.tables.filter(({ id }) => id !== stationaryEncounters.id),
+              stationaryEncounters
+            ]
+          });
+          database.prepare("UPDATE roll_table_catalog SET catalog_json = ?, updated_at = ? WHERE id = 1")
+            .run(JSON.stringify(updatedCatalog), new Date().toISOString());
+        }
+      }
+      database.exec("PRAGMA user_version = 24");
       database.exec("COMMIT");
     } catch (error) { database.exec("ROLLBACK"); database.close(); throw error; }
   }
@@ -1599,6 +1639,14 @@ function getRuntimeCampaign(database, accountId, runtimeId) {
   if (!campaign) return null;
   const { sourceJson, ...summary } = campaign;
   const setupPackage = JSON.parse(sourceJson);
+  const sourceFactionIds = new Set((setupPackage.factions || []).map((faction) => faction.id));
+  const liveFactions = database.prepare(`SELECT id, name, color FROM factions
+    WHERE runtime_campaign_id = ? AND faction_type = 'npc' ORDER BY name, id`).all(runtimeId);
+  for (const faction of liveFactions) {
+    if (!sourceFactionIds.has(faction.id)) {
+      setupPackage.factions.push({ id: faction.id, name: faction.name, color: faction.color, influenceCells: [] });
+    }
+  }
   const mapState = database.prepare("SELECT offlineBasemap_json FROM maps WHERE runtime_campaign_id = ?").get(runtimeId);
   if (mapState) setupPackage.map.offlineBasemap = mapState.offlineBasemap_json ? JSON.parse(mapState.offlineBasemap_json) : null;
   return { ...summary, setupPackage };

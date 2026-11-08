@@ -353,7 +353,16 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
 
     const combatMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/combat\/([a-z-]+)$/);
     if (combatMatch && ["POST"].includes(request.method)) {
-      return createCombatHandler({ database })(request, response, combatMatch[1], combatMatch[2]);
+      let campaignId;
+      try {
+        campaignId = decodeURIComponent(combatMatch[1]);
+      } catch {
+        return sendJson(response, 400, { error: "Invalid campaign ID." });
+      }
+      if (!getRuntimeCampaign(database, account.id, campaignId)) {
+        return sendJson(response, 404, { error: "Campaign not found." });
+      }
+      return createCombatHandler({ database })(request, response, campaignId, combatMatch[2]);
     }
 
     const changeListMatch = url.pathname.match(/^\/api\/campaigns\/([^/]+)\/character-changes$/);
@@ -735,8 +744,12 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
 
         if (request.method === "POST") {
           const body = await readJsonBody(request);
-          const faction = depthService.createFaction(database, campaignId, body);
-          return sendJson(response, 201, { faction });
+          const created = depthService.createFaction(database, campaignId, body, {
+            accountId: account.id,
+            expectedRevision: body.expectedRevision
+          });
+          const { campaignRevision, ...faction } = created;
+          return sendJson(response, 201, { faction, campaignRevision });
         }
 
         if (request.method === "PUT") {
@@ -754,6 +767,7 @@ function createCampaignHandler({ database, validateOfflineBasemap = null }) {
       } catch (error) {
         const status = error instanceof HttpError ? error.status
           : /Campaign not found|Faction not found/.test(error.message) ? 404
+          : /Campaign revision changed|Faction name already exists/.test(error.message) ? 409
           : /required and must be/.test(error.message) ? 422 : 422;
         return sendJson(response, status, { error: error.message });
       }
