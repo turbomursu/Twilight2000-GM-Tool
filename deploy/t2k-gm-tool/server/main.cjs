@@ -17,15 +17,7 @@ function startServer(environment = process.env) {
   initializeBackupScheduler(database);
   initializeBackupAutomation(database);
   
-  const accountsExist = database.prepare("SELECT COUNT(*) AS count FROM accounts").get().count > 0;
-  const bootstrapToken = accountsExist ? undefined : environment.FIELDBOOK_BOOTSTRAP_TOKEN;
-  let handler;
-  try {
-    handler = createAuthHandler({ database, bootstrapToken });
-  } catch (error) {
-    database.close();
-    throw error;
-  }
+  const handler = createAuthHandler({ database });
 
   const host = environment.FIELDBOOK_HOST || "0.0.0.0";
   const useLegacySinglePort = environment.FIELDBOOK_PORT

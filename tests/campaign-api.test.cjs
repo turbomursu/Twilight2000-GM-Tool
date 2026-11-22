@@ -13,7 +13,6 @@ const { emptyConditions } = require("../server/conditions.cjs");
 const { seedSampleRuntime } = require("../server/sample-data.cjs");
 const { resolveWeatherRoll } = require("../weather-rules.js");
 
-const bootstrapToken = "test-only-bootstrap-token-0123456789-abcdef";
 const password = "A-correct-horse-battery-41";
 
 function validSetupPackage() {
@@ -39,7 +38,7 @@ function validSetupPackage() {
 async function startTestServer(t) {
   const database = openRuntimeDatabase();
   const offlineBasemapDir = mkdtempSync(join(tmpdir(), "fieldbook-campaign-basemap-"));
-  const authHandler = createAuthHandler({ database, bootstrapToken });
+  const authHandler = createAuthHandler({ database });
   const server = http.createServer(createAppHandler({ database, authHandler, offlineBasemapDir }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -52,10 +51,10 @@ async function startTestServer(t) {
 }
 
 async function bootstrapGM(origin) {
-  const response = await fetch(`${origin}/api/auth/bootstrap`, {
+  const response = await fetch(`${origin}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bootstrapToken, username: "gm-user", password })
+    body: JSON.stringify({ username: "gm-user", password })
   });
   assert.equal(response.status, 201);
   return response.headers.get("set-cookie").split(";")[0];

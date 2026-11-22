@@ -1,11 +1,10 @@
-const { getAuthenticatedAccount, parseCookies, generateTemporaryPassword, hashPassword } = require("./auth.cjs");
+const { getAuthenticatedAccount, parseCookies } = require("./auth.cjs");
 const {
   createAssignedUser,
   createPlayerSeedTemplate,
   deletePlayerSeedTemplate,
   listAssignedUsers,
   listPlayerSeedTemplates,
-  resetAssignedUserPassword,
   updatePlayerSeedTemplate
 } = require("./runtime-store.cjs");
 
@@ -75,34 +74,12 @@ function createUserHandler({ database }) {
     if (request.method === "POST" && request.url === "/api/users") {
       try {
         const body = await readJsonBody(request);
-        const temporaryPassword = generateTemporaryPassword();
-        const passwordHash = await hashPassword(temporaryPassword);
-        const user = createAssignedUser(database, account.id, body.username, { passwordHash });
-        return sendJson(response, 201, { user, temporaryPassword });
+        const user = createAssignedUser(database, account.id, body.username);
+        return sendJson(response, 201, { user });
       } catch (error) {
         const status = error instanceof HttpError ? error.status
           : /UNIQUE constraint failed/i.test(error.message) || /already exists/i.test(error.message) ? 409
             : /GM account required/i.test(error.message) ? 403 : 422;
-        return sendJson(response, status, { error: error.message });
-      }
-    }
-    const temporaryPasswordMatch = request.url.match(/^\/api\/users\/([^/]+)\/temporary-password$/);
-    if (request.method === "POST" && temporaryPasswordMatch) {
-      let userId;
-      try {
-        userId = decodeURIComponent(temporaryPasswordMatch[1]);
-      } catch {
-        return sendJson(response, 400, { error: "Invalid user ID." });
-      }
-      try {
-        const temporaryPassword = generateTemporaryPassword();
-        const passwordHash = await hashPassword(temporaryPassword);
-        const user = resetAssignedUserPassword(database, account.id, userId, passwordHash);
-        return user
-          ? sendJson(response, 200, { user, temporaryPassword })
-          : sendJson(response, 404, { error: "Player account not found." });
-      } catch (error) {
-        const status = /GM account required/.test(error.message) ? 403 : 422;
         return sendJson(response, status, { error: error.message });
       }
     }
@@ -112,11 +89,8 @@ function createUserHandler({ database }) {
     if (request.method === "POST" && request.url === "/api/player-seeds") {
       try {
         const body = await readJsonBody(request);
-        const temporaryPassword = generateTemporaryPassword();
-        const passwordHash = await hashPassword(temporaryPassword);
-        const seed = createPlayerSeedTemplate(database, account.id, body, { passwordHash, temporaryPassword });
-        const { temporaryPassword: createdPassword, ...publicSeed } = seed;
-        return sendJson(response, 201, { seed: publicSeed, temporaryPassword: createdPassword });
+        const seed = createPlayerSeedTemplate(database, account.id, body);
+        return sendJson(response, 201, { seed });
       } catch (error) {
         const status = error instanceof HttpError ? error.status
           : /UNIQUE constraint failed/i.test(error.message) || /already has a character template/i.test(error.message) ? 409

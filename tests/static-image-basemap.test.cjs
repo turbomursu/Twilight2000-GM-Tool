@@ -13,7 +13,6 @@ const { createPlayerSeed, exportRuntimeSave, getRuntimeCampaign, openRuntimeData
 const { seedSampleRuntime } = require("../server/sample-data.cjs");
 const { getGMMap, updateGMMap } = require("../server/map-publications.cjs");
 
-const bootstrapToken = "static-image-test-bootstrap-token-0123456789";
 const password = "A-correct-horse-battery-41";
 
 function crc32(data) {
@@ -87,7 +86,7 @@ async function startServer(t) {
   const database = openRuntimeDatabase();
   const offlineBasemapDir = mkdtempSync(join(tmpdir(), "fieldbook-static-image-"));
   const server = http.createServer(createAppHandler({
-    database, authHandler: createAuthHandler({ database, bootstrapToken }), offlineBasemapDir
+    database, authHandler: createAuthHandler({ database }), offlineBasemapDir
   }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -132,9 +131,9 @@ test("campaign contract accepts static image references with an optional HTTPS l
 
 test("static image upload, publication switching, player access, and runtime backup retain boundaries", async (t) => {
   const { origin, database } = await startServer(t);
-  const gmCookie = (await fetch(`${origin}/api/auth/bootstrap`, {
+  const gmCookie = (await fetch(`${origin}/api/auth/register`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bootstrapToken, username: "image-gm", password })
+    body: JSON.stringify({ username: "image-gm", password })
   })).headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(`${origin}/map-basemap-client.js`, { redirect: "manual" })).status, 302);
   assert.equal((await fetch(`${origin}/map-basemap-client.js`, { headers: { Cookie: gmCookie } })).status, 200);

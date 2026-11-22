@@ -11,7 +11,6 @@ const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { createPlayerSeed, openRuntimeDatabase } = require("../server/runtime-store.cjs");
 
-const bootstrapToken = "image-coordinate-test-bootstrap-token-123456";
 const password = "A-correct-horse-battery-41";
 
 function crc32(data) {
@@ -78,7 +77,7 @@ async function startServer(t) {
   const database = openRuntimeDatabase();
   const offlineBasemapDir = mkdtempSync(join(tmpdir(), "fieldbook-image-coordinate-"));
   const server = http.createServer(createAppHandler({
-    database, authHandler: createAuthHandler({ database, bootstrapToken }), offlineBasemapDir
+    database, authHandler: createAuthHandler({ database }), offlineBasemapDir
   }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -104,10 +103,10 @@ test("authorized image-coordinate setup import, runtime editing, publication, an
   const anonymousHelper = await fetch(`${origin}/map-coordinates.js`, { redirect: "manual" });
   assert.equal(anonymousHelper.status, 302);
   assert.equal(anonymousHelper.headers.get("location"), "/login.html?next=%2Fmap-coordinates.js");
-  const bootstrap = await fetch(`${origin}/api/auth/bootstrap`, {
+  const bootstrap = await fetch(`${origin}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bootstrapToken, username: "image-coordinate-gm", password })
+    body: JSON.stringify({ username: "image-coordinate-gm", password })
   });
   assert.equal(bootstrap.status, 201);
   const gmCookie = bootstrap.headers.get("set-cookie").split(";")[0];

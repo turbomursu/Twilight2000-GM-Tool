@@ -6,22 +6,11 @@ const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { openRuntimeDatabase } = require("../server/runtime-store.cjs");
 
-const bootstrapToken = "test-only-bootstrap-token-0123456789-abcdef";
-const password = "A-correct-horse-battery-41";
-const changedPassword = "Another-correct-horse-42";
 
-async function loginAndChangePassword(origin, username, temporaryPassword, newPassword = changedPassword) {
-  const login = await postJson(origin, "/api/auth/login", { username, password: temporaryPassword });
-  assert.equal(login.status, 200);
-  assert.equal((await login.json()).mustChangePassword, true);
-  const loginCookie = login.headers.get("set-cookie").split(";")[0];
-  const change = await postJson(origin, "/api/auth/change-password", {
-    currentPassword: temporaryPassword,
-    newPassword
-  }, loginCookie);
-  assert.equal(change.status, 200);
-  assert.equal((await change.json()).account.mustChangePassword, false);
-  return change.headers.get("set-cookie").split(";")[0];
+async function login(origin, username) {
+  const response = await postJson(origin, "/api/auth/login", { username });
+  assert.equal(response.status, 200);
+  return response.headers.get("set-cookie").split(";")[0];
 }
 
 function validSetupPackage() {
@@ -41,7 +30,7 @@ function validSetupPackage() {
 
 async function startTestServer(t) {
   const database = openRuntimeDatabase();
-  const authHandler = createAuthHandler({ database, bootstrapToken });
+  const authHandler = createAuthHandler({ database });
   const server = http.createServer(createAppHandler({ database, authHandler }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -60,9 +49,9 @@ async function postJson(origin, path, body, cookie) {
   });
 }
 
-test("player changes temporary password, selects assigned campaign, fills only blank seed fields, and finalizes", async (t) => {
+test("player signs in by username, selects assigned campaign, fills only blank seed fields, and finalizes", async (t) => {
   const { origin, database } = await startTestServer(t);
-  const gmBootstrap = await postJson(origin, "/api/auth/bootstrap", { bootstrapToken, username: "gm-user", password });
+  const gmBootstrap = await postJson(origin, "/api/auth/register", { username: "gm-user", role: "gm" });
   const gmCookie = gmBootstrap.headers.get("set-cookie").split(";")[0];
   const importResponse = await fetch(`${origin}/api/campaigns/import-setup`, {
     method: "POST",
@@ -74,11 +63,9 @@ test("player changes temporary password, selects assigned campaign, fills only b
 
   const createdUserResponse = await postJson(origin, "/api/users", { username: "player-one" }, gmCookie);
   assert.equal(createdUserResponse.status, 201);
-  const { user, temporaryPassword } = await createdUserResponse.json();
+  const { user } = await createdUserResponse.json();
   assert.equal(user.username, "player-one");
   assert.equal(user.disabled, false);
-  assert.equal(user.mustChangePassword, true);
-  assert.equal(typeof temporaryPassword, "string");
   assert.equal(Object.hasOwn(user, "activationToken"), false);
   assert.equal((await postJson(origin, "/api/users", { username: "player-one" }, gmCookie)).status, 409);
   const users = await fetch(`${origin}/api/users`, { headers: { Cookie: gmCookie } });
@@ -103,12 +90,7 @@ test("player changes temporary password, selects assigned campaign, fills only b
   assert.equal(seed.status, "seed");
   assert.equal(Object.hasOwn(seed, "activationToken"), false);
 
-  const initialLogin = await postJson(origin, "/api/auth/login", { username: user.username, password: temporaryPassword });
-  assert.equal((await initialLogin.json()).mustChangePassword, true);
-  const initialCookie = initialLogin.headers.get("set-cookie").split(";")[0];
-  assert.equal((await fetch(`${origin}/api/player/campaigns`, { headers: { Cookie: initialCookie } })).status, 428);
-  const playerCookie = await loginAndChangePassword(origin, user.username, temporaryPassword);
-  assert.equal((await postJson(origin, "/api/auth/login", { username: user.username, password: temporaryPassword })).status, 401);
+  const playerCookie = await login(origin, user.username);
   assert.equal((await postJson(origin, "/api/users", { username: "player-two" }, playerCookie)).status, 403);
   assert.equal((await fetch(`${origin}/api/campaigns`, { headers: { Cookie: playerCookie } })).status, 403);
   assert.equal((await fetch(`${origin}/api/campaigns/${campaignId}`, { headers: { Cookie: playerCookie } })).status, 403);
@@ -253,7 +235,7 @@ test("player changes temporary password, selects assigned campaign, fills only b
 
 test("GM player templates stay independent until campaign assignment", async (t) => {
   const { origin } = await startTestServer(t);
-  const gmBootstrap = await postJson(origin, "/api/auth/bootstrap", { bootstrapToken, username: "gm-user", password });
+  const gmBootstrap = await postJson(origin, "/api/auth/register", { username: "gm-user", role: "gm" });
   const gmCookie = gmBootstrap.headers.get("set-cookie").split(";")[0];
   const templateResponse = await postJson(origin, "/api/player-seeds", {
     username: "seed-player",
@@ -275,15 +257,14 @@ test("GM player templates stay independent until campaign assignment", async (t)
     }
   }, gmCookie);
   assert.equal(templateResponse.status, 201);
-  const { seed: template, temporaryPassword } = await templateResponse.json();
+  const { seed: template } = await templateResponse.json();
   assert.equal(template.assignments.length, 0);
-  assert.equal(typeof temporaryPassword, "string");
   assert.equal(Object.hasOwn(template, "activationToken"), false);
   assert.equal(Object.hasOwn(template, "campaignId"), false);
 
   const gmTemplates = await fetch(`${origin}/api/player-seeds`, { headers: { Cookie: gmCookie } });
   assert.equal((await gmTemplates.json()).seeds.length, 1);
-  const playerCookie = await loginAndChangePassword(origin, template.username, temporaryPassword);
+  const playerCookie = await login(origin, template.username);
   assert.deepEqual((await (await fetch(`${origin}/api/player/campaigns`, { headers: { Cookie: playerCookie } })).json()).campaigns, []);
   assert.equal((await fetch(`${origin}/api/player-seeds`, { headers: { Cookie: playerCookie } })).status, 403);
   const playerSeedPage = await fetch(`${origin}/player-seeds.html`, { headers: { Cookie: playerCookie }, redirect: "manual" });
@@ -334,16 +315,11 @@ test("a player cannot access another player's campaign seed", async (t) => {
 
 test("a GM-created user can sign in before assignment but cannot open GM surfaces", async (t) => {
   const { origin } = await startTestServer(t);
-  const gmBootstrap = await postJson(origin, "/api/auth/bootstrap", { bootstrapToken, username: "gm-user", password });
+  const gmBootstrap = await postJson(origin, "/api/auth/register", { username: "gm-user", role: "gm" });
   const gmCookie = gmBootstrap.headers.get("set-cookie").split(";")[0];
   const created = await postJson(origin, "/api/users", { username: "waiting-player" }, gmCookie);
-  const { user, temporaryPassword: originalTemporaryPassword } = await created.json();
-  const reset = await postJson(origin, `/api/users/${encodeURIComponent(user.id)}/temporary-password`, {}, gmCookie);
-  assert.equal(reset.status, 200);
-  const { temporaryPassword } = await reset.json();
-  assert.notEqual(temporaryPassword, originalTemporaryPassword);
-  assert.equal((await postJson(origin, "/api/auth/login", { username: user.username, password: originalTemporaryPassword })).status, 401);
-  const playerCookie = await loginAndChangePassword(origin, user.username, temporaryPassword);
+  const { user } = await created.json();
+  const playerCookie = await login(origin, user.username);
 
   const playerPage = await fetch(`${origin}/player-interface.html`, { headers: { Cookie: playerCookie } });
   assert.equal(playerPage.status, 200);
@@ -352,4 +328,19 @@ test("a GM-created user can sign in before assignment but cannot open GM surface
   const gmPage = await fetch(`${origin}/index.html`, { headers: { Cookie: playerCookie }, redirect: "manual" });
   assert.equal(gmPage.status, 302);
   assert.equal(gmPage.headers.get("location"), "/player-interface.html");
+});
+test("a self-registered player can be claimed by a GM and assigned to a campaign", async (t) => {
+  const { origin } = await startTestServer(t);
+  const gmCookie = (await postJson(origin, "/api/auth/register", { username: "gm-user", role: "gm" })).headers.get("set-cookie").split(";")[0];
+  const playerCookie = (await postJson(origin, "/api/auth/register", { username: "walk-in", role: "player" })).headers.get("set-cookie").split(";")[0];
+  const users = await (await fetch(`${origin}/api/users`, { headers: { Cookie: gmCookie } })).json();
+  assert.deepEqual(users.users.map(({ username }) => username), ["walk-in"]);
+  const campaignId = (await (await fetch(`${origin}/api/campaigns/import-setup`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: gmCookie }, body: JSON.stringify(validSetupPackage())
+  })).json()).campaign.id;
+  const assigned = await postJson(origin, `/api/campaigns/${campaignId}/player-seeds`, {
+    username: "walk-in", displayLabel: "Walk In", fields: [{ key: "characterName", label: "Character name", value: "", required: true }]
+  }, gmCookie);
+  assert.equal(assigned.status, 201);
+  assert.equal((await (await fetch(`${origin}/api/player/campaigns`, { headers: { Cookie: playerCookie } })).json()).campaigns.length, 1);
 });

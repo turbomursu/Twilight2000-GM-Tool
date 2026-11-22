@@ -113,7 +113,7 @@ function seedSampleRuntime(database, gmAccountId, options = {}) {
     FROM accounts WHERE login_identifier = ?`).get(username);
   if (!user) {
     user = createAssignedUser(database, gmAccountId, username, { now: () => new Date(timestamp).getTime() });
-  } else if (user.global_role !== "player" || user.created_by_account_id !== gmAccountId) {
+  } else if (user.global_role !== "player" || user.created_by_account_id && user.created_by_account_id !== gmAccountId) {
     throw new Error(`The sample username '${username}' is not a player user created by this GM.`);
   }
 

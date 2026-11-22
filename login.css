@@ -45,3 +45,8 @@ input { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(
 .auth-feedback { min-height: 18px; margin: 12px 0 0; color: #9b4136; font-size: 11px; line-height: 1.45; }
 .auth-feedback.success { color: #356044; }
 .auth-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px 14px; margin-top: 20px; padding-top: 12px; border-top: 1px solid #c5cec4; color: var(--muted); font: 8px "Cascadia Mono", "Courier New", monospace; }
+.link-button { width: 100%; margin-top: 10px; padding: 8px; border: 0; color: #344a40; background: none; font-size: 11px; text-decoration: underline; cursor: pointer; }
+.role-field { margin: 12px 0 0; padding: 0; border: 0; }
+.role-field legend { padding: 0; margin-bottom: 6px; font-size: 11px; }
+.role-field label { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.role-field input { width: auto; min-height: 0; }

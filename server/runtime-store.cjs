@@ -1,4 +1,5 @@
-const { createHash, randomBytes, randomUUID } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
+const { NO_PASSWORD_MARKER } = require("./auth.cjs");
 const { DatabaseSync } = require("node:sqlite");
 const { assertCampaignSetupPackage, assertOfflineBasemap } = require("../campaign-package-contract.js");
 const mapCoordinates = require("../map-coordinates.js");
@@ -1441,13 +1442,14 @@ function importRuntimeBackup(database, gmAccountId, backup, playerAccountMap, op
       throw new Error("Each source player must map to a distinct local player account.");
     }
     const target = database.prepare(`SELECT global_role, created_by_account_id, disabled FROM accounts WHERE id = ?`).get(targetId);
-    if (!target || target.global_role !== "player" || target.created_by_account_id !== gmAccountId || target.disabled !== 0) {
+    if (!target || target.global_role !== "player" || (target.created_by_account_id && target.created_by_account_id !== gmAccountId) || target.disabled !== 0) {
       throw new Error("Choose active player accounts created by the importing GM.");
     }
     if (database.prepare("SELECT 1 AS assigned FROM player_seats WHERE account_id = ? AND active = 1 LIMIT 1").get(targetId)) {
       throw new Error("Choose an unassigned local player account for each imported seat.");
     }
     targetPlayerIds.add(targetId);
+    claimUnownedPlayer(database, gmAccountId, targetId);
     accountMap.set(membership.account_id, targetId);
   }
 
@@ -2315,21 +2317,20 @@ function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
   const nowValue = (options.now || (() => Date.now()))();
   const timestamp = new Date(nowValue).toISOString();
   const templateId = randomUUID();
-  let temporaryPassword = null;
   database.exec("BEGIN IMMEDIATE");
   try {
     if (!database.prepare("SELECT 1 AS allowed FROM accounts WHERE id = ? AND global_role = 'gm' AND disabled = 0").get(gmAccountId)) throw new Error("GM account required.");
     let account = database.prepare("SELECT id, global_role, created_by_account_id FROM accounts WHERE login_identifier = ?").get(username);
-    if (account && (account.global_role !== "player" || account.created_by_account_id !== gmAccountId)) throw new Error("Choose a player username created by this GM.");
+    if (account && (account.global_role !== "player" || (account.created_by_account_id && account.created_by_account_id !== gmAccountId))) throw new Error("Choose a player username created by this GM.");
     if (!account) {
-      if (typeof options.passwordHash !== "string") throw new Error("Temporary password credentials are required to create a player account.");
       const accountId = randomUUID();
       database.prepare(`INSERT INTO accounts
         (id, login_identifier, password_hash, disabled, must_change_password, created_at, updated_at, global_role, created_by_account_id)
-        VALUES (?, ?, ?, 0, 1, ?, ?, 'player', ?)`)
-        .run(accountId, username, options.passwordHash, timestamp, timestamp, gmAccountId);
-      temporaryPassword = options.temporaryPassword;
+        VALUES (?, ?, ?, 0, 0, ?, ?, 'player', ?)`)
+        .run(accountId, username, NO_PASSWORD_MARKER, timestamp, timestamp, gmAccountId);
       account = { id: accountId, global_role: "player", created_by_account_id: gmAccountId };
+    } else {
+      claimUnownedPlayer(database, gmAccountId, account.id);
     }
     if (database.prepare("SELECT 1 AS present FROM player_seed_templates WHERE account_id = ?").get(account.id)) throw new Error("This player already has a character template.");
     database.prepare(`INSERT INTO player_seed_templates
@@ -2337,7 +2338,7 @@ function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(templateId, gmAccountId, account.id, displayLabel, JSON.stringify(character), timestamp, timestamp);
     database.exec("COMMIT");
-    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp, temporaryPassword };
+    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -2379,6 +2380,11 @@ function deletePlayerSeedTemplate(database, gmAccountId, templateId) {
   }
 }
 
+function claimUnownedPlayer(database, gmAccountId, accountId) {
+  database.prepare("UPDATE accounts SET created_by_account_id = ? WHERE id = ? AND global_role = 'player' AND created_by_account_id IS NULL")
+    .run(gmAccountId, accountId);
+}
+
 function createAssignedUser(database, gmAccountId, username, options = {}) {
   if (typeof username !== "string" || !/^[A-Za-z0-9._-]{3,32}$/.test(username)) {
     throw new Error("Username must be 3-32 letters, numbers, dots, underscores, or hyphens.");
@@ -2386,20 +2392,17 @@ function createAssignedUser(database, gmAccountId, username, options = {}) {
   const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
   if (gm?.global_role !== "gm") throw new Error("GM account required.");
   const normalizedUsername = username.toLowerCase();
-  const timestampValue = (options.now || (() => Date.now()))();
-  const timestamp = new Date(timestampValue).toISOString();
+  const timestamp = new Date((options.now || (() => Date.now()))()).toISOString();
   const accountId = randomUUID();
-  const disabled = typeof options.passwordHash !== "string";
-  const passwordHash = disabled ? `disabled$${randomBytes(32).toString("hex")}` : options.passwordHash;
 
   database.exec("BEGIN IMMEDIATE");
   try {
     database.prepare(`INSERT INTO accounts
       (id, login_identifier, password_hash, disabled, must_change_password, created_at, updated_at, global_role, created_by_account_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'player', ?)`)
-      .run(accountId, normalizedUsername, passwordHash, Number(disabled), Number(!disabled), timestamp, timestamp, gmAccountId);
+      VALUES (?, ?, ?, 0, 0, ?, ?, 'player', ?)`)
+      .run(accountId, normalizedUsername, NO_PASSWORD_MARKER, timestamp, timestamp, gmAccountId);
     database.exec("COMMIT");
-    return { id: accountId, username: normalizedUsername, disabled, mustChangePassword: !disabled };
+    return { id: accountId, username: normalizedUsername, disabled: false };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -2409,40 +2412,11 @@ function createAssignedUser(database, gmAccountId, username, options = {}) {
 function listAssignedUsers(database, gmAccountId) {
   const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
   if (gm?.global_role !== "gm") return null;
-    return database.prepare(`SELECT accounts.id, accounts.login_identifier AS username, accounts.disabled,
-      accounts.must_change_password AS mustChangePassword,
+  return database.prepare(`SELECT accounts.id, accounts.login_identifier AS username, accounts.disabled,
       (SELECT COUNT(*) FROM player_seats WHERE player_seats.account_id = accounts.id AND player_seats.active = 1) AS campaignAssignments
-    FROM accounts WHERE accounts.global_role = 'player' AND accounts.created_by_account_id = ?
-    ORDER BY accounts.login_identifier`).all(gmAccountId).map((user) => ({
-      ...user,
-      disabled: Boolean(user.disabled),
-      mustChangePassword: Boolean(user.mustChangePassword)
-    }));
-}
-
-function resetAssignedUserPassword(database, gmAccountId, userId, passwordHash) {
-  const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
-  if (gm?.global_role !== "gm") throw new Error("GM account required.");
-  const timestamp = new Date().toISOString();
-  database.exec("BEGIN IMMEDIATE");
-  try {
-    const result = database.prepare(`UPDATE accounts SET password_hash = ?, disabled = 0,
-      must_change_password = 1, updated_at = ?
-      WHERE id = ? AND global_role = 'player' AND created_by_account_id = ?`)
-      .run(passwordHash, timestamp, userId, gmAccountId);
-    if (!result.changes) {
-      database.exec("COMMIT");
-      return null;
-    }
-    database.prepare("DELETE FROM sessions WHERE account_id = ?").run(userId);
-    database.prepare("DELETE FROM account_invites WHERE account_id = ?").run(userId);
-    const user = database.prepare("SELECT id, login_identifier AS username FROM accounts WHERE id = ?").get(userId);
-    database.exec("COMMIT");
-    return user;
-  } catch (error) {
-    database.exec("ROLLBACK");
-    throw error;
-  }
+    FROM accounts WHERE accounts.global_role = 'player'
+      AND (accounts.created_by_account_id = ? OR accounts.created_by_account_id IS NULL)
+    ORDER BY accounts.login_identifier`).all(gmAccountId).map((user) => ({ ...user, disabled: Boolean(user.disabled) }));
 }
 
 function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}) {
@@ -2496,10 +2470,11 @@ function createPlayerSeed(database, gmAccountId, campaignId, input, options = {}
       existingAccount = database.prepare(`SELECT id, disabled, global_role, created_by_account_id
         FROM accounts WHERE login_identifier = ?`).get(username);
     }
-    if (!existingAccount || existingAccount.global_role !== "player" || existingAccount.created_by_account_id !== gmAccountId) {
+    if (!existingAccount || existingAccount.global_role !== "player" || (existingAccount.created_by_account_id && existingAccount.created_by_account_id !== gmAccountId)) {
       throw new Error("Choose a player username created by this GM.");
     }
     const accountId = existingAccount.id;
+    claimUnownedPlayer(database, gmAccountId, accountId);
 
     database.prepare("INSERT INTO campaign_memberships (campaign_id, account_id, role, created_at) VALUES (?, ?, 'player', ?)")
       .run(campaignId, accountId, timestamp);
@@ -3833,7 +3808,6 @@ module.exports = {
   importRuntimeBackup,
   updateRuntimeDashboard,
   createAssignedUser,
-  resetAssignedUserPassword,
   listAssignedUsers,
   createPlayerSeedTemplate,
   listPlayerSeedTemplates,

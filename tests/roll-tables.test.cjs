@@ -39,7 +39,7 @@ function addAccount(database, id, role) {
 async function startServer(t, database) {
   const server = http.createServer(createAppHandler({
     database,
-    authHandler: createAuthHandler({ database, bootstrapToken: "test-roll-table-bootstrap-token-0123456789" })
+    authHandler: createAuthHandler({ database })
   }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");

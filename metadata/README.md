@@ -40,14 +40,13 @@ Run the roadmap and feature pages independently from the GM app with `node serve
 
 The Node service enforces GM/player roles and campaign ownership. Conditions, inventories/proposals, supported campaign records, publications, and COMMS persist in SQLite. The GM runtime includes a GM-only descriptive conflict/incident ledger; it does not calculate escalation or publish incidents to players. Players receive only their assigned character's public condition record; private GM notes are excluded. The GM manages condition and inventory state. Derived condition/carrying effects, verified item catalogs, and dice-governed actions remain unconnected. Node 24 or newer is required. Default HTTP listeners are GM port 8081 and player port 8080, without encryption. Use only on a trusted LAN, never the internet or untrusted networks. `FIELDBOOK_GM_PORT`, `FIELDBOOK_PLAYER_PORT`, and `FIELDBOOK_HOST` override listeners; explicit `FIELDBOOK_PORT` enables legacy single-port mode only when neither role-specific port is set.
 
-In PowerShell, configure a one-time bootstrap token before starting the service:
+In PowerShell, start the service:
 
 ```powershell
-$env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
 node server/main.cjs
 ```
 
-The first successful account bootstrap removes the stored bootstrap-token hash. Authentication routes include `POST /api/auth/bootstrap`, `POST /api/auth/login`, `POST /api/auth/change-password`, `GET /api/auth/session`, and `POST /api/auth/logout`; sessions use HttpOnly, SameSite=Strict cookies. GM user routes are `GET|POST /api/users` and `POST /api/users/:id/temporary-password`. New player accounts receive a temporary password that is shown once to the GM, and campaign pages/APIs remain blocked until the player changes it. GM player templates use `GET|POST /api/player-seeds` and `PUT|DELETE /api/player-seeds/:seedId`; creating a template can create a player login without assigning a campaign. Campaign routes include `POST /api/campaigns/import-setup`, `GET /api/campaigns`, `GET /api/campaigns/:id`, `GET /api/campaigns/:id/runtime`, `GET /api/campaigns/:id/character-changes`, and `POST /api/campaigns/:id/character-changes/:requestId/review`. GM seed assignment uses `POST /api/campaigns/:id/player-seeds` with a template ID; the server copies it into the campaign and enforces ownership and the four-seat limit. Player routes are `GET /api/player/campaigns`, `GET|PUT /api/player/campaigns/:id/character`, and `POST /api/player/campaigns/:id/character/finalize`. Set `FIELDBOOK_HOST`, `FIELDBOOK_PORT`, and `FIELDBOOK_DB_PATH` to override the listener and SQLite location.
+Sign-in is username-only (no passwords) for use on an air-gapped LAN: anyone who can reach the login screen can create an account, and the first account on a fresh database is always a GM. Authentication routes include `GET /api/auth/status`, `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`; sessions use HttpOnly, SameSite=Strict cookies. GM user routes are `GET|POST /api/users`. GM player templates use `GET|POST /api/player-seeds` and `PUT|DELETE /api/player-seeds/:seedId`; creating a template can create a player login without assigning a campaign. Campaign routes include `POST /api/campaigns/import-setup`, `GET /api/campaigns`, `GET /api/campaigns/:id`, `GET /api/campaigns/:id/runtime`, `GET /api/campaigns/:id/character-changes`, and `POST /api/campaigns/:id/character-changes/:requestId/review`. GM seed assignment uses `POST /api/campaigns/:id/player-seeds` with a template ID; the server copies it into the campaign and enforces ownership and the four-seat limit. Player routes are `GET /api/player/campaigns`, `GET|PUT /api/player/campaigns/:id/character`, and `POST /api/player/campaigns/:id/character/finalize`. Set `FIELDBOOK_HOST`, `FIELDBOOK_PORT`, and `FIELDBOOK_DB_PATH` to override the listener and SQLite location.
 
 ## Runtime Sample Data
 
@@ -57,7 +56,6 @@ In PowerShell, point the service at a temporary database, create the first GM ac
 
 ```powershell
 $env:FIELDBOOK_DB_PATH = "$env:TEMP\fieldbook-dev.sqlite"
-$env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
 node server/main.cjs
 # Create the GM account in the browser, then stop the server with Ctrl+C.
 Remove-Item Env:FIELDBOOK_DB_PATH
@@ -66,7 +64,7 @@ $env:FIELDBOOK_DB_PATH = "$env:TEMP\fieldbook-dev.sqlite"
 node server/main.cjs
 ```
 
-The command prints the runtime campaign ID and player username. The sample account is a development fixture; use the GM user-management flow to issue a temporary password before signing in. The GM dashboard snapshot is available to that campaign's owner at `GET /api/campaigns/:id/runtime`.
+The command prints the runtime campaign ID and player username. The sample account is a development fixture; sign in with the sample player's username. The GM dashboard snapshot is available to that campaign's owner at `GET /api/campaigns/:id/runtime`.
 
 ### Campaign authoring and runtime handoff
 

@@ -11,7 +11,6 @@ const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { openRuntimeDatabase, createPlayerSeed } = require("../server/runtime-store.cjs");
 
-const bootstrapToken = "setup-export-test-bootstrap-token-12345678";
 const password = "A-correct-horse-battery-41";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5V8AAAAASUVORK5CYII=", "base64");
 
@@ -43,7 +42,7 @@ async function fixture(t) {
   let server;
   async function start() {
     server = http.createServer(createAppHandler({
-      database, root, authHandler: createAuthHandler({ database, bootstrapToken }),
+      database, root, authHandler: createAuthHandler({ database }),
       logger: { error: (...args) => errors.push(args) }
     }));
     server.listen(0, "127.0.0.1");
@@ -52,9 +51,9 @@ async function fixture(t) {
   }
 
   let origin = await start();
-  const boot = await fetch(`${origin}/api/auth/bootstrap`, {
+  const boot = await fetch(`${origin}/api/auth/register`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bootstrapToken, username: "owner", password })
+    body: JSON.stringify({ username: "owner", password })
   });
   assert.equal(boot.status, 201);
   const ownerCookie = boot.headers.get("set-cookie").split(";")[0];

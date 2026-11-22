@@ -22,10 +22,9 @@ git status --short
 npm ci
 ```
 
-For a new local database, configure the one-time GM bootstrap token before starting:
+For a new local database, start the service:
 
 ```powershell
-$env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
 node server\main.cjs
 ```
 

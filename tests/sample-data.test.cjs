@@ -102,7 +102,7 @@ test("serves seeded runtime dashboard data only to its GM owner", async (t) => {
     .run(createHash("sha256").update(gmToken).digest("hex"), "gm-account-1", timestamp, "2099-01-01T00:00:00.000Z");
   database.prepare("INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
     .run(createHash("sha256").update(otherToken).digest("hex"), "other-gm", timestamp, "2099-01-01T00:00:00.000Z");
-  const authHandler = createAuthHandler({ database, bootstrapToken: "not-used-because-accounts-exist" });
+  const authHandler = createAuthHandler({ database });
   const server = http.createServer(createAppHandler({ database, authHandler }));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");

@@ -9,12 +9,10 @@ const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { openRuntimeDatabase } = require("../server/runtime-store.cjs");
 
-const bootstrapToken = "test-only-bootstrap-token-0123456789-abcdef";
-const password = "A-correct-horse-battery-41";
 
 async function startApp(t, options = {}) {
   const database = openRuntimeDatabase();
-  const authHandler = createAuthHandler({ database, bootstrapToken });
+  const authHandler = createAuthHandler({ database });
   const server = http.createServer(createAppHandler({
     database,
     authHandler,
@@ -33,10 +31,10 @@ async function startApp(t, options = {}) {
 }
 
 async function bootstrap(origin) {
-  return fetch(`${origin}/api/auth/bootstrap`, {
+  return fetch(`${origin}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bootstrapToken, username: "gm-user", password })
+    body: JSON.stringify({ username: "gm-user", role: "gm" })
   });
 }
 
@@ -64,7 +62,7 @@ test("redirects anonymous requests to login and serves only public auth assets",
 
   const login = await fetch(`${origin}/login.html`);
   assert.equal(login.status, 200);
-  assert.match(await login.text(), /id="bootstrap-form"/);
+  assert.match(await login.text(), /id="register-form"/);
   assert.equal((await fetch(`${origin}/login.css`)).status, 200);
   assert.equal((await fetch(`${origin}/login.js`)).status, 200);
 
@@ -194,7 +192,7 @@ test("keeps authenticated GM pages and APIs on the GM server port", async (t) =>
   const playerLogin = await fetch(`${origin}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "port-player", password })
+    body: JSON.stringify({ username: "port-player" })
   });
   const playerCookie = playerLogin.headers.get("set-cookie").split(";")[0];
 
@@ -226,7 +224,7 @@ test("offline PMTiles upload is GM-only and serves authenticated byte ranges", a
     (id, login_identifier, password_hash, global_role, created_by_account_id, created_at, updated_at)
     VALUES (?, ?, ?, 'player', ?, ?, ?)`).run("offline-player", "offline-player", gm.password_hash, gm.id, gm.created_at, gm.updated_at);
   const playerLogin = await fetch(`${origin}/api/auth/login`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "offline-player", password }) });
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "offline-player" }) });
   const playerCookie = playerLogin.headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(`${origin}/api/offline-basemaps`, {
     method: "POST", headers: { "Content-Type": "application/vnd.pmtiles", Cookie: playerCookie }, body: Buffer.alloc(128)

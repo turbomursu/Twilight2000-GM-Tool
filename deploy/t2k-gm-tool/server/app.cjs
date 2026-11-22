@@ -59,9 +59,8 @@ const PROTECTED_FILES = new Map([
 ]);
 const AUTH_PATHS = new Set([
   "/api/auth/status",
-  "/api/auth/bootstrap",
+  "/api/auth/register",
   "/api/auth/login",
-  "/api/auth/change-password",
   "/api/auth/session",
   "/api/auth/logout"
 ]);
@@ -112,15 +111,6 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
     if (AUTH_PATHS.has(url.pathname)) return authHandler(request, response);
     const cookieToken = parseCookies(request.headers.cookie)["fieldbook_session"];
     const account = getAuthenticatedAccount(database, cookieToken);
-    if (account?.mustChangePassword) {
-      if (url.pathname.startsWith("/api/")) {
-        return sendText(response, 428, "application/json; charset=utf-8", JSON.stringify({ error: "Change your password before continuing.", mustChangePassword: true }));
-      }
-      if (request.method === "GET" || request.method === "HEAD") {
-        response.writeHead(302, { Location: "/login.html?passwordChange=1", "Cache-Control": "no-store" });
-        return response.end();
-      }
-    }
     if (account && surfaceRole && account.role !== surfaceRole) {
       if (url.pathname.startsWith("/api/")) {
         return sendText(response, 403, "application/json; charset=utf-8", JSON.stringify({ error: `Use the ${account.role === "player" ? "player" : "GM"} server port.` }));
@@ -210,11 +200,11 @@ function createAppHandler({ database, authHandler, campaignHandler, playerHandle
     }
 
     if (url.pathname === "/" || url.pathname === "/login") {
-      const location = account?.mustChangePassword ? "/login.html?passwordChange=1" : account ? homePath : "/login.html";
+      const location = account ? homePath : "/login.html";
       response.writeHead(302, { Location: location, "Cache-Control": "no-store" });
       return response.end();
     }
-    if (url.pathname === "/login.html" && account && !account.mustChangePassword) {
+    if (url.pathname === "/login.html" && account) {
       response.writeHead(302, { Location: homePath, "Cache-Control": "no-store" });
       return response.end();
     }
