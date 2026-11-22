@@ -8,10 +8,10 @@ const dashboard = readFileSync(join(__dirname, "..", "index.html"), "utf8");
 
 function dayLoopHarness({ values = new Map(), storageFails = false } = {}) {
   class Element {
-    constructor() { this.children = []; this.dataset = {}; this.textContent = ""; }
+    constructor() { this.children = []; this.dataset = {}; this.attributes = {}; this.textContent = ""; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
-    setAttribute() {}
+    setAttribute(name, value) { this.attributes[name] = value; }
     addEventListener(name, callback) { this[name] = callback; }
   }
   const elements = new Map();
@@ -20,6 +20,7 @@ function dayLoopHarness({ values = new Map(), storageFails = false } = {}) {
       if (!elements.has(id)) elements.set(id, new Element());
       return elements.get(id);
     },
+    querySelector: () => ({ focus() {} }),
     createElement: () => new Element()
   };
   const localStorage = {
@@ -27,47 +28,78 @@ function dayLoopHarness({ values = new Map(), storageFails = false } = {}) {
     setItem: (key, value) => { if (storageFails) throw new Error("storage blocked"); values.set(key, value); }
   };
   const state = { runtimeCampaignId: "campaign-a", date: "2000-05-11", time: "00:00", day: 1 };
+  const views = [];
   const source = dashboard.match(/const DAY_LOOP_STORAGE_KEY = [\s\S]*?(?= {6}function render\(\))/);
   assert.ok(source);
   const api = runInNewContext(`${source[0]}\n({ currentDayLoop, renderDayLoop })`, {
-    document, localStorage, state, dateLabel: (date) => date
+    document, localStorage, state, dateLabel: (date) => date, setView: (view) => views.push(view)
   });
-  const list = document.getElementById("day-loop-list");
+  const nav = document.getElementById("day-loop-nav");
   return {
-    ...api, state, elements, values,
-    click: (loop) => list.click({ target: { closest: () => ({ dataset: { loop } }) } }),
-    buttons: () => list.children.flatMap((item) => item.children[1].children[1].children[1].children)
+    ...api, state, elements, values, views,
+    click: (loop, index) => nav.click({ target: { closest: () => ({ dataset: { loop, index } }) } }),
+    buttons: () => elements.get("dayloop-actions").children
   };
 }
 
-test("day loop tracks six one-hour stretches without advancing the campaign clock", () => {
+test("top day loop navigates phases and offers a single six-hour clock advance", () => {
   const h = dayLoopHarness();
   h.renderDayLoop();
-  assert.match(h.elements.get("dayloop-progress").textContent, /STRETCH 1 OF 6.*PHASE 1 OF 9/);
-  assert.ok(h.buttons().some((button) => button.dataset.view === "movement"));
-  for (let stretch = 1; stretch <= 6; stretch += 1) {
-    for (let phase = 0; phase < 8; phase += 1) h.click("next");
-    assert.equal(h.currentDayLoop().stretch, stretch);
-    assert.equal(h.state.time, "00:00");
-    if (stretch < 6) {
-      assert.ok(h.buttons().some((button) => button.dataset.loop === "stretch"));
-      h.click("stretch");
-      assert.equal(h.currentDayLoop().step, 0);
-    } else {
-      assert.ok(h.buttons().some((button) => button.dataset.action === "advance-time"));
-      assert.ok(!h.buttons().some((button) => button.dataset.loop === "stretch"));
-    }
-  }
+  assert.match(dashboard, /<header class="page-header">[\s\S]*?id="day-loop-nav"[\s\S]*?<\/header>\s*<div class="content">\s*<section class="view active" id="view-situation"/);
+  assert.match(h.elements.get("dayloop-progress").textContent, /PHASE 1 OF 9/);
+  assert.equal(h.elements.get("day-loop-list").children[0].children[0].attributes["aria-current"], "step");
+  for (let phase = 0; phase < 8; phase += 1) h.click("next");
+  assert.deepEqual(h.views, ["situation", "movement", "roster", "movement", "conflicts", "roster", "movement", "inventory", "movement"]);
+  assert.equal(h.state.time, "00:00");
+  assert.ok(h.buttons().some((button) => button.dataset.action === "advance-time" && button.dataset.loopAdvance === "true"));
+  assert.ok(!h.buttons().some((button) => button.dataset.loop === "stretch"));
+  h.click("back");
+  assert.equal(h.currentDayLoop().step, 7);
+  h.click("select", "2");
+  assert.equal(h.currentDayLoop().step, 2);
+  assert.equal(h.views.at(-1), "roster");
+  assert.match(h.elements.get("dayloop-phase-text").textContent, /GM handles one-hour stretches/);
   h.state.time = "06:00";
-  assert.equal(h.currentDayLoop().stretch, 1);
   assert.equal(h.currentDayLoop().step, 0);
+});
+
+test("day loop advance uses the revision-checked clock and switches views only on success", async () => {
+  const source = dashboard.match(/if \(action === "advance-time"\) \{[\s\S]*?(?= {8}if \(action === "use-rations")/);
+  assert.ok(source);
+  const calls = [];
+  const control = { disabled: false };
+  const state = { runtimeCampaignId: "campaign-a", runtimeRevision: 7 };
+  const context = {
+    action: "advance-time", button: { dataset: { loopAdvance: "true" } },
+    document: { querySelectorAll: () => [control] },
+    runtimeCampaignSelect: { value: "campaign-a" }, runtimeDataLoaded: true, state,
+    campaignApiRequest: async (url, options) => {
+      calls.push({ url, options });
+      return { runtime: { time: "06:00" } };
+    },
+    applyRuntimeSnapshot: (runtime) => { state.time = runtime.time; },
+    currentDayLoop: () => ({ step: 0 }), DAY_LOOP_PHASES: [{ view: "situation" }],
+    setView: (view) => calls.push(view), showToast: (message) => calls.push(message)
+  };
+  const run = runInNewContext(`(async () => { ${source[0]} })`, context);
+  await run();
+  assert.equal(state.time, "06:00");
+  assert.equal(calls[0].url, "/api/campaigns/campaign-a/advance-time");
+  assert.equal(JSON.parse(calls[0].options.body).expectedRevision, 7);
+  assert.equal(calls[1], "situation");
+  assert.equal(control.disabled, false);
+  calls.length = 0;
+  context.campaignApiRequest = async () => { throw new Error("revision conflict"); };
+  await run();
+  assert.match(calls[0], /Time not advanced: revision conflict/);
+  assert.equal(calls.length, 1);
+  assert.equal(control.disabled, false);
 });
 
 test("day loop exposes existing tools at the relevant phases", () => {
   const h = dayLoopHarness();
   h.renderDayLoop();
-  const rows = h.elements.get("day-loop-list").children;
-  const buttons = (phase) => rows[phase].children[1].children[1].children[1].children;
+  const buttons = (phase) => { h.click("select", String(phase)); return h.buttons(); };
   assert.ok(buttons(0).some((button) => button.dataset.view === "comms"));
   assert.ok(buttons(1).some((button) => button.dataset.view === "movement" && button.dataset.viewTarget === "weather-title"));
   assert.ok(buttons(3).some((button) => button.dataset.action === "dayloop-open-route"));
@@ -102,10 +134,12 @@ test("day loop combat shortcut uses the existing campaign resolver and returns f
     showModal() { this.open = true; }, close() { this.open = false; }
   };
   const frame = { removeAttribute(name) { delete this[name]; } };
+  let fallbackFocused = false;
   const nodes = {
     "combat-resolver-dialog": dialog, "combat-resolver-frame": frame,
     "conflict-battle-link": { addEventListener() {} }, "close-combat-resolver": { addEventListener() {} },
-    "cancel-combat-resolver": { addEventListener() {} }, "combat-resolver-campaign": {}
+    "cancel-combat-resolver": { addEventListener() {} }, "combat-resolver-campaign": {},
+    "dayloop-title": { focus() { fallbackFocused = true; } }
   };
   const messages = [];
   const state = { runtimeCampaignId: "campaign 1" };
@@ -126,6 +160,10 @@ test("day loop combat shortcut uses the existing campaign resolver and returns f
   callbacks.close();
   assert.equal(frame.src, undefined);
   assert.equal(trigger.focused, true);
+  trigger.isConnected = false;
+  open(trigger);
+  callbacks.close();
+  assert.equal(fallbackFocused, true);
 });
 
 test("day loop route shortcut opens the existing editor only for a loaded campaign", () => {
@@ -158,8 +196,12 @@ test("day loop preserves per-campaign progress and reports unavailable storage",
   h.click("next");
   const reloaded = dayLoopHarness({ values: h.values });
   assert.equal(reloaded.currentDayLoop().step, 1);
+  reloaded.renderDayLoop();
+  assert.equal(reloaded.views.at(-1), "movement");
   reloaded.state.runtimeCampaignId = "campaign-b";
   assert.equal(reloaded.currentDayLoop().step, 2);
+  reloaded.renderDayLoop();
+  assert.equal(reloaded.views.at(-1), "roster");
 
   const blocked = dayLoopHarness({ storageFails: true });
   blocked.click("next");
@@ -178,7 +220,12 @@ test("day loop carries older checklist progress forward without skipping new tra
   })]]);
   const h = dayLoopHarness({ values });
   assert.equal(h.currentDayLoop().step, 3);
-  assert.equal(h.currentDayLoop().stretch, 1);
+  const previous = dayLoopHarness({ values: new Map([["fieldbook.dayLoop.v2", JSON.stringify([
+    { owner: "campaign-a", shift: "2000-05-11T00:00", step: 5, stretch: 4 }
+  ])]]) });
+  assert.equal(previous.currentDayLoop().step, 5);
+  previous.click("next");
+  assert.equal(previous.currentDayLoop().step, 6);
 });
 
 test("weather die reports unavailable browser randomness and otherwise fills the die", () => {
@@ -207,7 +254,7 @@ test("campaign desk navigation items are in numerical order", () => {
   assert.ok(nav, "campaign desk navigation should exist");
   const numbers = [...nav[1].matchAll(/class="nav-icon" aria-hidden="true">(\d+)<\/span>/g)]
     .map(([, number]) => number);
-  assert.deepEqual(numbers, ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]);
+  assert.deepEqual(numbers, ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11"]);
 });
 
 test("active campaign detail small text uses a readable 12px size", () => {
