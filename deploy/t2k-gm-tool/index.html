@@ -283,6 +283,18 @@
     #setup-import-summary[hidden] { display: none; }
     .travel-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
     .travel-controls strong { font: 15px var(--serif); }
+    .day-loop-list { list-style: none; margin: 0; padding: 0; counter-reset: loop; }
+    .day-loop-step { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); color: var(--muted); }
+    .day-loop-step:last-child { border-bottom: 0; }
+    .day-loop-num { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); font: 11px var(--mono); }
+    .day-loop-step h3 { margin: 4px 0 0; font-size: 12px; }
+    .day-loop-body { display: none; margin-top: 8px; color: var(--ink); }
+    .day-loop-body p { margin: 0 0 10px; font-size: 12px; line-height: 1.5; }
+    .day-loop-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .day-loop-step[data-state="done"] .day-loop-num { background: var(--line); }
+    .day-loop-step[data-state="current"] { background: #e9eee4; color: var(--ink); }
+    .day-loop-step[data-state="current"] .day-loop-num { border-color: var(--ink); font-weight: 700; }
+    .day-loop-step[data-state="current"] .day-loop-body { display: block; }
     .stepper { display: flex; align-items: center; gap: 6px; }
     .stepper output { min-width: 80px; text-align: center; font: 11px var(--mono); }
     .supply-line { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid #e8ece5; }
@@ -1047,6 +1059,7 @@
         <button class="nav-item" data-view="conditions"><span class="nav-icon" aria-hidden="true">09</span>Conditions</button>
         <button class="nav-item" data-view="audit"><span class="nav-icon" aria-hidden="true">10</span>Audit</button>
         <button class="nav-item" data-view="conflicts"><span class="nav-icon" aria-hidden="true">11</span>Conflicts</button>
+                <button class="nav-item" data-view="dayloop"><span class="nav-icon" aria-hidden="true">12</span>Day loop</button>
       </nav>
       <div class="nav-label" style="margin-top: 20px;">Separate authoring tools</div>
       <a class="nav-link" href="campaign-setup.html">Campaign setup</a>
@@ -1267,11 +1280,12 @@
                     <label class="field" id="weather-custom-field" for="weather-custom-label" hidden><span class="eyebrow">GM-defined condition</span><input id="weather-custom-label" maxlength="80" placeholder="Describe the condition"></label>
                     <div class="weather-effects" role="note"><span class="eyebrow">Fourth Edition effects / reference</span><p id="weather-effects-copy"></p><span class="inline-hint">T2K Referee Aid, Strategic Play; Player's Manual p. 139. Effects remain GM-adjudicated.</span></div>
                     <div class="weather-roll-control">
-                      <span class="inline-hint">At shift start, record the physical d6 and select the symbol shown in the Referee Aid. The aid does not map symbols to numeric faces.</span>
+                      <span class="inline-hint">At shift start, roll a d6 (physical, or "Roll d6 for me"). GM-supplied mapping: 1 worsens the weather, 6 improves it; 2–5 leaving it unchanged is assumed. Verify against Player's Manual p. 139.</span>
                       <div class="weather-roll-inputs">
                         <label class="field" for="weather-d6-result"><span class="eyebrow">D6 result</span><input id="weather-d6-result" type="number" min="1" max="6" step="1" inputmode="numeric" required></label>
-                        <label class="field" for="weather-roll-outcome"><span class="eyebrow">Weather symbol</span><select id="weather-roll-outcome" required><option value="">Select outcome</option><option value="improves">Weather improves</option><option value="worsens">Weather worsens</option><option value="holds">No change</option></select></label>
+                        <label class="field" for="weather-roll-outcome"><span class="eyebrow">Weather outcome</span><select id="weather-roll-outcome" disabled><option value="">Enter a d6 result</option><option value="improves">Weather improves</option><option value="worsens">Weather worsens</option><option value="holds">No change</option></select></label>
                       </div>
+                      <button class="button" id="roll-weather-d6" type="button">Roll d6 for me</button>
                       <button class="button" id="roll-weather" type="button" disabled>Record weather roll</button>
                       <p class="feedback" id="weather-roll-status" role="status" aria-live="polite">Select a runtime campaign.</p>
                     </div>
@@ -1325,6 +1339,18 @@
           </div>
           <p class="feedback" id="history-status" role="status">Select a runtime campaign.</p>
           <div class="audit-table-wrap" role="region" tabindex="0" aria-label="Scrollable publication history"><table class="audit-table" aria-label="Map publication change history"><thead><tr><th>Recorded / UTC</th><th>Actor</th><th>Element</th><th>Old Value</th><th>New Value</th><th>Revision</th></tr></thead><tbody id="history-rows"></tbody></table></div>
+        </section>
+
+        <section class="view" id="view-dayloop" aria-labelledby="dayloop-title">
+          <div class="page-heading">
+            <div><div class="heading-tag">Strategic play / one shift at a time</div><h1 id="dayloop-title">Game day loop</h1></div>
+            <p>Work through each phase in order. A day has four shifts of about six hours; finishing the last phase advances the clock to the next shift.</p>
+          </div>
+          <section class="panel" aria-labelledby="dayloop-shift-title">
+            <div class="travel-controls"><div><div class="eyebrow">Current shift (from campaign clock)</div><strong id="dayloop-shift-title"></strong></div><span class="heading-tag" id="dayloop-progress"></span></div>
+            <ol class="day-loop-list" id="day-loop-list"></ol>
+            <div class="panel-body"><p class="inline-hint">Phase order follows the Strategic Play Referee Aid. This checklist is a GM aid only: it does not resolve rolls, and its progress is stored in this browser, not in campaign data.</p></div>
+          </section>
         </section>
 
         <section class="view" id="view-journal" aria-labelledby="journal-title">
@@ -2388,8 +2414,8 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const forcedCloudy = (state.weatherCloudyShiftsRemaining || 0) > 0;
         const alreadyRolled = state.weatherLastRollShift === shiftKey;
         const recordedRoll = Number(weatherD6Result.value);
-        const validRollInput = Number.isSafeInteger(recordedRoll) && recordedRoll >= 1 && recordedRoll <= 6
-          && ["improves", "worsens", "holds"].includes(weatherRollOutcome.value);
+        const validRollInput = Number.isSafeInteger(recordedRoll) && recordedRoll >= 1 && recordedRoll <= 6;
+        weatherRollOutcome.value = validRollInput ? FieldbookWeatherRules.weatherOutcomeForRoll(recordedRoll) : "";
         const savedCondition = weatherStateSelect.value === "GM-defined" ? weatherCustomLabel.value.trim() : weatherStateSelect.value;
         const conditionSaved = savedCondition === state.weather;
         weatherRollButton.disabled = !hasRuntime || !official || !conditionSaved || forcedCloudy || alreadyRolled || !validRollInput;
@@ -2400,9 +2426,99 @@ Military rank || optional</textarea><span class="row-description">One field per 
         else if (!conditionSaved) weatherRollStatus.textContent = "Save the current weather condition before recording a roll.";
         else if (forcedCloudy) weatherRollStatus.textContent = "Cloudy is required for one full shift before the next weather roll.";
         else if (alreadyRolled) weatherRollStatus.textContent = "Weather is already rolled for this shift.";
-        else if (!validRollInput) weatherRollStatus.textContent = "Enter the physical d6 result and select its weather symbol.";
+        else if (!validRollInput) weatherRollStatus.textContent = "Enter the d6 result or use Roll d6 for me.";
         else weatherRollStatus.textContent = "Ready to record this shift's weather result.";
       }
+      const DAY_LOOP_STORAGE_KEY = "fieldbook.dayLoop.v1";
+      const DAY_LOOP_PHASES = [
+        { title: "Start the shift", text: "Confirm the shift below. Set the light level and temperature for the season (Nordic Light table, Strategic Play Referee Aid; Player's Manual p. 139). Shifts are about 6 hours; the Referee may stretch them to 5–10." },
+        { title: "Roll for weather", text: "Roll 1D6 in the Weather log: 1 worsens, 6 improves, 2–5 no change (GM-supplied mapping). One roll per shift; the tool blocks it while Cloudy is required after Rain/Snow.", view: "movement", viewLabel: "Open weather log" },
+        { title: "Assign tasks", text: "Give each PC one task for the shift; a PC may march and keep watch. Task list: Player's Manual pp. 139–149. A task keeps its benefit if at least 3/4 of the shift is spent on it.", view: "roster", viewLabel: "Open personnel" },
+        { title: "Resolve tasks", text: "Call for each PC's roll and note the result. Check weekly upkeep: a mechanic's Tech roll to service each driven vehicle, and gun care for firearms used." },
+        { title: "Determine travel", text: "If the party travels, work out distance: marching covers 2 hexes (10 km each) on road or open terrain, otherwise 1. Off-road, one PC rolls Survival to navigate. Update the route and distance.", view: "movement", viewLabel: "Open movement" },
+        { title: "Check for encounters", text: "About halfway through the shift, draw an Encounter Card (Referee's Manual p. 36 if stationary, pp. 39–50 if moving). If one applies, the players choose to engage or avoid it.", rollTables: true, link: { href: "combat.html", label: "Open battle calculator" } },
+        { title: "Record the shift", text: "Log weather, distance, events and NPC contacts. Update rations, fuel and ammunition used, injuries and morale. Publish anything players should see.", noteButton: true, view: "inventory", viewLabel: "Open inventories" },
+        { title: "Advance to next shift", text: "Advance the clock six hours (daily rations are processed at midday). The loop then restarts at the next shift.", advance: true }
+      ];
+      function dayLoopShiftName(time) {
+        const hour = Number(String(time || "00:00").slice(0, 2));
+        if (hour >= 6 && hour < 12) return "Morning";
+        if (hour >= 12 && hour < 18) return "Day";
+        if (hour >= 18) return "Evening";
+        return "Night";
+      }
+      function readDayLoopProgress() {
+        try { return JSON.parse(localStorage.getItem(DAY_LOOP_STORAGE_KEY)) || {}; } catch { return {}; }
+      }
+      function dayLoopStep() {
+        const owner = state.runtimeCampaignId || "local";
+        const shift = `${state.date}T${state.time || "00:00"}`;
+        const saved = readDayLoopProgress();
+        const step = saved.owner === owner && saved.shift === shift ? Number(saved.step) : 0;
+        return Number.isInteger(step) && step >= 0 && step < DAY_LOOP_PHASES.length ? step : 0;
+      }
+      function setDayLoopStep(step) {
+        try {
+          localStorage.setItem(DAY_LOOP_STORAGE_KEY, JSON.stringify({ owner: state.runtimeCampaignId || "local", shift: `${state.date}T${state.time || "00:00"}`, step }));
+        } catch { /* progress is a convenience only */ }
+        renderDayLoop();
+      }
+      function renderDayLoop() {
+        const list = document.getElementById("day-loop-list");
+        if (!list) return;
+        const current = dayLoopStep();
+        document.getElementById("dayloop-shift-title").textContent = `${dayLoopShiftName(state.time)} shift / ${dateLabel(state.date)} ${state.time || "00:00"} / Day ${state.day}`;
+        document.getElementById("dayloop-progress").textContent = `PHASE ${current + 1} OF ${DAY_LOOP_PHASES.length}`;
+        list.replaceChildren(...DAY_LOOP_PHASES.map((phase, index) => {
+          const item = document.createElement("li");
+          item.className = "day-loop-step";
+          item.dataset.state = index < current ? "done" : index === current ? "current" : "upcoming";
+          if (index === current) item.setAttribute("aria-current", "step");
+          const number = document.createElement("span");
+          number.className = "day-loop-num";
+          number.textContent = index < current ? "✓" : String(index + 1);
+          const content = document.createElement("div");
+          const heading = document.createElement("h3");
+          heading.textContent = phase.title;
+          const body = document.createElement("div");
+          body.className = "day-loop-body";
+          const text = document.createElement("p");
+          text.textContent = phase.text;
+          const actions = document.createElement("div");
+          actions.className = "day-loop-actions";
+          const addButton = (label, attributes, className = "button") => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = className;
+            button.textContent = label;
+            Object.entries(attributes).forEach(([key, value]) => { button.dataset[key] = value; });
+            actions.append(button);
+          };
+          if (phase.view) addButton(phase.viewLabel, { view: phase.view });
+          if (phase.rollTables) addButton("Roll tables", { action: "open-roll-tables", rollContext: "movement" });
+          if (phase.noteButton) addButton("Log entry", { action: "open-note" });
+          if (phase.link) {
+            const link = document.createElement("a");
+            link.className = "button";
+            link.href = phase.link.href;
+            link.textContent = phase.link.label;
+            actions.append(link);
+          }
+          if (phase.advance) addButton("Advance 6 hours", { action: "advance-time" }, "button button-primary");
+          else addButton("Phase done — next", { loop: "next" }, "button button-primary");
+          if (index > 0) addButton("Back", { loop: "back" });
+          body.append(text, actions);
+          content.append(heading, body);
+          item.append(number, content);
+          return item;
+        }));
+      }
+      document.getElementById("day-loop-list").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-loop]");
+        if (!button) return;
+        const step = dayLoopStep();
+        setDayLoopStep(button.dataset.loop === "next" ? Math.min(DAY_LOOP_PHASES.length - 1, step + 1) : Math.max(0, step - 1));
+      });
       function render() {
         const formattedDate = `${dateLabel(state.date)} / ${state.time || "00:00"}`;
         document.getElementById("active-campaign-name").textContent = state.campaignName || "The Long Road";
@@ -2434,6 +2550,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
         renderPeople();
         renderConflicts();
         renderNotes();
+        renderDayLoop();
         if (runtimeDataLoaded) renderRuntimeRouteMap();
         else {
           document.getElementById("runtime-route-map").hidden = true;
@@ -2910,7 +3027,7 @@ Military rank || optional</textarea><span class="row-description">One field per 
           if (button.dataset.view === view) button.setAttribute("aria-current", "page");
           else button.removeAttribute("aria-current");
         });
-        const name = ({ situation: "Situation", roster: "Personnel", conflicts: "Conflicts", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions", audit: "Campaign audit" })[view] || "Situation";
+        const name = ({ situation: "Situation", roster: "Personnel", conflicts: "Conflicts", movement: "Movement", journal: "Field journal", influence: "Faction influence", publication: "Player map", comms: "COMMS", inventory: "Player inventories", conditions: "Character conditions", audit: "Campaign audit", dayloop: "Game day loop" })[view] || "Situation";
         document.getElementById("crumb-view").textContent = name;
         if (view === "situation") requestAnimationFrame(() => {
           drawMap();
@@ -4713,8 +4830,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
         updateWeatherRollAvailability();
       });
       weatherCustomLabel.addEventListener("input", updateWeatherRollAvailability);
+      document.getElementById("roll-weather-d6").addEventListener("click", () => {
+        const buffer = new Uint32Array(1);
+        let value;
+        do { crypto.getRandomValues(buffer); value = buffer[0]; } while (value >= 4294967292);
+        weatherD6Result.value = String((value % 6) + 1);
+        updateWeatherRollAvailability();
+      });
       weatherD6Result.addEventListener("input", updateWeatherRollAvailability);
-      weatherRollOutcome.addEventListener("change", updateWeatherRollAvailability);
       weatherForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const weather = weatherStateSelect.value === "GM-defined" ? weatherCustomLabel.value.trim() : weatherStateSelect.value;
@@ -4729,15 +4852,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
         const campaignId = state.runtimeCampaignId;
         if (weatherRollButton.disabled || !campaignId) return;
         const roll = Number(weatherD6Result.value);
-        const outcome = weatherRollOutcome.value;
         weatherRollButton.disabled = true;
         weatherRollStatus.className = "feedback";
-        weatherRollStatus.textContent = "Recording the d6 result and weather symbol.";
+        weatherRollStatus.textContent = "Recording the d6 result and weather outcome.";
         try {
           const result = await campaignApiRequest(`/api/campaigns/${encodeURIComponent(campaignId)}/weather-roll`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ expectedRevision: state.runtimeRevision, roll, outcome })
+            body: JSON.stringify({ expectedRevision: state.runtimeRevision, roll })
           });
           if (state.runtimeCampaignId !== campaignId) return;
           weatherD6Result.value = "";

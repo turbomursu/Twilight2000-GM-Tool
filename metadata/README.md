@@ -213,9 +213,9 @@ Backups include clock HH:MM, reserves, and `dailySupplyUsage`, plus clock/midday
 
 ### Strategic Weather Rolls And Duration
 
-In **Movement → Weather log**, record the physical d6 result and select the matching improve/worsen symbol shown in the T2K 4E Referee Aid. The local aid does not map those symbols to numeric faces, so the GM confirms the outcome; the app does not infer a threshold. Only Fair, Cloudy, and Rain/Snow use the verified progression. GM-defined conditions remain manual.
+In **Movement → Weather log**, record the physical d6 result (or use **Roll d6 for me**, which only fills the d6 field) and the outcome follows automatically: 1 worsens, 6 improves, 2–5 no change (GM-supplied mapping; 2–5 is assumed, verify against Player's Manual p. 139). Only Fair, Cloudy, and Rain/Snow use the verified progression. GM-defined conditions remain manual.
 
-`POST /api/campaigns/:id/weather-roll` accepts `{ "expectedRevision": 3, "roll": 4, "outcome": "worsens" }`. Outcomes are `improves`, `worsens`, or `holds`. The owning GM's server validates the d6 and outcome, applies at most one roll per campaign shift, and records the result in the GM journal and audit history. Stale or duplicate attempts return `409`; invalid input returns `422`.
+`POST /api/campaigns/:id/weather-roll` accepts `{ "expectedRevision": 3, "roll": 1 }`. The optional `outcome` (`improves`, `worsens`, `holds`) must match the d6 mapping or the request is rejected. The owning GM's server validates the d6 and outcome, applies at most one roll per campaign shift, and records the result in the GM journal and audit history. Stale or duplicate attempts return `409`; invalid input returns `422`.
 
 After one Fieldbook shift (the runtime clock's six-hour step) in Rain/Snow, advancing time automatically returns weather to Cloudy and locks weather rolls for one complete Cloudy shift. The lock and last rolled shift are included in runtime backups; older backups default both fields to their initial state. Effects remain GM-adjudicated and are not applied to combat rolls.
 
@@ -255,3 +255,8 @@ Standalone setup drafts and local sample records use browser storage. Server cam
 ## Product Direction
 
 The product has three connected surfaces: a GM-operated Campaign Setup Tool, a GM runtime tool that imports and runs its campaign package, and a browser-based Player Interface for 1-4 players. Each player has an assigned character and personal inventory; the GM controls published situation-report information. Dice-governed item actions must use verified Fourth Edition procedures. See [FEATURES.md](FEATURES.md) for the full product scope and [ROADMAP.md](ROADMAP.md) for delivery phases, dependencies, and completion checks. These are product goals, not a claim that every surface is already implemented.
+
+### Game Day Loop
+
+Open **Day loop** in the campaign desk. It lists the eight phases of one shift in order (start shift, weather, assign tasks, resolve tasks, travel, encounters, record, advance), shows a short instruction for the current phase, and links to the related view. Use **Phase done � next** to move on; the last phase advances the clock six hours and restarts the loop at the next shift. Progress is kept in this browser only and does not resolve any rolls.
+

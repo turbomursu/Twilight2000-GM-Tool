@@ -99,11 +99,12 @@ test("weather roll API is authenticated, revision-checked, and allows one roll p
     body: JSON.stringify({ expectedRevision: revision, roll, outcome }) });
   assert.equal((await send(initial.campaign.revision, 4, "holds", { Origin: "http://untrusted.example" })).status, 403);
   assert.equal((await send(initial.campaign.revision, 4, "invalid")).status, 422);
-  const response = await send(initial.campaign.revision, 4, "worsens");
+  assert.equal((await send(initial.campaign.revision, 4, "worsens")).status, 422);
+  const response = await send(initial.campaign.revision, 1, "worsens");
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.ok(Number.isSafeInteger(result.roll.roll) && result.roll.roll >= 1 && result.roll.roll <= 6);
-  assert.deepEqual(result.roll, resolveWeatherRoll("Cloudy", 4, "worsens"));
+  assert.deepEqual(result.roll, resolveWeatherRoll("Cloudy", 1, "worsens"));
   assert.equal(result.runtime.dashboard.weatherLastRollShift, "2000-05-11T00:00");
   assert.equal((await send(result.runtime.campaign.revision, 2, "holds")).status, 409);
 });

@@ -20,19 +20,19 @@ test("GM-defined weather does not receive guessed rules effects", () => {
   assert.match(describeWeatherEffects("Dense smoke"), /No automatic Fourth Edition effect/);
 });
 
-test("weather d6 result applies its recorded symbol outcome without assuming face mappings", () => {
-  assert.deepEqual(resolveWeatherRoll("Cloudy", 4, "improves"), {
-    roll: 4, previousWeather: "Cloudy", weather: "Fair", direction: "improves", changed: true
+test("weather d6 result maps 1 to worsens and 6 to improves; 2-5 hold", () => {
+  assert.deepEqual(resolveWeatherRoll("Cloudy", 6), {
+    roll: 6, previousWeather: "Cloudy", weather: "Fair", direction: "improves", changed: true
   });
-  assert.deepEqual(resolveWeatherRoll("Cloudy", 6, "holds"), {
-    roll: 6, previousWeather: "Cloudy", weather: "Cloudy", direction: "holds", changed: false
+  assert.deepEqual(resolveWeatherRoll("Cloudy", 4), {
+    roll: 4, previousWeather: "Cloudy", weather: "Cloudy", direction: "holds", changed: false
   });
   assert.deepEqual(resolveWeatherRoll("Cloudy", 1, "worsens"), {
     roll: 1, previousWeather: "Cloudy", weather: "Rain/Snow", direction: "worsens", changed: true
   });
-  assert.equal(resolveWeatherRoll("Fair", 5, "improves").weather, "Fair");
-  assert.equal(resolveWeatherRoll("Rain/Snow", 2, "worsens").weather, "Rain/Snow");
+  assert.equal(resolveWeatherRoll("Fair", 6).weather, "Fair");
+  assert.equal(resolveWeatherRoll("Rain/Snow", 1).weather, "Rain/Snow");
   assert.throws(() => resolveWeatherRoll("Dense smoke", 1), /verified weather condition/);
-  assert.throws(() => resolveWeatherRoll("Fair", 7, "holds"), /d6 result/);
-  assert.throws(() => resolveWeatherRoll("Fair", 2, "unknown"), /symbol outcome/);
+  assert.throws(() => resolveWeatherRoll("Fair", 7), /d6 result/);
+  assert.throws(() => resolveWeatherRoll("Fair", 2, "worsens"), /does not match/);
 });

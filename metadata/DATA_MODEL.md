@@ -72,7 +72,7 @@ The owning GM's six-hour action checks the campaign revision and computes time f
 
 ## Strategic Weather Roll Boundary
 
-The owning GM records a physical d6 result and selects the matching improve/worsen symbol from the Strategic Play Referee Aid. The local aid does not expose a numeric mapping for those symbols, so no face threshold is inferred. `POST /api/campaigns/:id/weather-roll` checks GM ownership and campaign revision, permits one roll per shift, applies the chosen one-step state change, and records the d6, symbol outcome, and resulting weather in the GM journal/audit trail. GM-defined weather has no automatic roll.
+The owning GM records a d6 result (physical or app-rolled). The outcome is derived from the GM-supplied mapping: 1 worsens, 6 improves, 2-5 no change (2-5 is an assumption pending Player's Manual p. 139 verification). `outcome` is optional in the request and, if sent, must match the derived value. `POST /api/campaigns/:id/weather-roll` checks GM ownership and campaign revision, permits one roll per shift, applies the derived one-step state change, and records the d6, outcome, and resulting weather in the GM journal/audit trail. GM-defined weather has no automatic roll.
 
 When a shift ends in Rain/Snow, the next six-hour clock advance returns the state to Cloudy and sets one forced Cloudy shift. Weather rolls remain blocked until that shift completes. Clock transitions and weather duration are atomic with journal/audit writes. Runtime backups preserve both the last rolled shift and the forced-Cloudy counter; older backups initialize those fields to no prior roll and no lock. These controls do not modify character or attack rolls.
 

@@ -29,7 +29,7 @@ T2K 4E defines gameplay through three separate time scales—**Combat Rounds** (
    - Surprises/ambushes go before normal initiative
 
 3. **Per Round (Repeats Each Round)**
-   - Each participant banks 2 fast actions + 1 slow action + free actions
+   - Each participant banks either 2 fast actions, or 1 slow + 1 fast action (taken in the same turn), plus free actions
    - Participants act in initiative order
    - Each participant:
      - Declares actions
