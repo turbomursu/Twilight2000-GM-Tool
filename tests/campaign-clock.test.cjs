@@ -82,13 +82,13 @@ test("weather rolls are once per shift and Rain/Snow returns to Cloudy for one r
     });
     runtime = getRuntimeDashboard(database, "weather-gm", campaignId);
     const rolled = rollRuntimeWeather(database, "weather-gm", campaignId,
-      { expectedRevision: runtime.campaign.revision, roll: 6, outcome: "worsens" });
+      { expectedRevision: runtime.campaign.revision, roll: 1 });
     assert.equal(rolled.roll.weather, "Rain/Snow");
     assert.equal(rolled.runtime.dashboard.weatherLastRollShift, "2000-05-11T00:00");
-    assert.match(rolled.runtime.journal[0].body, /D6 result 6.*Cloudy to Rain\/Snow/);
+    assert.match(rolled.runtime.journal[0].body, /D6 result 1.*Cloudy to Rain\/Snow/);
     assert.ok(listAuditEvents(database, "weather-gm", campaignId).events.some((event) => event.action === "weather.roll"));
     assert.throws(() => rollRuntimeWeather(database, "weather-gm", campaignId,
-      { expectedRevision: rolled.runtime.campaign.revision, roll: 1, outcome: "improves" }), /already been rolled/);
+      { expectedRevision: rolled.runtime.campaign.revision, roll: 6, outcome: "improves" }), /already been rolled/);
 
     const rainyShiftEnded = advanceRuntimeTime(database, "weather-gm", campaignId,
       { expectedRevision: rolled.runtime.campaign.revision });
@@ -97,7 +97,7 @@ test("weather rolls are once per shift and Rain/Snow returns to Cloudy for one r
     assert.match(rainyShiftEnded.journal[0].body, /returned to Cloudy for at least one full shift/);
     assert.ok(listAuditEvents(database, "weather-gm", campaignId).events.some((event) => event.action === "weather.duration"));
     assert.throws(() => rollRuntimeWeather(database, "weather-gm", campaignId,
-      { expectedRevision: rainyShiftEnded.campaign.revision, roll: 6, outcome: "worsens" }), /remain Cloudy/);
+      { expectedRevision: rainyShiftEnded.campaign.revision, roll: 1 }), /remain Cloudy/);
 
     const backup = exportRuntimeSave(database, "weather-gm", campaignId);
     assert.equal(backup.data.dashboardState.weather_cloudy_shifts_remaining, 1);
@@ -111,7 +111,7 @@ test("weather rolls are once per shift and Rain/Snow returns to Cloudy for one r
     assert.equal(runtime.dashboard.weatherCloudyShiftsRemaining, 1);
     const nextShift = advanceRuntimeTime(database, "weather-gm", campaignId, { expectedRevision: runtime.campaign.revision });
     const resumedRoll = rollRuntimeWeather(database, "weather-gm", campaignId,
-      { expectedRevision: nextShift.campaign.revision, roll: 1, outcome: "improves" });
+      { expectedRevision: nextShift.campaign.revision,       roll: 6 });
     assert.equal(resumedRoll.roll.weather, "Fair");
   } finally { database.close(); }
 });

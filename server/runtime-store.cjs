@@ -2779,7 +2779,7 @@ function rollRuntimeWeather(database, accountId, campaignId, input, options = {}
     || Object.keys(input).some((key) => !["expectedRevision", "roll", "outcome"].includes(key))
     || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0
     || !Number.isSafeInteger(input.roll) || input.roll < 1 || input.roll > 6
-    || !["improves", "worsens", "holds"].includes(input.outcome)) throw new Error("Record a d6 result and its matching weather symbol outcome.");
+    || (input.outcome !== undefined && !["improves", "worsens", "holds"].includes(input.outcome))) throw new Error("Record a d6 result from 1 to 6.");
   database.exec("BEGIN IMMEDIATE");
   try {
     const current = getRuntimeDashboard(database, accountId, campaignId);

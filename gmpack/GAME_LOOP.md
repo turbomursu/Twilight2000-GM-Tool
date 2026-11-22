@@ -315,8 +315,7 @@ Used during tactical encounters (close combat, ranged firefight, ambush, etc.)
 ### Per Participant Each Round
 
 **Bank Actions at Round Start:**
-- 2 Fast Actions
-- 1 Slow Action
+- Either 2 Fast Actions, or 1 Slow Action + 1 Fast Action (a slow action is a separate action type, taken in the same turn)
 - Free Actions (list per combat type: movement, helping, etc.)
 
 **Act in Initiative Order:**
@@ -385,7 +384,7 @@ Used during campaign travel between major encounters
 
 2. **Roll for Weather Change**
    - Roll 1D6 and apply the matching weather symbol shown in the Strategic Play Referee Aid
-   - The local aid does not encode a numeric face mapping; record the physical result and GM-confirmed symbol outcome
+   - GM-supplied mapping (verify against Player's Manual p. 139): 1 worsens, 6 improves, 2–5 no change (assumed); the tool derives the outcome from the d6
    - Use cited visibility, ranged-attack, marching Stamina, and driving guidance for GM adjudication; do not infer blanket terrain modifiers
 
 ### Per-Participant Tasks
