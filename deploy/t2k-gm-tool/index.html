@@ -1343,13 +1343,13 @@
 
         <section class="view" id="view-dayloop" aria-labelledby="dayloop-title">
           <div class="page-heading">
-            <div><div class="heading-tag">Strategic play / one shift at a time</div><h1 id="dayloop-title">Game day loop</h1></div>
-            <p>Work through each phase in order. A day has four shifts of about six hours; finishing the last phase advances the clock to the next shift.</p>
+            <div><div class="heading-tag">Live campaign / GM workflow</div><h1 id="dayloop-title">Game day loop</h1></div>
+            <p>Guide the day through one-hour stretches and six-hour shifts. Record decisions and outcomes in the campaign tools; the checklist does not resolve them.</p>
           </div>
           <section class="panel" aria-labelledby="dayloop-shift-title">
-            <div class="travel-controls"><div><div class="eyebrow">Current shift (from campaign clock)</div><strong id="dayloop-shift-title"></strong></div><span class="heading-tag" id="dayloop-progress"></span></div>
+            <div class="travel-controls"><div><div class="eyebrow">Campaign clock / shift anchor</div><strong id="dayloop-shift-title"></strong></div><span class="heading-tag" id="dayloop-progress"></span></div>
             <ol class="day-loop-list" id="day-loop-list"></ol>
-            <div class="panel-body"><p class="inline-hint">Phase order follows the Strategic Play Referee Aid. This checklist is a GM aid only: it does not resolve rolls, and its progress is stored in this browser, not in campaign data.</p></div>
+            <div class="panel-body"><p class="inline-hint">Progress is stored in this browser, not in campaign data or backups. The campaign clock advances only after the sixth stretch; times recorded during a shift retain the clock's shift anchor. The GM decides when the day starts or ends. Advancing time applies the existing GM-defined midday ration bookkeeping.</p><p class="feedback" id="dayloop-storage-status" role="status" aria-live="polite"></p></div>
           </section>
         </section>
 
@@ -2429,46 +2429,72 @@ Military rank || optional</textarea><span class="row-description">One field per 
         else if (!validRollInput) weatherRollStatus.textContent = "Enter the d6 result or use Roll d6 for me.";
         else weatherRollStatus.textContent = "Ready to record this shift's weather result.";
       }
-      const DAY_LOOP_STORAGE_KEY = "fieldbook.dayLoop.v1";
+      const DAY_LOOP_STORAGE_KEY = "fieldbook.dayLoop.v2";
       const DAY_LOOP_PHASES = [
-        { title: "Start the shift", text: "Confirm the shift below. Set the light level and temperature for the season (Nordic Light table, Strategic Play Referee Aid; Player's Manual p. 139). Shifts are about 6 hours; the Referee may stretch them to 5–10." },
-        { title: "Roll for weather", text: "Roll 1D6 in the Weather log: 1 worsens, 6 improves, 2–5 no change (GM-supplied mapping). One roll per shift; the tool blocks it while Cloudy is required after Rain/Snow.", view: "movement", viewLabel: "Open weather log" },
-        { title: "Assign tasks", text: "Give each PC one task for the shift; a PC may march and keep watch. Task list: Player's Manual pp. 139–149. A task keeps its benefit if at least 3/4 of the shift is spent on it.", view: "roster", viewLabel: "Open personnel" },
-        { title: "Resolve tasks", text: "Call for each PC's roll and note the result. Check weekly upkeep: a mechanic's Tech roll to service each driven vehicle, and gun care for firearms used." },
-        { title: "Determine travel", text: "If the party travels, work out distance: marching covers 2 hexes (10 km each) on road or open terrain, otherwise 1. Off-road, one PC rolls Survival to navigate. Update the route and distance.", view: "movement", viewLabel: "Open movement" },
-        { title: "Check for encounters", text: "About halfway through the shift, draw an Encounter Card (Referee's Manual p. 36 if stationary, pp. 39–50 if moving). If one applies, the players choose to engage or avoid it.", rollTables: true, link: { href: "combat.html", label: "Open battle calculator" } },
-        { title: "Record the shift", text: "Log weather, distance, events and NPC contacts. Update rations, fuel and ammunition used, injuries and morale. Publish anything players should see.", noteButton: true, view: "inventory", viewLabel: "Open inventories" },
-        { title: "Advance to next shift", text: "Advance the clock six hours (daily rations are processed at midday). The loop then restarts at the next shift.", advance: true }
+        { title: "Start or review the day", text: "At the start of the day, review the situation, party, weather and plans. Otherwise check what changed since the last stretch.", buttons: [{ label: "Situation", view: "situation" }, { label: "Personnel", view: "roster" }, { label: "COMMS", view: "comms" }] },
+        { title: "Review weather", text: "Review current conditions and use the weather log when the GM decides a rules shift requires a roll. The existing weather control tracks its own shift limits.", buttons: [{ label: "Weather log", view: "movement", viewTarget: "weather-title" }] },
+        { title: "Choose character tasks", text: "Review each character's activity for this stretch and make changes when appropriate. Record assignments in the journal; the checklist does not assign tasks or apply their rules.", buttons: [{ label: "Personnel", view: "roster" }, { label: "Inventories", view: "inventory" }, { label: "Log assignments", action: "open-note" }] },
+        { title: "Plan travel or stay", text: "If travelling, review the route and GM-managed progress. If stationary, continue with the chosen activities. The route estimate is planning guidance, not travel resolution.", buttons: [{ label: "Movement", view: "movement" }, { label: "Edit route", action: "dayloop-open-route" }] },
+        { title: "Handle events or encounters", text: "The GM decides whether an event or encounter occurs and how to resolve it. Record the outcome; the checklist does not generate encounters. The battle resolver does not save results automatically.", buttons: [{ label: "Roll tables", action: "open-roll-tables", rollContext: "conflicts" }, { label: "Conflicts", view: "conflicts" }, { label: "Battle resolver", action: "dayloop-open-combat" }, { label: "Log event", action: "open-note" }] },
+        { title: "Resolve activities", text: "Resolve the chosen activities using verified rules or GM adjudication, then record rolls and outcomes in the journal.", buttons: [{ label: "Roll tables", action: "open-roll-tables", rollContext: "personnel" }, { label: "Log outcomes", action: "open-note" }, { label: "Personnel", view: "roster" }] },
+        { title: "Update the campaign", text: "Record route progress, position, supplies, injuries and other consequences as appropriate. Changes and player publication remain explicit GM actions.", buttons: [{ label: "Movement and supplies", view: "movement" }, { label: "Player map", view: "publication" }, { label: "Player report", view: "situation", viewTarget: "gm-report-title" }, { label: "Inventories", view: "inventory" }, { label: "Conditions", view: "conditions" }, { label: "COMMS", view: "comms" }, { label: "Journal", view: "journal" }] },
+        { title: "Review end of day", text: "When the GM ends the day, review food, water and sleep for each character and record the results. Otherwise continue to the next stretch. These checks are GM-managed.", buttons: [{ label: "Shared supplies", view: "movement", viewTarget: "supply-title" }, { label: "Inventories", view: "inventory" }, { label: "Conditions", view: "conditions" }, { label: "Log review", action: "open-note" }] },
+        { title: "Finish the stretch", text: "After stretches 1–5, continue the checklist without advancing campaign time. After stretch 6, advance the clock six hours. The existing GM-defined shared ration deduction runs at midday; food, water and sleep are not otherwise resolved here.", advance: true }
       ];
-      function dayLoopShiftName(time) {
-        const hour = Number(String(time || "00:00").slice(0, 2));
-        if (hour >= 6 && hour < 12) return "Morning";
-        if (hour >= 12 && hour < 18) return "Day";
-        if (hour >= 18) return "Evening";
-        return "Night";
-      }
+      let dayLoopStorageWarning = "";
+      let dayLoopStorageWritable = true;
       function readDayLoopProgress() {
-        try { return JSON.parse(localStorage.getItem(DAY_LOOP_STORAGE_KEY)) || {}; } catch { return {}; }
+        try {
+          const current = localStorage.getItem(DAY_LOOP_STORAGE_KEY);
+          if (current !== null) {
+            const entries = JSON.parse(current);
+            if (!Array.isArray(entries)) throw new Error("Invalid checklist data");
+            return entries;
+          }
+          const previous = JSON.parse(localStorage.getItem("fieldbook.dayLoop.v1") || "null");
+          const oldSteps = [0, 1, 2, 3, 3, 4, 6, 7];
+          return previous && Number.isInteger(previous.step) && oldSteps[previous.step] !== undefined
+            ? [{ ...previous, stretch: 1, step: oldSteps[previous.step] }] : [];
+        } catch {
+          dayLoopStorageWritable = false;
+          dayLoopStorageWarning = "Checklist storage is unavailable or invalid; progress will only last in this page.";
+          return [];
+        }
       }
-      function dayLoopStep() {
+      let dayLoopProgress = readDayLoopProgress();
+      function currentDayLoop() {
         const owner = state.runtimeCampaignId || "local";
         const shift = `${state.date}T${state.time || "00:00"}`;
-        const saved = readDayLoopProgress();
-        const step = saved.owner === owner && saved.shift === shift ? Number(saved.step) : 0;
-        return Number.isInteger(step) && step >= 0 && step < DAY_LOOP_PHASES.length ? step : 0;
+        const saved = dayLoopProgress.find((entry) => entry && entry.owner === owner && entry.shift === shift);
+        const step = saved ? saved.step : 0;
+        const stretch = saved ? saved.stretch : 1;
+        return {
+          step: Number.isInteger(step) && step >= 0 && step < DAY_LOOP_PHASES.length ? step : 0,
+          stretch: Number.isInteger(stretch) && stretch >= 1 && stretch <= 6 ? stretch : 1
+        };
       }
-      function setDayLoopStep(step) {
-        try {
-          localStorage.setItem(DAY_LOOP_STORAGE_KEY, JSON.stringify({ owner: state.runtimeCampaignId || "local", shift: `${state.date}T${state.time || "00:00"}`, step }));
-        } catch { /* progress is a convenience only */ }
+      function setDayLoopProgress(step, stretch) {
+        const owner = state.runtimeCampaignId || "local";
+        const shift = `${state.date}T${state.time || "00:00"}`;
+        dayLoopProgress = dayLoopProgress.filter((entry) => entry && entry.owner !== owner);
+        dayLoopProgress.push({ owner, shift, step, stretch });
+        if (dayLoopStorageWritable) {
+          try {
+            localStorage.setItem(DAY_LOOP_STORAGE_KEY, JSON.stringify(dayLoopProgress));
+            dayLoopStorageWarning = "";
+          } catch {
+            dayLoopStorageWarning = "Checklist storage is unavailable; progress will only last in this page.";
+          }
+        }
         renderDayLoop();
       }
       function renderDayLoop() {
         const list = document.getElementById("day-loop-list");
         if (!list) return;
-        const current = dayLoopStep();
-        document.getElementById("dayloop-shift-title").textContent = `${dayLoopShiftName(state.time)} shift / ${dateLabel(state.date)} ${state.time || "00:00"} / Day ${state.day}`;
-        document.getElementById("dayloop-progress").textContent = `PHASE ${current + 1} OF ${DAY_LOOP_PHASES.length}`;
+        const { step: current, stretch } = currentDayLoop();
+        document.getElementById("dayloop-shift-title").textContent = `${dateLabel(state.date)} ${state.time || "00:00"} / Day ${state.day}`;
+        document.getElementById("dayloop-progress").textContent = `STRETCH ${stretch} OF 6 / PHASE ${current + 1} OF ${DAY_LOOP_PHASES.length}`;
+        document.getElementById("dayloop-storage-status").textContent = dayLoopStorageWarning;
         list.replaceChildren(...DAY_LOOP_PHASES.map((phase, index) => {
           const item = document.createElement("li");
           item.className = "day-loop-step";
@@ -2494,17 +2520,9 @@ Military rank || optional</textarea><span class="row-description">One field per 
             Object.entries(attributes).forEach(([key, value]) => { button.dataset[key] = value; });
             actions.append(button);
           };
-          if (phase.view) addButton(phase.viewLabel, { view: phase.view });
-          if (phase.rollTables) addButton("Roll tables", { action: "open-roll-tables", rollContext: "movement" });
-          if (phase.noteButton) addButton("Log entry", { action: "open-note" });
-          if (phase.link) {
-            const link = document.createElement("a");
-            link.className = "button";
-            link.href = phase.link.href;
-            link.textContent = phase.link.label;
-            actions.append(link);
-          }
-          if (phase.advance) addButton("Advance 6 hours", { action: "advance-time" }, "button button-primary");
+          for (const { label, ...attributes } of phase.buttons || []) addButton(label, attributes);
+          if (phase.advance && stretch === 6) addButton("Advance campaign clock 6 hours", { action: "advance-time" }, "button button-primary");
+          else if (phase.advance) addButton("Next one-hour stretch", { loop: "stretch" }, "button button-primary");
           else addButton("Phase done — next", { loop: "next" }, "button button-primary");
           if (index > 0) addButton("Back", { loop: "back" });
           body.append(text, actions);
@@ -2516,8 +2534,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
       document.getElementById("day-loop-list").addEventListener("click", (event) => {
         const button = event.target.closest("button[data-loop]");
         if (!button) return;
-        const step = dayLoopStep();
-        setDayLoopStep(button.dataset.loop === "next" ? Math.min(DAY_LOOP_PHASES.length - 1, step + 1) : Math.max(0, step - 1));
+        const { step, stretch } = currentDayLoop();
+        if (button.dataset.loop === "stretch" && step === DAY_LOOP_PHASES.length - 1 && stretch < 6) {
+          setDayLoopProgress(0, stretch + 1);
+        } else if (button.dataset.loop === "next" || button.dataset.loop === "back") {
+          setDayLoopProgress(button.dataset.loop === "next" ? Math.min(DAY_LOOP_PHASES.length - 1, step + 1) : Math.max(0, step - 1), stretch);
+        }
       });
       function render() {
         const formattedDate = `${dateLabel(state.date)} / ${state.time || "00:00"}`;
@@ -3761,20 +3783,26 @@ Military rank || optional</textarea><span class="row-description">One field per 
 
       const combatResolverDialog = document.getElementById("combat-resolver-dialog");
       const combatResolverFrame = document.getElementById("combat-resolver-frame");
-      document.getElementById("conflict-battle-link").addEventListener("click", () => {
+      let combatResolverTrigger = null;
+      function openCombatResolver(trigger) {
         const campaignId = runtimeDataLoaded ? state.runtimeCampaignId : null;
-        if (!campaignId || combatResolverDialog.open) return;
+        if (!campaignId) { showToast("Select a runtime campaign first."); return; }
+        if (combatResolverDialog.open) return;
+        combatResolverTrigger = trigger;
         document.getElementById("combat-resolver-campaign").textContent =
           runtimeCampaignSelect.selectedOptions[0]?.textContent || campaignId;
         combatResolverFrame.src = `combat.html?campaign=${encodeURIComponent(campaignId)}&embedded=1`;
         combatResolverDialog.showModal();
-      });
+      }
+      document.getElementById("conflict-battle-link").addEventListener("click", (event) => openCombatResolver(event.currentTarget));
       function closeCombatResolver() { combatResolverDialog.close(); }
       document.getElementById("close-combat-resolver").addEventListener("click", closeCombatResolver);
       document.getElementById("cancel-combat-resolver").addEventListener("click", closeCombatResolver);
       combatResolverDialog.addEventListener("close", () => {
         combatResolverFrame.removeAttribute("src");
-        document.getElementById("conflict-battle-link").focus();
+        if (combatResolverTrigger?.isConnected) combatResolverTrigger.focus();
+        else document.querySelector('[data-view="dayloop"]').focus();
+        combatResolverTrigger = null;
       });
       // Escape in the embedded document does not bubble to the parent dialog.
       window.addEventListener("message", (event) => {
@@ -4544,10 +4572,19 @@ Military rank || optional</textarea><span class="row-description">One field per 
       document.addEventListener("click", async (event) => {
         const button = event.target.closest("button");
         if (!button) return;
-        if (button.dataset.view) { setView(button.dataset.view); return; }
+        if (button.dataset.view) {
+          setView(button.dataset.view);
+          if (button.dataset.viewTarget) document.getElementById(button.dataset.viewTarget)?.scrollIntoView({ block: "start" });
+          return;
+        }
         const action = button.dataset.action;
         if (!action) return;
         if (action === "open-note") document.getElementById("note-dialog").showModal();
+        if (action === "dayloop-open-combat") openCombatResolver(button);
+        if (action === "dayloop-open-route") {
+          if (!runtimeDataLoaded || !routeLocations().length) showToast("Select a runtime campaign with locations first.");
+          else if (!document.getElementById("route-editor-dialog").open) openRouteEditor();
+        }
         if (action === "close-note") document.getElementById("note-dialog").close();
         if (action === "open-person") {
           if (state.runtimeCampaignId) {

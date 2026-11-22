@@ -2,10 +2,11 @@ const assert = require("node:assert/strict");
 const { createHash, randomBytes } = require("node:crypto");
 const http = require("node:http");
 const { once } = require("node:events");
-const { mkdtempSync, rmSync } = require("node:fs");
+const { mkdtempSync, readFileSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const test = require("node:test");
+const { runInNewContext } = require("node:vm");
 const { createAppHandler } = require("../server/app.cjs");
 const { createAuthHandler } = require("../server/auth.cjs");
 const { getRollTableCatalog, replaceRollTableCatalog } = require("../server/roll-tables.cjs");
@@ -24,6 +25,40 @@ const sampleCatalog = {
     notes: []
   }]
 };
+
+test("roll-table modal opens from dynamically rendered workflow buttons", async () => {
+  const elements = new Map();
+  const listeners = {};
+  const makeElement = () => ({
+    open: false, children: [], addEventListener() {}, replaceChildren(...children) { this.children = children; },
+    append(child) { this.children.push(child); }, showModal() { this.open = true; }, close() { this.open = false; }
+  });
+  const document = {
+    getElementById(id) { if (!elements.has(id)) elements.set(id, makeElement()); return elements.get(id); },
+    querySelectorAll: () => [], createElement: makeElement,
+    addEventListener(name, callback) { listeners[name] = callback; }
+  };
+  let requests = 0;
+  const catalog = { schemaVersion: 1, tables: [] };
+  runInNewContext(readFileSync(join(__dirname, "..", "roll-tables-client.js"), "utf8"), {
+    document, window: { FieldbookRollTableContract: { validateRollTableCatalog: (value) => value } },
+    fetch: async () => { requests += 1; return { ok: true, json: async () => ({ catalog, revision: 1 }) }; }
+  });
+  const button = { dataset: { rollContext: "conflicts" } };
+  listeners.click({ target: { closest: () => button } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements.get("roll-tables-dialog").open, true);
+  assert.match(elements.get("roll-table-context-label").textContent, /Opened from Conflicts/);
+  assert.equal(requests, 1);
+  listeners.click({ target: { closest: () => button } });
+  assert.equal(requests, 1);
+  elements.get("roll-tables-dialog").close();
+  button.dataset.rollContext = "personnel";
+  listeners.click({ target: { closest: () => button } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(elements.get("roll-table-context-label").textContent, /Opened from Personnel/);
+  assert.equal(requests, 2);
+});
 
 function addAccount(database, id, role) {
   const timestamp = new Date().toISOString();

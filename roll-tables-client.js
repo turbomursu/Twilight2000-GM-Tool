@@ -198,14 +198,14 @@
     }
   }
 
-  document.querySelectorAll('[data-action="open-roll-tables"]').forEach((button) => {
-    button.addEventListener("click", () => {
-      context = contextLabels[button.dataset.rollContext] ? button.dataset.rollContext : "situation";
-      document.getElementById("roll-table-context-label").textContent =
-        `Opened from ${contextLabels[context]}. Tables are shared across campaigns and GM accounts; players cannot access them.`;
-      dialog.showModal();
-      loadCatalog();
-    });
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest('button[data-action="open-roll-tables"]');
+    if (!button || dialog.open) return;
+    context = contextLabels[button.dataset.rollContext] ? button.dataset.rollContext : "situation";
+    document.getElementById("roll-table-context-label").textContent =
+      `Opened from ${contextLabels[context]}. Tables are shared across campaigns and GM accounts; players cannot access them.`;
+    dialog.showModal();
+    loadCatalog();
   });
   document.querySelectorAll("[data-roll-close]").forEach((button) => button.addEventListener("click", () => dialog.close()));
   select.addEventListener("change", renderTable);

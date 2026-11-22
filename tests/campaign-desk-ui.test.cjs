@@ -6,6 +6,181 @@ const { Script, runInNewContext } = require("node:vm");
 
 const dashboard = readFileSync(join(__dirname, "..", "index.html"), "utf8");
 
+function dayLoopHarness({ values = new Map(), storageFails = false } = {}) {
+  class Element {
+    constructor() { this.children = []; this.dataset = {}; this.textContent = ""; }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = children; }
+    setAttribute() {}
+    addEventListener(name, callback) { this[name] = callback; }
+  }
+  const elements = new Map();
+  const document = {
+    getElementById(id) {
+      if (!elements.has(id)) elements.set(id, new Element());
+      return elements.get(id);
+    },
+    createElement: () => new Element()
+  };
+  const localStorage = {
+    getItem: (key) => { if (storageFails) throw new Error("storage blocked"); return values.get(key) ?? null; },
+    setItem: (key, value) => { if (storageFails) throw new Error("storage blocked"); values.set(key, value); }
+  };
+  const state = { runtimeCampaignId: "campaign-a", date: "2000-05-11", time: "00:00", day: 1 };
+  const source = dashboard.match(/const DAY_LOOP_STORAGE_KEY = [\s\S]*?(?= {6}function render\(\))/);
+  assert.ok(source);
+  const api = runInNewContext(`${source[0]}\n({ currentDayLoop, renderDayLoop })`, {
+    document, localStorage, state, dateLabel: (date) => date
+  });
+  const list = document.getElementById("day-loop-list");
+  return {
+    ...api, state, elements, values,
+    click: (loop) => list.click({ target: { closest: () => ({ dataset: { loop } }) } }),
+    buttons: () => list.children.flatMap((item) => item.children[1].children[1].children[1].children)
+  };
+}
+
+test("day loop tracks six one-hour stretches without advancing the campaign clock", () => {
+  const h = dayLoopHarness();
+  h.renderDayLoop();
+  assert.match(h.elements.get("dayloop-progress").textContent, /STRETCH 1 OF 6.*PHASE 1 OF 9/);
+  assert.ok(h.buttons().some((button) => button.dataset.view === "movement"));
+  for (let stretch = 1; stretch <= 6; stretch += 1) {
+    for (let phase = 0; phase < 8; phase += 1) h.click("next");
+    assert.equal(h.currentDayLoop().stretch, stretch);
+    assert.equal(h.state.time, "00:00");
+    if (stretch < 6) {
+      assert.ok(h.buttons().some((button) => button.dataset.loop === "stretch"));
+      h.click("stretch");
+      assert.equal(h.currentDayLoop().step, 0);
+    } else {
+      assert.ok(h.buttons().some((button) => button.dataset.action === "advance-time"));
+      assert.ok(!h.buttons().some((button) => button.dataset.loop === "stretch"));
+    }
+  }
+  h.state.time = "06:00";
+  assert.equal(h.currentDayLoop().stretch, 1);
+  assert.equal(h.currentDayLoop().step, 0);
+});
+
+test("day loop exposes existing tools at the relevant phases", () => {
+  const h = dayLoopHarness();
+  h.renderDayLoop();
+  const rows = h.elements.get("day-loop-list").children;
+  const buttons = (phase) => rows[phase].children[1].children[1].children[1].children;
+  assert.ok(buttons(0).some((button) => button.dataset.view === "comms"));
+  assert.ok(buttons(1).some((button) => button.dataset.view === "movement" && button.dataset.viewTarget === "weather-title"));
+  assert.ok(buttons(3).some((button) => button.dataset.action === "dayloop-open-route"));
+  assert.ok(buttons(4).some((button) => button.dataset.action === "dayloop-open-combat"));
+  assert.ok(buttons(4).some((button) => button.dataset.action === "open-roll-tables" && button.dataset.rollContext === "conflicts"));
+  assert.ok(buttons(5).some((button) => button.dataset.action === "open-roll-tables" && button.dataset.rollContext === "personnel"));
+  for (const view of ["movement", "publication", "situation", "inventory", "conditions", "comms"]) {
+    assert.ok(buttons(6).some((button) => button.dataset.view === view), view);
+  }
+  assert.ok(buttons(6).some((button) => button.dataset.viewTarget === "gm-report-title"));
+  assert.ok(buttons(7).some((button) => button.dataset.viewTarget === "supply-title"));
+});
+
+test("targeted workflow links switch views before scrolling to the existing tool", () => {
+  const source = dashboard.match(/if \(button\.dataset\.view\) \{[\s\S]*?\n {8}\}/);
+  assert.ok(source);
+  const calls = [];
+  const activate = runInNewContext(`(button) => { ${source[0]} }`, {
+    setView: (view) => calls.push(view),
+    document: { getElementById: (id) => ({ scrollIntoView: () => calls.push(id) }) }
+  });
+  activate({ dataset: { view: "movement", viewTarget: "weather-title" } });
+  assert.deepEqual(calls, ["movement", "weather-title"]);
+});
+
+test("day loop combat shortcut uses the existing campaign resolver and returns focus", () => {
+  const source = dashboard.match(/const combatResolverDialog = document\.getElementById\("combat-resolver-dialog"\);[\s\S]*?(?= {6}\/\/ Escape)/);
+  assert.ok(source);
+  const callbacks = {};
+  const dialog = {
+    open: false, addEventListener(name, callback) { callbacks[name] = callback; },
+    showModal() { this.open = true; }, close() { this.open = false; }
+  };
+  const frame = { removeAttribute(name) { delete this[name]; } };
+  const nodes = {
+    "combat-resolver-dialog": dialog, "combat-resolver-frame": frame,
+    "conflict-battle-link": { addEventListener() {} }, "close-combat-resolver": { addEventListener() {} },
+    "cancel-combat-resolver": { addEventListener() {} }, "combat-resolver-campaign": {}
+  };
+  const messages = [];
+  const state = { runtimeCampaignId: "campaign 1" };
+  const context = {
+    document: { getElementById: (id) => nodes[id], querySelector: () => ({ focus() {} }) },
+    runtimeDataLoaded: false, state, runtimeCampaignSelect: { selectedOptions: [{ textContent: "Campaign" }] },
+    showToast: (message) => messages.push(message)
+  };
+  const open = runInNewContext(`${source[0]}\nopenCombatResolver`, context);
+  const trigger = { isConnected: true, focused: false, focus() { this.focused = true; } };
+  open(trigger);
+  assert.match(messages[0], /Select a runtime campaign/);
+  assert.equal(dialog.open, false);
+  context.runtimeDataLoaded = true;
+  open(trigger);
+  assert.equal(dialog.open, true);
+  assert.equal(frame.src, "combat.html?campaign=campaign%201&embedded=1");
+  callbacks.close();
+  assert.equal(frame.src, undefined);
+  assert.equal(trigger.focused, true);
+});
+
+test("day loop route shortcut opens the existing editor only for a loaded campaign", () => {
+  const source = dashboard.match(/if \(action === "dayloop-open-route"\) \{[\s\S]*?\n {8}\}/);
+  assert.ok(source);
+  let opened = 0;
+  const messages = [];
+  const dialog = { open: false };
+  const context = {
+    action: "dayloop-open-route", runtimeDataLoaded: false, routeLocations: () => [{}],
+    document: { getElementById: () => dialog }, openRouteEditor: () => { opened += 1; },
+    showToast: (message) => messages.push(message)
+  };
+  runInNewContext(source[0], context);
+  assert.match(messages[0], /Select a runtime campaign/);
+  context.runtimeDataLoaded = true;
+  runInNewContext(source[0], context);
+  assert.equal(opened, 1);
+  dialog.open = true;
+  runInNewContext(source[0], context);
+  assert.equal(opened, 1);
+});
+
+test("day loop preserves per-campaign progress and reports unavailable storage", () => {
+  const h = dayLoopHarness();
+  h.click("next");
+  h.state.runtimeCampaignId = "campaign-b";
+  assert.equal(h.currentDayLoop().step, 0);
+  h.click("next");
+  h.click("next");
+  const reloaded = dayLoopHarness({ values: h.values });
+  assert.equal(reloaded.currentDayLoop().step, 1);
+  reloaded.state.runtimeCampaignId = "campaign-b";
+  assert.equal(reloaded.currentDayLoop().step, 2);
+
+  const blocked = dayLoopHarness({ storageFails: true });
+  blocked.click("next");
+  assert.equal(blocked.currentDayLoop().step, 1);
+  assert.match(blocked.elements.get("dayloop-storage-status").textContent, /only last in this page/);
+  const invalid = new Map([["fieldbook.dayLoop.v2", "invalid"]]);
+  const corrupted = dayLoopHarness({ values: invalid });
+  corrupted.click("next");
+  assert.equal(invalid.get("fieldbook.dayLoop.v2"), "invalid");
+  assert.match(corrupted.elements.get("dayloop-storage-status").textContent, /invalid/);
+});
+
+test("day loop carries older checklist progress forward without skipping new travel review", () => {
+  const values = new Map([["fieldbook.dayLoop.v1", JSON.stringify({
+    owner: "campaign-a", shift: "2000-05-11T00:00", step: 3
+  })]]);
+  const h = dayLoopHarness({ values });
+  assert.equal(h.currentDayLoop().step, 3);
+  assert.equal(h.currentDayLoop().stretch, 1);
+});
+
 test("weather die reports unavailable browser randomness and otherwise fills the die", () => {
   const handler = dashboard.match(/document\.getElementById\("roll-weather-d6"\)\.addEventListener\("click", \(\) => \{([\s\S]*?)\n {6}\}\);/);
   assert.ok(handler);
@@ -121,7 +296,7 @@ test("separated surfaces retain valid inline JavaScript and synchronized deploym
   assert.match(dashboard, /closest\?\.\("\.live-influence-hex, \.live-influence-location"\)/);
   for (const filename of ["index.html", "campaign-setup.html", "campaign-setup-import-client.js", "maptiler-reference-client.js", "campaign-package-contract.js",
     "map-coordinates.js", "map-basemap-client.js", "map-publication-client.js", "map-visualization-client.js", "location-client.js", "route-client.js",
-    "map-tooltip-client.js", "roll-tables.json", "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
+    "map-tooltip-client.js", "roll-tables.json", "roll-tables-client.js", "player-interface.html", "server/app.cjs", "server/setup-packages.cjs", "server/runtime-store.cjs",
     "server/map-publications.cjs", "server/campaigns.cjs", "server/campaign-depth-service.cjs", "server/audit.cjs", "server/sample-data.cjs",
     "metadata/FEATURES.md", "metadata/ROADMAP.md", "metadata/DATA_MODEL.md", "metadata/ROLL_TABLES.md",
     "project-features.html", "project-status.html", "combat.html", "combat-client.js"]) {
