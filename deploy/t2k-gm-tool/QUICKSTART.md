@@ -10,10 +10,9 @@
 ### Install and Run
 
 1. Run `INSTALL_SERVER.bat` or `INSTALL_SERVER.ps1`.
-2. If you used the batch installer, open a new terminal.
-3. From this folder, run `npm start`.
-4. Open the GM Tool at `http://localhost:8081`.
-5. Enter the bootstrap token from `token.txt`, then create the GM account.
+2. From this folder, run `npm start`.
+3. Open the GM Tool at `http://localhost:8081`.
+4. Create the first GM username.
 
 ## Done!
 
@@ -73,9 +72,9 @@ npm start
 Ctrl+C (in command prompt)
 ```
 
-## Password Security
+## Access
 
-The GM chooses a password during first-run setup. GM-created player accounts receive temporary passwords and must replace them at first sign-in.
+Everyone signs in by username only. Anyone with server access can impersonate any player or GM, so use only on a trusted LAN.
 
 ## Backup Your Data
 

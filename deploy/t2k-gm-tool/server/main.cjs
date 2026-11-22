@@ -12,16 +12,14 @@ function startServer(environment = process.env) {
   mkdirSync(dirname(databasePath), { recursive: true });
 
   const database = openRuntimeDatabase(databasePath);
-  
+
   // Initialize backup scheduler and automation
   initializeBackupScheduler(database);
   initializeBackupAutomation(database);
-  
-  const accountsExist = database.prepare("SELECT COUNT(*) AS count FROM accounts").get().count > 0;
-  const bootstrapToken = accountsExist ? undefined : environment.FIELDBOOK_BOOTSTRAP_TOKEN;
+
   let handler;
   try {
-    handler = createAuthHandler({ database, bootstrapToken });
+    handler = createAuthHandler({ database });
   } catch (error) {
     database.close();
     throw error;
@@ -53,7 +51,7 @@ function startServer(environment = process.env) {
     });
     servers.push(http.createServer(appHandler));
   });
-  
+
   // Start background backup runner
   // Get list of all campaigns across all GMs
   let getAllCampaignIds = () => {
@@ -82,20 +80,20 @@ function startServer(environment = process.env) {
       let gmAccount = null;
       try {
         gmAccount = database.prepare(`
-          SELECT DISTINCT actor_account_id FROM audit_events 
-          WHERE campaign_id = ? AND action = 'campaign.created' 
+          SELECT DISTINCT actor_account_id FROM audit_events
+          WHERE campaign_id = ? AND action = 'campaign.created'
           LIMIT 1
         `).get(campaignId);
       } catch {
-        // Table might not exist in test env, fall back to finding any GM  
+        // Table might not exist in test env, fall back to finding any GM
       }
 
       if (!gmAccount) {
         // Fallback: find any account that has ownership of this campaign
         try {
           gmAccount = database.prepare(`
-            SELECT DISTINCT actor_account_id FROM audit_events 
-            WHERE campaign_id = ? 
+            SELECT DISTINCT actor_account_id FROM audit_events
+            WHERE campaign_id = ?
             LIMIT 1
           `).get(campaignId);
         } catch {

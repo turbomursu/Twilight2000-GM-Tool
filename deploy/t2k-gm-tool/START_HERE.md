@@ -12,12 +12,12 @@ Welcome! You have everything needed to run a T2K 4E campaign.
 1. **Read:** [QUICKSTART.md](QUICKSTART.md)
 2. **Run:** `INSTALL_SERVER.bat`
 3. **Start:** `npm start`
-4. **Open:** http://localhost:8080, enter the token from `token.txt`, and create the GM account
+4. **Open:** http://localhost:8081 and create the first GM username
 
 ### 📖 I Need Detailed Instructions (5 minutes)
 1. **Read:** [INSTALLATION.md](INSTALLATION.md) (complete step-by-step guide)
 2. Follow all steps carefully
-3. Open http://localhost:8080 and complete first-run setup with the token in `token.txt`
+3. Open http://localhost:8081 and create the first GM username
 4. Create your campaign
 
 ### 📚 I Need to Understand Everything (15 minutes)
@@ -77,8 +77,8 @@ Open a terminal in this folder and run: npm start
 
 ### Step 3: Open Browser
 ```
-Go to: http://localhost:8080
-Enter the bootstrap token from token.txt and create the GM account.
+Go to: http://localhost:8081
+Create the first GM username.
 ```
 
 **Done!** You're ready to create campaigns.
@@ -149,7 +149,7 @@ Your campaign data is automatically backed up:
 
 ## 🔐 Security First!
 
-GM-created player accounts must change their temporary password at first sign-in. Keep the bootstrap token and temporary passwords private.
+Everyone signs in by username only. Anyone with server access can impersonate any player or GM. Use only on a trusted LAN.
 
 ---
 

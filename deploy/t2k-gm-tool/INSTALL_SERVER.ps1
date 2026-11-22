@@ -100,29 +100,8 @@ if (-not (Test-Path "data\maps\atlas")) {
 Write-Host "       ✓ Created /data directory for campaigns"
 Write-Host "       ✓ Created /data/maps/atlas for image and PMTiles assets"
 
-# Step 6: Create the first-run GM bootstrap token
 Write-Host ""
-Write-Host "[6/6] Creating the first-run GM bootstrap token..."
-$tokenBytes = New-Object byte[] 32
-$randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-try {
-    $randomGenerator.GetBytes($tokenBytes)
-} finally {
-    $randomGenerator.Dispose()
-}
-$bootstrapToken = [Convert]::ToBase64String($tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
-$tokenPath = Join-Path $PSScriptRoot "token.txt"
-try {
-    [System.IO.File]::WriteAllText($tokenPath, $bootstrapToken, [System.Text.Encoding]::ASCII)
-    [Environment]::SetEnvironmentVariable("FIELDBOOK_BOOTSTRAP_TOKEN", $bootstrapToken, "User")
-    $env:FIELDBOOK_BOOTSTRAP_TOKEN = $bootstrapToken
-} catch {
-    Write-Host "ERROR: Could not save the bootstrap token or configure the user environment."
-    Write-Host $_.Exception.Message
-    exit 1
-}
-Write-Host "       ✓ Saved bootstrap token to $tokenPath"
-Write-Host "       ✓ Configured FIELDBOOK_BOOTSTRAP_TOKEN for this and future sessions"
+Write-Host "[6/6] Username-only access configured for trusted networks."
 
 Write-Host ""
 Write-Host "========================================"
@@ -131,9 +110,9 @@ Write-Host "========================================"
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Run: npm start"
-Write-Host "     (Open a new terminal first if this installer was run from an existing terminal)"
 Write-Host "  2. Open GM browser to http://localhost:8081 (players use port 8080)"
-Write-Host "  3. Enter the token saved in token.txt and create the GM account"
+Write-Host "  3. Create the first GM username in the browser"
+Write-Host "  Anyone with server access can use any username. Use a trusted LAN only."
 Write-Host ""
 Write-Host "For detailed setup instructions, see:"
 Write-Host "  - INSTALLATION.md"

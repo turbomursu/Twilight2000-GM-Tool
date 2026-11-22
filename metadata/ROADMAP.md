@@ -1,6 +1,6 @@
 # Development Roadmap — Plan B Edition
 
-**Last updated:** 08 Nov 2026
+**Last updated:** 22 Nov 2026
 **Strategy:** Session management first. Complete existing session workflows before expanding interconnected simulation systems.
 **Reference:** [Plan B — Scope Assessment](../gmpack/plan-b.html)
 
@@ -14,7 +14,7 @@ The Twilight: 2000 GM Tool has three connected surfaces over a shared, versioned
 
 Keep a setup package distinct from a running campaign save. Importing setup data creates a new initial runtime state; later changes belong to the GM runtime and do not rewrite the setup package. Setup notes and other GM-only content are never published automatically. Keep GM-only notes, unrevealed state, and other players' private data outside each player's view. Enforce identity, character ownership, and permissions at the authoritative data boundary.
 
-**Deployment:** Run the authoritative service on a GM-controlled Raspberry Pi or laptop on the local network, with browser clients connecting over LAN using plain HTTP. Store runtime campaign state in SQLite on that host; retain versioned JSON for setup-package exchange and backups. HTTP is unencrypted, so the service must remain on a trusted LAN and must not be exposed to the internet or untrusted networks. Remote hosting is out of initial scope and requires a separate deployment and security decision if added later.
+**Deployment:** Run the authoritative service on a GM-controlled Raspberry Pi or laptop on the local network, with browser clients connecting over LAN using plain HTTP. Store runtime campaign state in SQLite on that host; retain versioned JSON for setup-package exchange and backups. Sign-in requires only a username, so anyone with server access can impersonate any GM or player. HTTP is unencrypted, so the service must remain on a trusted LAN and must not be exposed to the internet or untrusted networks. Remote hosting is out of initial scope and requires a separate deployment and security decision if added later.
 
 **Surface separation:** Keep authoring links outside numbered runtime views. Campaign Setup drafts remain browser-local; server saving creates separate versioned schema-v2 files that can be reopened or downloaded for the runtime's focused import preview/confirmation. Preserve shared validation and server permissions, without automatic draft/runtime synchronization. Existing implementation priorities and partial-surface acceptance checks remain unchanged.
 

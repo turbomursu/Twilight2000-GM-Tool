@@ -32,7 +32,7 @@
    ```
    Double-click: INSTALL_SERVER.bat
    Follow prompts and wait for completion
-   Open a new terminal after the batch installer finishes
+   Run from the installation directory
    ```
 
 3. **Start the Server**
@@ -42,13 +42,11 @@
 
 4. **Access in Browser**
    ```
-   Open: http://localhost:8080
-   Read the bootstrap token from token.txt
+   Open: http://localhost:8081
    ```
 
 5. **Create the GM Account**
-   - Enter the token from token.txt on the first-run setup page
-   - Choose a GM username and password
+   - Choose a GM username on the first-run setup page
 
 That's it! You're ready to manage campaigns.
 
@@ -244,7 +242,7 @@ After login, you can access:
 
 ### First-Run GM Account
 
-There are no default GM credentials. Enter the bootstrap token saved in `token.txt`, then choose the GM username and password. GM-created player accounts receive temporary passwords and must change them at first sign-in.
+Create the first GM username on the setup page. Everyone signs in by username only; anyone with server access can impersonate any account. Use only on a trusted LAN.
 
 ### Creating Additional Users
 
@@ -553,8 +551,8 @@ If response times exceed 500ms, consider:
 - [ ] INSTALL_SERVER.bat ran successfully
 - [ ] Server starts without errors
 - [ ] Browser can access http://localhost:8080
-- [ ] First-run GM account created with the token in token.txt
-- [ ] Player temporary-password change is required at first sign-in
+- [ ] First-run GM username created
+- [ ] Player and GM accounts sign in by username
 - [ ] Data folder created with backups
 - [ ] Can create a new campaign
 - [ ] Can navigate all main menus

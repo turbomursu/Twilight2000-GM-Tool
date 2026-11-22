@@ -2315,20 +2315,17 @@ function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
   const nowValue = (options.now || (() => Date.now()))();
   const timestamp = new Date(nowValue).toISOString();
   const templateId = randomUUID();
-  let temporaryPassword = null;
   database.exec("BEGIN IMMEDIATE");
   try {
     if (!database.prepare("SELECT 1 AS allowed FROM accounts WHERE id = ? AND global_role = 'gm' AND disabled = 0").get(gmAccountId)) throw new Error("GM account required.");
     let account = database.prepare("SELECT id, global_role, created_by_account_id FROM accounts WHERE login_identifier = ?").get(username);
     if (account && (account.global_role !== "player" || account.created_by_account_id !== gmAccountId)) throw new Error("Choose a player username created by this GM.");
     if (!account) {
-      if (typeof options.passwordHash !== "string") throw new Error("Temporary password credentials are required to create a player account.");
       const accountId = randomUUID();
       database.prepare(`INSERT INTO accounts
         (id, login_identifier, password_hash, disabled, must_change_password, created_at, updated_at, global_role, created_by_account_id)
-        VALUES (?, ?, ?, 0, 1, ?, ?, 'player', ?)`)
-        .run(accountId, username, options.passwordHash, timestamp, timestamp, gmAccountId);
-      temporaryPassword = options.temporaryPassword;
+        VALUES (?, ?, ?, 0, 0, ?, ?, 'player', ?)`)
+        .run(accountId, username, `unused$${randomBytes(32).toString("hex")}`, timestamp, timestamp, gmAccountId);
       account = { id: accountId, global_role: "player", created_by_account_id: gmAccountId };
     }
     if (database.prepare("SELECT 1 AS present FROM player_seed_templates WHERE account_id = ?").get(account.id)) throw new Error("This player already has a character template.");
@@ -2337,7 +2334,7 @@ function createPlayerSeedTemplate(database, gmAccountId, input, options = {}) {
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(templateId, gmAccountId, account.id, displayLabel, JSON.stringify(character), timestamp, timestamp);
     database.exec("COMMIT");
-    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp, temporaryPassword };
+    return { id: templateId, accountId: account.id, username, displayLabel, character, assignments: [], createdAt: timestamp, updatedAt: timestamp };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -2389,17 +2386,18 @@ function createAssignedUser(database, gmAccountId, username, options = {}) {
   const timestampValue = (options.now || (() => Date.now()))();
   const timestamp = new Date(timestampValue).toISOString();
   const accountId = randomUUID();
-  const disabled = typeof options.passwordHash !== "string";
-  const passwordHash = disabled ? `disabled$${randomBytes(32).toString("hex")}` : options.passwordHash;
+  const role = options.role === undefined ? "player" : options.role;
+  if (role !== "player" && role !== "gm") throw new Error("Role must be player or gm.");
+  const passwordHash = `unused$${randomBytes(32).toString("hex")}`;
 
   database.exec("BEGIN IMMEDIATE");
   try {
     database.prepare(`INSERT INTO accounts
       (id, login_identifier, password_hash, disabled, must_change_password, created_at, updated_at, global_role, created_by_account_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'player', ?)`)
-      .run(accountId, normalizedUsername, passwordHash, Number(disabled), Number(!disabled), timestamp, timestamp, gmAccountId);
+      VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?)`)
+      .run(accountId, normalizedUsername, passwordHash, timestamp, timestamp, role, gmAccountId);
     database.exec("COMMIT");
-    return { id: accountId, username: normalizedUsername, disabled, mustChangePassword: !disabled };
+    return { id: accountId, username: normalizedUsername, role, disabled: false, mustChangePassword: false };
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -2409,14 +2407,13 @@ function createAssignedUser(database, gmAccountId, username, options = {}) {
 function listAssignedUsers(database, gmAccountId) {
   const gm = database.prepare("SELECT global_role FROM accounts WHERE id = ? AND disabled = 0").get(gmAccountId);
   if (gm?.global_role !== "gm") return null;
-    return database.prepare(`SELECT accounts.id, accounts.login_identifier AS username, accounts.disabled,
-      accounts.must_change_password AS mustChangePassword,
+    return database.prepare(`SELECT accounts.id, accounts.login_identifier AS username, accounts.global_role AS role, accounts.disabled,
       (SELECT COUNT(*) FROM player_seats WHERE player_seats.account_id = accounts.id AND player_seats.active = 1) AS campaignAssignments
-    FROM accounts WHERE accounts.global_role = 'player' AND accounts.created_by_account_id = ?
+    FROM accounts WHERE accounts.created_by_account_id = ?
     ORDER BY accounts.login_identifier`).all(gmAccountId).map((user) => ({
       ...user,
       disabled: Boolean(user.disabled),
-      mustChangePassword: Boolean(user.mustChangePassword)
+      mustChangePassword: false
     }));
 }
 

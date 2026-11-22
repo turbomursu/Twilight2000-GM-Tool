@@ -1,13 +1,8 @@
-const { promisify } = require("node:util");
-const { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } = require("node:crypto");
+const { createHash, randomBytes, randomUUID } = require("node:crypto");
 
-const scryptAsync = promisify(scrypt);
 const SESSION_COOKIE = "fieldbook_session";
 const SESSION_LIFETIME_MS = 8 * 60 * 60 * 1000;
-const PASSWORD_HASH_COST = 32768;
 const MAX_BODY_BYTES = 16 * 1024;
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_FAILURE_LIMIT = 5;
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -18,51 +13,6 @@ class HttpError extends Error {
 
 function sha256(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
-function generateTemporaryPassword() {
-  return randomBytes(24).toString("base64url");
-}
-
-function safeHexEqual(left, right) {
-  if (typeof left !== "string" || typeof right !== "string" || !/^[a-f0-9]{64}$/.test(left) || !/^[a-f0-9]{64}$/.test(right)) return false;
-  return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
-}
-
-function initializeBootstrapToken(database, token) {
-  const accountCount = database.prepare("SELECT COUNT(*) AS count FROM accounts").get().count;
-  if (accountCount > 0) {
-    database.prepare("DELETE FROM server_config WHERE key = 'bootstrap_token_sha256'").run();
-    return;
-  }
-  if (typeof token !== "string" || Buffer.byteLength(token, "utf8") < 32 || Buffer.byteLength(token, "utf8") > 256) {
-    throw new Error("Set FIELDBOOK_BOOTSTRAP_TOKEN to a random value between 32 and 256 bytes before first startup.");
-  }
-  database.prepare(`INSERT INTO server_config (key, value) VALUES ('bootstrap_token_sha256', ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(sha256(token));
-}
-
-async function hashPassword(password) {
-  const salt = randomBytes(16).toString("hex");
-  const derived = await scryptAsync(password, salt, 64, {
-    N: PASSWORD_HASH_COST,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024
-  });
-  return `scrypt$${PASSWORD_HASH_COST}$${salt}$${derived.toString("hex")}`;
-}
-
-async function verifyPassword(password, encodedHash) {
-  const [, cost, salt, expectedHex] = typeof encodedHash === "string" ? encodedHash.split("$") : [];
-  if (cost !== String(PASSWORD_HASH_COST) || !/^[a-f0-9]{32}$/.test(salt || "") || !/^[a-f0-9]{128}$/.test(expectedHex || "")) return false;
-  const actual = await scryptAsync(password, salt, 64, {
-    N: PASSWORD_HASH_COST,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024
-  });
-  return timingSafeEqual(actual, Buffer.from(expectedHex, "hex"));
 }
 
 function parseCookies(header = "") {
@@ -81,7 +31,7 @@ function getAuthenticatedAccount(database, token) {
     FROM sessions JOIN accounts ON accounts.id = sessions.account_id
     WHERE sessions.token_hash = ? AND accounts.disabled = 0`).get(tokenHash);
   if (row && row.expires_at > new Date().toISOString()) {
-    return { id: row.id, username: row.login_identifier, role: row.global_role, mustChangePassword: Boolean(row.must_change_password) };
+    return { id: row.id, username: row.login_identifier, role: row.global_role, mustChangePassword: false };
   }
   database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
   return null;
@@ -145,45 +95,6 @@ function normalizeUsername(value) {
   return value.toLowerCase();
 }
 
-function validatePassword(value) {
-  if (typeof value !== "string" || value.length < 8 || Buffer.byteLength(value, "utf8") > 128) {
-    throw new HttpError(400, "Password must be at least 8 characters and at most 128 bytes.");
-  }
-  return value;
-}
-
-function createLoginLimiter() {
-  const failures = new Map();
-  return {
-    isBlocked(key, now) {
-      const state = failures.get(key);
-      if (!state) return false;
-      if (state.windowStartedAt + LOGIN_WINDOW_MS <= now) {
-        failures.delete(key);
-        return false;
-      }
-      return state.blockedUntil > now;
-    },
-    fail(key, now) {
-      if (failures.size > 10000) {
-        for (const [entryKey, state] of failures) {
-          if (state.windowStartedAt + LOGIN_WINDOW_MS <= now) failures.delete(entryKey);
-        }
-      }
-      const state = failures.get(key);
-      if (!state || state.windowStartedAt + LOGIN_WINDOW_MS <= now) {
-        failures.set(key, { count: 1, windowStartedAt: now, blockedUntil: 0 });
-        return;
-      }
-      state.count += 1;
-      if (state.count >= LOGIN_FAILURE_LIMIT) state.blockedUntil = now + LOGIN_WINDOW_MS;
-    },
-    clear(key) {
-      failures.delete(key);
-    }
-  };
-}
-
 function createSession(database, accountId, now = Date.now()) {
   const token = randomBytes(32).toString("base64url");
   const createdAt = new Date(now).toISOString();
@@ -193,10 +104,8 @@ function createSession(database, accountId, now = Date.now()) {
   return { token, expiresAt };
 }
 
-function createAuthHandler({ database, bootstrapToken }) {
-  initializeBootstrapToken(database, bootstrapToken);
-  const limiter = createLoginLimiter();
-  let dummyPasswordHash;
+function createAuthHandler({ database }) {
+  database.prepare("DELETE FROM server_config WHERE key = 'bootstrap_token_sha256'").run();
 
   return async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -211,25 +120,17 @@ function createAuthHandler({ database, bootstrapToken }) {
 
       if (route === "GET /api/auth/status") {
         const accountCount = database.prepare("SELECT COUNT(*) AS count FROM accounts").get().count;
-        const bootstrapAvailable = Boolean(database.prepare("SELECT value FROM server_config WHERE key = 'bootstrap_token_sha256'").get());
-        return sendJson(response, 200, { setupRequired: accountCount === 0 && bootstrapAvailable });
+        return sendJson(response, 200, { setupRequired: accountCount === 0 });
       }
 
       if (route === "POST /api/auth/bootstrap") {
         const body = await readJsonBody(request);
         const username = normalizeUsername(body.username);
-        const password = validatePassword(body.password);
-        const tokenHash = database.prepare("SELECT value FROM server_config WHERE key = 'bootstrap_token_sha256'").get()?.value;
-        if (!safeHexEqual(tokenHash, sha256(typeof body.bootstrapToken === "string" ? body.bootstrapToken : ""))) {
-          throw new HttpError(401, "Bootstrap authorization failed.");
-        }
-        const passwordHash = await hashPassword(password);
+        const passwordHash = `unused$${randomBytes(32).toString("hex")}`;
         const accountId = randomUUID();
         database.exec("BEGIN IMMEDIATE");
         try {
           if (database.prepare("SELECT COUNT(*) AS count FROM accounts").get().count !== 0) throw new HttpError(409, "Initial account setup is already complete.");
-          const currentTokenHash = database.prepare("SELECT value FROM server_config WHERE key = 'bootstrap_token_sha256'").get()?.value;
-          if (!safeHexEqual(currentTokenHash, sha256(body.bootstrapToken))) throw new HttpError(401, "Bootstrap authorization failed.");
           const now = new Date().toISOString();
           database.prepare(`INSERT INTO accounts (id, login_identifier, password_hash, created_at, updated_at, global_role)
             VALUES (?, ?, ?, ?, ?, 'gm')`).run(accountId, username, passwordHash, now, now);
@@ -245,64 +146,24 @@ function createAuthHandler({ database, bootstrapToken }) {
       }
 
       if (route === "POST /api/auth/login") {
-        const ip = request.socket.remoteAddress || "unknown";
         const now = Date.now();
-        if (limiter.isBlocked(ip, now)) throw new HttpError(429, "Too many login attempts. Try again later.");
         const body = await readJsonBody(request);
-        if (typeof body.username !== "string" || typeof body.password !== "string") throw new HttpError(401, "Invalid username or password.");
+        if (typeof body.username !== "string") throw new HttpError(401, "Invalid username.");
         const username = body.username.toLowerCase();
-        const account = database.prepare(`SELECT id, login_identifier, password_hash, disabled, global_role, must_change_password
+        const account = database.prepare(`SELECT id, login_identifier, disabled, global_role
           FROM accounts WHERE login_identifier = ?`).get(username);
-        if (!dummyPasswordHash) dummyPasswordHash = hashPassword(randomBytes(32).toString("hex"));
-        const passwordHash = account?.password_hash || await dummyPasswordHash;
-        const passwordMatches = await verifyPassword(body.password, passwordHash);
-        if (!account || account.disabled || !passwordMatches) {
-          limiter.fail(ip, now);
-          throw new HttpError(401, "Invalid username or password.");
+        if (!account || account.disabled) {
+          throw new HttpError(401, "Invalid username.");
         }
-        limiter.clear(ip);
         database.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(new Date(now).toISOString());
         const session = createSession(database, account.id, now);
         setSessionCookie(response, session.token);
         return sendJson(response, 200, {
           authenticated: true,
           homePath: getAccountHomePath(database, account.id),
-          mustChangePassword: Boolean(account.must_change_password),
-          account: { id: account.id, username: account.login_identifier, role: account.global_role, mustChangePassword: Boolean(account.must_change_password) }
+          mustChangePassword: false,
+          account: { id: account.id, username: account.login_identifier, role: account.global_role, mustChangePassword: false }
         });
-      }
-
-      if (route === "POST /api/auth/change-password") {
-        const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
-        const account = getAuthenticatedAccount(database, token);
-        if (!account) throw new HttpError(401, "Sign in before changing your password.");
-        const body = await readJsonBody(request);
-        const currentPassword = validatePassword(body.currentPassword);
-        const newPassword = validatePassword(body.newPassword);
-        const stored = database.prepare("SELECT password_hash FROM accounts WHERE id = ? AND disabled = 0").get(account.id);
-        if (!stored || !(await verifyPassword(currentPassword, stored.password_hash))) {
-          throw new HttpError(401, "Current password is incorrect.");
-        }
-        if (currentPassword === newPassword) throw new HttpError(400, "Choose a password different from the temporary password.");
-        const passwordHash = await hashPassword(newPassword);
-        database.exec("BEGIN IMMEDIATE");
-        try {
-          const now = new Date().toISOString();
-          database.prepare(`UPDATE accounts SET password_hash = ?, must_change_password = 0, updated_at = ?
-            WHERE id = ? AND disabled = 0`).run(passwordHash, now, account.id);
-          database.prepare("DELETE FROM sessions WHERE account_id = ?").run(account.id);
-          const session = createSession(database, account.id);
-          database.exec("COMMIT");
-          setSessionCookie(response, session.token);
-          return sendJson(response, 200, {
-            authenticated: true,
-            homePath: getAccountHomePath(database, account.id),
-            account: { id: account.id, username: account.username, role: account.role, mustChangePassword: false }
-          });
-        } catch (error) {
-          database.exec("ROLLBACK");
-          throw error;
-        }
       }
 
       if (route === "GET /api/auth/session") {
@@ -329,4 +190,4 @@ function createAuthHandler({ database, bootstrapToken }) {
   };
 }
 
-module.exports = { createAuthHandler, getAuthenticatedAccount, getAccountHomePath, parseCookies, hashPassword, generateTemporaryPassword };
+module.exports = { createAuthHandler, getAuthenticatedAccount, getAccountHomePath, parseCookies };

@@ -22,10 +22,9 @@ git status --short
 npm ci
 ```
 
-For a new local database, configure the one-time GM bootstrap token before starting:
+For a new local database, start the service and create the first GM username in the browser:
 
 ```powershell
-$env:FIELDBOOK_BOOTSTRAP_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
 node server\main.cjs
 ```
 
@@ -39,7 +38,7 @@ Default listeners:
 The service binds to `0.0.0.0` by default. HTTP is for a trusted LAN only, not the internet or untrusted networks.
 `FIELDBOOK_HOST`, `FIELDBOOK_GM_PORT`, and `FIELDBOOK_PLAYER_PORT` override listeners. Explicit `FIELDBOOK_PORT` enables the legacy single-port mode only when neither role-specific port is set.
 `FIELDBOOK_DB_PATH` selects the database; the default is `data/fieldbook.sqlite`. Do not use a shared live database for tests.
-Authentication remains required; use disposable isolated fixtures for review rather than production bypasses.
+Login requires only a username; anyone with server access can impersonate any GM or player. Use disposable isolated fixtures for review.
 
 ## Current Architecture And Handoff
 

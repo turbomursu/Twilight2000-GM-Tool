@@ -91,17 +91,8 @@ if not exist "data\maps\atlas" mkdir data\maps\atlas
 echo       ✓ Created /data directory for campaigns
 echo       ✓ Created /data/maps/atlas for image and PMTiles assets
 
-REM Create a cryptographically random bootstrap token and persist it for future terminals.
 echo.
-echo [6/6] Creating the first-run GM bootstrap token...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $bytes=New-Object byte[] 32; $rng=[Security.Cryptography.RandomNumberGenerator]::Create(); try{$rng.GetBytes($bytes)}finally{$rng.Dispose()}; $token=[Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_'); [IO.File]::WriteAllText((Join-Path $PWD 'token.txt'),$token,[Text.Encoding]::ASCII); [Environment]::SetEnvironmentVariable('FIELDBOOK_BOOTSTRAP_TOKEN',$token,'User')"
-if errorlevel 1 (
-    echo ERROR: Could not create or save the bootstrap token.
-    pause
-    exit /b 1
-)
-echo       ✓ Saved bootstrap token to %CD%\token.txt
-echo       ✓ Configured FIELDBOOK_BOOTSTRAP_TOKEN for future terminals
+echo [6/6] Username-only access configured for trusted networks.
 
 echo.
 echo ========================================
@@ -109,10 +100,10 @@ echo  INSTALLATION COMPLETE
 echo ========================================
 echo.
 echo Next steps:
-echo   1. Open a new terminal, then run: npm start
-echo      (A new terminal loads the saved bootstrap-token environment variable)
+echo   1. Run: npm start
 echo   2. Open GM browser to http://localhost:8081 ^(players use port 8080^)
-echo   3. Enter the token saved in token.txt and create the GM account
+echo   3. Create the first GM username in the browser
+echo   Anyone with server access can use any username. Use a trusted LAN only.
 echo.
 echo For detailed setup instructions, see:
 echo   - INSTALLATION.md

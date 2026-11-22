@@ -47,13 +47,13 @@ npm start
 
 ### 4. Open in Browser
 ```
-http://localhost:8080
+http://localhost:8081
 ```
 
-Enter the bootstrap token from `token.txt` and create the GM account.
+Create the first GM username.
 
-### 5. Player Passwords
-GM-created player accounts receive a temporary password. Players must replace it at first sign-in before accessing campaign pages or APIs.
+### 5. Username Access
+Players and GMs sign in by username only. Anyone with server access can impersonate any account, so use only on a trusted LAN.
 
 ---
 

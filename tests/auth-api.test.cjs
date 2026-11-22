@@ -80,21 +80,14 @@ test("starts shared player and GM services on separate ports", async (t) => {
 
 test("bootstraps one GM account, authenticates sessions, and logs out", async (t) => {
   const { origin, database } = await startTestServer(t);
-  const rejectedBootstrap = await postJson(`${origin}/api/auth/bootstrap`, {
-    bootstrapToken: "incorrect-token-that-is-long-enough",
-    username: "gm-user",
-    password
-  });
-  assert.equal(rejectedBootstrap.status, 401);
-
-  const bootstrap = await postJson(`${origin}/api/auth/bootstrap`, { bootstrapToken, username: "GM.User", password });
+  const bootstrap = await postJson(`${origin}/api/auth/bootstrap`, { username: "GM.User" });
   assert.equal(bootstrap.status, 201);
   const bootstrapBody = await bootstrap.json();
   assert.equal(bootstrapBody.authenticated, true);
   assert.deepEqual(bootstrapBody.account, { id: bootstrapBody.account.id, username: "gm.user", role: "gm" });
   assert.equal(Object.hasOwn(bootstrapBody.account, "password_hash"), false);
   const storedPasswordHash = database.prepare("SELECT password_hash FROM accounts WHERE id = ?").get(bootstrapBody.account.id).password_hash;
-  assert.match(storedPasswordHash, /^scrypt\$32768\$/);
+  assert.match(storedPasswordHash, /^unused\$/);
   assert.notEqual(storedPasswordHash, password);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM server_config").get().count, 0);
 
@@ -104,14 +97,12 @@ test("bootstraps one GM account, authenticates sessions, and logs out", async (t
   assert.match(bootstrapCookie, /SameSite=Strict/);
 
   const repeatedBootstrap = await postJson(`${origin}/api/auth/bootstrap`, { bootstrapToken, username: "other-user", password });
-  assert.equal(repeatedBootstrap.status, 401);
+  assert.equal(repeatedBootstrap.status, 409);
 
-  const invalidLogin = await postJson(`${origin}/api/auth/login`, { username: "gm.user", password: "wrong password" });
+  const invalidLogin = await postJson(`${origin}/api/auth/login`, { username: "unknown" });
   assert.equal(invalidLogin.status, 401);
-  const suffixedPasswordLogin = await postJson(`${origin}/api/auth/login`, { username: "gm.user", password: `${password}extra` });
-  assert.equal(suffixedPasswordLogin.status, 401);
 
-  const login = await postJson(`${origin}/api/auth/login`, { username: "GM.USER", password });
+  const login = await postJson(`${origin}/api/auth/login`, { username: "GM.USER" });
   assert.equal(login.status, 200);
   const loginCookie = login.headers.get("set-cookie").split(";")[0];
   const sessionToken = loginCookie.slice(loginCookie.indexOf("=") + 1);
@@ -131,28 +122,13 @@ test("bootstraps one GM account, authenticates sessions, and logs out", async (t
   assert.equal(expiredSession.status, 401);
 });
 
-test("accepts passwords of eight characters and rejects shorter passwords", async (t) => {
+test("first-run setup validates usernames without requiring a password", async (t) => {
   const { origin } = await startTestServer(t);
-  const tooShortBootstrap = await postJson(`${origin}/api/auth/bootstrap`, {
-    bootstrapToken, username: "gm-user", password: "shortpw"
-  });
-  assert.equal(tooShortBootstrap.status, 400);
-
-  const bootstrap = await postJson(`${origin}/api/auth/bootstrap`, {
-    bootstrapToken, username: "gm-user", password: "password"
-  });
+  const invalidBootstrap = await postJson(`${origin}/api/auth/bootstrap`, { username: "x" });
+  assert.equal(invalidBootstrap.status, 400);
+  const bootstrap = await postJson(`${origin}/api/auth/bootstrap`, { username: "gm-user" });
   assert.equal(bootstrap.status, 201);
-  const cookie = bootstrap.headers.get("set-cookie").split(";")[0];
-
-  const tooShortChange = await postJson(`${origin}/api/auth/change-password`, {
-    currentPassword: "password", newPassword: "shortpw"
-  }, { Cookie: cookie });
-  assert.equal(tooShortChange.status, 400);
-
-  const change = await postJson(`${origin}/api/auth/change-password`, {
-    currentPassword: "password", newPassword: "passw0rd"
-  }, { Cookie: cookie });
-  assert.equal(change.status, 200);
+  assert.equal((await postJson(`${origin}/api/auth/login`, { username: "gm-user" })).status, 200);
 });
 
 test("rejects cross-origin authentication mutations", async (t) => {
