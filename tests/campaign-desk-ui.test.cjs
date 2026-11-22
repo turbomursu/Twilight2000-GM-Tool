@@ -2,9 +2,30 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const test = require("node:test");
-const { Script } = require("node:vm");
+const { Script, runInNewContext } = require("node:vm");
 
 const dashboard = readFileSync(join(__dirname, "..", "index.html"), "utf8");
+
+test("weather die reports unavailable browser randomness and otherwise fills the die", () => {
+  const handler = dashboard.match(/document\.getElementById\("roll-weather-d6"\)\.addEventListener\("click", \(\) => \{([\s\S]*?)\n {6}\}\);/);
+  assert.ok(handler);
+  const run = (crypto) => {
+    const weatherRollStatus = {};
+    const weatherD6Result = { value: "" };
+    let updated = false;
+    runInNewContext(`(() => {${handler[1]}\n})()`, {
+      crypto, weatherRollStatus, weatherD6Result,
+      updateWeatherRollAvailability: () => { updated = true; }
+    });
+    return { weatherRollStatus, weatherD6Result, updated };
+  };
+  const unavailable = run(undefined);
+  assert.match(unavailable.weatherRollStatus.textContent, /unavailable.*physical d6/);
+  assert.equal(unavailable.weatherD6Result.value, "");
+  const available = run({ getRandomValues: (buffer) => { buffer[0] = 5; } });
+  assert.equal(available.weatherD6Result.value, "6");
+  assert.equal(available.updated, true);
+});
 
 test("campaign desk navigation items are in numerical order", () => {
   const nav = dashboard.match(/<nav class="nav-list" aria-label="Views">([\s\S]*?)<\/nav>/);

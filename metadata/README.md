@@ -213,7 +213,7 @@ Backups include clock HH:MM, reserves, and `dailySupplyUsage`, plus clock/midday
 
 ### Strategic Weather Rolls And Duration
 
-In **Movement → Weather log**, record the physical d6 result (or use **Roll d6 for me**, which only fills the d6 field) and the outcome follows automatically: 1 worsens, 6 improves, 2–5 no change (GM-supplied mapping; 2–5 is assumed, verify against Player's Manual p. 139). Only Fair, Cloudy, and Rain/Snow use the verified progression. GM-defined conditions remain manual.
+In **Movement → Weather log**, record the physical d6 result (or use **Roll d6 for me**, which only fills the d6 field) and the outcome follows automatically: 1 worsens, 6 improves, 2–5 no change (GM-supplied mapping; the GM confirmed 2–5 from Player's Manual p. 139). Only Fair, Cloudy, and Rain/Snow use the verified progression. GM-defined conditions remain manual.
 
 `POST /api/campaigns/:id/weather-roll` accepts `{ "expectedRevision": 3, "roll": 1 }`. The optional `outcome` (`improves`, `worsens`, `holds`) must match the d6 mapping or the request is rejected. The owning GM's server validates the d6 and outcome, applies at most one roll per campaign shift, and records the result in the GM journal and audit history. Stale or duplicate attempts return `409`; invalid input returns `422`.
 
@@ -258,5 +258,5 @@ The product has three connected surfaces: a GM-operated Campaign Setup Tool, a G
 
 ### Game Day Loop
 
-Open **Day loop** in the campaign desk. It lists the eight phases of one shift in order (start shift, weather, assign tasks, resolve tasks, travel, encounters, record, advance), shows a short instruction for the current phase, and links to the related view. Use **Phase done � next** to move on; the last phase advances the clock six hours and restarts the loop at the next shift. Progress is kept in this browser only and does not resolve any rolls.
+Open **Day loop** in the campaign desk. It lists the eight phases of one shift in order (start shift, weather, assign tasks, resolve tasks, travel, encounters, record, advance), shows a short instruction for the current phase, and links to the related view. Use **Phase done — next** to move on; the last phase advances the clock six hours and restarts the loop at the next shift. Progress is kept in this browser only and does not resolve any rolls.
 

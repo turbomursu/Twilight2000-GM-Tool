@@ -24,9 +24,11 @@ test("weather d6 result maps 1 to worsens and 6 to improves; 2-5 hold", () => {
   assert.deepEqual(resolveWeatherRoll("Cloudy", 6), {
     roll: 6, previousWeather: "Cloudy", weather: "Fair", direction: "improves", changed: true
   });
-  assert.deepEqual(resolveWeatherRoll("Cloudy", 4), {
-    roll: 4, previousWeather: "Cloudy", weather: "Cloudy", direction: "holds", changed: false
-  });
+  for (const roll of [2, 3, 4, 5]) {
+    assert.deepEqual(resolveWeatherRoll("Cloudy", roll), {
+      roll, previousWeather: "Cloudy", weather: "Cloudy", direction: "holds", changed: false
+    });
+  }
   assert.deepEqual(resolveWeatherRoll("Cloudy", 1, "worsens"), {
     roll: 1, previousWeather: "Cloudy", weather: "Rain/Snow", direction: "worsens", changed: true
   });

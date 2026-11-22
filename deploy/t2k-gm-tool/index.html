@@ -1280,7 +1280,7 @@
                     <label class="field" id="weather-custom-field" for="weather-custom-label" hidden><span class="eyebrow">GM-defined condition</span><input id="weather-custom-label" maxlength="80" placeholder="Describe the condition"></label>
                     <div class="weather-effects" role="note"><span class="eyebrow">Fourth Edition effects / reference</span><p id="weather-effects-copy"></p><span class="inline-hint">T2K Referee Aid, Strategic Play; Player's Manual p. 139. Effects remain GM-adjudicated.</span></div>
                     <div class="weather-roll-control">
-                      <span class="inline-hint">At shift start, roll a d6 (physical, or "Roll d6 for me"). GM-supplied mapping: 1 worsens the weather, 6 improves it; 2–5 leaving it unchanged is assumed. Verify against Player's Manual p. 139.</span>
+                      <span class="inline-hint">At shift start, roll a d6 (physical, or "Roll d6 for me"). GM-supplied mapping: 1 worsens the weather, 6 improves it; 2–5 leaves it unchanged (Player's Manual p. 139, GM-confirmed).</span>
                       <div class="weather-roll-inputs">
                         <label class="field" for="weather-d6-result"><span class="eyebrow">D6 result</span><input id="weather-d6-result" type="number" min="1" max="6" step="1" inputmode="numeric" required></label>
                         <label class="field" for="weather-roll-outcome"><span class="eyebrow">Weather outcome</span><select id="weather-roll-outcome" disabled><option value="">Enter a d6 result</option><option value="improves">Weather improves</option><option value="worsens">Weather worsens</option><option value="holds">No change</option></select></label>
@@ -4831,9 +4831,14 @@ Military rank || optional</textarea><span class="row-description">One field per 
       });
       weatherCustomLabel.addEventListener("input", updateWeatherRollAvailability);
       document.getElementById("roll-weather-d6").addEventListener("click", () => {
+        if (!globalThis.crypto?.getRandomValues) {
+          weatherRollStatus.className = "feedback error";
+          weatherRollStatus.textContent = "Secure browser randomness is unavailable; enter a physical d6 result.";
+          return;
+        }
         const buffer = new Uint32Array(1);
         let value;
-        do { crypto.getRandomValues(buffer); value = buffer[0]; } while (value >= 4294967292);
+        do { globalThis.crypto.getRandomValues(buffer); value = buffer[0]; } while (value >= 4294967292);
         weatherD6Result.value = String((value % 6) + 1);
         updateWeatherRollAvailability();
       });

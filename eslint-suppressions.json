@@ -42,7 +42,7 @@
   },
   "server/combat-api.cjs": {
     "no-unused-vars": {
-      "count": 13
+      "count": 5
     }
   },
   "server/combat-log.cjs": {

@@ -384,7 +384,7 @@ Used during campaign travel between major encounters
 
 2. **Roll for Weather Change**
    - Roll 1D6 and apply the matching weather symbol shown in the Strategic Play Referee Aid
-   - GM-supplied mapping (verify against Player's Manual p. 139): 1 worsens, 6 improves, 2–5 no change (assumed); the tool derives the outcome from the d6
+   - GM-supplied mapping: 1 worsens, 6 improves, 2–5 no change (the latter GM-confirmed from Player's Manual p. 139); the tool derives the outcome from the d6
    - Use cited visibility, ranged-attack, marching Stamina, and driving guidance for GM adjudication; do not infer blanket terrain modifiers
 
 ### Per-Participant Tasks
