@@ -4468,6 +4468,12 @@ Military rank || optional</textarea><span class="row-description">One field per 
           button.disabled = false;
         }
       });
+      const usersEntryUrl = new URL(window.location.href);
+      if (usersEntryUrl.searchParams.get("open") === "users") {
+        usersEntryUrl.searchParams.delete("open");
+        window.history.replaceState(null, "", usersEntryUrl);
+        document.getElementById("open-users-dialog").click();
+      }
 
       async function refreshPlayerSeedRoster(campaignId) {
         playerSeedRosterList.textContent = "Loading assigned players…";

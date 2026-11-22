@@ -42,6 +42,9 @@ input { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(
 .submit-button { display: flex; align-items: center; justify-content: space-between; min-height: 42px; margin-top: 12px; padding: 0 13px; border: 1px solid #263a30; border-radius: 2px; color: #fff; background: linear-gradient(180deg, #40594b, #2d4338); font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
 .submit-button:hover { background: linear-gradient(180deg, #4a6654, #344c3e); }
 .submit-button:disabled { cursor: wait; opacity: .7; }
+.secondary-button { min-height: 40px; margin-top: 4px; padding: 0 13px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: #e2e7df; font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+.secondary-button:hover { border-color: #758579; background: #f0f2ec; }
+.secondary-button[hidden] { display: none; }
 .auth-feedback { min-height: 18px; margin: 12px 0 0; color: #9b4136; font-size: 11px; line-height: 1.45; }
 .auth-feedback.success { color: #356044; }
 .auth-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px 14px; margin-top: 20px; padding-top: 12px; border-top: 1px solid #c5cec4; color: var(--muted); font: 8px "Cascadia Mono", "Courier New", monospace; }
